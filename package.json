@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "Play chess against an AI with a character, and learn with an AI coach: Chesspal keeps the rules, the board, the games and the memory; the AI plays, reasons and talks.",
   "type": "module",
+  "bin": {
+    "chesspal": "dist/cli/cli.js"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -52,5 +55,9 @@
     "eslint": "^10.14.0",
     "typescript": "^6.0.3",
     "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
   }
 }
