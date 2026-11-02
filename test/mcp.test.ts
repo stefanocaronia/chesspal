@@ -33,11 +33,13 @@ describe("the MCP server", () => {
         await client?.close();
     });
 
-    it("offers every command as a tool, with its description", async () => {
+    it("offers every command as a tool, with its description, but those of the command line alone", async () => {
         const { tools } = await (await connect()).listTools();
+        const offered = commands.filter((command) => command.cliOnly !== true);
 
-        expect(tools.map((tool) => tool.name)).toEqual(commands.map((command) => command.name));
-        expect(tools[0]?.description).toBe(commands[0]?.description);
+        expect(tools.map((tool) => tool.name)).toEqual(offered.map((command) => command.name));
+        expect(tools[0]?.description).toBe(offered[0]?.description);
+        expect(tools.map((tool) => tool.name)).not.toContain("init");
     });
 
     it("sends the host to status, keeps the board out of the AI's head, and loads status at once", async () => {

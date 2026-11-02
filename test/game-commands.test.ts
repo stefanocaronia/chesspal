@@ -28,7 +28,8 @@ describe("a game in chat", () => {
             /^Player: 1\.e4 \(e2-e4\)\.\nYou \(Black\) to move, move 1\.\nFEN: rnbqkbnr\/pppppppp\/8\/8\/4P3\/8\/PPPP1PPP\/RNBQKBNR b KQkq - 0 1\nAttacked pieces: none\n(?:.*\n){4}Legal by piece \(20\): Nb8 \(2\) Nc6 Na6; .* Ph7 \(2\) h6 h5; no moves: Ke8 Qd8 Ra8 Rh8 Bc8 Bf8\nNext: choose your move/,
         );
         expect(await run(context, "ai_move", { move: "e5", plan: "Develop the knights, then castle.", comment: "The open game." })).toBe(
-            "Played 1...e5.\nPlayer (White) to move, move 2.\nNext: wait for the player's move, then call player_move with it.",
+            "Played 1...e5.\nPlayer (White) to move, move 2.\nBoard, to copy into your message for the player:\n  a b c d e f g h\n8 r n b q k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n"
+                + "5 . . . . p . . . 5\n4 . . . . P . . . 4\n3 . . . . . . . . 3\n2 P P P P . P P P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\nNext: wait for the player's move, then call player_move with it.",
         );
         expect(await run(context, "player_move", { move: "g1f3" })).toContain("\nPlan: Develop the knights, then castle.\n");
 
@@ -121,7 +122,7 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "g4" });
 
         expect(await run(context, "ai_move", { move: "Qh4#", plan: "Mate.", comment: "c" })).toMatch(
-            /^Played 2\.\.\.Qh4#\.\nGame over: 0-1, checkmate\.\nChesspal could not archive the game: .*games could not be made \(.+\): check that it is a folder, and can be written\. The game is saved in game\.json: it goes to the archive when a new game starts\.\nNext: /,
+            /^Played 2\.\.\.Qh4#\.\nGame over: 0-1, checkmate\.\nChesspal could not archive the game: .*games could not be made \(.+\): check that it is a folder, and can be written\. The game is saved in game\.json: it goes to the archive when a new game starts\.\nBoard, to copy into your message for the player:\n[\s\S]*\nNext: /,
         );
         expect(await run(context, "status")).toContain("Game over: 0-1, checkmate.\nNext: ");
         await expect(run(context, "new_game", { ai_colour: "white" })).rejects.toThrow(/^Chesspal could not archive the game: .* Nothing changed\.$/);
@@ -185,6 +186,8 @@ describe("a game in chat", () => {
 
         expect(await run(context, "ai_move", { move: "Qh4+", plan: "Mate.", comment: "The fool's mate." })).toBe(
             `Played 2...Qh4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Archived in ${archive}.\n`
+                + "Board, to copy into your message for the player:\n  a b c d e f g h\n8 r n b . k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n5 . . . . p . . . 5\n"
+                + "4 . . . . . . P q 4\n3 . . . . . P . . 3\n2 P P P P P . . P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\n"
                 + "Next: tell the player how the game ended; new_game starts another.",
         );
         expect(readArchive(context)).toContain('[Result "0-1"]\n[Termination "checkmate"]');

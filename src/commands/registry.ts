@@ -16,6 +16,8 @@ export interface Command<Schema extends z.ZodObject = z.ZodObject, Result = unkn
     idempotent?: boolean;
     /** Hosts load the tool at once instead of on demand: for the ones the AI calls at the start of every chat. */
     alwaysLoad?: boolean;
+    /** Only the command line has it, as init: the MCP server leaves it out, and its description costs the AI no tokens. */
+    cliOnly?: boolean;
     /** Fields the command line takes as positional arguments, in order. */
     positionals?: Extract<keyof Schema["shape"], string>[];
     /** Returns a value, never prints: the MCP server speaks on stdout, and only the command line writes there. */

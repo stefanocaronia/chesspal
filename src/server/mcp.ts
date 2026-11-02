@@ -16,7 +16,7 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
 {
     const server = new McpServer({ name: "chesspal", version }, { instructions: serverInstructions });
 
-    for (const command of list) {
+    for (const command of list.filter((each) => each.cliOnly !== true)) {
         server.registerTool(command.name, toolConfig(command), (input: unknown) => track(runTool(command, input, context)));
     }
 

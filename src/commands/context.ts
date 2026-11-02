@@ -7,10 +7,12 @@ export interface Context
     random: () => number;
     /** The time now: when a game starts. */
     now: () => Date;
+    /** The operating system, as process.platform names it: how a host starts the server. */
+    platform: string;
 }
 
 /** The context of a process started in the player's folder. */
 export function defaultContext(): Context
 {
-    return { folder: process.cwd(), random: Math.random, now: () => new Date() };
+    return { folder: process.cwd(), random: Math.random, now: () => new Date(), platform: process.platform };
 }
