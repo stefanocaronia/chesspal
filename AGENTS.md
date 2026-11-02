@@ -24,3 +24,4 @@ Portraits: in the look of 1980s–90s TV anime, head and shoulders on a plain ba
 - **Rounds**: when a step of the plan is done, a feature finished or a playtest played, Claude runs a review round with the colleagues the work touches (the crew skill), before calling the step done.
 - **Tasks**: when a question or a check falls in a colleague's field and needs more than a glance, Claude gives it to them as a subagent, within the permissions of their `tools`.
 - **Never an engine**: no colleague proposes Stockfish or any other chess engine, not even as an option (D-6).
+- **Ideas wait**: until phase 1 is playable, a new idea goes into `project/IDEE.md` and is discussed at the end of the phase; only one that touches the next work becomes a decision at once (D-33).
