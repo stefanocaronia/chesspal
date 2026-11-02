@@ -1,0 +1,18 @@
+node_modules/
+dist/
+tmp/
+
+# Local tooling
+/.codegraph/
+/.obsidian/
+/.claude
+/.codex/
+/.gemini/
+/.agents/
+
+# Secrets never go in the repo
+.env
+.env.*
+
+# The private repo: project docs and the colleagues (.claude links into it)
+/project/
