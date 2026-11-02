@@ -8,13 +8,14 @@ import { play, testContext } from "./commands.ts";
 const context = testContext();
 
 describe("the command line", () => {
-    it("lists the commands and mcp, each with the first sentence of its description", async () => {
+    it("lists the commands, mcp and listen, each with the first sentence of its description", async () => {
         const { output, exitCode } = await runCommandLine([], context);
 
         expect(exitCode).toBe(0);
         expect(output).toContain(`chesspal ${version}`);
         expect(output).toMatch(/ {2}status +Shows what Chesspal sees now: its version, the player's folder and the game, with your next step\.\n/);
         expect(output).toMatch(/ {2}mcp +Start the MCP server for an AI host\.\n/);
+        expect(output).toMatch(/ {2}listen +Wait for the player's move on the board page and wake the chat\.\n/);
     });
 
     it("says its version", async () => {
@@ -43,9 +44,11 @@ describe("the command line", () => {
         expect(option).toEqual({ output: "status has no parameter --colour. Nothing changed.\nUsage: chesspal status [options]\nRun `chesspal status --help` for its options.", exitCode: 1 });
     });
 
-    it("refuses options after mcp, which a host would read as the protocol", async () => {
+    it("refuses options after mcp and listen, which a host starts as they are", async () => {
         expect((await runCommandLine(["mcp", "--stdio"], context)).exitCode).toBe(1);
         expect((await runCommandLine(["mcp", "--help"], context)).exitCode).toBe(0);
+        expect((await runCommandLine(["listen", "--port", "5870"], context)).exitCode).toBe(1);
+        expect((await runCommandLine(["listen", "--help"], context)).exitCode).toBe(0);
     });
 });
 

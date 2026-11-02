@@ -11,8 +11,9 @@ export interface CommandLineResult
     exitCode: number;
 }
 
-// The one command that exists only on the command line: cli.ts starts the server when it comes alone.
+// The commands that exist only on the command line: cli.ts starts the server, or the doorbell, when one comes alone.
 const mcpDescription = "Start the MCP server for an AI host. Through it the host uses these commands as tools; the host starts it, with no options.";
+const listenDescription = "Wait for the player's move on the board page and wake the chat. Claude Code starts it at the end of each turn, as init sets it up.";
 
 /** The `chesspal` command line: finds the command, validates its input, runs it and renders the result. */
 export async function runCommandLine(argv: string[], context: Context = defaultContext(), list: AnyCommand[] = commands): Promise<CommandLineResult>
@@ -31,6 +32,11 @@ export async function runCommandLine(argv: string[], context: Context = defaultC
         // A host that adds options to it would get this text instead of the protocol: it must see the failure.
         const help = `chesspal mcp\n\n${mcpDescription}`;
         return args.length === 0 || args.includes("--help") || args.includes("-h") ? success(help) : failure(`chesspal mcp takes no options: ${args.join(" ")}.\n\n${help}`);
+    }
+
+    if (commandName === "listen") {
+        const help = `chesspal listen\n\n${listenDescription}`;
+        return args.length === 0 || args.includes("--help") || args.includes("-h") ? success(help) : failure(`chesspal listen takes no options: ${args.join(" ")}.\n\n${help}`);
     }
 
     const command = list.find((candidate) => candidate.name === commandName);
@@ -183,7 +189,7 @@ function inputFields(command: AnyCommand): [string, z.ZodType][]
 /** The commands, each with the first sentence of its description. */
 function generalHelp(list: AnyCommand[]): string
 {
-    const width = Math.max("mcp".length, ...list.map((command) => command.name.length));
+    const width = Math.max("listen".length, ...list.map((command) => command.name.length));
     const line = (name: string, description: string): string => `  ${name.padEnd(width)} ${firstSentence(description)}`;
     return [
         `chesspal ${version}`,
@@ -191,6 +197,7 @@ function generalHelp(list: AnyCommand[]): string
         "Commands:",
         ...list.map((command) => line(command.name, command.description)),
         line("mcp", mcpDescription),
+        line("listen", listenDescription),
         "",
         "Run `chesspal <command> --help` for its options.",
     ].join("\n");

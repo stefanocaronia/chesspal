@@ -8,8 +8,8 @@ import { defineCommand } from "./registry.ts";
 /** The AI's move, with its plan, kept hidden (D-29), and its comment for the player (D-12, D-36): a short answer, since the player moves next. */
 export const aiMove = defineCommand({
     name: "ai_move",
-    description: "Plays your move, with your plan, hidden from the player, and your comment on it for them. It answers with the board, for you to copy into your "
-        + "message to the player. "
+    description: "Plays your move, with your plan, hidden from the player, and your comment on it for them. It answers with the board, for your message when the player "
+        + "plays in the chat. "
         + 'Example: ai_move {move: "d5", plan: "After exd5 Na5, chase the bishop on c4.", comment: "d5 shuts the bishop out of f7."}.',
     input: z.object({
         move: z.string().min(1).describe("your move, in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q)"),
@@ -22,7 +22,7 @@ export const aiMove = defineCommand({
     format: (result) => {
         // The board goes before the next step, which stays the last line.
         const lines = moveLines(result);
-        return [`Played ${result.move}.`, ...lines.slice(0, -1), "Board, to copy into your message for the player:", boardText(result.game.fen), ...lines.slice(-1)].join("\n");
+        return [`Played ${result.move}.`, ...lines.slice(0, -1), "Board, for your message when the player plays in the chat:", boardText(result.game.fen), ...lines.slice(-1)].join("\n");
     },
 });
 

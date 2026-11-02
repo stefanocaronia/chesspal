@@ -6,6 +6,8 @@ import { type Context, defaultContext } from "../commands/context.ts";
 import { commands } from "../commands/index.ts";
 import { type AnyCommand, inputProblems, isBoolean } from "../commands/registry.ts";
 import { version } from "../version.ts";
+import { pagePorts } from "./bell.ts";
+import { startPage } from "./page.ts";
 
 /** What the host reads as the server starts, before any tool: where to begin, and the rule of every move (D-27). Short, since hosts may cut it. */
 export const serverInstructions = "Chesspal keeps the chess for you: the rules, the board, the clock, the games and the player's memory. Call `status` at the start of every "
@@ -38,7 +40,33 @@ export async function startMcpServer(context: Context = defaultContext(), list: 
 
     process.stdin.on("end", leave);
     process.stdin.on("close", leave);
-    await createMcpServer(context, list).connect(new StdioServerTransport());
+    const server = createMcpServer(context, list);
+    context.page = await pageOf(context.folder, () => opponentOf(server.server.getClientVersion()?.name));
+    await server.connect(new StdioServerTransport());
+}
+
+/** The opponent's name for the page, from the host's: Claude Code and the desktop app are Claude, Codex is Codex; another host is unnamed. */
+export function opponentOf(host: string | undefined): string | undefined
+{
+    return /claude/i.test(host ?? "") ? "Claude" : /codex/i.test(host ?? "") ? "Codex" : undefined;
+}
+
+/** The board page of the player's folder, served by this process for as long as the chat lasts (D-47); without it the game goes on in the chat. */
+async function pageOf(folder: string, opponent: () => string | undefined): Promise<string | undefined>
+{
+    try {
+        const { url } = await startPage(folder, opponent);
+
+        if (!pagePorts(folder).includes(Number(new URL(url).port))) {
+            process.stderr.write(`The board page is at ${url}, off its usual ports: the doorbell cannot find it, so moves on the page do not wake the chat.\n`);
+        }
+
+        return url;
+    } catch (error) {
+        // The host keeps what the server writes on stderr in its logs.
+        process.stderr.write(`${(error as Error).message}\n`);
+        return undefined;
+    }
 }
 
 // The tool calls still running, which the server waits for before it leaves.

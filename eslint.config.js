@@ -33,6 +33,18 @@ export default [
             }],
         },
     },
+    // The page runs in the browser: it uses the chess core and asks the server for the rest.
+    {
+        files: ["src/page/**/*.ts", "src/page/**/*.tsx"],
+        rules: {
+            "no-restricted-imports": ["error", {
+                patterns: [
+                    { group: ["node:*", ...builtinModules], message: "The page runs in the browser: no Node." },
+                    { regex: "^\\.\\./(?!core/index\\.ts$)", message: "The page imports only its own files and the chess core: the rest it asks the server for." },
+                ],
+            }],
+        },
+    },
     // The games on disk sit below the commands, and print nothing: the MCP server speaks on stdout.
     {
         files: ["src/games/**/*.ts"],

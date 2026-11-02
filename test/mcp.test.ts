@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { createMcpServer, serverInstructions } from "../src/server/mcp.ts";
+import { createMcpServer, opponentOf, serverInstructions } from "../src/server/mcp.ts";
 import { play, testContext } from "./commands.ts";
 
 let client: Client | undefined;
@@ -50,6 +50,13 @@ describe("the MCP server", () => {
         expect(serverInstructions.length).toBeLessThan(512);
         expect(serverInstructions).toContain("Every move goes through Chesspal's tools");
         expect(status?._meta?.["anthropic/alwaysLoad"]).toBe(true);
+    });
+
+    it("names the opponent on the page after the host: Claude, Codex, or no name", () => {
+        expect(opponentOf("claude-code")).toBe("Claude");
+        expect(opponentOf("codex-mcp-client")).toBe("Codex");
+        expect(opponentOf("gemini-cli-mcp-client")).toBeUndefined();
+        expect(opponentOf(undefined)).toBeUndefined();
     });
 
     it("states every hint, since a missing one reads as the worst case", async () => {

@@ -8,6 +8,8 @@ interface Status
 {
     version: string;
     folder: string;
+    /** The board page's address, where the player plays when the chat serves it. */
+    page?: string;
     game?: GameSummary;
     /** Why the game on disk cannot be read, when it cannot. */
     problem?: string;
@@ -24,6 +26,10 @@ export const status = defineCommand({
     run: (_input, context): Status => {
         const status: Status = { version, folder: context.folder };
 
+        if (context.page !== undefined) {
+            status.page = context.page;
+        }
+
         try {
             const current = loadGame(context.folder);
 
@@ -36,7 +42,12 @@ export const status = defineCommand({
 
         return status;
     },
-    format: ({ version, folder, game, problem }) => [`Chesspal ${version}. Folder: ${folder}`, ...(problem === undefined ? gameLines(game) : [problem])].join("\n"),
+    format: ({ version, folder, page, game, problem }) =>
+        [
+            `Chesspal ${version}. Folder: ${folder}`,
+            ...(page === undefined ? [] : [`Board page: ${page}`]),
+            ...(problem === undefined ? gameLines(game) : [problem]),
+        ].join("\n"),
 });
 
 function gameLines(game: GameSummary | undefined): string[]

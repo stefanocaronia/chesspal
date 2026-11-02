@@ -9,6 +9,8 @@ export interface Context
     now: () => Date;
     /** The operating system, as process.platform names it: how a host starts the server. */
     platform: string;
+    /** The address of the board page, when the MCP server serves it (D-47). */
+    page?: string;
 }
 
 /** The context of a process started in the player's folder. */

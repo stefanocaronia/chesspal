@@ -16,5 +16,6 @@
     "types": ["node"],
     "newLine": "lf"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/page"]
 }

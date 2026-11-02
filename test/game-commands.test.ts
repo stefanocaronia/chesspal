@@ -28,7 +28,7 @@ describe("a game in chat", () => {
             /^Player: 1\.e4 \(e2-e4\)\.\nYou \(Black\) to move, move 1\.\nFEN: rnbqkbnr\/pppppppp\/8\/8\/4P3\/8\/PPPP1PPP\/RNBQKBNR b KQkq - 0 1\nAttacked pieces: none\n(?:.*\n){4}Legal by piece \(20\): Nb8 \(2\) Nc6 Na6; .* Ph7 \(2\) h6 h5; no moves: Ke8 Qd8 Ra8 Rh8 Bc8 Bf8\nNext: choose your move/,
         );
         expect(await run(context, "ai_move", { move: "e5", plan: "Develop the knights, then castle.", comment: "The open game." })).toBe(
-            "Played 1...e5.\nPlayer (White) to move, move 2.\nBoard, to copy into your message for the player:\n  a b c d e f g h\n8 r n b q k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n"
+            "Played 1...e5.\nPlayer (White) to move, move 2.\nBoard, for your message when the player plays in the chat:\n  a b c d e f g h\n8 r n b q k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n"
                 + "5 . . . . p . . . 5\n4 . . . . P . . . 4\n3 . . . . . . . . 3\n2 P P P P . P P P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\nNext: wait for the player's move, then call player_move with it.",
         );
         expect(await run(context, "player_move", { move: "g1f3" })).toContain("\nPlan: Develop the knights, then castle.\n");
@@ -122,7 +122,7 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "g4" });
 
         expect(await run(context, "ai_move", { move: "Qh4#", plan: "Mate.", comment: "c" })).toMatch(
-            /^Played 2\.\.\.Qh4#\.\nGame over: 0-1, checkmate\.\nChesspal could not archive the game: .*games could not be made \(.+\): check that it is a folder, and can be written\. The game is saved in game\.json: it goes to the archive when a new game starts\.\nBoard, to copy into your message for the player:\n[\s\S]*\nNext: /,
+            /^Played 2\.\.\.Qh4#\.\nGame over: 0-1, checkmate\.\nChesspal could not archive the game: .*games could not be made \(.+\): check that it is a folder, and can be written\. The game is saved in game\.json: it goes to the archive when a new game starts\.\nBoard, for your message when the player plays in the chat:\n[\s\S]*\nNext: /,
         );
         expect(await run(context, "status")).toContain("Game over: 0-1, checkmate.\nNext: ");
         await expect(run(context, "new_game", { ai_colour: "white" })).rejects.toThrow(/^Chesspal could not archive the game: .* Nothing changed\.$/);
@@ -186,7 +186,7 @@ describe("a game in chat", () => {
 
         expect(await run(context, "ai_move", { move: "Qh4+", plan: "Mate.", comment: "The fool's mate." })).toBe(
             `Played 2...Qh4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Archived in ${archive}.\n`
-                + "Board, to copy into your message for the player:\n  a b c d e f g h\n8 r n b . k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n5 . . . . p . . . 5\n"
+                + "Board, for your message when the player plays in the chat:\n  a b c d e f g h\n8 r n b . k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n5 . . . . p . . . 5\n"
                 + "4 . . . . . . P q 4\n3 . . . . . P . . 3\n2 P P P P P . . P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\n"
                 + "Next: tell the player how the game ended; new_game starts another.",
         );
@@ -246,8 +246,8 @@ describe("a game in chat", () => {
         expect(readFileSync(path, "utf8")).toBe("{ not json");
     });
 
-    it("keeps status under 150 tokens while the player is to move", async () => {
-        const context = playerFolder();
+    it("keeps status under 150 tokens while the player is to move, with the board page's address", async () => {
+        const context = { ...playerFolder(), page: "http://127.0.0.1:5870/" };
         await run(context, "new_game", { ai_colour: "black" });
 
         for (const [player, ai] of [["e4", "e5"], ["Nf3", "Nc6"], ["Bb5", "a6"], ["Ba4", "Nf6"]] as const) {
@@ -257,10 +257,11 @@ describe("a game in chat", () => {
 
         // About four characters a token, as Priya measures them (T-50).
         expect((await run(context, "status")).length).toBeLessThan(600);
+        expect(await run(context, "status")).toContain("\nBoard page: http://127.0.0.1:5870/\n");
     });
 
-    it("keeps the position the AI decides on, with its facts, under 1,150 characters in player_move and 1,300 in status", async () => {
-        const context = playerFolder();
+    it("keeps the position the AI decides on, with its facts, under 1,150 characters in player_move and 1,300 in status with the board page", async () => {
+        const context = { ...playerFolder(), page: "http://127.0.0.1:5870/" };
         await run(context, "new_game", { ai_colour: "white", from: "r3k2r/pppq1ppp/2npbn2/2b1p3/2B1P3/2NPBN2/PPPQ1PPP/R3K2R w KQkq - 0 8" });
         await run(context, "ai_move", { move: "h3", plan: "p".repeat(200), comment: "c".repeat(300) });
         const played = await run(context, "player_move", { move: "8... h6" });

@@ -8,6 +8,9 @@ import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
 
+// The doorbell of the moves on the page (D-47), as init writes it into Claude Code's settings.
+const bellHook = { type: "command", command: "chesspal listen", asyncRewake: true, timeout: 86_400 };
+
 afterEach(() => {
     for (const folder of folders.splice(0)) {
         rmSync(folder, { recursive: true, force: true });
@@ -29,7 +32,7 @@ describe("chesspal init", () => {
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${opponentInstructions()}\n<!-- chesspal: end -->\n`);
         expect(text(chess, "CLAUDE.md")).toBe("@AGENTS.md\n");
-        expect(json(chess, ".claude/settings.json")).toEqual({ enabledMcpjsonServers: ["chesspal"], permissions: { allow: ["mcp__chesspal"] } });
+        expect(json(chess, ".claude/settings.json")).toEqual({ enabledMcpjsonServers: ["chesspal"], permissions: { allow: ["mcp__chesspal"] }, hooks: { Stop: [{ hooks: [bellHook] }] } });
         expect(text(chess, ".codex/config.toml")).toBe('[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
         expect(opponentInstructions()).toContain("call `status`");
     });
@@ -49,7 +52,8 @@ describe("chesspal init", () => {
         writeFileSync(join(folder, ".mcp.json"), JSON.stringify({ mcpServers: { other: { command: "other" } } }));
         writeFileSync(join(folder, "AGENTS.md"), "<!-- chesspal: old -->\nOld lines.\n<!-- chesspal: end -->\n\nMy own rules.\n");
         writeFileSync(join(folder, "CLAUDE.md"), "My notes.\n");
-        writeFileSync(join(folder, ".claude", "settings.json"), "﻿" + JSON.stringify({ model: "opus", permissions: { allow: ["Bash(ls)"] } }));
+        const ownStop = { hooks: [{ type: "command", command: "say done" }] };
+        writeFileSync(join(folder, ".claude", "settings.json"), "﻿" + JSON.stringify({ model: "opus", permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [ownStop] } }));
         writeFileSync(join(folder, ".codex", "config.toml"), 'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n');
         await runCommandLine(["init"], testContext(folder));
 
@@ -57,7 +61,12 @@ describe("chesspal init", () => {
         expect(text(folder, "AGENTS.md")).toMatch(/^<!-- chesspal: these lines [^\n]*\nThis folder is the player's chess table[\s\S]*<!-- chesspal: end -->\n\nMy own rules\.\n$/);
         expect(text(folder, "AGENTS.md")).not.toContain("Old lines.");
         expect(text(folder, "CLAUDE.md")).toBe("@AGENTS.md\nMy notes.\n");
-        expect(json(folder, ".claude/settings.json")).toEqual({ model: "opus", enabledMcpjsonServers: ["chesspal"], permissions: { allow: ["Bash(ls)", "mcp__chesspal"] } });
+        expect(json(folder, ".claude/settings.json")).toEqual({
+            model: "opus",
+            enabledMcpjsonServers: ["chesspal"],
+            permissions: { allow: ["Bash(ls)", "mcp__chesspal"] },
+            hooks: { Stop: [ownStop, { hooks: [bellHook] }] },
+        });
         expect(text(folder, ".codex/config.toml")).toBe('model = "gpt-5"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n\n[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
         expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/is set up already: nothing to change\.\n/);
     });

@@ -19,12 +19,13 @@
     "instructions"
   ],
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc && tsc -p src/page && node -e \"require('node:fs').cpSync('src/page', 'dist/page', { recursive: true, filter: (path) => !/[.]tsx?$|tsconfig[.]json$/.test(path) })\"",
     "dev": "tsc --watch",
     "test": "vitest run",
     "format": "eslint --fix . && dprint fmt",
-    "lint": "eslint . && dprint check && tsc -p tsconfig.test.json && tsc -p tsconfig.core.json",
-    "bench": "npm run build && node --experimental-strip-types test/bench/core.ts && node --experimental-strip-types test/bench/commands.ts"
+    "lint": "eslint . && dprint check && tsc -p tsconfig.test.json && tsc -p tsconfig.core.json && tsc -p src/page --noEmit",
+    "bench": "npm run build && node --experimental-strip-types test/bench/core.ts && node --experimental-strip-types test/bench/commands.ts",
+    "page": "npm run build && node --experimental-strip-types --no-warnings test/demo/page.ts"
   },
   "engines": {
     "node": ">=22.13"
@@ -61,6 +62,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "chess.js": "^1.4.0",
+    "preact": "^10.29.8",
     "zod": "^4.6.7"
   }
 }

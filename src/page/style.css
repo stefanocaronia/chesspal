@@ -1,0 +1,542 @@
+/* The page in Zoe's Salotto azzurro (D-46): the board on the left, the players and the moves beside it, one column on a phone; light and dark. */
+:root {
+    --page: #f4f3ef;
+    --card: #ffffff;
+    --ink: #1d2733;
+    --soft: #626d7b;
+    --line: #e4e2dc;
+    --accent: #2d6aa8;
+    --quote: #f1f5f9;
+    --light-square: #eaf1f8;
+    --dark-square: #86abd0;
+    --last-move: rgba(255, 196, 80, 0.5);
+    --selected: rgba(255, 196, 80, 0.7);
+    --white-fill: #fffefa;
+    --white-line: #1d2733;
+    --black-fill: #232c38;
+    --black-line: #1d2733;
+    --black-detail: #dfe6ee;
+    --torretta-body: #6d9fd1;
+    --torretta-shade: #4b7cb0;
+    --torretta-screen: #16263a;
+    --torretta-face: #f2f7fc;
+    --torretta-light: #f4c84c;
+    --shadow: 0 1px 2px rgba(29, 39, 51, 0.06), 0 6px 18px rgba(29, 39, 51, 0.06);
+    --gap: 20px;
+    --column: 300px;
+    --head: 60px;
+    --radius: 10px;
+    color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+    --page: #11161d;
+    --card: #19202a;
+    --ink: #e6ebf1;
+    --soft: #8d98a7;
+    --line: #262f3b;
+    --accent: #7cb0e4;
+    --quote: #1f2834;
+    --light-square: #a9bccd;
+    --dark-square: #61809e;
+    --white-fill: #fbf9f2;
+    --white-line: #111820;
+    --black-fill: #1a212b;
+    --black-line: #0d1218;
+    --black-detail: #c9d4df;
+    --torretta-screen: #0f1a28;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.25);
+    color-scheme: dark;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--page);
+    color: var(--ink);
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+
+/* The header */
+.top {
+    height: var(--head);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 var(--gap);
+}
+
+.title {
+    flex: 1;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.icon {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.command {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 7px 11px;
+    font-size: 14px;
+    color: var(--soft);
+}
+
+.command:hover,
+.command[aria-pressed="true"] {
+    color: var(--ink);
+    border-color: var(--line);
+    background: var(--card);
+}
+
+.command:focus-visible,
+.theme:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.theme {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--soft);
+}
+
+.theme:hover {
+    color: var(--ink);
+}
+
+:root[data-theme="dark"] .theme .sun,
+:root:not([data-theme="dark"]) .theme .moon {
+    display: none;
+}
+
+/* The layout: the board spans the rows of the column beside it */
+.app {
+    display: grid;
+    gap: 14px var(--gap);
+    padding: 0 var(--gap) var(--gap);
+    grid-template-columns: auto var(--column);
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "board ai" "board side" "board you";
+    justify-content: center;
+}
+
+.app.flipped {
+    grid-template-areas: "board you" "board side" "board ai";
+}
+
+.board-wrap {
+    grid-area: board;
+    position: relative;
+    width: min(calc(100vw - var(--column) - 3 * var(--gap)), calc(100vh - var(--head) - var(--gap)), 880px);
+}
+
+/* The board */
+.board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    user-select: none;
+    container-type: inline-size;
+}
+
+.square {
+    position: relative;
+}
+
+.square.light {
+    background-color: var(--light-square);
+}
+
+.square.dark {
+    background-color: var(--dark-square);
+}
+
+.square.last {
+    background-image: linear-gradient(var(--last-move), var(--last-move));
+}
+
+.square.selected {
+    background-image: linear-gradient(var(--selected), var(--selected));
+}
+
+.board.playable .square {
+    cursor: pointer;
+}
+
+/* The ranks and files grow with the board, as 15 points on 800 */
+.coordinate {
+    position: absolute;
+    font-size: clamp(10px, 1.9cqw, 16px);
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.coordinate.rank {
+    top: 4%;
+    left: 5%;
+}
+
+.coordinate.file {
+    right: 5%;
+    bottom: 4%;
+}
+
+.square.light .coordinate {
+    color: var(--dark-square);
+}
+
+.square.dark .coordinate {
+    color: var(--light-square);
+}
+
+.square .piece {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* The pieces: their solid parts, then their inner lines */
+.piece .body {
+    stroke-width: 2.6;
+    stroke-linejoin: round;
+}
+
+.piece.white .body {
+    fill: var(--white-fill);
+    stroke: var(--white-line);
+}
+
+.piece.black .body {
+    fill: var(--black-fill);
+    stroke: var(--black-line);
+}
+
+.piece .detail {
+    fill: none;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+}
+
+.piece.white .detail {
+    stroke: var(--white-line);
+}
+
+.piece.black .detail {
+    stroke: var(--black-detail);
+}
+
+.piece .detail .dot {
+    stroke: none;
+}
+
+.piece.white .dot {
+    fill: var(--white-line);
+}
+
+.piece.black .dot {
+    fill: var(--black-detail);
+}
+
+.toast {
+    position: absolute;
+    left: 50%;
+    bottom: 4%;
+    transform: translateX(-50%);
+    max-width: 80%;
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 7px;
+    background: var(--ink);
+    color: var(--card);
+    font-size: 13.5px;
+    line-height: 1.35;
+    box-shadow: var(--shadow);
+}
+
+/* The players' cards */
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+}
+
+.player.ai {
+    grid-area: ai;
+}
+
+.player.you {
+    grid-area: you;
+}
+
+.player-line {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.player-line > svg {
+    flex: none;
+}
+
+.who {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.name {
+    font-weight: 600;
+}
+
+.note {
+    color: var(--soft);
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.taken {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 20px;
+    margin-top: 3px;
+}
+
+.taken .group {
+    display: inline-flex;
+}
+
+.taken .piece {
+    width: 22px;
+    height: 22px;
+}
+
+.taken .piece + .piece {
+    margin-left: -12px;
+}
+
+/* On a dark card the dark pieces taken would be outlines alone: grey shapes, apart from the white ones */
+:root[data-theme="dark"] .taken {
+    --black-fill: var(--soft);
+    --black-line: var(--soft);
+    --black-detail: var(--card);
+}
+
+.balance {
+    margin-left: 2px;
+    color: var(--soft);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.comment {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    border-radius: 7px;
+    background: var(--quote);
+    font-size: 14.5px;
+    line-height: 1.5;
+    text-wrap: pretty;
+}
+
+.avatar .back {
+    fill: var(--quote);
+}
+
+.avatar .figure {
+    fill: var(--soft);
+}
+
+/* The Torretta, whose eyes blink now and then */
+.torretta .antenna {
+    fill: none;
+    stroke: var(--torretta-shade);
+    stroke-width: 4;
+    stroke-linecap: round;
+}
+
+.torretta .light {
+    fill: var(--torretta-light);
+}
+
+.torretta .shade {
+    fill: var(--torretta-shade);
+}
+
+.torretta .body {
+    fill: var(--torretta-body);
+}
+
+.torretta .screen {
+    fill: var(--torretta-screen);
+}
+
+.torretta .eyes,
+.torretta .mouth {
+    fill: var(--torretta-face);
+}
+
+.torretta .eyes {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: blink 6s infinite;
+}
+
+@keyframes blink {
+    0%,
+    95%,
+    100% {
+        transform: scaleY(1);
+    }
+
+    97% {
+        transform: scaleY(0.1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .torretta .eyes {
+        animation: none;
+    }
+}
+
+/* The moves */
+.side {
+    grid-area: side;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+}
+
+.moves {
+    flex: 1;
+    min-height: 90px;
+    overflow: auto;
+    padding: 8px 10px;
+    font-size: 14px;
+}
+
+.moves ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.moves li {
+    display: grid;
+    grid-template-columns: 30px 1fr 1fr;
+    padding: 3px 6px;
+    border-radius: 5px;
+}
+
+.moves li:nth-child(even) {
+    background: var(--page);
+}
+
+.moves .number {
+    color: var(--soft);
+}
+
+.moves .last {
+    justify-self: start;
+    font-weight: 700;
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.moves .result {
+    margin: 6px;
+    font-weight: 600;
+}
+
+.empty {
+    margin: 0;
+    color: var(--soft);
+}
+
+.problem {
+    max-width: 40em;
+    margin: 24px auto;
+    padding: 0 16px;
+}
+
+/* Beside the board, the column takes the board's height and the moves scroll in it, however long the game */
+@media (min-width: 841px) {
+    .side {
+        contain: size;
+    }
+}
+
+/* A phone: one column, the AI above the board and the player below it */
+@media (max-width: 840px) {
+    :root {
+        --gap: 12px;
+        --head: 54px;
+    }
+
+    .command span {
+        display: none;
+    }
+
+    .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+        grid-template-areas: "ai" "board" "you" "side";
+    }
+
+    .app.flipped {
+        grid-template-areas: "you" "board" "ai" "side";
+    }
+
+    .board-wrap {
+        width: 100%;
+    }
+
+    .moves ol {
+        columns: 2;
+        column-gap: 12px;
+    }
+
+    .moves li {
+        break-inside: avoid;
+    }
+}
