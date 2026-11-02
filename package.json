@@ -22,7 +22,8 @@
     "dev": "tsc --watch",
     "test": "vitest run",
     "format": "eslint --fix . && dprint fmt",
-    "lint": "eslint . && dprint check && tsc -p tsconfig.test.json"
+    "lint": "eslint . && dprint check && tsc -p tsconfig.test.json && tsc -p tsconfig.core.json",
+    "bench": "node --experimental-strip-types test/bench/core.ts"
   },
   "engines": {
     "node": ">=22.13"
@@ -58,6 +59,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
+    "chess.js": "^1.4.0",
     "zod": "^4.6.7"
   }
 }

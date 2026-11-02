@@ -14,7 +14,9 @@
     "functionDeclaration.bracePosition": "nextLine",
     "functionExpression.bracePosition": "nextLine",
     "method.bracePosition": "nextLine",
-    "constructor.bracePosition": "nextLine"
+    "constructor.bracePosition": "nextLine",
+    "getAccessor.bracePosition": "nextLine",
+    "setAccessor.bracePosition": "nextLine"
   },
   "includes": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "eslint.config.js", "vitest.config.ts"],
   "excludes": ["**/node_modules", "dist"],

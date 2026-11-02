@@ -1,5 +1,6 @@
 import stylistic from "@stylistic/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
+import { builtinModules } from "node:module";
 
 // Only the layout rules dprint cannot apply: braces always, a blank line around block statements, at most one blank line.
 export default [
@@ -23,8 +24,13 @@ export default [
         files: ["src/core/**/*.ts"],
         rules: {
             "no-console": "error",
-            "no-restricted-globals": ["error", { name: "process", message: "The chess core runs in the browser too: no Node." }],
-            "no-restricted-imports": ["error", { patterns: [{ group: ["node:*", "fs", "path"], message: "The chess core runs in the browser too: no Node." }] }],
+            "no-restricted-globals": ["error", ...["process", "Buffer", "require", "__dirname", "__filename", "global"].map((name) => ({ name, message: "The chess core runs in the browser too: no Node." }))],
+            "no-restricted-imports": ["error", {
+                patterns: [
+                    { group: ["node:*", ...builtinModules], message: "The chess core runs in the browser too: no Node." },
+                    { group: ["../*"], message: "The chess core imports only its own files and chess.js: commands, server and CLI use the core, never the other way." },
+                ],
+            }],
         },
     },
     // The MCP server speaks on stdout: commands return values, and only the CLI prints.
