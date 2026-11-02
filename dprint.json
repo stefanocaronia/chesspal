@@ -1,0 +1,22 @@
+{
+  "typescript": {
+    "indentWidth": 4,
+    "lineWidth": 240,
+    "quoteStyle": "preferDouble",
+    "semiColons": "always",
+    "bracePosition": "sameLine",
+    "nextControlFlowPosition": "sameLine",
+    "classDeclaration.bracePosition": "nextLine",
+    "classExpression.bracePosition": "nextLine",
+    "interfaceDeclaration.bracePosition": "nextLine",
+    "enumDeclaration.bracePosition": "nextLine",
+    "moduleDeclaration.bracePosition": "nextLine",
+    "functionDeclaration.bracePosition": "nextLine",
+    "functionExpression.bracePosition": "nextLine",
+    "method.bracePosition": "nextLine",
+    "constructor.bracePosition": "nextLine"
+  },
+  "includes": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "eslint.config.js", "vitest.config.ts"],
+  "excludes": ["**/node_modules", "dist"],
+  "plugins": ["https://plugins.dprint.dev/typescript-0.96.1.wasm"]
+}

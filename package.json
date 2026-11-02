@@ -1,0 +1,56 @@
+{
+  "name": "chesspal",
+  "version": "0.0.1",
+  "description": "Play chess against an AI with a character, and learn with an AI coach: Chesspal keeps the rules, the board, the games and the memory; the AI plays, reasons and talks.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "format": "eslint --fix . && dprint fmt",
+    "lint": "eslint . && dprint check && tsc -p tsconfig.test.json"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "keywords": [
+    "chess",
+    "ai",
+    "chess-coach",
+    "chess-teacher",
+    "mcp",
+    "mcp-server",
+    "claude-code",
+    "codex"
+  ],
+  "author": {
+    "name": "Stefano Caronia",
+    "url": "https://stefanocaronia.it"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stefanocaronia/chesspal.git"
+  },
+  "homepage": "https://github.com/stefanocaronia/chesspal#readme",
+  "devDependencies": {
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^22.20.5",
+    "@typescript-eslint/parser": "^8.72.1",
+    "dprint": "^0.58.0",
+    "eslint": "^10.14.0",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5"
+  }
+}

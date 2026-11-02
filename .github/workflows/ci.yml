@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Reads the code only; a newer push to the same branch stops the run it makes old.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # Linux and Windows while the repo is private, where macOS spends ten times the minutes; macOS joins when it is public.
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The dependencies that ship with the package, without a known vulnerability of high severity or worse.
+      - run: npm audit --omit=dev --audit-level=high
+        if: matrix.os == 'ubuntu-latest'
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test

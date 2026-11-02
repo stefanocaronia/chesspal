@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "paths": {
+      "chesspal": ["./src/index.ts"]
+    }
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}
