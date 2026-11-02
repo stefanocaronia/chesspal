@@ -20,6 +20,7 @@ report([
     { name: "play a move as squares, in a new position", budget: 2.5, run: () => onNewPositions((game, move) => game.play(move), true) },
     { name: "a move as the server plays it, in a new position", budget: 2.5, run: () => onNewPositions(serverMove) },
     { name: "legal moves of a position not seen yet", budget: 1.5, run: () => looksAtNewPositions((game) => game.legalMoves()) },
+    { name: "facts of a position not seen yet, its legal moves known", budget: 0.5, run: factsOfNewPositions },
     { name: "legal moves of a position seen", budget: 0.005, run: () => timed(1_000, () => repeat(1_000, () => kept.legalMoves())) },
     { name: "position and outcome of a new position", budget: 0.1, run: () => looksAtNewPositions((game) => [game.position, game.outcome]) },
     { name: `write the PGN of ${plies} plies`, budget: 1, run: () => timed(1, () => writePgn(record)) },
@@ -42,6 +43,22 @@ function looksAtNewPositions(look: (game: Game) => unknown): number
     return time / moves.length;
 }
 
+/** The time of the facts of positions not seen yet, their legal moves computed before: what the facts add to a move. */
+function factsOfNewPositions(): number
+{
+    const moves = randomGame(seed++, 40);
+    const game = new Game();
+    let time = 0;
+
+    for (const move of moves) {
+        game.play(move);
+        game.legalMoves();
+        time += timed(1, () => game.facts);
+    }
+
+    return time / moves.length;
+}
+
 /** The time of one move, played from positions not seen yet. */
 function onNewPositions(play: (game: Game, move: string) => void, asSquares = false): number
 {
@@ -56,11 +73,11 @@ function onNewPositions(play: (game: Game, move: string) => void, asSquares = fa
     return time / moves.length;
 }
 
-/** What the server does at each move: play it, then what it tells the AI about the new position. */
+/** What the server does at each move: play it, then what it tells the AI about the new position, its facts included. */
 function serverMove(game: Game, move: string): void
 {
     game.play(move);
-    void [game.position, game.outcome, game.legalMoves()];
+    void [game.position, game.outcome, game.legalMoves(), game.facts];
 }
 
 function playAll(moves: string[]): void

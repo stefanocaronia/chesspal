@@ -147,7 +147,7 @@ describe("chesspal mcp", () => {
 
         try {
             expect(await server.exited, `stderr: ${server.output.stderr}`).toBe(0);
-            expect(server.lines().find((line) => line.id === 3)?.result).toMatchObject({ content: [{ type: "text", text: expect.stringMatching(/^Player: 1\.e4\./) }] });
+            expect(server.lines().find((line) => line.id === 3)?.result).toMatchObject({ content: [{ type: "text", text: expect.stringMatching(/^Player: 1\.e4 \(e2-e4\)\./) }] });
             expect(server.lines().find((line) => line.id === 3)?.result?.isError).toBeUndefined();
             expect((JSON.parse(readFileSync(join(folder, "game.json"), "utf8")) as { pgn: string; }).pgn).toContain("1. e4 *");
         } finally {

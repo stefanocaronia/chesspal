@@ -1,6 +1,7 @@
 // A move of the AI or of the player on the current game: played, saved, and archived when it ends the game.
 import { archiveGame, type CurrentGame, endOf, saveGame } from "../games/index.ts";
-import { colourName, gameGoingOn, type MovePlayed, summaryOf } from "./game-summary.ts";
+import { gameGoingOn, type MovePlayed, summaryOf } from "./game-summary.ts";
+import { colourName } from "./view.ts";
 
 /** Who plays a move: the AI, or the player through the AI. */
 export type Mover = "ai" | "player";

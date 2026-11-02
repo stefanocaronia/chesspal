@@ -1,5 +1,6 @@
 // A live game on chess.js: the rules, the record, and the legal moves computed once per position.
 import { Chess, type Move as ChessMove, type Square, validateFen } from "chess.js";
+import { type Facts, factsOf } from "./facts.ts";
 import { type Annotation, cleanComment, type GameRecord, type RecordedMove, recordedMove } from "./record.ts";
 
 export type { Square } from "chess.js";
@@ -53,6 +54,7 @@ export class Game
     private readonly tags: Record<string, string>;
     private readonly comment: string | undefined;
     private readonly moves: RecordedMove[] = [];
+    private last: Move | undefined;
     private keptPosition: Position | undefined;
     private keptOutcome: Outcome | undefined;
     private keptRecord: GameRecord | undefined;
@@ -102,6 +104,18 @@ export class Game
     {
         this.keptRecord ??= this.snapshot();
         return this.keptRecord;
+    }
+
+    /** The last move played, with its squares; none before the first. */
+    get lastMove(): Move | undefined
+    {
+        return this.last;
+    }
+
+    /** What the position shows (D-26): attackers and defenders, pieces at risk, pins, checks, the moves of each piece; computed once for each position. */
+    get facts(): Facts
+    {
+        return factsOf(this.chess, legalMovesOf(this.chess));
     }
 
     /** The legal moves, or those of the piece on a square. */
@@ -171,6 +185,7 @@ export class Game
             this.chess.move({ from: move.from, to: move.to, promotion: move.promotion });
         }
 
+        this.last = move;
         this.keptPosition = undefined;
         this.keptOutcome = undefined;
         this.keptRecord = undefined;

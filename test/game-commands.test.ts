@@ -25,7 +25,7 @@ describe("a game in chat", () => {
             "New game: you play Black, the player White.\nPlayer (White) to move, move 1.\nNext: wait for the player's move, then call player_move with it.",
         );
         expect(await run(context, "player_move", { move: "e4" })).toMatch(
-            /^Player: 1\.e4\.\nYou \(Black\) to move, move 1\.\nFEN: rnbqkbnr\/pppppppp\/8\/8\/4P3\/8\/PPPP1PPP\/RNBQKBNR b KQkq - 0 1\nLegal \(20\): Nc6 .* h5\nNext: choose your move/,
+            /^Player: 1\.e4 \(e2-e4\)\.\nYou \(Black\) to move, move 1\.\nFEN: rnbqkbnr\/pppppppp\/8\/8\/4P3\/8\/PPPP1PPP\/RNBQKBNR b KQkq - 0 1\nAttacked pieces: none\n(?:.*\n){4}Legal by piece \(20\): Nb8 \(2\) Nc6 Na6; .* Ph7 \(2\) h6 h5; no moves: Ke8 Qd8 Ra8 Rh8 Bc8 Bf8\nNext: choose your move/,
         );
         expect(await run(context, "ai_move", { move: "e5", plan: "Develop the knights, then castle.", comment: "The open game." })).toBe(
             "Played 1...e5.\nPlayer (White) to move, move 2.\nNext: wait for the player's move, then call player_move with it.",
@@ -44,14 +44,16 @@ describe("a game in chat", () => {
         expect(await run(playerFolder(0.2), "new_game", { ai_colour: "random" })).toContain("you play White");
         expect(await run(playerFolder(0.7), "new_game", { ai_colour: "random" })).toContain("you play Black");
         expect(await run(playerFolder(), "new_game", { ai_colour: "white", from: "4k3/8/8/8/8/8/4P3/4K3 w - - 0 40" })).toContain(
-            "You (White) to move, move 40.\nFEN: 4k3/8/8/8/8/8/4P3/4K3 w - - 0 40\nLegal (",
+            "You (White) to move, move 40.\nFEN: 4k3/8/8/8/8/8/4P3/4K3 w - - 0 40\nAttacked pieces: none\n",
         );
 
         const context = playerFolder();
 
         const lichess = '[White "Morphy"]\n[Result "1-0"]\n[Termination "Unterminated"]\n\n1. e4 e5 2. Nf3 {[%plan Theirs.]} 1-0';
 
-        expect(await run(context, "new_game", { ai_colour: "black", from: lichess })).toMatch(/You \(Black\) to move, move 2\.\nFEN: .*\nLegal \(\d+\): [^\n]*\nNext: /);
+        expect(await run(context, "new_game", { ai_colour: "black", from: lichess })).toMatch(
+            /You \(Black\) to move, move 2\.\nLast move: 2\.Nf3 \(g1-f3\)\.\nFEN: .*\nAttacked pieces \(attackers \/ defenders\):\nBlack Pe5: Nf3 \/ -\n(?:.*\n)*Legal by piece \(29\): [^\n]*\nNext: /,
+        );
         expect(gameFile(context).pgn).toContain('[White "Player"]\n[Black "AI"]\n[Result "*"]\n\n1. e4 e5 2. Nf3 *');
     });
 
@@ -170,7 +172,7 @@ describe("a game in chat", () => {
             closeSync(held);
         }
 
-        expect(await run(context, "player_move", { move: "e4" })).toContain("Player: 1.e4.");
+        expect(await run(context, "player_move", { move: "e4" })).toContain("Player: 1.e4 (e2-e4).");
         expect(existsSync(join(context.folder, `game.json.${process.pid}.tmp`))).toBe(false);
     });
 
@@ -254,15 +256,61 @@ describe("a game in chat", () => {
         expect((await run(context, "status")).length).toBeLessThan(600);
     });
 
-    it("keeps the position the AI decides on under 250 tokens, in player_move and in status", async () => {
+    it("keeps the position the AI decides on, with its facts, under 1,150 characters in player_move and 1,300 in status", async () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "white", from: "r3k2r/pppq1ppp/2npbn2/2b1p3/2B1P3/2NPBN2/PPPQ1PPP/R3K2R w KQkq - 0 8" });
         await run(context, "ai_move", { move: "h3", plan: "p".repeat(200), comment: "c".repeat(300) });
         const played = await run(context, "player_move", { move: "8... h6" });
 
-        expect(Number(/Legal \((\d+)\)/.exec(played)?.[1])).toBeGreaterThan(40);
-        expect(played.length).toBeLessThan(1_000);
-        expect((await run(context, "status")).length).toBeLessThan(1_000);
+        expect(Number(/Legal by piece \((\d+)\)/.exec(played)?.[1])).toBeGreaterThan(40);
+        expect(played.match(/^(?:White|Black) [KQRBNP][a-h][1-8]: /gm)).toHaveLength(8);
+        expect(played).toContain("\nWhite Ph3: Be6(+Qd7) / Pg2 Rh1\n");
+        // About 0.72 Claude tokens a character, as Priya measures them: within 800 and 900 tokens (D-26).
+        expect(played.length).toBeLessThan(1_150);
+        expect((await run(context, "status")).length).toBeLessThan(1_300);
+    });
+
+    it("shows the whole view with look, or only the board for the player", async () => {
+        const context = playerFolder();
+
+        await expect(run(context, "look")).rejects.toThrow("There is no game to look at: start one with new_game.");
+        await run(context, "new_game", { ai_colour: "black" });
+        expect(await run(context, "look")).toMatch(/^Player \(White\) to move, move 1\.\nFEN: .*\nWhite pieces \(attackers \/ defenders\):\nQd1: - \/ Ke1\n/);
+        await run(context, "player_move", { move: "e4" });
+        const view = await run(context, "look");
+
+        expect(view).toMatch(/^You \(Black\) to move, move 1\.\nLast move: 1\.e4 \(e2-e4\)\.\nFEN: .*\nWhite pieces \(attackers \/ defenders\):\nQd1: - \/ Ke1\n/);
+        expect(view).toContain("\nBf1: - / Ke1(+Qd1)\n");
+        expect(view).toContain("\nBlack pieces (attackers / defenders):\nQd8: - / Ke8\n");
+        expect(view).toContain("\nLegal by piece (20): Nb8 (2) Nc6 Na6; ");
+        expect(view).not.toMatch(/^K[a-h][1-8]: /m);
+        expect(await run(context, "look", { only: "board" })).toBe(
+            [
+                "  a b c d e f g h",
+                "8 r n b q k b n r 8",
+                "7 p p p p p p p p 7",
+                "6 . . . . . . . . 6",
+                "5 . . . . . . . . 5",
+                "4 . . . . P . . . 4",
+                "3 . . . . . . . . 3",
+                "2 P P P P . P P P 2",
+                "1 R N B Q K B N R 1",
+                "  a b c d e f g h",
+            ].join("\n"),
+        );
+    });
+
+    it("shows with look how a game ended in checkmate: the check, and no legal moves", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "f3" });
+        await run(context, "ai_move", { move: "e5", plan: "Open the diagonal.", comment: "The centre." });
+        await run(context, "player_move", { move: "g4" });
+        await run(context, "ai_move", { move: "Qh4#", plan: "Mate.", comment: "Mate." });
+        const view = await run(context, "look");
+
+        expect(view).toMatch(/^Game over: 0-1, .*\nLast move: 2\.\.\.Qh4# \(d8-h4\)\.\nFEN: .*\nWhite is in check from Qh4\.\nWhite pieces/);
+        expect(view).not.toContain("Legal by piece");
     });
 });
 

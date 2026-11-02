@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { Game } from "../core/index.ts";
 import { type CurrentGame, saveGame } from "../games/index.ts";
-import { colourName, gameGoingOn, type GameSummary, nextStep, positionLines, summaryOf } from "./game-summary.ts";
+import { gameGoingOn, type GameSummary, nextStep, positionLines, summaryOf } from "./game-summary.ts";
 import { archived } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
+import { colourName } from "./view.ts";
 
 interface Ended
 {

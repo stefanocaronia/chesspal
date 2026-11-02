@@ -1,6 +1,7 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
-import type { GameRecord, Side } from "../core/index.ts";
+import type { Facts, GameRecord, Side, Square } from "../core/index.ts";
 import { type CurrentGame, currentPlan, endOf, loadGame } from "../games/index.ts";
+import { colourName, compactView } from "./view.ts";
 
 /** The current game, as the commands give it. */
 export interface GameSummary
@@ -11,12 +12,22 @@ export interface GameSummary
     fen: string;
     /** The last moves, numbered: 3.Bc4 Nf6 4.Ng5 d5. */
     lastMoves: string;
-    /** When the AI is to move: the legal moves in SAN. */
-    legal?: string[];
+    /** The last move, numbered, with its squares. */
+    lastMove?: LastMove;
+    /** When the AI is to move: the facts of the position (D-26), the legal moves of each piece among them. */
+    facts?: Facts;
     /** When the AI is to move: the plan it wrote last. */
     plan?: string;
     /** When the game is over: how it ended, and its name in the archive once it is there. */
     end?: { result: string; termination?: string; archive?: string; };
+}
+
+/** A move numbered as in the game (4.Ng5, 4...d5), with the squares it went from and to. */
+export interface LastMove
+{
+    move: string;
+    from: Square;
+    to: Square;
 }
 
 /** A move played by the AI or the player, with where the game stands after it. */
@@ -35,14 +46,18 @@ export interface MovePlayed
 export function summaryOf(current: CurrentGame, archive?: string): GameSummary
 {
     const { game, ai } = current;
-    const { position, record } = game;
+    const { position, record, lastMove } = game;
     const end = endOf(game);
     const summary: GameSummary = { ai, turn: position.turn, moveNumber: position.moveNumber, fen: position.fen, lastMoves: lastMoves(record, 6) };
+
+    if (lastMove !== undefined) {
+        summary.lastMove = { move: lastMoves(record, 1), from: lastMove.from, to: lastMove.to };
+    }
 
     if (end !== undefined) {
         summary.end = archive === undefined ? end : { ...end, archive };
     } else if (position.turn === ai) {
-        summary.legal = game.legalMoves().map((move) => move.san);
+        summary.facts = game.facts;
         const plan = currentPlan(record);
 
         if (plan !== undefined) {
@@ -71,30 +86,36 @@ export function gameGoingOn(folder: string): CurrentGame
     return current;
 }
 
-/** Where the game stands: the AI's position to decide on, the player's turn, or how it ended. */
-export function positionLines(game: GameSummary): string[]
+/** Where the game stands: the AI's position to decide on, with its last move unless the lines before named it; the player's turn; or how it ended. */
+export function positionLines(game: GameSummary, withLastMove = true): string[]
 {
-    if (game.end !== undefined) {
-        const archived = game.end.archive === undefined ? "" : ` Archived in ${game.end.archive}.`;
-        return [`Game over: ${endText(game.end)}.${archived}`];
-    }
-
-    if (game.turn !== game.ai) {
-        return [`Player (${colourName(game.turn)}) to move, move ${game.moveNumber}.`];
+    if (game.end !== undefined || game.turn !== game.ai) {
+        return [whereLine(game)];
     }
 
     return [
-        `You (${colourName(game.turn)}) to move, move ${game.moveNumber}.`,
-        `FEN: ${game.fen}`,
-        `Legal (${game.legal?.length ?? 0}): ${game.legal?.join(" ") ?? ""}`,
+        ...headLines(game, withLastMove),
+        ...(game.facts === undefined ? [] : compactView(game.facts, game.turn)),
         ...(game.plan === undefined ? [] : [`Plan: ${game.plan}`]),
     ];
 }
 
-/** The lines after a move: its note, where the game stands, a warning, the next step. */
+/** The head of a view: where the game stands, the last move unless the lines before named it, and the FEN. */
+export function headLines(game: GameSummary, withLastMove = true): string[]
+{
+    return [whereLine(game), ...(withLastMove && game.lastMove !== undefined ? [`Last move: ${lastMoveText(game.lastMove)}.`] : []), `FEN: ${game.fen}`];
+}
+
+/** A move with its squares: 4.Ng5 (f3-g5). */
+export function lastMoveText({ move, from, to }: LastMove): string
+{
+    return `${move} (${from}-${to})`;
+}
+
+/** The lines after a move, which the line before named: its note, where the game stands, a warning, the next step. */
 export function moveLines({ note, game, warning }: MovePlayed): string[]
 {
-    return [...(note === undefined ? [] : [`Note: ${note}`]), ...positionLines(game), ...(warning === undefined ? [] : [warning]), nextStep(game)];
+    return [...(note === undefined ? [] : [`Note: ${note}`]), ...positionLines(game, false), ...(warning === undefined ? [] : [warning]), nextStep(game)];
 }
 
 /** What the AI does next: the one line every host reads, even where the server's instructions are not shown. */
@@ -117,9 +138,15 @@ export function sidesLine(ai: Side): string
     return `you play ${colourName(ai)}, the player ${colourName(ai === "white" ? "black" : "white")}`;
 }
 
-export function colourName(side: Side): string
+/** Who is to move, or how the game ended. */
+function whereLine(game: GameSummary): string
 {
-    return side === "white" ? "White" : "Black";
+    if (game.end !== undefined) {
+        const archived = game.end.archive === undefined ? "" : ` Archived in ${game.end.archive}.`;
+        return `Game over: ${endText(game.end)}.${archived}`;
+    }
+
+    return `${game.turn === game.ai ? "You" : "Player"} (${colourName(game.turn)}) to move, move ${game.moveNumber}.`;
 }
 
 function endText({ result, termination }: { result: string; termination?: string; }): string
