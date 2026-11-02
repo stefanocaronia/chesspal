@@ -41,6 +41,8 @@ export interface Facts
     readonly undefended: readonly Square[];
     /** Pieces defended, but attacked by a piece worth less. */
     readonly attackedByCheaper: readonly Square[];
+    /** Pieces defended, but by fewer pieces than attack them, counting only the direct ones on both sides; not those attacked by a cheaper piece. */
+    readonly outnumbered: readonly Square[];
     /** Pieces neither attacked nor defended, kings left out: the first targets of a tactic. */
     readonly loose: readonly Square[];
     readonly pins: readonly Pin[];
@@ -102,6 +104,8 @@ function computed(chess: Chess, legal: readonly Move[]): Facts
     const officers = pieces.filter((piece) => piece.piece !== "K");
     const atRisk = officers.filter((piece) => piece.attackers.length > 0);
     const valueAt = (square: Square) => values[chess.get(square)!.type];
+    const defended = atRisk.filter((piece) => piece.defenders.length > 0);
+    const byCheaper = defended.filter((piece) => Math.min(...piece.attackers.map(valueAt)) < valueAt(piece.square));
     const relativePins = placed.filter((piece) => piece.type === "q" || piece.type === "r").flatMap((target) =>
         pinsTo(chess, target).filter((pin) => valueAt(pin.by) < values[target.type] || factsAt.get(target.square)?.defenders.length === 0)
     );
@@ -110,7 +114,8 @@ function computed(chess: Chess, legal: readonly Move[]): Facts
         pieces,
         ...(chess.inCheck() && king !== undefined ? { checkedBy: king.attackers } : {}),
         undefended: atRisk.filter((piece) => piece.defenders.length === 0).map((piece) => piece.square),
-        attackedByCheaper: atRisk.filter((piece) => piece.defenders.length > 0 && Math.min(...piece.attackers.map(valueAt)) < valueAt(piece.square)).map((piece) => piece.square),
+        attackedByCheaper: byCheaper.map((piece) => piece.square),
+        outnumbered: defended.filter((piece) => !byCheaper.includes(piece) && piece.attackers.length > piece.defenders.length).map((piece) => piece.square),
         loose: officers.filter((piece) => piece.attackers.length === 0 && piece.defenders.length === 0).map((piece) => piece.square),
         pins: [...kingPins, ...relativePins].sort((left, right) => compare(left.square, right.square)),
         checks: legal.filter((move) => /[+#]$/.test(move.san)).map((move) => move.san),

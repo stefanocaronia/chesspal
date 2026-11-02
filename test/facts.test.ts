@@ -29,6 +29,15 @@ describe("the facts of a position", () => {
         expect(from("R3k3/8/8/8/8/8/8/4K3 b - - 0 1").facts.undefended).toEqual([]);
     });
 
+    it("tells a piece attacked more times than defended, counting the direct ones only", () => {
+        // From the first playtest: the pawn on c5 is attacked by Nb3 and Be3, and defended only by the queen, with the bishop on e7 behind her.
+        const facts = from("r1b1r1k1/ppp1bppp/3q1n1n/1Pp1N3/P3PP2/1N1PB2P/4B1P1/R2QK2R b KQ - 0 19").facts;
+
+        expect(facts.outnumbered).toEqual(["c5"]);
+        expect(facts.attackedByCheaper).not.toContain("c5");
+        expect(from("2r2rk1/pp1bppbp/3p2p1/q2N3P/2n1P1P1/1B2BP2/PPPQN3/1K1R3R b - - 0 18").facts.outnumbered).not.toContain("d2");
+    });
+
     it("finds the pins to the king, and to a queen or rook of a piece worth less when the pinner is worth less or that piece is undefended", () => {
         // The pawn on d6 stands between two queens: no pin.
         expect(from("r1bqkb1r/5ppp/p1np1n2/1p2p1B1/4P3/N1N5/PPP2PPP/R2QKB1R w KQkq - 0 9").facts.pins).toEqual([{ square: "f6", by: "g5", to: "d8" }]);

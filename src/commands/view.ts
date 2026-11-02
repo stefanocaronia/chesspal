@@ -49,9 +49,10 @@ function checkLines(facts: Facts, turn: Side, names: Names): string[]
 function tacticLines(facts: Facts, turn: Side, names: Names): string[]
 {
     const list = (squares: readonly Square[]) => bySide(facts, squares, names) || "none";
-    const atRisk = facts.undefended.length === 0 && facts.attackedByCheaper.length === 0
+    const atRisk = facts.undefended.length === 0 && facts.attackedByCheaper.length === 0 && facts.outnumbered.length === 0
         ? "At risk: none"
-        : `Attacked and undefended: ${list(facts.undefended)}; defended, but attacked by a cheaper piece: ${list(facts.attackedByCheaper)}`;
+        : `Attacked and undefended: ${list(facts.undefended)}; defended, but attacked by a cheaper piece: ${list(facts.attackedByCheaper)}; `
+            + `attacked more times than defended: ${list(facts.outnumbered)}`;
     const pins = facts.pins.map((pin) => `${names.sided(pin.square)} to ${names.piece(pin.to)} by ${names.piece(pin.by)}`);
 
     return [
