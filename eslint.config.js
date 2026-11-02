@@ -33,6 +33,16 @@ export default [
             }],
         },
     },
+    // The games on disk sit below the commands, and print nothing: the MCP server speaks on stdout.
+    {
+        files: ["src/games/**/*.ts"],
+        rules: {
+            "no-console": "error",
+            "no-restricted-imports": ["error", {
+                patterns: [{ group: ["../commands/*", "../server/*", "../cli/*"], message: "The games module sits below the commands: they use it, never the other way." }],
+            }],
+        },
+    },
     // The MCP server speaks on stdout: commands return values, and only the CLI prints.
     {
         files: ["src/commands/**/*.ts", "src/server/**/*.ts"],

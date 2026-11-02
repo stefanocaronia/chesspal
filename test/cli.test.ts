@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import { defineCommand } from "../src/commands/registry.ts";
-import { play } from "./commands.ts";
+import { play, testContext } from "./commands.ts";
 
-const context = { folder: "/the/player" };
+const context = testContext();
 
 describe("the command line", () => {
     it("lists the commands and mcp, each with the first sentence of its description", async () => {
@@ -13,7 +13,7 @@ describe("the command line", () => {
 
         expect(exitCode).toBe(0);
         expect(output).toContain(`chesspal ${version}`);
-        expect(output).toMatch(/ {2}status +Shows what Chesspal sees now: its version and the player's folder\.\n/);
+        expect(output).toMatch(/ {2}status +Shows what Chesspal sees now: its version, the player's folder and the game, with your next step\.\n/);
         expect(output).toMatch(/ {2}mcp +Start the MCP server for an AI host\.\n/);
     });
 
@@ -22,7 +22,7 @@ describe("the command line", () => {
     });
 
     it("runs a command and renders its result, as text or as JSON", async () => {
-        expect((await runCommandLine(["status"], context)).output).toBe(`Chesspal ${version}\nFolder: /the/player`);
+        expect((await runCommandLine(["status"], context)).output).toBe(`Chesspal ${version}. Folder: /the/player\nNo game.\nNext: ask the player which colour they want, then call new_game.`);
         expect(JSON.parse((await runCommandLine(["status", "--json"], context)).output)).toEqual({ version, folder: "/the/player" });
     });
 

@@ -1,0 +1,63 @@
+// The commands' bench (D-34): a move as the MCP server plays it, game.json written, and the command line in a new process, against their budgets.
+// Run it with: npm run bench, which builds dist/ first. It exits with 1 when a median is over its budget.
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { Context } from "../../src/commands/context.ts";
+import { commands } from "../../src/commands/index.ts";
+import { Game, writePgn } from "../../src/core/index.ts";
+import { testContext } from "../commands.ts";
+import { randomGame, report, timed } from "./bench.ts";
+
+const folder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
+const context = testContext(folder);
+const long = new Game({ tags: {}, moves: randomGame(1, 120).map((san) => ({ san })) });
+const longFile = JSON.stringify({ format: 1, ai: "black", started: new Date().toISOString(), pgn: writePgn(long.record) });
+const cli = fileURLToPath(new URL("../../dist/cli/cli.js", import.meta.url));
+let seed = 2_000;
+
+try {
+    report([
+        { name: "a move through player_move or ai_move, game.json written", budget: 3, run: movesOfANewGame },
+        { name: "status in a game", budget: 0.5, run: () => timed(1, () => call(context, "status")) },
+        { name: "status after another process changed a game of 120 plies", budget: 25, run: readAgain },
+        { name: "chesspal status from the command line, a new process", budget: 500, run: () => timed(1, () => spawnSync(process.execPath, [cli, "status"], { cwd: folder })) },
+    ]);
+} finally {
+    rmSync(folder, { recursive: true, force: true });
+}
+
+/** The time of one move of a new random game of 40 plies, the player's and the AI's in turn, each saved. */
+function movesOfANewGame(): number
+{
+    const moves = randomGame(seed++, 40);
+    call(context, "new_game", { ai_colour: "black", replace: true });
+    let time = 0;
+
+    moves.forEach((move, index) => {
+        time += timed(1, () => (index % 2 === 0 ? call(context, "player_move", { move }) : call(context, "ai_move", { move, plan: "A plan.", comment: "A comment." })));
+    });
+
+    return time / moves.length;
+}
+
+/** The time of a status when game.json was written by someone else: read, parsed and replayed. */
+function readAgain(): number
+{
+    writeFileSync(join(folder, "game.json"), longFile);
+    return timed(1, () => call(context, "status"));
+}
+
+/** A command as the MCP server runs it: its input checked, its result as text. */
+function call(at: Context, name: string, input: Record<string, unknown> = {}): string
+{
+    const command = commands.find((candidate) => candidate.name === name);
+
+    if (command === undefined) {
+        throw new Error(`There is no command ${name}.`);
+    }
+
+    return command.format(command.run(command.input.parse(input), at));
+}

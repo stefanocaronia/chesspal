@@ -4,7 +4,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { type Context, defaultContext } from "../commands/context.ts";
 import { commands } from "../commands/index.ts";
-import { type AnyCommand, inputProblems } from "../commands/registry.ts";
+import { type AnyCommand, inputProblems, isBoolean } from "../commands/registry.ts";
 import { version } from "../version.ts";
 
 /** What the host reads as the server starts, before any tool: where to begin, and the rule of every move (D-27). Short, since hosts may cut it. */
@@ -57,7 +57,8 @@ function toolConfig(command: AnyCommand)
     const readOnly = command.readOnly === true;
     const annotations = { readOnlyHint: readOnly, destructiveHint: command.destructive === true, idempotentHint: readOnly || command.idempotent === true, openWorldHint: false };
     const meta = command.alwaysLoad ? { "anthropic/alwaysLoad": true } : undefined;
-    return { description: command.description, inputSchema: z.looseObject({}).meta(shownInput(command)), annotations, _meta: meta };
+    // The SDK writes the draft's address in every schema: it says nothing to an AI, and costs tokens in every tool.
+    return { description: command.description, inputSchema: z.looseObject({}).meta({ ...shownInput(command), $schema: undefined }), annotations, _meta: meta };
 }
 
 async function runTool(command: AnyCommand, input: unknown, context: Context): Promise<CallToolResult>
@@ -91,7 +92,7 @@ function shownInput(command: AnyCommand): ShownInput
 /** The command's input, checked as its schema says; what is wrong comes with every parameter the tool takes, for a call made without the schema. */
 function checkedInput(command: AnyCommand, input: unknown): unknown
 {
-    const parsed = (command.input as z.ZodObject).strict().safeParse(input ?? {});
+    const parsed = (command.input as z.ZodObject).strict().safeParse(withFlags(command, input ?? {}));
 
     if (parsed.success) {
         return parsed.data;
@@ -103,4 +104,20 @@ function checkedInput(command: AnyCommand, input: unknown): unknown
     const parameters = Object.entries(shown.properties ?? {}).map(([name, field]) => `- ${name}${required.includes(name) ? "" : " (optional)"}${field.description === undefined ? "" : `: ${field.description}`}`);
     const again = parameters.length === 0 ? "call it again with no parameters." : `call it again with its parameters.\n${command.name} takes:\n${parameters.join("\n")}`;
     throw new Error(`${inputProblems(command.name, parsed.error.issues, given, (name) => name)} Nothing changed: ${again}`);
+}
+
+/** The input with "true" and "false" as flags where the command takes one: some hosts send every value as text. */
+function withFlags(command: AnyCommand, input: unknown): unknown
+{
+    if (typeof input !== "object" || input === null) {
+        return input;
+    }
+
+    const { shape } = command.input as z.ZodObject;
+    return Object.fromEntries(
+        Object.entries(input).map(([name, value]) => {
+            const field = shape[name];
+            return [name, field !== undefined && isBoolean(field) && (value === "true" || value === "false") ? value === "true" : value];
+        }),
+    );
 }

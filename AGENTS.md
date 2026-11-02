@@ -19,7 +19,7 @@ This file is about **developing** Chesspal. The instructions for **playing** are
 | `AGENTS.md`, `CLAUDE.md` | this guide (`CLAUDE.md` only imports it) | yes | no |
 | `project/` | the maintainer's private repository: project docs and colleagues | no | no |
 | `.claude/` | a junction to `project/.claude/`: see "Colleagues" | no | no |
-| `src/` | the chess core (`src/core/`, browser-safe), the commands, the CLI, the MCP server | yes | built into `dist/` |
+| `src/` | the chess core (`src/core/`, browser-safe), the games on disk (`src/games/`), the commands, the CLI, the MCP server | yes | built into `dist/` |
 | `test/` | tests | yes | no |
 | `tmp/` | scratch output | no | no |
 

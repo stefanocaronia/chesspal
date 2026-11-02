@@ -1,5 +1,12 @@
 import { z } from "zod";
+import type { Context } from "../src/commands/context.ts";
 import { defineCommand } from "../src/commands/registry.ts";
+
+/** A context for the tests: a folder, a fixed draw and a fixed time, 2 November 2026 at 15:30:12 where the tests run. */
+export function testContext(folder = "/the/player", random = 0, now = new Date(2026, 10, 2, 15, 30, 12)): Context
+{
+    return { folder, random: () => random, now: () => now };
+}
 
 /** A command with every kind of field, for the command line and the server: the real ones come with the chess (T-6). */
 export const play = defineCommand({

@@ -51,11 +51,11 @@ describe("a game", () => {
         const game = new Game();
         const illegal = game.play("Nf6");
 
-        expect(illegal).toMatchObject({ played: false, refusal: "illegal", message: "Nf6 is not legal here, with white to move." });
+        expect(illegal).toMatchObject({ played: false, refusal: "illegal", message: "Nf6 is not legal here, with White to move." });
         expect(illegal.played ? [] : illegal.legal).toContain("Nf3");
         expect(game.play("O-O")).toMatchObject({ refusal: "illegal" });
 
-        for (const move of ["xyz", "bc4", "--", "", "e2e4e5"]) {
+        for (const move of ["xyz", "bc4", "--", "", "e2e4e5", "E4", "1-0"]) {
             expect(game.play(move), move).toMatchObject({ played: false, refusal: "unreadable" });
         }
 
@@ -69,14 +69,16 @@ describe("a game", () => {
 
     it("reads the notation of books, phones and word processors", () => {
         const game = played(standard, "e2–e4", "e7—e5", "♘f3", "nc6", "♗b5", "a7−a6", "B×c6", "♟dxc6", "0–0");
+        const numbered = played(standard, "1. e4", "1...e5", "2.Nf3", "2… Nc6", "3 . Bb5", "3. ... a6");
 
         expect(game.record.moves.map((move) => move.san)).toEqual(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Bxc6", "dxc6", "O-O"]);
+        expect(numbered.record.moves.map((move) => move.san)).toEqual(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6"]);
     });
 
     it("plays a move written with a check or a mate it does not give, and says so", () => {
-        expect(new Game().play("e4+")).toEqual({ played: true, move: { san: "e4", from: "e2", to: "e4" }, note: "You wrote e4+, but e4 gives no check." });
-        expect(played(standard, "f3", "e5", "g4").play("Qh4+")).toMatchObject({ played: true, note: "You wrote Qh4+, but Qh4 is checkmate." });
-        expect(played(standard, "e4", "f5").play("Qh5#")).toMatchObject({ played: true, note: "You wrote Qh5#, but Qh5 is check, not mate." });
+        expect(new Game().play("e4+")).toEqual({ played: true, move: { san: "e4", from: "e2", to: "e4" }, note: "Written as e4+, but e4 gives no check." });
+        expect(played(standard, "f3", "e5", "g4").play("Qh4+")).toMatchObject({ played: true, note: "Written as Qh4+, but Qh4 is checkmate." });
+        expect(played(standard, "e4", "f5").play("Qh5#")).toMatchObject({ played: true, note: "Written as Qh5#, but Qh5 is check, not mate." });
         expect(played(standard, "f3", "e5", "g4").play("Qh4#")).not.toHaveProperty("note");
     });
 

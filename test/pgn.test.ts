@@ -96,7 +96,7 @@ describe("reading PGN", () => {
     });
 
     it("names the line of a move it cannot play", () => {
-        expect(() => readPgn('[Event "x"]\n\n1. e4 e5\n2. Ke3 *')).toThrow("Line 4, move 2: Ke3 is not legal here, with white to move.");
+        expect(() => readPgn('[Event "x"]\n\n1. e4 e5\n2. Ke3 *')).toThrow("Line 4, move 2: Ke3 is not legal here, with White to move.");
         expect(() => readPgn("1. d4 d5 2. Nf3 Nf6 3. Nd2 *")).toThrow("Line 1, move 3: Nd2 could be Nbd2 or Nfd2: say which.");
         expect(() => readPgn("1. e4\n-- 2. d4 *")).toThrow('Line 2, move 1: "--" is not a move');
     });

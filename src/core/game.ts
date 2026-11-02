@@ -231,7 +231,7 @@ export class Game
 
     private illegal(input: string): Refused
     {
-        return { refusal: "illegal", message: `${input} is not legal here, with ${sideToMove(this.chess)} to move.` };
+        return { refusal: "illegal", message: `${input} is not legal here, with ${this.chess.turn() === "w" ? "White" : "Black"} to move.` };
     }
 
     private snapshot(): GameRecord
@@ -316,16 +316,17 @@ function toMove({ san, from, to, promotion }: ChessMove): Move
     return Object.freeze(promotion === undefined ? { san, from, to } : { san, from, to, promotion: promotion as Promotion });
 }
 
-/** The move in SAN's own letters: trimmed, its signs and figurines in ASCII, a piece's small letter in capital (not b, a file too), castling in capital O. */
+/** The move in SAN's own letters: trimmed, without a move number before it, its signs and figurines in ASCII, a piece's small letter in capital (not b, a file too), castling in capital O. */
 function normalized(text: string): string
 {
     return text.trim()
+        .replace(/^\d+\s*(?:\.[\s.]*|…\s*)/, "")
         .replace(/[–—−×♔-♟]/g, (sign) => asciiOf[sign] ?? sign)
         .replace(/^[nrqk](?=[a-h1-8x:])/, (piece) => piece.toUpperCase())
         .replace(/^[0Oo]-[0Oo](?:-[0Oo])?(?=[+#]?[!?]*$)/, (castling) => castling.replace(/[0o]/g, "O"));
 }
 
-/** What the board says when a move was written with a check or a mate it does not give: a sign that the writer sees another position. */
+/** What the board says when a move was written with a check or a mate it does not give: a sign that the writer sees another position; neutral, since the AI reads it of the player's moves too. */
 function checkNote(input: string, san: string): string | undefined
 {
     const written = /([+#])[!?]*$/.exec(input)?.[1];
@@ -337,7 +338,7 @@ function checkNote(input: string, san: string): string | undefined
 
     const bare = san.replace(/[+#]$/, "");
     const truth = given === undefined ? "gives no check" : given === "+" ? "is check, not mate" : "is checkmate";
-    return `You wrote ${input}, but ${bare} ${truth}.`;
+    return `Written as ${input}, but ${bare} ${truth}.`;
 }
 
 /** The board of a FEN tag, refused when no game can reach it; without one, the standard position. */

@@ -1,0 +1,29 @@
+import { z } from "zod";
+import { loadGame, playerPgn } from "../games/index.ts";
+import { defineCommand } from "./registry.ts";
+
+interface Exported
+{
+    format: "pgn" | "fen";
+    text: string;
+}
+
+/** The game as PGN or its position as FEN, for the player to copy or keep: the plans stay hidden while it goes on (D-29). */
+export const exportGame = defineCommand({
+    name: "export",
+    description: "Gives the game as PGN, or its position as FEN, for the player to copy or keep. While the game goes on, the PGN leaves out your plans. "
+        + 'Example: export {format: "pgn"}.',
+    input: z.object({ format: z.enum(["pgn", "fen"]).describe("pgn for the whole game, fen for the position") }),
+    readOnly: true,
+    positionals: ["format"],
+    run: ({ format }, context): Exported => {
+        const current = loadGame(context.folder);
+
+        if (current === undefined) {
+            throw new Error("There is no game to export: start one with new_game.");
+        }
+
+        return { format, text: format === "fen" ? current.game.position.fen : playerPgn(current) };
+    },
+    format: (result) => result.text,
+});

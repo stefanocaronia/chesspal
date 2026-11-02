@@ -23,7 +23,7 @@
     "test": "vitest run",
     "format": "eslint --fix . && dprint fmt",
     "lint": "eslint . && dprint check && tsc -p tsconfig.test.json && tsc -p tsconfig.core.json",
-    "bench": "node --experimental-strip-types test/bench/core.ts"
+    "bench": "npm run build && node --experimental-strip-types test/bench/core.ts && node --experimental-strip-types test/bench/commands.ts"
   },
   "engines": {
     "node": ">=22.13"

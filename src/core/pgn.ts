@@ -21,6 +21,13 @@ export function readPgn(text: string): GameRecord[]
     return new PgnReader(text).read();
 }
 
+/** The day of a date, in its own time zone, as PGN's Date tag writes it: 2026.11.02. */
+export function pgnDate(date: Date): string
+{
+    const two = (value: number): string => String(value).padStart(2, "0");
+    return `${date.getFullYear()}.${two(date.getMonth() + 1)}.${two(date.getDate())}`;
+}
+
 // The seven tags of every PGN, in their order, with the value for an unknown one.
 const sevenTags = [["Event", "?"], ["Site", "?"], ["Date", "????.??.??"], ["Round", "?"], ["White", "?"], ["Black", "?"], ["Result", "*"]] as const;
 const sevenTagNames = new Set<string>(sevenTags.map(([name]) => name));
