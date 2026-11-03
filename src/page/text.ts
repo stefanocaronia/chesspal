@@ -26,7 +26,7 @@ export interface Text
     taken(pieces: readonly string[], ahead: number): string;
     writeTo(name: string): string;
     readBy(name: string): string;
-    waitingFull(name: string, most: number, canMove: boolean): string;
+    readonly oneAMove: string;
 }
 
 /** The words for the first of the browser's languages the page speaks, else English. */
@@ -62,7 +62,7 @@ const english: Text = {
     taken: (pieces, ahead) => `Pieces taken: ${pieces.length === 0 ? "none" : pieces.join(", ")}${ahead > 0 ? `; ahead by ${ahead}` : ""}`,
     writeTo: (name) => `Write to ${name}…`,
     readBy: (name) => `Read by ${name}`,
-    waitingFull: (name, most, canMove) => `${name} has not answered your last ${most} messages yet: wait for the answer${canMove ? ", or make your move" : ""}.`,
+    oneAMove: "One message a move: you can write again after your next move.",
 };
 
 const italian: Text = {
@@ -89,5 +89,5 @@ const italian: Text = {
     taken: (pieces, ahead) => `Pezzi presi: ${pieces.length === 0 ? "nessuno" : pieces.join(", ")}${ahead > 0 ? `; avanti di ${ahead}` : ""}`,
     writeTo: (name) => `Scrivi a ${name}…`,
     readBy: (name) => `Letto da ${name}`,
-    waitingFull: (name, most, canMove) => `${name} non ha ancora risposto ai tuoi ultimi ${most} messaggi: aspetta la sua risposta${canMove ? ", o fai la tua mossa" : ""}.`,
+    oneAMove: "Un messaggio a mossa: potrai scrivere di nuovo dopo la tua prossima mossa.",
 };

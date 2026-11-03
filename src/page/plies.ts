@@ -26,8 +26,8 @@ export function pliesOf(record: GameRecord): Ply[]
     });
 }
 
-/** How many of the player's lines may wait for the AI's answer, and how long a line may be: the server's limits (T-65), which a test keeps equal. */
-export const talkLimits = { waiting: 3, line: 500 } as const;
+/** How long a line of the player's may be: the server's limit (D-54), which a test keeps equal. */
+export const talkLimits = { line: 200 } as const;
 
 /** A line said on the board page, with the moves the game had then (T-65); the player's with how far it got: written, read by the AI, or answered. */
 export interface TalkLine

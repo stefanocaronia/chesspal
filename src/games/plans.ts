@@ -1,10 +1,10 @@
 // The AI's plan rides in the comment of its move as [%plan …], the form of [%clk], which GUIs do not show (D-29, D-41).
 import type { GameRecord } from "../core/index.ts";
 
-/** The comment of the AI's move, with its plan. */
-export function commentWithPlan(comment: string, plan: string): string
+/** The comment of the AI's move, when it has one, with its plan. */
+export function commentWithPlan(comment: string | undefined, plan: string): string
 {
-    return `${comment} [%plan ${plan}]`;
+    return comment === undefined ? `[%plan ${plan}]` : `${comment} [%plan ${plan}]`;
 }
 
 /** The plan the AI wrote last, if it wrote one. */

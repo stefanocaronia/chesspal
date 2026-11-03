@@ -75,6 +75,7 @@ export function App({ text }: { text: Text; })
     const ahead = (side: Side): number => side === "white" ? material.balance : -material.balance;
     const name = served.opponent ?? text.ai;
     const talk = game?.talk ?? [];
+    const said = playerWords(plies, ai, talk);
 
     // Words sent leave the box; what the player wrote on while they went stays.
     const clearSent = (refused: string | undefined, words: string): void => {
@@ -93,8 +94,8 @@ export function App({ text }: { text: Text; })
             return;
         }
 
-        // The words written and not sent go with the move (D-53).
-        const words = draft;
+        // The words written and not sent go with the move (D-53), unless the player has written for it already (D-54).
+        const words = said.length > 0 ? "" : draft;
         setSelected(undefined);
         void sendMove(`${selected}${square}${promotion(pieces.get(selected), square)}`, words).then((refused) => {
             setRefusal(refused);
@@ -128,8 +129,7 @@ export function App({ text }: { text: Text; })
                     <section class="you-block" aria-label={text.you}>
                         {game === null ? null : (
                             <Compose
-                                lines={playerWords(plies, ai, talk)}
-                                waiting={talk.filter((line) => line.who === "player" && line.heard !== "answered").length}
+                                lines={said}
                                 draft={draft}
                                 onDraft={(words) => {
                                     setDraft(words);

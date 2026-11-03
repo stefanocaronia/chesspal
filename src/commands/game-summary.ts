@@ -144,7 +144,9 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
     }
 
     if (game.turn === game.ai) {
-        return "Next: choose your move, then call ai_move with it, your plan and your comment.";
+        return words.length === 0
+            ? "Next: choose your move, then call ai_move with it, your plan and any comment."
+            : "Next: choose your move, then call ai_move with it, your plan and a comment that answers the player.";
     }
 
     return words.length === 0 ? "Next: wait for the player's move, then call player_move with it." : "Next: answer the player with ai_say, then wait for their move.";

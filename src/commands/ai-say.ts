@@ -10,14 +10,14 @@ interface Said
     words: string[];
 }
 
-/** The AI's words on the board page without a move (T-65): its answer to what the player wrote there, read only there. */
+/** The AI's words on the board page without a move (T-65): its answer to what the player wrote there, read only there, on the player's time (D-54). */
 export const aiSay = defineCommand({
     name: "ai_say",
-    description: "Says something to the player on the board page, without a move: your answer to what they wrote there. "
+    description: "Answers what the player wrote on the board page, without a move, while they are to move: when you are, answer in ai_move's comment. "
         + 'Example: ai_say {text: "Sure, I\'ll play faster."}.',
     input: z.object({
         text: z.string().trim().min(1, "write what you say").max(talkLimits.ai, `write ${talkLimits.ai} characters at most`).describe(
-            "what you say to the player, two or three sentences at most",
+            "your answer to the player, one or two short sentences",
         ),
     }),
     run: ({ text }, context): Said => {

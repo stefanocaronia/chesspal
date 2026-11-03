@@ -45,6 +45,6 @@ describe("the moves on the page", () => {
     });
 
     it("hold the player's words to the server's limits", () => {
-        expect(pageLimits).toEqual({ waiting: talkLimits.waiting, line: talkLimits.player });
+        expect(pageLimits).toEqual({ line: talkLimits.player });
     });
 });

@@ -19,11 +19,10 @@ export function AiWords({ words }: { words: readonly string[]; })
 
 /**
  * The player's words still on the page, the last with how far it got, and the box they write in: Enter or the button sends the words alone, the next move
- * takes them with it. Once enough of their words wait for an answer, only a move takes more.
+ * takes them with it. One line a move: once they have written, the box waits for their next move (D-54).
  */
-export function Compose({ lines, waiting, draft, onDraft, onSend, canMove, name, problem, text }: {
+export function Compose({ lines, draft, onDraft, onSend, canMove, name, problem, text }: {
     lines: readonly TalkLine[];
-    waiting: number;
     draft: string;
     onDraft: (draft: string) => void;
     onSend: () => void;
@@ -35,9 +34,10 @@ export function Compose({ lines, waiting, draft, onDraft, onSend, canMove, name,
 {
     const list = useRef<HTMLOListElement>(null);
     useScrolledToEnd(list, lines.map((line) => line.text));
-    const full = waiting >= talkLimits.waiting;
+    // The lines on the page are those since the player's last move: one is this move's.
+    const full = lines.length > 0;
     const blank = draft.trim() === "";
-    const note = problem ?? (full ? text.waitingFull(name, talkLimits.waiting, canMove) : "");
+    const note = problem ?? (full ? text.oneAMove : "");
 
     const submit = (): void => {
         if (!full && !blank) {
@@ -65,6 +65,7 @@ export function Compose({ lines, waiting, draft, onDraft, onSend, canMove, name,
                 <p class="limit" role="status">{note}</p>
                 <textarea
                     rows={2}
+                    disabled={full}
                     maxLength={talkLimits.line}
                     placeholder={text.writeTo(name)}
                     aria-label={text.writeTo(name)}
@@ -78,7 +79,7 @@ export function Compose({ lines, waiting, draft, onDraft, onSend, canMove, name,
                     }}
                 />
                 <div class="foot">
-                    {draft.length >= talkLimits.line - 100
+                    {draft.length >= talkLimits.line - 50
                         ? <span class="count">{draft.length}/{talkLimits.line}</span>
                         : <span class="hint">{!blank && canMove ? text.withMove : ""}</span>}
                     <button class="send" type="submit" disabled={full || blank}>

@@ -1,12 +1,12 @@
 // The talk on the board page (D-51, T-65): the player's words and the AI's answers, kept in game.json beside the PGN.
-import type { CurrentGame, Speaker, TalkLine } from "./current-game.ts";
+import { type CurrentGame, endOf, type Speaker, type TalkLine } from "./current-game.ts";
 
-/** The most a line may hold, by who says it, and how many of the player's lines may wait for the AI's answer. */
-export const talkLimits = { player: 500, ai: 400, waiting: 3 } as const;
+/** The most a line may hold, by who says it (D-54). */
+export const talkLimits = { player: 200, ai: 200 } as const;
 
 /**
- * A new line of the talk, said when the game has `ply` moves: refused when it is empty or too long, and the player's words without a move when
- * `talkLimits.waiting` of theirs already wait for an answer. Words that come with a move are answered with it.
+ * A new line of the talk, said when the game has `ply` moves: refused when it is empty or too long. The player says one line a move, the one sent with
+ * the move included; the AI only answers the player's words, on the player's time (D-54).
  */
 export function talkLine(current: CurrentGame, who: Speaker, text: string, at: Date, ply = current.game.record.moves.length): TalkLine
 {
@@ -21,10 +21,12 @@ export function talkLine(current: CurrentGame, who: Speaker, text: string, at: D
         throw new Error(`The words are ${words.length} characters long: write at most ${most}.`);
     }
 
-    const alone = ply === current.game.record.moves.length;
+    if (who === "player" && current.talk.some((line) => line.who === "player" && line.ply >= sincePlayerMoved(current))) {
+        throw new Error("You have already written for this move: your next words go with your next move.");
+    }
 
-    if (who === "player" && alone && unanswered(current).length >= talkLimits.waiting) {
-        throw new Error(`The AI has not answered your last ${talkLimits.waiting} messages yet: wait for its answer.`);
+    if (who === "ai") {
+        refuseAiWords(current);
     }
 
     return { who, text: words, ply, at: at.toISOString() };
@@ -54,6 +56,29 @@ export function heardLines(current: CurrentGame, given: ReadonlySet<string>): (H
         const key = keyOf(current, index);
         return line.who === "ai" ? undefined : !waiting.has(key) ? "answered" : given.has(key) ? "read" : "sent";
     });
+}
+
+/** The AI speaks apart from its move only to answer the player, and never while its move waits: it answers in the move's comment then. */
+function refuseAiWords(current: CurrentGame): void
+{
+    const { game, ai } = current;
+
+    if (unanswered(current).length === 0) {
+        throw new Error("The player has written nothing to answer: ai_say only answers their words, and a comment rides with your move. Nothing changed.");
+    }
+
+    if (game.position.turn === ai && endOf(game) === undefined) {
+        throw new Error("It is your move: answer the player in ai_move's comment. Nothing changed.");
+    }
+}
+
+/** How many moves the game had just after the player's last move, 0 before it: the player's lines since then are this move's. */
+function sincePlayerMoved(current: CurrentGame): number
+{
+    const moves = current.game.record.moves.length;
+    // The last move is the AI's when the AI is not to move: the player's is the one before it.
+    const lastIsAi = current.game.position.turn !== current.ai;
+    return !lastIsAi ? moves : moves >= 2 ? moves - 1 : 0;
 }
 
 /** The player's lines after the AI's last words and its last move, each with a key of its own across games. */
