@@ -19,10 +19,11 @@ export function AiWords({ words }: { words: readonly string[]; })
 
 /**
  * The player's words still on the page, the last with how far it got, and the box they write in: Enter or the button sends the words alone, the next move
- * takes them with it. One line a move: once they have written, the box waits for their next move (D-54).
+ * takes them with it. 200 characters from one move of the AI's to the next: once they are written, the box goes until its move (D-54).
  */
-export function Compose({ lines, draft, onDraft, onSend, canMove, name, problem, text }: {
+export function Compose({ lines, spent, draft, onDraft, onSend, canMove, name, problem, text }: {
     lines: readonly TalkLine[];
+    spent: number;
     draft: string;
     onDraft: (draft: string) => void;
     onSend: () => void;
@@ -34,13 +35,11 @@ export function Compose({ lines, draft, onDraft, onSend, canMove, name, problem,
 {
     const list = useRef<HTMLOListElement>(null);
     useScrolledToEnd(list, lines.map((line) => line.text));
-    // The lines on the page are those since the player's last move: one is this move's.
-    const full = lines.length > 0;
+    const left = talkLimits.line - spent;
     const blank = draft.trim() === "";
-    const note = problem ?? (full ? text.oneAMove : "");
 
     const submit = (): void => {
-        if (!full && !blank) {
+        if (!blank) {
             onSend();
         }
     };
@@ -55,41 +54,42 @@ export function Compose({ lines, draft, onDraft, onSend, canMove, name, problem,
                     </li>
                 ))}
             </ol>
-            <form
-                class="compose"
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    submit();
-                }}
-            >
-                <p class="limit" role="status">{note}</p>
-                <textarea
-                    rows={2}
-                    disabled={full}
-                    maxLength={talkLimits.line}
-                    placeholder={text.writeTo(name)}
-                    aria-label={text.writeTo(name)}
-                    value={draft}
-                    onInput={(event) => onDraft(event.currentTarget.value)}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-                            event.preventDefault();
-                            submit();
-                        }
+            {left <= 0 ? null : (
+                <form
+                    class="compose"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        submit();
                     }}
-                />
-                <div class="foot">
-                    {draft.length >= talkLimits.line - 50
-                        ? <span class="count">{draft.length}/{talkLimits.line}</span>
-                        : <span class="hint">{!blank && canMove ? text.withMove : ""}</span>}
-                    <button class="send" type="submit" disabled={full || blank}>
-                        {text.send}
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M5 12H18M13 7L18 12L13 17" />
-                        </svg>
-                    </button>
-                </div>
-            </form>
+                >
+                    <p class="limit" role="status">{problem ?? ""}</p>
+                    <textarea
+                        rows={2}
+                        maxLength={left}
+                        placeholder={text.writeTo(name)}
+                        aria-label={text.writeTo(name)}
+                        value={draft}
+                        onInput={(event) => onDraft(event.currentTarget.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+                                event.preventDefault();
+                                submit();
+                            }
+                        }}
+                    />
+                    <div class="foot">
+                        {spent + draft.length >= talkLimits.line - 50
+                            ? <span class="count">{spent + draft.length}/{talkLimits.line}</span>
+                            : <span class="hint">{!blank && canMove ? text.withMove : ""}</span>}
+                        <button class="send" type="submit" disabled={blank}>
+                            {text.send}
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M5 12H18M13 7L18 12L13 17" />
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+            )}
         </>
     );
 }

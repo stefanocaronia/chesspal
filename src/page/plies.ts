@@ -63,3 +63,10 @@ export function playerWords(plies: readonly Ply[], ai: Side, talk: readonly Talk
     const moved = plies.findLastIndex((ply) => ply.side !== ai);
     return talk.filter((line) => line.who === "player" && line.ply > moved);
 }
+
+/** How many characters the player has written since the AI's last move, of the 200 they may until its next one (D-54). */
+export function playerSpent(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): number
+{
+    const moved = plies.findLastIndex((ply) => ply.side === ai);
+    return talk.filter((line) => line.who === "player" && line.ply > moved).reduce((sum, line) => sum + line.text.length, 0);
+}

@@ -378,7 +378,7 @@ describe("the talk on the board page", () => {
         expect(await run(context, "look")).not.toContain("Ready?");
     });
 
-    it("takes one message of the player's a move, and lets the AI speak apart from its move only to answer them, on their time", async () => {
+    it("takes 200 characters of the player's a move, and lets the AI answer them apart from its move once, on their time", async () => {
         const context = playerFolder();
 
         await expect(run(context, "ai_say", { text: "Hello." })).rejects.toThrow("There is no game: the board page shows your words beside one. Nothing changed.");
@@ -387,15 +387,17 @@ describe("the talk on the board page", () => {
         await expect(run(context, "ai_say", { text: "Hello." })).rejects.toThrow("The player has written nothing to answer");
         await expect(run(context, "player_say", { text: "o".repeat(201) })).rejects.toThrow("write 200 characters at most");
 
-        await run(context, "player_say", { text: "One." });
-        await expect(run(context, "player_say", { text: "Two." })).rejects.toThrow("You have already written for this move: your next words go with your next move.");
+        await run(context, "player_say", { text: "o".repeat(150) });
+        await expect(run(context, "player_say", { text: "t".repeat(51) })).rejects.toThrow("The words are 51 characters long: write at most 50 more until the AI's next move.");
         await run(context, "ai_say", { text: "I hear you." });
-        await expect(run(context, "ai_say", { text: "And more." })).rejects.toThrow("The player has written nothing to answer");
-        await expect(run(context, "player_say", { text: "Two." })).rejects.toThrow("You have already written for this move");
+        await run(context, "player_say", { text: "t".repeat(50) });
+        await expect(run(context, "ai_say", { text: "And more." })).rejects.toThrow("You have answered the player once for this move: answer the rest in ai_move's comment.");
+        await expect(run(context, "player_say", { text: "Two." })).rejects.toThrow("You have written your 200 characters until the AI's next move: write again after it.");
 
         await run(context, "player_move", { move: "e4" });
-        expect(await run(context, "player_say", { text: "Two." })).toContain("«Two.»");
         await expect(run(context, "ai_say", { text: "Wait." })).rejects.toThrow("It is your move: answer the player in ai_move's comment. Nothing changed.");
+        await run(context, "ai_move", { move: "e5", plan: "A plan." });
+        expect(await run(context, "player_say", { text: "Two." })).toContain("«Two.»");
     });
 
     it("gives the player's words on one line, and once the AI has spoken on a game over, only the next game", async () => {

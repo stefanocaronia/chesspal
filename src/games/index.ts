@@ -3,4 +3,4 @@ export { archivedName, archiveGame, playerPgn, startOfNewGame } from "./archive.
 export { type CurrentGame, endOf, type GameEnd, loadGame, saveGame, type Speaker, type TalkLine } from "./current-game.ts";
 export { makeFolder, writeAtomically } from "./files.ts";
 export { commentWithPlan, currentPlan, withoutPlans } from "./plans.ts";
-export { type Heard, heardLines, talkLimits, talkLine, unheardWords, type Words } from "./talk.ts";
+export { type Heard, heardLines, playerLinesThisMove, talkLimits, talkLine, unheardWords, type Words } from "./talk.ts";

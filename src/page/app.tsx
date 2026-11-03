@@ -1,12 +1,13 @@
 // The page: the game of the player's folder, replayed with the chess core from its PGN (D-17), kept up to date as it changes, the player's moves (D-47) and
 // words (T-65), in Zoe's three columns (D-53): the talk, the board, the game.
-import { useEffect, useMemo, useState } from "preact/hooks";
-import { Game, materialOf, readPgn, type Side } from "../core/index.ts";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { Game, materialOf, readPgn, type Side, type Square } from "../core/index.ts";
 import { Board, piecesOf } from "./board.tsx";
 import { GameColumn, rememberFolded, startFolded } from "./game-column.tsx";
 import { Header } from "./header.tsx";
 import { Avatar, PlayerCard } from "./player-card.tsx";
-import { aiWords, playerWords, pliesOf, type TalkLine } from "./plies.ts";
+import { aiWords, playerSpent, playerWords, pliesOf, type TalkLine } from "./plies.ts";
+import { playSound, rememberSound, soundOf, soundOn, wakeSounds } from "./sounds.ts";
 import { AiWords, Compose } from "./talk.tsx";
 import type { Text } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
@@ -22,6 +23,7 @@ export function App({ text }: { text: Text; })
     const [folded, setFolded] = useState(startFolded);
     const [draft, setDraft] = useState("");
     const [unsent, setUnsent] = useState<string | undefined>(undefined);
+    const [sound, setSound] = useState(soundOn);
 
     useEffect(() => {
         let latest = 0;
@@ -58,13 +60,46 @@ export function App({ text }: { text: Text; })
     const material = useMemo(() => materialOf(live.position.fen), [live]);
     const pieces = useMemo(() => piecesOf(live.position.fen), [live]);
     const plies = useMemo(() => pliesOf(live.record), [live]);
+    // The player's move shows at once, before the server has it: the game it sends next takes its place (T-70).
+    const [pending, setPending] = useState<string | undefined>(undefined);
+    const shown = useMemo(() => pending === undefined ? live : withMove(live, pending), [live, pending]);
+    useEffect(() => setPending(undefined), [game]);
+    useMoveSounds(game, live, sound);
+
+    const switchSound = (): void => {
+        setSound(!sound);
+        rememberSound(!sound);
+    };
+
+    // A game going on is archived unfinished: the player says so first (T-64).
+    const startNewGame = (): void => {
+        const going = game !== null && game !== undefined && !live.outcome.over && (live.record.tags.Result ?? "*") === "*";
+
+        if (going && !confirm(text.abandonGame)) {
+            return;
+        }
+
+        setSelected(undefined);
+        void post("/api/new", {}).then(setRefusal);
+    };
+
+    const header = (
+        <Header
+            text={text}
+            onNewGame={served === undefined ? undefined : startNewGame}
+            flipped={flipped}
+            onFlip={() => setFlipped(!flipped)}
+            sound={sound}
+            onSound={switchSound}
+        />
+    );
 
     if (problem !== undefined) {
         return <p class="problem">{problem}</p>;
     }
 
     if (served === undefined || game === undefined) {
-        return <Header text={text} flipped={flipped} onFlip={() => setFlipped(!flipped)} />;
+        return header;
     }
 
     const player = game === null || game.ai === "black" ? "white" : "black";
@@ -84,22 +119,25 @@ export function App({ text }: { text: Text; })
         }
     };
 
-    const choose = (square: string): void => {
-        const piece = pieces.get(square);
-        const own = piece !== undefined && (piece === piece.toUpperCase()) === (player === "white");
+    const select = (square: string | undefined): void => {
         setRefusal(undefined);
+        setSelected(square);
+    };
 
-        if (own || selected === undefined) {
-            setSelected(own ? square : undefined);
-            return;
-        }
-
-        // The words written and not sent go with the move (D-53), unless the player has written for it already (D-54).
-        const words = said.length > 0 ? "" : draft;
+    const play = (from: string, to: string): void => {
+        // The words written and not sent go with the move (D-53): the box holds no more than the move has left (D-54).
+        const words = draft;
+        const move = `${from}${to}${promotion(pieces.get(from), to)}`;
         setSelected(undefined);
-        void sendMove(`${selected}${square}${promotion(pieces.get(selected), square)}`, words).then((refused) => {
+        setRefusal(undefined);
+        setPending(move);
+        void sendMove(move, words).then((refused) => {
             setRefusal(refused);
             clearSent(refused, words);
+
+            if (refused !== undefined) {
+                setPending(undefined);
+            }
         });
     };
 
@@ -119,7 +157,7 @@ export function App({ text }: { text: Text; })
 
     return (
         <>
-            <Header text={text} flipped={flipped} onFlip={() => setFlipped(!flipped)} />
+            {header}
             <main class={`app${flipped ? " flipped" : ""}${folded ? " folded" : ""}`}>
                 <div class="talk">
                     <section class="ai-block" aria-label={name}>
@@ -130,6 +168,7 @@ export function App({ text }: { text: Text; })
                         {game === null ? null : (
                             <Compose
                                 lines={said}
+                                spent={playerSpent(plies, ai, talk)}
                                 draft={draft}
                                 onDraft={(words) => {
                                     setDraft(words);
@@ -156,11 +195,14 @@ export function App({ text }: { text: Text; })
                 </div>
                 <div class="board-wrap">
                     <Board
-                        fen={live.position.fen}
+                        fen={shown.position.fen}
                         bottom={flipped ? ai : player}
-                        lastMove={live.lastMove}
+                        lastMove={shown.lastMove}
+                        player={playerToMove && pending === undefined ? player : undefined}
                         selected={selected}
-                        onSquare={playerToMove ? choose : undefined}
+                        targets={selected === undefined ? [] : live.legalMoves(selected as Square)}
+                        onSelect={select}
+                        onMove={play}
                         text={text}
                     />
                     {refusal === undefined ? null : <p class="toast" role="alert">{refusal}</p>}
@@ -189,6 +231,29 @@ interface Served
     readonly opponent?: string;
 }
 
+/** Plays the sound of each move the game gains while the page watches it, the AI's and the player's: none for a game loaded or begun again (T-71). */
+function useMoveSounds(game: Served["game"] | undefined, live: Game, on: boolean): void
+{
+    const seen = useRef<{ started: string; moves: number; } | undefined>(undefined);
+
+    useEffect(wakeSounds, []);
+
+    useEffect(() => {
+        if (game === undefined || game === null) {
+            return;
+        }
+
+        const moves = live.record.moves.length;
+        const before = seen.current;
+        seen.current = { started: game.started, moves };
+        const sound = soundOf(live);
+
+        if (on && before?.started === game.started && moves === before.moves + 1 && sound !== undefined) {
+            playSound(sound);
+        }
+    }, [live]);
+}
+
 /** Sends the player's move to the server, which plays it as the chat would, with the words written for the AI: the reason it was refused, or undefined. */
 function sendMove(move: string, words: string): Promise<string | undefined>
 {
@@ -210,6 +275,13 @@ async function post(path: string, body: object): Promise<string | undefined>
     } catch (error) {
         return String(error);
     }
+}
+
+/** The game with the player's move played on a copy, for the board to show before the server answers; the game itself when the move is not legal. */
+function withMove(game: Game, move: string): Game
+{
+    const copy = new Game(game.record);
+    return copy.play(move).played ? copy : game;
 }
 
 /** A pawn that reaches the last rank becomes a queen, until the page lets the player choose (T-11). */

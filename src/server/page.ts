@@ -7,9 +7,10 @@ import { createRequire } from "node:module";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Context } from "../commands/context.ts";
+import { newGame } from "../commands/new-game.ts";
 import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
-import { endOf, heardLines, loadGame, playerPgn, talkLimits, unheardWords } from "../games/index.ts";
+import { endOf, heardLines, loadGame, playerLinesThisMove, playerPgn, talkLimits, unheardWords } from "../games/index.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
 
 /** The page of a player's folder, served: its address, how to tell it the AI was given words, which change no file, and how to stop it. */
@@ -110,9 +111,14 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         return;
     }
 
+    if (request.method === "POST" && path === "/api/new") {
+        newGameFromPage(request, response, served);
+        return;
+    }
+
     // The API answers GET alone: a HEAD at the doorbell would wait there as a hook does.
     if (request.method !== "GET" && (request.method !== "HEAD" || path.startsWith("/api/"))) {
-        send(response, 405, "text/plain; charset=utf-8", "The page only reads, moves with POST /api/move and writes with POST /api/message.");
+        send(response, 405, "text/plain; charset=utf-8", "The page only reads, moves with POST /api/move, writes with POST /api/message and starts a game with POST /api/new.");
         return;
     }
 
@@ -174,7 +180,7 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
     send(response, 200, json, JSON.stringify({ played: true }));
 }
 
-/** The player's words from the page, without a move: saved with the game as player_say saves them, refused in the player's words, and the doorbell rung. */
+/** The player's words from the page, without a move: saved with the game as player_say saves them, refused in the player's words, the doorbell rung for the first. */
 async function messageFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
     if (!isJson(request)) {
@@ -189,15 +195,41 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
         return;
     }
 
+    let current;
+
     try {
-        say(served.folder, "player", text, served.context.now());
+        current = say(served.folder, "player", text, served.context.now());
+    } catch (error) {
+        send(response, 409, json, JSON.stringify({ error: (error as Error).message }));
+        return;
+    }
+
+    // The first words of a move wake the chat; the AI finds the rest at its next call (D-54).
+    if (playerLinesThisMove(current).length === 1) {
+        served.bell.ring();
+    }
+
+    send(response, 200, json, JSON.stringify({ said: true }));
+}
+
+/** A new game from the page, the sides as in the game before (T-64): one going on goes to the archive unfinished, and the doorbell tells the chat. */
+function newGameFromPage(request: IncomingMessage, response: ServerResponse, served: Served): void
+{
+    if (!isJson(request)) {
+        send(response, 415, json, JSON.stringify({ error: "Send the request as JSON: {}." }));
+        return;
+    }
+
+    try {
+        const before = loadGame(served.folder);
+        newGame.run({ ai_colour: before?.ai ?? "black", replace: true }, served.context);
     } catch (error) {
         send(response, 409, json, JSON.stringify({ error: (error as Error).message }));
         return;
     }
 
     served.bell.ring();
-    send(response, 200, json, JSON.stringify({ said: true }));
+    send(response, 200, json, JSON.stringify({ started: true }));
 }
 
 const json = "application/json; charset=utf-8";

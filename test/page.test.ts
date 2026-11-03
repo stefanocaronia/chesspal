@@ -98,6 +98,22 @@ describe("the player's moves on the page", () => {
         expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain("1. e4 e5 {Symmetry.} *");
     });
 
+    it("starts a new game with the sides of the game before, the one going on archived", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+
+        expect(await post(page, "/api/new", {})).toMatchObject({ status: 200, body: '{"started":true}' });
+        expect(JSON.parse((await get(page, "/api/game")).body).game.ai).toBe("black");
+        await run(folder, "new_game", { ai_colour: "white", replace: true });
+        await run(folder, "ai_move", { move: "e4", plan: "A plan." });
+
+        expect(await post(page, "/api/new", {})).toMatchObject({ status: 200, body: '{"started":true}' });
+        const game = JSON.parse((await get(page, "/api/game")).body).game;
+        expect(game.ai).toBe("white");
+        expect(game.pgn).not.toContain("e4");
+        expect((await post(page, "/api/new", {}, { "content-type": "text/plain" })).status).toBe(415);
+    });
+
     it("takes the player's words, alone or with their move, and refuses them in the player's words", async () => {
         const folder = playerFolder();
         const page = await open(folder);
@@ -106,21 +122,27 @@ describe("the player's moves on the page", () => {
         await run(folder, "new_game", { ai_colour: "black" });
 
         expect(await post(page, "/api/message", { text: "  Hi!  " })).toMatchObject({ status: 200, body: '{"said":true}' });
-        // One message a move: the words sent alone were this move's.
-        expect(await post(page, "/api/move", { move: "e4", message: "Your turn." })).toMatchObject({
+        // 200 characters a move: the words sent alone count with those sent with the move.
+        expect(await post(page, "/api/move", { move: "e4", message: "y".repeat(198) })).toMatchObject({
             status: 409,
-            body: '{"error":"You have already written for this move: your next words go with your next move."}',
+            body: '{"error":"The words are 198 characters long: write at most 197 more until the AI\'s next move."}',
         });
-        expect(await post(page, "/api/move", { move: "e4" })).toMatchObject({ status: 200, body: '{"played":true}' });
-        expect(JSON.parse((await get(page, "/api/game")).body).game.talk).toEqual([{ who: "player", text: "Hi!", ply: 0, heard: "sent" }]);
+        expect(await post(page, "/api/move", { move: "e4", message: "Your turn." })).toMatchObject({ status: 200, body: '{"played":true}' });
+        expect(JSON.parse((await get(page, "/api/game")).body).game.talk).toEqual([
+            { who: "player", text: "Hi!", ply: 0, heard: "sent" },
+            { who: "player", text: "Your turn.", ply: 1, heard: "sent" },
+        ]);
         expect(JSON.parse(readFileSync(join(folder, "game.json"), "utf8")).talk[0]).toEqual({ who: "player", text: "Hi!", ply: 0, at: new Date(2026, 10, 2, 15, 30, 12).toISOString() });
 
-        expect(await post(page, "/api/message", { text: "x".repeat(201) })).toMatchObject({ status: 409, body: '{"error":"The words are 201 characters long: write at most 200."}' });
-        expect((await post(page, "/api/message", { text: "Are you there?" })).status).toBe(200);
+        // The words written while the AI thinks count with those of the move, until the AI moves.
+        expect(await post(page, "/api/message", { text: "x".repeat(201) })).toMatchObject({
+            status: 409,
+            body: '{"error":"The words are 201 characters long: write at most 187 more until the AI\'s next move."}',
+        });
+        expect((await post(page, "/api/message", { text: "x".repeat(187) })).status).toBe(200);
         expect((await post(page, "/api/message", { text: "Hello?" })).status).toBe(409);
         await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." });
-        expect((await post(page, "/api/move", { move: "Nf3", message: "And a move." })).status).toBe(409);
-        expect(await post(page, "/api/move", { move: "Nf3" })).toMatchObject({ status: 200, body: '{"played":true}' });
+        expect(await post(page, "/api/move", { move: "Nf3", message: "And a move." })).toMatchObject({ status: 200, body: '{"played":true}' });
         expect((await post(page, "/api/message", { text: "Hi" }, { "content-type": "text/plain" })).status).toBe(415);
         expect((await post(page, "/api/message", { text: "  " })).status).toBe(400);
         // A body past 4 KB is cut off where it stands.
@@ -216,6 +238,9 @@ describe("the doorbell of the chat", () => {
         const heard = await Promise.race([waiting, new Promise((done) => setTimeout(() => done("waiting"), 300))]);
 
         expect(heard).toBe("waiting");
+        // The first words of a move rang already: the next ones wait for the AI's next call.
+        await post(page, "/api/message", { text: "Are you there?" });
+        expect(await Promise.race([waiting, new Promise((done) => setTimeout(() => done("waiting"), 300))])).toBe("waiting");
         await post(page, "/api/move", { move: "Nf3" });
         expect(await waiting).toBe(true);
     });

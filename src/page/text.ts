@@ -7,6 +7,9 @@ export interface Text
     readonly language: string;
     readonly flip: string;
     readonly theme: string;
+    readonly sounds: string;
+    readonly newGame: string;
+    readonly abandonGame: string;
     readonly board: string;
     readonly game: string;
     readonly moves: string;
@@ -26,7 +29,6 @@ export interface Text
     taken(pieces: readonly string[], ahead: number): string;
     writeTo(name: string): string;
     readBy(name: string): string;
-    readonly oneAMove: string;
 }
 
 /** The words for the first of the browser's languages the page speaks, else English. */
@@ -43,6 +45,9 @@ const english: Text = {
     language: "en",
     flip: "Flip",
     theme: "Light or dark theme",
+    sounds: "Sounds",
+    newGame: "New game",
+    abandonGame: "Start a new game? The one going on goes to the archive unfinished.",
     board: "Chessboard",
     game: "The game",
     moves: "Moves",
@@ -62,13 +67,15 @@ const english: Text = {
     taken: (pieces, ahead) => `Pieces taken: ${pieces.length === 0 ? "none" : pieces.join(", ")}${ahead > 0 ? `; ahead by ${ahead}` : ""}`,
     writeTo: (name) => `Write to ${name}…`,
     readBy: (name) => `Read by ${name}`,
-    oneAMove: "One message a move: you can write again after your next move.",
 };
 
 const italian: Text = {
     language: "it",
     flip: "Gira",
     theme: "Tema chiaro o scuro",
+    sounds: "Suoni",
+    newGame: "Nuova partita",
+    abandonGame: "Iniziare una nuova partita? Quella in corso va nell'archivio, non finita.",
     board: "Scacchiera",
     game: "La partita",
     moves: "Mosse",
@@ -89,5 +96,4 @@ const italian: Text = {
     taken: (pieces, ahead) => `Pezzi presi: ${pieces.length === 0 ? "nessuno" : pieces.join(", ")}${ahead > 0 ? `; avanti di ${ahead}` : ""}`,
     writeTo: (name) => `Scrivi a ${name}…`,
     readBy: (name) => `Letto da ${name}`,
-    oneAMove: "Un messaggio a mossa: potrai scrivere di nuovo dopo la tua prossima mossa.",
 };
