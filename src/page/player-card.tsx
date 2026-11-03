@@ -49,14 +49,19 @@ export function PlayerCard({ place, picture, name, side, taken, ahead, turn = fa
     );
 }
 
-/** The player's picture until the profiles bring theirs (T-19): a plain figure. */
+/** The player's picture until the profiles bring theirs (T-19): a simple face, in a circle. */
 export function Avatar()
 {
     return (
         <svg class="avatar" viewBox="0 0 64 64" width="48" height="48" aria-hidden="true">
             <circle class="back" cx="32" cy="32" r="32" />
-            <circle class="figure" cx="32" cy="26" r="11" />
-            <path class="figure" d="M12 56C14 44 22 39 32 39C42 39 50 44 52 56Z" />
+            <path class="shirt" d="M10 66C11 52 20 45 32 45C44 45 53 52 54 66Z" />
+            <path class="skin" d="M27 37H37V47C37 50 27 50 27 47Z" />
+            <circle class="skin" cx="32" cy="28" r="12" />
+            <path class="hair" d="M19.5 29C18 18 24 12.5 32.5 12.5C41 12.5 46.5 18 44.5 29C43 23.5 39 20.5 33 21.5C28 22.5 23 24 19.5 29Z" />
+            <circle class="eye" cx="27.5" cy="29.5" r="1.7" />
+            <circle class="eye" cx="36.5" cy="29.5" r="1.7" />
+            <path class="smile" d="M28.5 34.5Q32 37.5 35.5 34.5" />
         </svg>
     );
 }

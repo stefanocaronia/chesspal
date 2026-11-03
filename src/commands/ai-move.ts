@@ -22,7 +22,7 @@ export const aiMove = defineCommand({
     run: ({ move, plan, comment }, context): MovePlayed => {
         // The player's words are read before the move, which would count as the answer to them; a move refused leaves them for the next call.
         const waiting = waitingWords(context);
-        const played = playMove(context.folder, "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: commentWithPlan(comment, plan) });
+        const played = playMove(context.folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: commentWithPlan(comment, plan) });
         return { ...played, words: give(context, waiting) };
     },
     format: (result) => {

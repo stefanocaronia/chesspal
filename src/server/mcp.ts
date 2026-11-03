@@ -41,7 +41,8 @@ export async function startMcpServer(context: Context = defaultContext(), list: 
     process.stdin.on("end", leave);
     process.stdin.on("close", leave);
     const server = createMcpServer(context, list);
-    context.page = await pageOf(context, () => opponentOf(server.server.getClientVersion()?.name));
+    context.host = () => server.server.getClientVersion()?.name;
+    context.page = await pageOf(context, () => opponentOf(context.host?.()));
     await server.connect(new StdioServerTransport());
 }
 

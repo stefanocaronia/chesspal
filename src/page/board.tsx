@@ -1,7 +1,8 @@
 // The board: eight ranks of squares from a FEN, one side at the bottom, Zoe's pieces (T-9), the ranks and files on the edge squares. The player moves
 // with two clicks or by dragging a piece, which lifts off the board, in Zoe's design (T-70).
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Move, PieceLetter, Side } from "../core/index.ts";
+import type { HowEnded } from "./ending.ts";
 import { Piece } from "./pieces.tsx";
 import type { Text } from "./text.ts";
 
@@ -10,19 +11,29 @@ import type { Text } from "./text.ts";
  * picks one, and the legal moves of the piece picked show as dots, rings on captures; a second press on one of them, or a drag there, plays it. At any time
  * the right button lights a square, or draws an arrow when dragged, until a left click.
  */
-export function Board({ fen, bottom, lastMove, player, selected, targets, onSelect, onMove, text }: {
+export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, player, selected, targets, dots, onSelect, onMove, text }: {
     fen: string;
     bottom: Side;
     lastMove?: Move;
+    /** The move after this position, while the player looks back (T-88): stepping back over it slides its pieces home. */
+    nextMove?: Move;
+    /** Whether the position comes from a jump of more moves through the game, which shows it at once. */
+    jumped?: boolean;
+    check: boolean;
+    /** The game over, when this is its last position (T-77): the mated king's square turns red, the kings get their badges. */
+    end?: BoardEnd;
     player?: Side;
     selected?: string;
     targets: readonly Move[];
+    dots: boolean;
     onSelect: (square: string | undefined) => void;
     onMove: (from: string, to: string) => void;
     text: Text;
 })
 {
     const pieces = piecesOf(fen);
+    const mated = end?.how === "checkmate" ? kingToMove(fen, pieces) : undefined;
+    const signs = end === undefined ? noSigns : kingSigns(pieces, fen.split(" ")[1] === "b" ? "black" : "white", end);
     const ranks = bottom === "white" ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8];
     const columns = bottom === "white" ? [...files] : [...files].reverse();
     const board = useRef<HTMLDivElement>(null);
@@ -31,6 +42,27 @@ export function Board({ fen, bottom, lastMove, player, selected, targets, onSele
     const marking = useRef<{ from: string; id: number; } | undefined>(undefined);
     const [marks, setMarks] = useState<Marks>(noMarks);
     const [drawing, setDrawing] = useState<Arrow | undefined>(undefined);
+    // A new position slides the pieces of its move there, but for the one the player dragged, and shakes a king in check (T-74).
+    const before = useRef<string | undefined>(undefined);
+    const dragged = useRef<string | undefined>(undefined);
+    const motion = useMemo(() => {
+        const was = before.current === undefined ? undefined : piecesOf(before.current);
+        before.current = fen;
+        // A move played on the position before slides there, a step back over one slides it home; a jump through the game moves every piece to its place (T-88).
+        const fresh = was !== undefined && jumped !== true && lastMove !== undefined && playedOn(was, pieces, lastMove);
+        const undone = was !== undefined && jumped !== true && nextMove !== undefined && playedOn(pieces, was, nextMove);
+        const moved = was === undefined
+            ? noMotion
+            : fresh
+            ? motionOf(lastMove, dragged.current, check ? kingToMove(fen, pieces) : undefined, was)
+            : undone
+            ? backOf(nextMove)
+            : jumped === true
+            ? rearranged(was, pieces)
+            : noMotion;
+        dragged.current = undefined;
+        return moved;
+    }, [fen]);
 
     const own = (square: string): boolean => {
         const piece = pieces.get(square);
@@ -209,6 +241,7 @@ export function Board({ fen, bottom, lastMove, player, selected, targets, onSele
 
         if (!cancelled && to !== undefined && to !== drag.from && isTarget(to)) {
             setDrag(undefined);
+            dragged.current = `${drag.from}${to}`;
             onMove(drag.from, to);
         } else if (!cancelled && to === drag.from) {
             setDrag(undefined);
@@ -221,7 +254,7 @@ export function Board({ fen, bottom, lastMove, player, selected, targets, onSele
         <>
             <div
                 ref={board}
-                class={player === undefined ? "board" : "board playable"}
+                class={["board", player === undefined ? "" : "playable", end === undefined ? "" : endClasses(end)].filter((name) => name !== "").join(" ")}
                 role="grid"
                 aria-label={text.board}
                 onPointerDown={down}
@@ -237,23 +270,50 @@ export function Board({ fen, bottom, lastMove, player, selected, targets, onSele
                         const dark = (files.indexOf(file) + rank) % 2 === 1;
                         const marked = lastMove !== undefined && (lastMove.from === square || lastMove.to === square);
                         const target = targets.find((move) => move.to === square);
+                        const sign = signs.get(square);
                         const classes = [
                             "square",
                             dark ? "dark" : "light",
                             marked ? "last" : "",
+                            mated === square ? "mated" : "",
+                            sign?.classes ?? "",
                             selected === square ? "selected" : "",
                             marks.squares.includes(square) ? "marked" : "",
                             own(square) ? "own" : "",
-                            target === undefined ? "" : target.san.includes("x") ? "hint capture" : "hint",
+                            target === undefined ? "" : !dots ? "target" : target.san.includes("x") ? "hint capture" : "hint",
                             drag?.over === square && drag.over !== drag.from ? "over" : "",
                             drag?.from === square ? "from" : "",
+                            motion.slides.has(square) ? "slide" : "",
+                            motion.shake === square ? "shake" : "",
+                            motion.appear?.has(square) === true ? "appear" : "",
                         ].filter((name) => name !== "").join(" ");
-                        const label = piece === undefined ? square : `${square}, ${text.piece(piece.toUpperCase() as PieceLetter, piece === piece.toUpperCase() ? "white" : "black")}`;
+                        const named = piece === undefined ? square : `${square}, ${text.piece(piece.toUpperCase() as PieceLetter, piece === piece.toUpperCase() ? "white" : "black")}`;
+                        const label = mated === square ? `${named}, ${text.checkmate}` : named;
+                        const from = motion.slides.get(square);
+                        const moving = from !== undefined || motion.shake === square || motion.appear?.has(square) === true;
+                        // How far the sliding piece comes from, in squares as the board is turned.
+                        const away = from === undefined ? undefined : {
+                            "--dx": columns.indexOf(from[0]!) - column,
+                            "--dy": ranks.indexOf(Number(from[1])) - row,
+                        };
                         return (
-                            <div key={square} class={classes} role="gridcell" aria-label={label}>
+                            <div key={square} class={classes} role="gridcell" aria-label={label} style={away}>
                                 {column === 0 ? <span class="coordinate rank">{rank}</span> : null}
                                 {row === 7 ? <span class="coordinate file">{file}</span> : null}
-                                {piece === undefined ? null : <Piece letter={piece} />}
+                                {motion.taken?.square === square
+                                    ? (
+                                        <span key={`taken ${fen}`} class="taken-piece">
+                                            <Piece letter={motion.taken.letter} />
+                                        </span>
+                                    )
+                                    : null}
+                                {motion.gone?.filter((gone) => gone.square === square).map((gone) => (
+                                    <span key={`gone ${fen}`} class="gone-piece">
+                                        <Piece letter={gone.letter} />
+                                    </span>
+                                ))}
+                                {piece === undefined ? null : <Piece key={moving ? fen : "still"} letter={piece} />}
+                                {sign === undefined ? null : <Badge kind={sign.badge} />}
                             </div>
                         );
                     })
@@ -263,6 +323,15 @@ export function Board({ fen, bottom, lastMove, player, selected, targets, onSele
             {drag === undefined || !pieces.has(drag.from) ? null : <Lifted drag={drag} letter={pieces.get(drag.from)!} />}
         </>
     );
+}
+
+/** A game over as the board shows it (T-77): how it ended, who won, the player's side, and whether it ended a moment ago, which plays its effects. */
+export interface BoardEnd
+{
+    readonly how?: HowEnded;
+    readonly winner?: Side;
+    readonly player: Side;
+    readonly fresh: boolean;
 }
 
 /** The pieces of a FEN by square, as its letters: uppercase for White. */
@@ -311,6 +380,178 @@ interface Drag
     readonly over?: string;
     readonly touch: boolean;
     readonly back: boolean;
+}
+
+/**
+ * How a new position moves on the board: each sliding piece's square with the square it comes from, the piece it takes, which stays until it arrives, and
+ * the king in check that shakes.
+ */
+interface Motion
+{
+    readonly slides: ReadonlyMap<string, string>;
+    readonly taken?: { readonly square: string; readonly letter: string; };
+    /** After a jump through the game (T-88): the pieces that fade from their squares, and the squares where a piece appears. */
+    readonly gone?: readonly { readonly square: string; readonly letter: string; }[];
+    readonly appear?: ReadonlySet<string>;
+    readonly shake?: string;
+}
+
+const noMotion: Motion = { slides: new Map() };
+
+/**
+ * The last move slides, but for a piece the player dragged there (`dragged`, its squares), over the piece it takes, as it stood `before`; a castling rook
+ * slides always.
+ */
+function motionOf(move: Move, dragged: string | undefined, shake: string | undefined, before: ReadonlyMap<string, string>): Motion
+{
+    const slides = new Map<string, string>();
+    let taken: Motion["taken"];
+
+    if (dragged !== `${move.from}${move.to}`) {
+        slides.set(move.to, move.from);
+        // A pawn that takes en passant lands beside the pawn it takes.
+        const square = before.has(move.to) ? move.to : before.get(move.from)?.toLowerCase() === "p" && move.from[0] !== move.to[0] ? `${move.to[0]}${move.from[1]}` : undefined;
+        const letter = square === undefined ? undefined : before.get(square);
+        taken = square === undefined || letter === undefined ? undefined : { square, letter };
+    }
+
+    const rank = move.from[1];
+
+    if (move.san.startsWith("O-O-O")) {
+        slides.set(`d${rank}`, `a${rank}`);
+    } else if (move.san.startsWith("O-O")) {
+        slides.set(`f${rank}`, `h${rank}`);
+    }
+
+    return { slides, ...(taken === undefined ? {} : { taken }), ...(shake === undefined ? {} : { shake }) };
+}
+
+/**
+ * A jump through the game, from the pieces `before` to those `now`: each piece slides to the nearest square where one like it stands now, the closest pairs
+ * first; a piece left over fades, and one that has no piece to come from appears.
+ */
+function rearranged(before: ReadonlyMap<string, string>, now: ReadonlyMap<string, string>): Motion
+{
+    const left = [...before].filter(([square, letter]) => now.get(square) !== letter);
+    const arrived = [...now].filter(([square, letter]) => before.get(square) !== letter);
+    const pairs = arrived
+        .flatMap(([to, letter]) => left.filter(([, was]) => was === letter).map(([from]) => ({ from, to, distance: distanceOf(from, to) })))
+        .sort((one, other) => one.distance - other.distance);
+    const slides = new Map<string, string>();
+    const moved = new Set<string>();
+
+    for (const { from, to } of pairs) {
+        if (!slides.has(to) && !moved.has(from)) {
+            slides.set(to, from);
+            moved.add(from);
+        }
+    }
+
+    return {
+        slides,
+        appear: new Set(arrived.map(([square]) => square).filter((square) => !slides.has(square))),
+        gone: left.filter(([square]) => !moved.has(square)).map(([square, letter]) => ({ square, letter })),
+    };
+}
+
+/** How far apart two squares are, in squares. */
+function distanceOf(from: string, to: string): number
+{
+    return Math.hypot(files.indexOf(from[0]!) - files.indexOf(to[0]!), Number(from[1]) - Number(to[1]));
+}
+
+/** A move taken back: its piece, and a castling rook, slide home; a piece it took is there again under the one leaving. */
+function backOf(move: Move): Motion
+{
+    const rank = move.from[1];
+    const slides = new Map<string, string>([[move.from, move.to]]);
+
+    if (move.san.startsWith("O-O-O")) {
+        slides.set(`a${rank}`, `d${rank}`);
+    } else if (move.san.startsWith("O-O")) {
+        slides.set(`h${rank}`, `f${rank}`);
+    }
+
+    return { slides };
+}
+
+/** Whether the pieces `now` are those `before` with the move played: the piece on its square came from where it began, a pawn there when it promoted. */
+function playedOn(before: ReadonlyMap<string, string>, now: ReadonlyMap<string, string>, move: Move): boolean
+{
+    const piece = before.get(move.from);
+    const landed = now.get(move.to);
+    return piece !== undefined && !now.has(move.from) && (landed === piece || (move.san.includes("=") && piece.toLowerCase() === "p"));
+}
+
+/** The square of the king whose side is to move in a FEN. */
+function kingToMove(fen: string, pieces: ReadonlyMap<string, string>): string | undefined
+{
+    const king = fen.split(" ")[1] === "b" ? "k" : "K";
+    return [...pieces].find(([, letter]) => letter === king)?.[0];
+}
+
+/** A king's badge at the end: the winner's crown, the mate or the flag of the loser, half a point each in a draw. */
+type BadgeKind = "crown" | "mate" | "flag" | "half";
+
+/** What a king's square shows at the end: its badge, and how its king takes the end, laid down, standing in a draw, or stalemated. */
+interface KingSign
+{
+    readonly badge: BadgeKind;
+    readonly classes: string;
+}
+
+const noSigns: ReadonlyMap<string, KingSign> = new Map();
+
+/** The kings' signs at the end, by their squares: the loser's king lies down when mated or resigning; both kings of a draw stand, the stalemated one stuck. */
+function kingSigns(pieces: ReadonlyMap<string, string>, toMove: Side, end: BoardEnd): ReadonlyMap<string, KingSign>
+{
+    const kingOf = (side: Side): string | undefined => [...pieces].find(([, letter]) => letter === (side === "white" ? "K" : "k"))?.[0];
+    const signs = new Map<string, KingSign>();
+
+    const sign = (side: Side, badge: BadgeKind, classes: string): void => {
+        const square = kingOf(side);
+
+        if (square !== undefined) {
+            signs.set(square, { badge, classes });
+        }
+    };
+
+    if (end.winner === undefined) {
+        sign("white", "half", end.how === "stalemate" && toMove === "white" ? "drawn stalled" : "drawn");
+        sign("black", "half", end.how === "stalemate" && toMove === "black" ? "drawn stalled" : "drawn");
+        return signs;
+    }
+
+    const loser = end.winner === "white" ? "black" : "white";
+    sign(end.winner, "crown", "winner");
+
+    if (end.how === "checkmate" || end.how === "resignation") {
+        sign(loser, end.how === "checkmate" ? "mate" : "flag", "fallen");
+    }
+
+    return signs;
+}
+
+/** The board's classes at the end: how the game ended, and, a moment after it did, whether the player won or lost, which pick the effects in the style. */
+function endClasses(end: BoardEnd): string
+{
+    const side = end.winner === undefined ? "" : end.winner === end.player ? "player-won" : "player-lost";
+    const classes = ["ended", end.how === undefined ? "" : `by-${end.how.replaceAll(" ", "-")}`, end.fresh ? `fresh ${side}` : ""];
+    return classes.filter((name) => name !== "").join(" ").trim();
+}
+
+/** A king's badge in the corner of its square. */
+function Badge({ kind }: { kind: BadgeKind; })
+{
+    return (
+        <span class={`badge ${kind}`} aria-hidden="true">
+            {kind === "mate" ? "#" : kind === "half" ? "½" : (
+                <svg viewBox="0 0 24 24">
+                    {kind === "crown" ? <path d="M4 18L3 7L8.5 11L12 5L15.5 11L21 7L20 18Z" /> : <path d="M6 21V4M6 4.5C10 2.5 13 6.5 18 4.5V13.5C13 15.5 10 11.5 6 13.5" />}
+                </svg>
+            )}
+        </span>
+    );
 }
 
 /** An arrow drawn with the right button, from one square to another. */

@@ -1,6 +1,8 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
 import type { Facts, GameRecord, Side, Square } from "../core/index.ts";
-import { type CurrentGame, currentPlan, endOf, loadGame } from "../games/index.ts";
+import { type CurrentGame, currentPlan, endOf } from "../games/index.ts";
+import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
+import { openingLine } from "./opening-book.ts";
 import { colourName, compactView } from "./view.ts";
 
 /** The current game, as the commands give it. */
@@ -14,10 +16,14 @@ export interface GameSummary
     lastMoves: string;
     /** The last move, numbered, with its squares. */
     lastMove?: LastMove;
+    /** The opening by Lichess's book (D-15): ECO and name, and the move the game left the book at. */
+    opening?: string;
     /** When the AI is to move: the facts of the position (D-26), the legal moves of each piece among them. */
     facts?: Facts;
     /** When the AI is to move: the plan it wrote last. */
     plan?: string;
+    /** In a game with a time control: the time each side had left when the command ran (D-13). */
+    clock?: ClockSummary;
     /** When the game is over: how it ended, and its name in the archive once it is there. */
     end?: { result: string; termination?: string; archive?: string; };
 }
@@ -45,7 +51,7 @@ export interface MovePlayed
 }
 
 /** The game as the commands tell it; a game over with the name it has in the archive, when it is there. */
-export function summaryOf(current: CurrentGame, archive?: string): GameSummary
+export function summaryOf(current: CurrentGame, now: Date, archive?: string): GameSummary
 {
     const { game, ai } = current;
     const { position, record, lastMove } = game;
@@ -54,6 +60,17 @@ export function summaryOf(current: CurrentGame, archive?: string): GameSummary
 
     if (lastMove !== undefined) {
         summary.lastMove = { move: lastMoves(record, 1), from: lastMove.from, to: lastMove.to };
+    }
+
+    const opening = openingLine(record);
+    const clock = clockSummaryOf(current, now);
+
+    if (clock !== undefined) {
+        summary.clock = clock;
+    }
+
+    if (opening !== undefined) {
+        summary.opening = opening;
     }
 
     if (end !== undefined) {
@@ -70,10 +87,10 @@ export function summaryOf(current: CurrentGame, archive?: string): GameSummary
     return summary;
 }
 
-/** The current game, refused when there is none or when it is over. */
-export function gameGoingOn(folder: string): CurrentGame
+/** The current game `now`, refused when there is none or when it is over, on time too. */
+export function gameGoingOn(folder: string, now: Date): CurrentGame
 {
-    const current = loadGame(folder);
+    const current = gameAt(folder, now);
 
     if (current === undefined) {
         throw new Error("There is no game going on: start one with new_game. Nothing changed.");
@@ -92,7 +109,7 @@ export function gameGoingOn(folder: string): CurrentGame
 export function positionLines(game: GameSummary, withLastMove = true): string[]
 {
     if (game.end !== undefined || game.turn !== game.ai) {
-        return [whereLine(game)];
+        return [whereLine(game), ...clockLines(game)];
     }
 
     return [
@@ -102,10 +119,16 @@ export function positionLines(game: GameSummary, withLastMove = true): string[]
     ];
 }
 
-/** The head of a view: where the game stands, the last move unless the lines before named it, and the FEN. */
+/** The head of a view: where the game stands, the last move unless the lines before named it, the opening, and the FEN. */
 export function headLines(game: GameSummary, withLastMove = true): string[]
 {
-    return [whereLine(game), ...(withLastMove && game.lastMove !== undefined ? [`Last move: ${lastMoveText(game.lastMove)}.`] : []), `FEN: ${game.fen}`];
+    return [
+        whereLine(game),
+        ...(withLastMove && game.lastMove !== undefined ? [`Last move: ${lastMoveText(game.lastMove)}.`] : []),
+        ...(game.opening === undefined ? [] : [`Opening: ${game.opening}`]),
+        ...clockLines(game),
+        `FEN: ${game.fen}`,
+    ];
 }
 
 /** A move with its squares: 4.Ng5 (f3-g5). */
@@ -136,7 +159,7 @@ export function wordLines(words: readonly string[]): string[]
 export function nextStep(game: GameSummary | undefined, words: readonly string[] = []): string
 {
     if (game === undefined) {
-        return "Next: ask the player which colour they want, then call new_game.";
+        return "Next: ask the player which colour they want and whether they want a clock, then call new_game.";
     }
 
     if (game.end !== undefined) {
@@ -159,6 +182,11 @@ export function sidesLine(ai: Side): string
 }
 
 /** Who is to move, or how the game ended. */
+function clockLines(game: GameSummary): string[]
+{
+    return game.clock === undefined ? [] : [clockLine(game.clock, game.ai)];
+}
+
 function whereLine(game: GameSummary): string
 {
     if (game.end !== undefined) {

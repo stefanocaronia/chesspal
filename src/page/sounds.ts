@@ -21,26 +21,6 @@ export function soundOf(game: Game): Sound | undefined
     return game.position.check ? "check" : last.san.includes("x") ? "capture" : "move";
 }
 
-/** Whether the player left the sounds on, as this browser remembers: on at first. */
-export function soundOn(): boolean
-{
-    try {
-        return localStorage.getItem(remembered) !== "off";
-    } catch {
-        return true;
-    }
-}
-
-/** Remembers whether the player wants the sounds. */
-export function rememberSound(on: boolean): void
-{
-    try {
-        localStorage.setItem(remembered, on ? "on" : "off");
-    } catch {
-        // The choice lasts as long as the page.
-    }
-}
-
 /** Lets the page play sounds: a browser plays none before the player has touched the page, so the first touch wakes them. */
 export function wakeSounds(): void
 {
@@ -77,8 +57,6 @@ interface Tone
     readonly wave: OscillatorType;
     readonly volume: number;
 }
-
-const remembered = "chesspal-sound";
 
 // A wooden knock for a piece set down, two for a capture, a call for a check, a chord for a mate, a falling pair for a draw.
 const tones: Readonly<Record<Sound, readonly Tone[]>> = {

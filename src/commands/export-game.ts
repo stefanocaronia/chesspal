@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { loadGame, playerPgn } from "../games/index.ts";
+import { playerPgn } from "../games/index.ts";
+import { gameAt } from "./clock.ts";
 import { defineCommand } from "./registry.ts";
 
 interface Exported
@@ -14,10 +15,11 @@ export const exportGame = defineCommand({
     description: "Gives the game as PGN, or its position as FEN, for the player to copy or keep. While the game goes on, the PGN leaves out your plans. "
         + 'Example: export {format: "pgn"}.',
     input: z.object({ format: z.enum(["pgn", "fen"]).describe("pgn for the whole game, fen for the position") }),
+    // Read only for the host: a flag that has fallen is written, as the time already decided.
     readOnly: true,
     positionals: ["format"],
     run: ({ format }, context): Exported => {
-        const current = loadGame(context.folder);
+        const current = gameAt(context.folder, context.now());
 
         if (current === undefined) {
             throw new Error("There is no game to export: start one with new_game.");

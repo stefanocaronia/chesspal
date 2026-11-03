@@ -82,7 +82,7 @@ function claudeFile(folder: string): FileChange | undefined
 
 /**
  * Claude Code's settings: the chesspal server of .mcp.json approved and its tools allowed, so that the first chat asks for neither, and the doorbell of the
- * moves on the page (D-47); the player's own stay.
+ * moves on the page (D-47), and the note of how each chat starts (D-57); the player's own stay.
  */
 function claudeSettingsFile(folder: string): FileChange | undefined
 {
@@ -90,20 +90,34 @@ function claudeSettingsFile(folder: string): FileChange | undefined
     const settings = jsonOf(path);
     const permissions = isObject(settings.permissions) ? settings.permissions : {};
     const hooks = isObject(settings.hooks) ? settings.hooks : {};
-    const stops = Array.isArray(hooks.Stop) ? hooks.Stop as unknown[] : [];
-    const belled = stops.some((entry) => isObject(entry) && Array.isArray(entry.hooks) && entry.hooks.some((hook) => isObject(hook) && hook.command === bellHook.command));
     return changed(path, {
         ...settings,
         enabledMcpjsonServers: withItem(settings.enabledMcpjsonServers, "chesspal"),
         permissions: { ...permissions, allow: withItem(permissions.allow, "mcp__chesspal") },
-        // Put back beside the player's own hooks whenever it is missing; a Stop of theirs that is no list stays theirs.
-        hooks: hooks.Stop !== undefined && !Array.isArray(hooks.Stop) ? hooks : { ...hooks, Stop: belled ? stops : [...stops, { hooks: [bellHook] }] },
+        hooks: withHook(withHook(hooks, "Stop", bellHook), "SessionStart", chatHook),
     });
+}
+
+/** The hooks with one of Chesspal's put back beside the player's own whenever it is missing; an event of theirs that is no list stays theirs. */
+function withHook(hooks: Record<string, unknown>, event: string, ours: { command: string; }): Record<string, unknown>
+{
+    const entries = hooks[event];
+
+    if (entries !== undefined && !Array.isArray(entries)) {
+        return hooks;
+    }
+
+    const list = (entries ?? []) as unknown[];
+    const there = list.some((entry) => isObject(entry) && Array.isArray(entry.hooks) && entry.hooks.some((hook) => isObject(hook) && hook.command === ours.command));
+    return there ? hooks : { ...hooks, [event]: [...list, { hooks: [ours] }] };
 }
 
 // Claude Code's Stop hook for the doorbell (D-47): it waits in the background from the end of each turn, and wakes the chat only when the player moves on
 // the page; a day at most, until the next turn starts another.
 const bellHook = { type: "command", command: "chesspal listen", asyncRewake: true, timeout: 86_400 };
+
+// Claude Code's SessionStart hook (D-57): it notes how each chat starts, so that a new game waits for a clean one.
+const chatHook = { type: "command", command: "chesspal chat" };
 
 /** Codex's settings, read once the player trusts the folder: the chesspal server with its tools approved, a table of Chesspal's rewritten; the rest stays. */
 function codexConfigFile(folder: string, platform: string): FileChange | undefined

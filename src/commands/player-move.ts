@@ -13,6 +13,15 @@ export const playerMove = defineCommand({
     input: z.object({ move: z.string().min(1).describe("the player's move, in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q)") }),
     alwaysLoad: true,
     positionals: ["move"],
-    run: ({ move }, context): MovePlayed => ({ ...playMove(context.folder, "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`), words: newWords(context) }),
+    run: ({ move }, context): MovePlayed => ({
+        ...playMove(context.folder, context.now(), "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`, { allowance: chatAllowance }),
+        words: newWords(context),
+    }),
     format: (result) => [`Player: ${result.game.lastMove === undefined ? result.move : lastMoveText(result.game.lastMove)}.`, ...moveLines(result), ...closingLines(result.game, result.words)].join("\n"),
 });
+
+/**
+ * The time a move in the chat leaves off the player's clock (D-36): the AI writing after its move and reading the player's, about 10 s as Priya measured.
+ * Claude Code's hooks will time it exactly (T-53); the board page's moves need none.
+ */
+export const chatAllowance = 10_000;

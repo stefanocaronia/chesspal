@@ -6,8 +6,9 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { createRequire } from "node:module";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gameAt } from "../commands/clock.ts";
 import type { Context } from "../commands/context.ts";
-import { newGame } from "../commands/new-game.ts";
+import { ChatNotClear, newGame } from "../commands/new-game.ts";
 import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
 import { endOf, heardLines, loadGame, playerLinesThisMove, playerPgn, talkLimits, unheardWords } from "../games/index.ts";
@@ -87,7 +88,7 @@ const html = [
     "",
 ].join("\n");
 
-const types: Readonly<Record<string, string>> = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml" };
+const types: Readonly<Record<string, string>> = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8" };
 
 function answer(request: IncomingMessage, response: ServerResponse, served: Served): void
 {
@@ -159,7 +160,7 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
         return;
     }
 
-    const refused = refusalOf(served.folder);
+    const refused = refusalOf(served.folder, served.context.now());
 
     if (refused !== undefined) {
         send(response, 409, json, JSON.stringify({ error: refused }));
@@ -169,9 +170,10 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
     const message = textOf(body?.message);
 
     try {
-        playMove(served.folder, "player", move, (problem) => problem, message === undefined ? {} : { said: { text: message, at: served.context.now() } });
+        const now = served.context.now();
+        playMove(served.folder, now, "player", move, (problem) => problem, message === undefined ? {} : { said: { text: message, at: now } });
     } catch (error) {
-        send(response, 409, json, JSON.stringify({ error: (error as Error).message }));
+        send(response, 409, json, JSON.stringify({ error: (error as Error).message, ...(error instanceof ChatNotClear ? { clearChat: true } : {}) }));
         return;
     }
 
@@ -235,10 +237,10 @@ function newGameFromPage(request: IncomingMessage, response: ServerResponse, ser
 const json = "application/json; charset=utf-8";
 
 /** Why the player cannot move now, in their words; undefined when they can. */
-function refusalOf(folder: string): string | undefined
+function refusalOf(folder: string, now: Date): string | undefined
 {
     try {
-        const current = loadGame(folder);
+        const current = gameAt(folder, now);
 
         if (current === undefined || endOf(current.game) !== undefined) {
             return "There is no game going on: start one in the chat.";
@@ -356,10 +358,11 @@ function watchGame(served: Served): () => void
 function sendGame(response: ServerResponse, served: Served): void
 {
     try {
-        const current = loadGame(served.folder);
+        // A flag that has fallen ends the game as the page reads it (D-13).
+        const current = gameAt(served.folder, served.context.now());
         const heard = current === undefined ? [] : heardLines(current, served.context.given);
         const talk = current?.talk.map(({ who, text, ply }, index) => heard[index] === undefined ? { who, text, ply } : { who, text, ply, heard: heard[index] });
-        const body = { game: current === undefined ? null : { pgn: playerPgn(current), ai: current.ai, started: current.started, talk }, opponent: served.opponent() };
+        const body = { game: current === undefined ? null : { pgn: playerPgn(current), ai: current.ai, started: current.started, talk, ...(current.clock === undefined ? {} : { clock: current.clock }) }, opponent: served.opponent() };
         send(response, 200, "application/json; charset=utf-8", JSON.stringify(body));
     } catch (error) {
         send(response, 500, "application/json; charset=utf-8", JSON.stringify({ error: (error as Error).message }));
@@ -384,7 +387,8 @@ function sendFile(response: ServerResponse, path: string): void
         return;
     }
 
-    send(response, 200, type, bytes);
+    // A pieces' set loaded again for each piece that moves blanks the pieces drawn from it, at times until the next move (T-88): the browser keeps it an hour.
+    send(response, 200, type, bytes, type === types[".svg"] ? { "Cache-Control": "max-age=3600" } : {});
 }
 
 function builtFile(path: string): string | undefined

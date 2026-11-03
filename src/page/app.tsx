@@ -1,29 +1,51 @@
 // The page: the game of the player's folder, replayed with the chess core from its PGN (D-17), kept up to date as it changes, the player's moves (D-47) and
-// words (T-65), in Zoe's three columns (D-53): the talk, the board, the game.
+// words (T-65), in Zoe's three columns (D-53): the talk, the board, the game, the side ones folded as the player likes (T-84).
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { Game, materialOf, readPgn, type Side, type Square } from "../core/index.ts";
+import { Game, materialOf, openingOf, readPgn, type Side, type Square } from "../core/index.ts";
 import { Board, piecesOf } from "./board.tsx";
-import { GameColumn, rememberFolded, startFolded } from "./game-column.tsx";
+import { flipKeys, type Step, stepKeys, stepped } from "./browse.ts";
+import { howEnded, useJustEnded } from "./ending.ts";
+import { FoldTab } from "./fold-tab.tsx";
+import { type Column, foldKeys, gameUnderBoard, nextFold, oneColumn, rememberFold, startFolds } from "./folds.ts";
+import { GameColumn } from "./game-column.tsx";
 import { Header } from "./header.tsx";
+import { useOpeningBook } from "./opening-book.ts";
+import { ChosenSet } from "./pieces.tsx";
 import { Avatar, PlayerCard } from "./player-card.tsx";
-import { aiWords, playerSpent, playerWords, pliesOf, type TalkLine } from "./plies.ts";
-import { playSound, rememberSound, soundOf, soundOn, wakeSounds } from "./sounds.ts";
-import { AiWords, Compose } from "./talk.tsx";
-import type { Text } from "./text.ts";
+import { aiSpoke, aiWords, playerSpent, playerWords, pliesOf, type TalkLine } from "./plies.ts";
+import { SettingsPanel } from "./settings-panel.tsx";
+import { languagesOf, saveSettings, type Settings, showSettings } from "./settings.ts";
+import { playSound, soundOf, wakeSounds } from "./sounds.ts";
+import { AiWords, Compose, TalkFaces } from "./talk.tsx";
+import { textFor } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
 
-/** The page: the board of the game in the player's folder, where the player moves on their turn, the talk with the AI beside it, and the game's column. */
-export function App({ text }: { text: Text; })
+/**
+ * The page: the board of the game in the player's folder, where the player moves on their turn, the talk with the AI beside it, and the game's column; in the
+ * settings the player chose, `start` as this browser remembered them (D-56).
+ */
+export function App({ start }: { start: Settings; })
 {
+    const [settings, setSettings] = useState(start);
+    const [setting, setSetting] = useState(false);
+    const text = useMemo(() => textFor(languagesOf(settings)), [settings.language]);
+    const sound = settings.sound;
+    useEffect(() => void (document.documentElement.lang = text.language), [text]);
+
+    const change = (next: Settings): void => {
+        setSettings(next);
+        saveSettings(next);
+        showSettings(next);
+    };
+
     const [served, setServed] = useState<Served | undefined>(undefined);
     const [problem, setProblem] = useState<string | undefined>(undefined);
     const [selected, setSelected] = useState<string | undefined>(undefined);
     const [refusal, setRefusal] = useState<string | undefined>(undefined);
     const [flipped, setFlipped] = useState(false);
-    const [folded, setFolded] = useState(startFolded);
+    const [folds, setFolds] = useState(startFolds);
     const [draft, setDraft] = useState("");
     const [unsent, setUnsent] = useState<string | undefined>(undefined);
-    const [sound, setSound] = useState(soundOn);
 
     useEffect(() => {
         let latest = 0;
@@ -60,16 +82,54 @@ export function App({ text }: { text: Text; })
     const material = useMemo(() => materialOf(live.position.fen), [live]);
     const pieces = useMemo(() => piecesOf(live.position.fen), [live]);
     const plies = useMemo(() => pliesOf(live.record), [live]);
+    const book = useOpeningBook(live.record.moves.length > 0);
+    const opening = useMemo(() => book === undefined ? undefined : openingOf(live.record, book), [live, book]);
     // The player's move shows at once, before the server has it: the game it sends next takes its place (T-70).
     const [pending, setPending] = useState<string | undefined>(undefined);
-    const shown = useMemo(() => pending === undefined ? live : withMove(live, pending), [live, pending]);
-    useEffect(() => setPending(undefined), [game]);
+    // The player may look back through the moves played (T-88): `viewing` how many are shown, undefined for the game as it is; a new move brings it back.
+    const [viewing, setViewing] = useState<number | undefined>(undefined);
+    const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
+    const next = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove, [live, viewing]);
+    const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
+    useEffect(() => {
+        setPending(undefined);
+        setViewing(undefined);
+    }, [game]);
     useMoveSounds(game, live, sound);
+    const unread = useUnread(game === undefined || game === null ? undefined : aiSpoke(plies, game.ai, game.talk), folds.talk !== "open");
 
-    const switchSound = (): void => {
-        setSound(!sound);
-        rememberSound(!sound);
+    const fold = (column: Column): void => {
+        const next = nextFold(column, folds[column]);
+
+        // The focus in what folds away goes to the column's tab.
+        if (next !== "open" && document.getElementById(column)?.contains(document.activeElement) === true) {
+            document.getElementById(`fold-${column}`)?.focus();
+        }
+
+        setFolds({ ...folds, [column]: next });
+        rememberFold(column, next);
     };
+
+    useFoldKeys(fold);
+
+    const total = live.record.moves.length;
+    const at = viewing ?? total;
+    // A jump of more than one move shows the position at once: only a step slides its pieces.
+    const shownBefore = useRef(at);
+    const jumped = Math.abs(shownBefore.current - at) > 1;
+    shownBefore.current = at;
+
+    const goTo = (count: number): void => {
+        setSelected(undefined);
+        setViewing(count >= total ? undefined : Math.max(0, count));
+    };
+
+    const step = (to: Step): void => goTo(stepped(to, at, total));
+    useBrowseKeys(step, () => setFlipped(!flipped));
+    const wheel = useWheelSteps(step);
+
+    // The header's theme switch picks the other of the two the page shows, leaving the system's.
+    const switchTheme = (): void => change({ ...settings, theme: document.documentElement.dataset.theme === "dark" ? "light" : "dark" });
 
     // A game going on is archived unfinished: the player says so first (T-64).
     const startNewGame = (): void => {
@@ -80,32 +140,46 @@ export function App({ text }: { text: Text; })
         }
 
         setSelected(undefined);
-        void post("/api/new", {}).then(setRefusal);
+        void post("/api/new", {}, text.clearChat).then(setRefusal);
     };
+
+    const result = live.outcome.over ? live.outcome.result : live.record.tags.Result;
+    const ended = result !== undefined && result !== "*";
+    const how = ended ? howEnded(live.outcome, live.record.tags.Termination) : undefined;
+    const winner = result === "1-0" ? "white" : result === "0-1" ? "black" : undefined;
+    const justEnded = useJustEnded(game === undefined || game === null ? undefined : ended ? "over" : "going");
 
     const header = (
         <Header
             text={text}
+            verdict={ended ? text.verdict(how, winner) : undefined}
             onNewGame={served === undefined ? undefined : startNewGame}
             flipped={flipped}
             onFlip={() => setFlipped(!flipped)}
             sound={sound}
-            onSound={switchSound}
+            onSound={() => change({ ...settings, sound: !sound })}
+            onTheme={switchTheme}
+            onSettings={() => setSetting(true)}
         />
     );
+
+    const panel = <SettingsPanel open={setting} settings={settings} onChange={change} onClose={() => setSetting(false)} text={text} />;
 
     if (problem !== undefined) {
         return <p class="problem">{problem}</p>;
     }
 
     if (served === undefined || game === undefined) {
-        return header;
+        return (
+            <>
+                {header}
+                {panel}
+            </>
+        );
     }
 
     const player = game === null || game.ai === "black" ? "white" : "black";
     const ai = player === "white" ? "black" : "white";
-    const result = live.outcome.over ? live.outcome.result : live.record.tags.Result;
-    const ended = result !== undefined && result !== "*";
     const playerToMove = game !== null && !ended && live.position.turn === player;
     const ahead = (side: Side): number => side === "white" ? material.balance : -material.balance;
     const name = served.opponent ?? text.ai;
@@ -150,16 +224,16 @@ export function App({ text }: { text: Text; })
         });
     };
 
-    const fold = (away: boolean): void => {
-        setFolded(away);
-        rememberFolded(away);
-    };
-
     return (
-        <>
-            {header}
-            <main class={`app${flipped ? " flipped" : ""}${folded ? " folded" : ""}`}>
-                <div class="talk">
+        <ChosenSet.Provider value={settings.set}>
+            {panel}
+            <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`}>
+                {header}
+                <TalkFaces name={name} ai={ai} player={player} aiMoves={!ended && game !== null && !playerToMove} playerMoves={playerToMove} unread={unread} text={text} />
+                <FoldTab column="talk" folded={folds.talk === "folded"} label={text.talk} unread={unread && folds.talk === "folded"} onFold={fold} />
+                <FoldTab column="game" folded={folds.game === "folded"} label={text.game} onFold={fold} />
+                <span class="visually-hidden" aria-live="polite">{unread ? text.wrote(name) : ""}</span>
+                <div class="talk" id="talk">
                     <section class="ai-block" aria-label={name}>
                         <PlayerCard place="ai" picture={<Torretta size={48} />} name={name} side={ai} taken={material.taken[ai]} ahead={ahead(ai)} text={text} />
                         <AiWords words={aiWords(plies, ai, talk)} />
@@ -193,14 +267,24 @@ export function App({ text }: { text: Text; })
                         />
                     </section>
                 </div>
-                <div class="board-wrap">
+                <div
+                    class="board-wrap"
+                    onWheel={wheel}
+                    // A press on the board while the player looks back brings the game as it is: the next one plays.
+                    onPointerDownCapture={viewing === undefined ? undefined : (event) => event.button === 0 && goTo(total)}
+                >
                     <Board
                         fen={shown.position.fen}
                         bottom={flipped ? ai : player}
                         lastMove={shown.lastMove}
-                        player={playerToMove && pending === undefined ? player : undefined}
+                        nextMove={next}
+                        jumped={jumped}
+                        check={shown.position.check}
+                        end={ended && viewing === undefined && pending === undefined ? { how, winner, player, fresh: justEnded } : undefined}
+                        player={playerToMove && pending === undefined && viewing === undefined ? player : undefined}
                         selected={selected}
-                        targets={selected === undefined ? [] : live.legalMoves(selected as Square)}
+                        targets={selected === undefined || viewing !== undefined ? [] : live.legalMoves(selected as Square)}
+                        dots={settings.dots}
                         onSelect={select}
                         onMove={play}
                         text={text}
@@ -210,14 +294,19 @@ export function App({ text }: { text: Text; })
                 <GameColumn
                     plies={plies}
                     result={ended ? result : undefined}
+                    how={how}
+                    lit={justEnded}
                     started={game?.started}
                     move={live.position.moveNumber}
-                    folded={folded}
-                    onFold={fold}
+                    toMove={live.position.turn}
+                    opening={opening}
+                    shownPlies={at}
+                    onShow={goTo}
+                    onStep={step}
                     text={text}
                 />
             </main>
-        </>
+        </ChosenSet.Provider>
     );
 }
 
@@ -254,6 +343,102 @@ function useMoveSounds(game: Served["game"] | undefined, live: Game, on: boolean
     }, [live]);
 }
 
+/** Whether the AI spoke while the talk was folded, by how many times it has spoken (`spoke`, undefined before a game): until the player opens the talk. */
+function useUnread(spoke: number | undefined, folded: boolean): boolean
+{
+    const [unread, setUnread] = useState(false);
+    const heard = useRef(spoke);
+
+    useEffect(() => {
+        if (!folded) {
+            setUnread(false);
+        } else if (spoke !== undefined && heard.current !== undefined && spoke > heard.current) {
+            setUnread(true);
+        }
+
+        heard.current = spoke;
+    }, [spoke, folded]);
+
+    return unread;
+}
+
+/**
+ * `[` and `]` fold the talk and the game, as in editors with two side bars; never while the player types or drags a piece, nor in one column, nor the game
+ * under the board.
+ */
+function useFoldKeys(fold: (column: Column) => void): void
+{
+    useEffect(() => {
+        const press = (event: KeyboardEvent): void => {
+            if (!forThePage(event) || oneColumn()) {
+                return;
+            }
+
+            const column = (Object.keys(foldKeys) as Column[]).find((key) => foldKeys[key] === event.key);
+
+            if (column !== undefined && !(column === "game" && gameUnderBoard())) {
+                event.preventDefault();
+                fold(column);
+            }
+        };
+
+        window.addEventListener("keydown", press);
+        return () => window.removeEventListener("keydown", press);
+    });
+}
+
+/** The keys of Lichess and chess.com: the arrows, Home and End step through the moves (T-88), f and x turn the board round. */
+function useBrowseKeys(step: (to: Step) => void, flip: () => void): void
+{
+    useEffect(() => {
+        const press = (event: KeyboardEvent): void => {
+            const to = stepKeys[event.key];
+            const flips = flipKeys.includes(event.key.toLowerCase());
+
+            if (!forThePage(event) || (to === undefined && !flips)) {
+                return;
+            }
+
+            event.preventDefault();
+
+            if (to === undefined) {
+                flip();
+            } else {
+                step(to);
+            }
+        };
+
+        window.addEventListener("keydown", press);
+        return () => window.removeEventListener("keydown", press);
+    });
+}
+
+/** The mouse wheel over the board steps through the moves, as on Lichess: down forward, a step a notch, however finely a touchpad turns it. */
+function useWheelSteps(step: (to: Step) => void): (event: WheelEvent) => void
+{
+    const turned = useRef(0);
+
+    return (event) => {
+        event.preventDefault();
+        turned.current += event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? event.deltaY : event.deltaY * notch;
+
+        while (Math.abs(turned.current) >= notch) {
+            step(turned.current > 0 ? "forward" : "back");
+            turned.current -= Math.sign(turned.current) * notch;
+        }
+    };
+}
+
+// How far a wheel turns in one notch, in pixels.
+const notch = 100;
+
+/** Whether a key is the page's: not one the player types into a box or the settings, nor with a modifier, nor while a piece is in the air. */
+function forThePage(event: KeyboardEvent): boolean
+{
+    const typing = (event.target as HTMLElement).closest("input, textarea, select, [contenteditable], dialog") !== null;
+    return !(event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || typing || document.documentElement.classList.contains("dragging"));
+}
+
 /** Sends the player's move to the server, which plays it as the chat would, with the words written for the AI: the reason it was refused, or undefined. */
 function sendMove(move: string, words: string): Promise<string | undefined>
 {
@@ -267,11 +452,18 @@ function sendMessage(words: string): Promise<string | undefined>
     return post("/api/message", { text: words.trim() });
 }
 
-async function post(path: string, body: object): Promise<string | undefined>
+/** Sends a request to the server: the reason it was refused, in the player's language when the chat must be cleared first (D-57), or undefined. */
+async function post(path: string, body: object, clearChat?: string): Promise<string | undefined>
 {
     try {
         const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        return response.ok ? undefined : ((await response.json()) as { error?: string; }).error ?? response.statusText;
+
+        if (response.ok) {
+            return undefined;
+        }
+
+        const refusal = (await response.json()) as { error?: string; clearChat?: boolean; };
+        return refusal.clearChat === true && clearChat !== undefined ? clearChat : refusal.error ?? response.statusText;
     } catch (error) {
         return String(error);
     }

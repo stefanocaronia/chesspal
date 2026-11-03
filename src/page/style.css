@@ -1,14 +1,14 @@
 /* The page in Zoe's Salotto azzurro (D-46), in three columns (D-53): the talk, the board, the game; one column on a phone; light and dark. */
 :root {
-    --page: #f4f3ef;
-    --card: #ffffff;
+    --page: color-mix(in oklab, var(--dark-square) 12%, #fbfbfa);
+    --card: color-mix(in oklab, var(--dark-square) 3%, #ffffff);
     --ink: #1d2733;
     --soft: #626d7b;
-    --line: #e4e2dc;
+    --line: color-mix(in oklab, var(--dark-square) 24%, #f1f1ef);
     --accent: #2d6aa8;
     --on-accent: #ffffff;
-    --quote: #f1f5f9;
-    --say: #d3e4f6;
+    --quote: color-mix(in oklab, var(--dark-square) 9%, #fafafa);
+    --say: color-mix(in oklab, var(--dark-square) 38%, #fafafa);
     --say-ink: #1d2733;
     --warn-back: #fff4d6;
     --light-square: #eaf1f8;
@@ -17,6 +17,7 @@
     --selected: rgba(255, 196, 80, 0.7);
     --mark: #f07c1e;
     --mark-square: rgba(240, 124, 30, 0.65);
+    --mated: rgba(214, 40, 40, 0.8);
     --hint: rgba(0, 0, 0, 0.14);
     --hover-edge: #f4c84c;
     --lift-shadow: rgba(16, 28, 44, 0.32);
@@ -29,26 +30,35 @@
     --torretta-face: #f2f7fc;
     --torretta-light: #f4c84c;
     --shadow: 0 1px 2px rgba(29, 39, 51, 0.06), 0 6px 18px rgba(29, 39, 51, 0.06);
+    /* On a light page the board keeps a thin edge in its dark squares colour, and a deeper shadow, so its light squares do not melt into the page (T-83) */
+    --board-shadow: 0 0 0 1px color-mix(in oklab, var(--dark-square) 55%, transparent), 0 2px 4px rgba(29, 39, 51, 0.1), 0 10px 28px rgba(29, 39, 51, 0.12);
     --gap: 20px;
     --left: 300px;
     --right: 264px;
-    --tab: 44px;
-    --head: 60px;
-    --radius: 10px;
+    --tab: 16px;
+    --rail: 56px;
+    --coin: 40px;
+    /* How far from the board's top and bottom edges the faces sit, in the cards and folded, and the tabs */
+    --ear: 36px;
+    --tuck: 10px;
+    --bar: 36px;
+    /* The cards' corners, as the board's; the room between the cards, and between them and the board */
+    --radius: 6px;
+    --between: 10px;
     --bubble: 14px;
     color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-    --page: #11161d;
-    --card: #19202a;
+    --page: color-mix(in oklab, var(--dark-square) 13%, #0b0d10);
+    --card: color-mix(in oklab, var(--dark-square) 16%, #14171b);
     --ink: #e6ebf1;
     --soft: #8d98a7;
-    --line: #262f3b;
+    --line: color-mix(in oklab, var(--dark-square) 24%, #1b1f24);
     --accent: #7cb0e4;
     --on-accent: #0f1a28;
-    --quote: #1f2834;
-    --say: #22344a;
+    --quote: color-mix(in oklab, var(--dark-square) 20%, #1a1d22);
+    --say: color-mix(in oklab, var(--dark-square) 34%, #15181c);
     --say-ink: #e6ebf1;
     --warn-back: #2a2616;
     --light-square: #a9bccd;
@@ -57,6 +67,7 @@
     --lift-shadow: rgba(0, 0, 0, 0.5);
     --torretta-screen: #0f1a28;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.25);
+    --board-shadow: var(--shadow);
     color-scheme: dark;
 }
 
@@ -86,11 +97,20 @@ button {
 
 /* The header */
 .top {
-    height: var(--head);
+    grid-area: head;
+    height: var(--bar);
+    margin-top: var(--between);
+    container-type: inline-size;
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 0 var(--gap);
+}
+
+/* In the page's grid the header spans the board, edge to edge, as far from it as the cards */
+.app .top {
+    margin: 0;
+    padding: 0;
 }
 
 .title {
@@ -98,6 +118,26 @@ button {
     font-size: 17px;
     font-weight: 600;
     letter-spacing: 0.01em;
+}
+
+/* A game over says how it ended by the new game, which stands out in the accent (T-77) */
+.verdict {
+    margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    animation: appear 200ms;
+}
+
+.verdict:empty {
+    display: none;
 }
 
 .icon {
@@ -129,6 +169,25 @@ button {
     background: var(--card);
 }
 
+.command.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+}
+
+.command.primary:hover {
+    background: color-mix(in oklab, var(--accent) 85%, var(--ink));
+    border-color: transparent;
+    color: var(--on-accent);
+}
+
+/* The header's buttons never wrap or shrink: the word on a game over gives way */
+.top .command,
+.top .theme {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
 :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -154,20 +213,54 @@ button {
     display: none;
 }
 
-/* Three columns: the talk, the board, the game. The side columns take the board's height and scroll inside it */
+/* Three columns: the talk, the board, the game, under the header, which spans the board. The side columns take the board's height and scroll inside it; folded,
+   they slide under the board, which grows into the room */
 .app {
+    --left-now: var(--left);
+    --right-now: var(--right);
+    --rows: var(--between);
     display: grid;
-    gap: 14px var(--gap);
-    padding: 0 var(--gap) var(--gap);
-    grid-template-columns: var(--left) auto var(--right);
+    gap: var(--rows) var(--between);
+    padding: var(--between) var(--gap);
+    grid-template-columns: var(--left-now) auto var(--right-now);
+    transition: grid-template-columns 200ms cubic-bezier(0.2, 0, 0, 1);
     /* The talk keeps room for the AI's words, the box and both cards, however small the board. */
-    grid-template-rows: minmax(440px, auto);
-    grid-template-areas: "talk board side";
+    grid-template-rows: auto minmax(440px, auto);
+    grid-template-areas: ". head ." "talk board side";
     justify-content: center;
 }
 
+/* Beside a narrow board the header's buttons keep only their icons */
+@container (max-width: 560px) {
+    .command span {
+        display: none;
+    }
+}
+
+/* Beside the word on a game over, the Torretta alone stands for the name, and the flip keeps only its icon; a phone gives the word a line of its own */
+@media (min-width: 841px) {
+    @container (max-width: 720px) {
+        .top:has(.verdict:not(:empty)) .title,
+        .top:has(.verdict:not(:empty)) .command:not(.primary) span {
+            display: none;
+        }
+
+        .top:has(.verdict:not(:empty)) .verdict {
+            margin-right: auto;
+        }
+    }
+}
+
+.app.talk-rail {
+    --left-now: var(--rail);
+}
+
+.app.talk-folded {
+    --left-now: 0px;
+}
+
 .app.folded {
-    grid-template-columns: var(--left) auto var(--tab);
+    --right-now: 0px;
 }
 
 .board-wrap {
@@ -175,11 +268,8 @@ button {
     position: relative;
     /* 12.5cqw is a square, for the lifted piece too */
     container-type: inline-size;
-    width: min(calc(100vw - var(--left) - var(--right) - 4 * var(--gap)), calc(100vh - var(--head) - var(--gap)), 860px);
-}
-
-.app.folded .board-wrap {
-    width: min(calc(100vw - var(--left) - var(--tab) - 4 * var(--gap)), calc(100vh - var(--head) - var(--gap)), 860px);
+    width: min(calc(100vw - var(--left-now) - var(--right-now) - 2 * var(--gap) - 2 * var(--between)), calc(100vh - var(--bar) - 3 * var(--between)));
+    transition: width 200ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .talk {
@@ -187,9 +277,217 @@ button {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 14px;
+    gap: var(--between);
     contain: size;
     min-height: 0;
+}
+
+/* Narrowing, the talk fades into its card of faces while it slides under the board, in the same 200ms */
+.app.talk-rail .talk,
+.app.talk-folded .talk {
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 120ms 80ms, visibility 0s 200ms;
+}
+
+/* A column's tab (T-84), a drawer's handle at the top: open, on the outer edge of the column's first card; folded, the column slides under the board and the
+   tab peeks out from under it */
+.fold-tab {
+    align-self: start;
+    position: relative;
+    display: flex;
+    width: var(--tab);
+    height: 48px;
+    margin-top: calc(var(--ear) - 24px);
+    transition: width 200ms cubic-bezier(0.2, 0, 0, 1), margin 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.fold-tab.folded {
+    width: calc(var(--tab) + var(--tuck));
+}
+
+.fold-tab.of-talk {
+    grid-area: talk;
+    justify-self: start;
+    margin-left: calc(-1 * var(--tab));
+}
+
+.fold-tab.of-talk.folded {
+    margin-left: calc(var(--between) - var(--tab));
+}
+
+.fold-tab.of-game {
+    grid-area: side;
+    justify-self: end;
+    margin-right: calc(-1 * var(--tab));
+}
+
+.fold-tab.of-game.folded {
+    margin-right: calc(var(--between) - var(--tab));
+}
+
+.fold-tab button {
+    flex: 1;
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    color: var(--soft);
+}
+
+.fold-tab button:hover {
+    color: var(--ink);
+}
+
+.fold-tab .icon {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2;
+}
+
+/* Rounded on the outer side, its icon clear of the board; the card it leans on gives its inner edge */
+.fold-tab.of-talk button {
+    border-right: 0;
+    border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.fold-tab.of-game button {
+    border-left: 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.fold-tab.of-talk.folded button {
+    padding-right: var(--tuck);
+}
+
+.fold-tab.of-game.folded button {
+    padding-left: var(--tuck);
+}
+
+/* The talk narrowed to a card beside the board, with two equal coins where the faces sat in the cards: the Torretta above and the player below, once the talk
+   has slid under the board */
+.faces {
+    grid-area: talk;
+    justify-self: start;
+    display: none;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    width: var(--rail);
+    min-height: 0;
+    overflow: hidden;
+    padding: calc(var(--ear) - var(--coin) / 2 - 1px) 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.app.talk-rail .faces {
+    display: flex;
+    animation: faces-in 120ms 80ms both;
+}
+
+/* Folding, the card of faces slides under the board in its turn */
+.app.talk-folded .faces {
+    display: flex;
+    visibility: hidden;
+    transition: visibility 0s 200ms;
+}
+
+.app.flipped .faces {
+    flex-direction: column-reverse;
+}
+
+@keyframes faces-in {
+    from {
+        opacity: 0;
+    }
+}
+
+/* Each face with the name and side written down the card from it: the lower one's run up to it */
+.rail-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-height: 0;
+}
+
+.rail-player.you,
+.app.flipped .rail-player.ai {
+    flex-direction: column-reverse;
+}
+
+.app.flipped .rail-player.you {
+    flex-direction: column;
+}
+
+/* The lower name reads upwards, its letters' tops to the left */
+.rail-player.you .rail-name,
+.app.flipped .rail-player.ai .rail-name {
+    rotate: 180deg;
+}
+
+.app.flipped .rail-player.you .rail-name {
+    rotate: none;
+}
+
+.rail-name {
+    min-height: 0;
+    overflow: hidden;
+    writing-mode: vertical-rl;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.face {
+    flex: none;
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--coin);
+    height: var(--coin);
+    border-radius: 50%;
+    background: var(--say);
+}
+
+/* Both faces fill their circle, with no edge */
+.face svg {
+    width: var(--coin);
+    height: var(--coin);
+    clip-path: circle(50%);
+}
+
+/* Who moves: their name in the accent */
+.rail-player.moving .rail-name {
+    color: var(--accent);
+}
+
+/* The AI spoke while the talk was narrowed or folded: on the Torretta, or on the tab */
+.face.unread::after,
+.fold-tab button.unread::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--page);
+}
+
+.fold-tab button.unread::after {
+    top: -4px;
+    right: auto;
+    left: -4px;
 }
 
 .ai-block,
@@ -214,14 +512,17 @@ button {
 }
 
 /* The board */
+/* Above the columns' tabs, which slide under it */
 .board {
+    position: relative;
+    z-index: 1;
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     grid-template-rows: repeat(8, 1fr);
     aspect-ratio: 1;
-    border-radius: 6px;
+    border-radius: var(--radius);
     overflow: hidden;
-    box-shadow: var(--shadow);
+    box-shadow: var(--board-shadow);
     user-select: none;
     container-type: inline-size;
 }
@@ -246,6 +547,11 @@ button {
     background-image: linear-gradient(var(--selected), var(--selected));
 }
 
+/* The king checkmated (T-77): its square red, over the last move's colour */
+.square.mated {
+    background-image: linear-gradient(var(--mated), var(--mated));
+}
+
 /* The player's marks with the right button (T-73): orange squares and arrows, gone at a left click */
 .square.marked {
     background-image: linear-gradient(var(--mark-square), var(--mark-square));
@@ -257,6 +563,8 @@ button {
     top: 0;
     width: 100%;
     aspect-ratio: 1;
+    /* Over every square, the sliding piece's too (z-index 1) */
+    z-index: 2;
     pointer-events: none;
     opacity: 0.8;
 }
@@ -298,7 +606,8 @@ button {
 }
 
 @media (hover: hover) {
-    .board.playable .square.hint:hover {
+    .board.playable .square.hint:hover,
+    .board.playable .square.target:hover {
         box-shadow: inset 0 0 0 max(2px, 0.625cqw) var(--hover-edge);
     }
 }
@@ -317,7 +626,8 @@ button {
     touch-action: none;
 }
 
-.board.playable .square.hint {
+.board.playable .square.hint,
+.board.playable .square.target {
     cursor: pointer;
 }
 
@@ -365,10 +675,281 @@ button {
     transition-duration: 180ms;
 }
 
+/* A move not dragged slides from its square, in 12.5cqw a square, and a king in check rings like a bell struck (T-74) */
+.square.slide {
+    z-index: 1;
+}
+
+.square.slide .piece {
+    animation: slide 220ms cubic-bezier(0.25, 0.8, 0.35, 1);
+}
+
+.square.shake .piece {
+    animation: ring 320ms cubic-bezier(0.3, 0, 0.2, 1) 200ms;
+}
+
+/* The piece taken stays under the one that takes it until it arrives */
+.square .taken-piece .piece {
+    animation: taken 220ms step-end forwards;
+}
+
+/* A jump through the game (T-88): a piece no longer there fades, one that was not there appears */
+.square .gone-piece .piece {
+    animation: taken 220ms forwards;
+}
+
+.square.appear .piece {
+    animation: appear 220ms;
+}
+
+@keyframes appear {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes taken {
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes slide {
+    from {
+        translate: calc(var(--dx) * 12.5cqw) calc(var(--dy) * 12.5cqw);
+    }
+}
+
+/* The hammer's blow, then a vibration that dies away: each swing smaller, eased at both ends */
+@keyframes ring {
+    12% {
+        translate: -2.5% 0;
+    }
+
+    34% {
+        translate: 1.8% 0;
+    }
+
+    56% {
+        translate: -1.1% 0;
+    }
+
+    78% {
+        translate: 0.5% 0;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .lifted .piece,
     .lifted.back {
         transition: none;
+    }
+
+    .square.slide .piece,
+    .square.shake .piece,
+    .square.appear .piece {
+        animation: none;
+    }
+
+    .square .taken-piece,
+    .square .gone-piece {
+        display: none;
+    }
+}
+
+/* The end of the game (T-77): the kings' badges and the loser's king laid down stay; the effects play once, when the game ends under the player's eyes */
+.square.fallen .piece {
+    rotate: -90deg;
+    scale: 0.88;
+}
+
+.badge {
+    position: absolute;
+    top: 2.5%;
+    right: 2.5%;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: clamp(14px, 3.8cqw, 30px);
+    height: clamp(14px, 3.8cqw, 30px);
+    border-radius: 50%;
+    color: #fff;
+    font-size: clamp(9px, 2.5cqw, 19px);
+    font-weight: 800;
+    line-height: 1;
+    /* Edged in white, to stand out on any square, the red one too */
+    box-shadow: 0 0 0 max(1.5px, 0.25cqw) #fff, 0 0.2cqw 0.6cqw rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
+.badge svg {
+    width: 66%;
+    height: 66%;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.badge.crown {
+    background: #e0a526;
+    color: #3b2a00;
+}
+
+/* The mate white on the red square, edged in red */
+.badge.mate {
+    background: #fff;
+    color: #c81e1e;
+    box-shadow: 0 0 0 max(1.5px, 0.25cqw) #c81e1e, 0 0.2cqw 0.6cqw rgba(0, 0, 0, 0.4);
+}
+
+.badge.flag {
+    background: #4a4f57;
+}
+
+.badge.half {
+    background: #69727d;
+}
+
+/* Checkmate: the king rings with the check, its square fills with red from the edges, then it falls */
+@media (prefers-reduced-motion: no-preference) {
+    .board.fresh.by-checkmate .square.mated {
+        background-image: none;
+        animation: mate-in 300ms cubic-bezier(0.2, 0.8, 0.2, 1) 450ms forwards;
+    }
+}
+
+.board.fresh.by-checkmate .square.fallen .piece {
+    animation: ring 320ms cubic-bezier(0.3, 0, 0.2, 1) 200ms, fall 550ms 800ms backwards;
+}
+
+/* A resignation: the king is laid down slowly, as a player lays theirs */
+.board.fresh.by-resignation .square.fallen .piece {
+    animation: lay 1000ms cubic-bezier(0.45, 0, 0.55, 1) 250ms backwards;
+}
+
+/* Stalemate: the king darts one way and the other, and finds no square */
+.board.fresh.by-stalemate .square.stalled .piece {
+    animation: dart 700ms cubic-bezier(0.4, 0, 0.2, 1) 250ms;
+}
+
+/* The other draws: both kings light up together */
+.board.fresh:not(.by-stalemate) .square.drawn {
+    animation: draw-glow 1000ms ease-in-out 200ms;
+}
+
+/* The badges come once the kings have taken the end */
+.board.fresh .badge {
+    animation: badge-in 320ms cubic-bezier(0.3, 1.4, 0.5, 1) 800ms backwards;
+}
+
+.board.fresh.by-checkmate .badge {
+    animation-delay: 1350ms;
+}
+
+.board.fresh.by-resignation .badge {
+    animation-delay: 1200ms;
+}
+
+.board.fresh.by-stalemate .badge {
+    animation-delay: 950ms;
+}
+
+/* The player won: a narrow golden sheen crosses the board once, after the badges; a loss needs no more than the king and its badge */
+.board.fresh.player-won::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 44%, rgba(255, 230, 150, 0.6) 50%, transparent 56%) 0 0 / 300% 100% no-repeat;
+    mix-blend-mode: screen;
+    animation: sheen 900ms cubic-bezier(0.45, 0, 0.55, 1) 1600ms backwards;
+}
+
+@keyframes mate-in {
+    from {
+        box-shadow: inset 0 0 0 0 var(--mated);
+    }
+
+    to {
+        box-shadow: inset 0 0 0 7cqw var(--mated);
+    }
+}
+
+/* Falling, the king tips a little past lying and settles */
+@keyframes fall {
+    from {
+        rotate: 0deg;
+        scale: 1;
+        animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+    }
+
+    75% {
+        rotate: -96deg;
+        scale: 0.88;
+        animation-timing-function: ease-out;
+    }
+}
+
+@keyframes lay {
+    from {
+        rotate: 0deg;
+        scale: 1;
+    }
+}
+
+@keyframes dart {
+    20% {
+        translate: 6% -3%;
+    }
+
+    40%,
+    80% {
+        translate: 0 0;
+    }
+
+    60% {
+        translate: -6% -3%;
+    }
+}
+
+@keyframes draw-glow {
+    40%,
+    60% {
+        /* A ring in the skin's colour, much darker than its squares, to show on the light and the dark ones */
+        box-shadow: inset 0 0 0 0.6cqw color-mix(in oklab, var(--dark-square) 50%, #1d2733), inset 0 0 2.5cqw 0.4cqw color-mix(in oklab, var(--dark-square) 40%, transparent);
+    }
+}
+
+@keyframes badge-in {
+    from {
+        scale: 0;
+        opacity: 0;
+    }
+}
+
+@keyframes sheen {
+    from {
+        background-position: 100% 0;
+    }
+
+    to {
+        background-position: 0 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .board.fresh,
+    .board.fresh .square,
+    .board.fresh .piece,
+    .board.fresh .badge {
+        animation: none;
+    }
+
+    .board.fresh::after {
+        display: none;
     }
 }
 
@@ -424,6 +1005,7 @@ button {
 
 .toast {
     position: absolute;
+    z-index: 3;
     left: 50%;
     bottom: 4%;
     transform: translateX(-50%);
@@ -478,11 +1060,13 @@ button {
     font-weight: 600;
 }
 
+/* The pieces taken overlap within a kind; with nearly all of them, they wrap rather than leave the card */
 .taken {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
-    height: 20px;
+    gap: 2px 4px;
+    min-height: 20px;
     margin-top: 3px;
 }
 
@@ -490,15 +1074,15 @@ button {
     display: inline-flex;
 }
 
-/* At 22 px the edge is drawn a little thicker, so the pieces taken stay crisp on the card */
+/* At 20 px the edge is drawn a little thicker, so the pieces taken stay crisp on the card */
 .taken .piece {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     --piece-edge-width: 9px;
 }
 
 .taken .piece + .piece {
-    margin-left: -9px;
+    margin-left: -11px;
 }
 
 /* On a dark card the dark pieces taken would vanish: grey shapes, apart from the white ones */
@@ -513,12 +1097,36 @@ button {
     font-weight: 600;
 }
 
-.avatar .back {
-    fill: var(--quote);
+/* The player's face, masked by a circle */
+.avatar {
+    clip-path: circle(50%);
 }
 
-.avatar .figure {
-    fill: var(--soft);
+.avatar .back {
+    fill: var(--say);
+}
+
+.avatar .shirt {
+    fill: var(--accent);
+}
+
+.avatar .skin {
+    fill: #f1c6a0;
+}
+
+.avatar .hair {
+    fill: #4a3426;
+}
+
+.avatar .eye {
+    fill: #2b2420;
+}
+
+.avatar .smile {
+    fill: none;
+    stroke: #2b2420;
+    stroke-width: 1.6;
+    stroke-linecap: round;
 }
 
 /* The Torretta, whose eyes blink now and then */
@@ -812,95 +1420,175 @@ button {
     margin: 8px 0 0;
 }
 
-/* The game's column, which folds into a slim tab at the right edge */
+/* The game's column, folded from the header */
 .side {
     grid-area: side;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--between);
     contain: size;
     min-height: 0;
 }
 
-.side-head {
+/* The game's card, as tall as a player's across the board: a little board where the player's card has their face, round people, a square game */
+.game-card {
+    margin: 0;
+    min-height: 74px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    height: 28px;
-}
-
-.side-head h2 {
-    margin: 0;
+    gap: 12px;
     font-size: 13px;
-    font-weight: 600;
-    color: var(--soft);
-    letter-spacing: 0.02em;
 }
 
-.fold,
-.tab {
+.tile {
+    position: relative;
+    flex: none;
     display: grid;
     place-items: center;
-    background: none;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    color: var(--soft);
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius);
+    /* A board of four squares in the skin's colours, the dark one at the bottom left as on a board */
+    background: conic-gradient(var(--dark-square) 0 25%, var(--light-square) 0 50%, var(--dark-square) 0 75%, var(--light-square) 0);
+    overflow: hidden;
 }
 
-.fold {
+.tile .piece {
+    --piece-edge-width: 7px;
+    width: 40px;
+    height: 40px;
+}
+
+/* The king to move, edged in the accent like the coin of whoever moves */
+.tile.moving {
+    box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent);
+}
+
+/* At the end both kings: side by side in a draw, the loser laid at the winner's feet */
+.tile.over {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding-bottom: 4px;
+}
+
+.tile.over .piece {
+    --piece-edge-width: 8px;
     width: 30px;
     height: 30px;
 }
 
-.fold:hover,
-.tab:hover {
-    color: var(--ink);
-    border-color: var(--line);
-    background: var(--card);
+.tile.draw .piece + .piece {
+    margin-left: -12px;
 }
 
-.game-card {
-    margin: 0;
+.tile.win > span {
+    position: absolute;
     display: grid;
-    gap: 3px;
-    font-size: 13px;
 }
 
-.game-card div {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
+.tile.win .piece {
+    width: 100%;
+    height: 100%;
 }
 
-.game-card dt {
+.tile.win .up {
+    right: 5px;
+    bottom: 4px;
+    width: 28px;
+    height: 28px;
+}
+
+/* Laid down, the king is as wide as it was tall: it drops 5px to rest where the other stands */
+.tile.win .down {
+    left: 4px;
+    bottom: -1px;
+    width: 24px;
+    height: 24px;
+    rotate: -90deg;
+}
+
+.game-card .what {
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.game-card p {
+    margin: 0;
+}
+
+.game-card .head,
+.game-card .when {
     color: var(--soft);
 }
 
-.game-card dd {
+.game-card .big {
+    color: var(--ink);
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+.game-card .when {
+    margin-top: 2px;
+}
+
+/* The game ended under the player's eyes: once the board has shown it, with the kings' badges, the card lights up in the accent and fades back */
+.game-card.lit {
+    animation: lit 1200ms ease-out 1350ms;
+}
+
+@keyframes lit {
+    20% {
+        box-shadow: 0 0 0 2px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+}
+
+.opening {
+    display: grid;
+    gap: 2px;
+    font-size: 13px;
+}
+
+.opening p {
     margin: 0;
 }
 
-.tab-away {
-    display: none;
-    grid-area: side;
-    align-self: start;
+.opening .family {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.opening .book {
+    display: grid;
+    align-self: center;
+    color: var(--accent);
+}
+
+.opening .book .icon {
+    width: 21px;
+    height: 21px;
+    stroke-width: 2.3;
+}
+
+.opening .book.out {
+    color: var(--ink);
+}
+
+.opening .variation {
+    color: var(--ink);
+}
+
+.opening .out {
+    color: var(--soft);
+    font-size: 12px;
 }
 
 .app.folded .side {
-    display: none;
-}
-
-.app.folded .tab-away {
-    display: block;
-}
-
-.tab {
-    width: var(--tab);
-    padding: 10px 0;
-    gap: 14px;
-    border-color: var(--line);
-    background: var(--card);
-    box-shadow: var(--shadow);
+    visibility: hidden;
+    transition: visibility 0s 200ms;
 }
 
 .moves {
@@ -932,22 +1620,78 @@ button {
     color: var(--soft);
 }
 
-.moves .last {
+/* A move is a button that shows it on the board (T-88) */
+.moves .ply {
     justify-self: start;
+    padding: 0 3px;
+    margin-left: -3px;
+    background: none;
+    border: 0;
+    border-radius: 3px;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.moves .ply:hover {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.moves .current {
     font-weight: 700;
     box-shadow: inset 0 -2px 0 var(--accent);
 }
 
-/* A piece in a move: a solid figure in the colour of the text; a thin edge, so the queen's crown stays open beside the rook */
+/* The buttons that step through the moves, under them as on Lichess and chess.com */
+.steps {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+}
+
+.steps button {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    padding: 6px 0;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.steps button:hover:not(:disabled) {
+    background: var(--page);
+    border-color: var(--line);
+}
+
+.steps button:disabled {
+    color: var(--soft);
+    opacity: 0.5;
+    cursor: default;
+}
+
+.steps .icon {
+    width: 20px;
+    height: 20px;
+    stroke-width: 2;
+}
+
+/* A piece in a move: White's white and Black's black, edged in the colour of the text, so either shows on either theme */
 .figurine {
     display: inline-block;
     width: 1.15em;
     height: 1.15em;
     margin-right: 0.05em;
     vertical-align: -0.22em;
-    --piece-fill: currentColor;
+    --piece-fill: #fff;
     --piece-edge: currentColor;
-    --piece-edge-width: 2px;
+    --piece-edge-width: 7px;
+}
+
+.figurine.black {
+    --piece-fill: #000;
 }
 
 .visually-hidden {
@@ -975,28 +1719,422 @@ button {
     padding: 0 16px;
 }
 
-/* Where three columns would leave the board small, the game's column opens over the board's right edge and the board keeps its size */
+/* The settings (D-56): a dialog over the page; each choice shows at once */
+.settings {
+    width: min(440px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    padding: 0 20px 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+}
+
+.settings::backdrop {
+    background: rgba(16, 22, 29, 0.4);
+}
+
+.settings header {
+    position: sticky;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0 8px;
+    background: var(--card);
+}
+
+.settings h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.settings h3 {
+    margin: 18px 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--soft);
+}
+
+.choices {
+    margin-bottom: 12px;
+}
+
+.choices .label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: var(--soft);
+}
+
+.options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: none;
+    font-size: 14px;
+}
+
+.choice:hover {
+    border-color: var(--soft);
+}
+
+.choice[aria-checked="true"] {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.sample {
+    display: inline-flex;
+}
+
+.sample .piece {
+    width: 26px;
+    height: 26px;
+}
+
+/* A swatch: the board's two squares and its highlight, the pieces' two colours, or the marks' one */
+.swatch {
+    display: inline-flex;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px var(--line);
+}
+
+.swatch i {
+    width: 14px;
+    height: 20px;
+}
+
+.swatch[data-board] i:first-child {
+    background: var(--light-square);
+}
+
+.swatch[data-board] i:nth-child(2) {
+    background: var(--dark-square);
+}
+
+.swatch[data-board] i:nth-child(3) {
+    background: var(--dark-square) linear-gradient(var(--last-move), var(--last-move));
+}
+
+.swatch[data-pieces] i:first-child {
+    background: var(--white-piece);
+}
+
+.swatch[data-pieces] i:last-child {
+    background: var(--black-piece);
+}
+
+.swatch[data-marks] i {
+    background: var(--mark);
+}
+
+.toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 14px;
+}
+
+.toggle input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+}
+
+/* Zoe's palettes (T-82): on the page's root and on each swatch of the settings. Board skins, each with its own highlights */
+:root[data-board="azzurro"],
+[data-board="azzurro"] {
+    --light-square: #eaf1f8;
+    --dark-square: #86abd0;
+    --last-move: rgba(255, 206, 70, 0.65);
+    --selected: rgba(255, 190, 50, 0.85);
+    --hover-edge: #f4c84c;
+}
+
+:root[data-theme="dark"][data-board="azzurro"],
+:root[data-theme="dark"] [data-board="azzurro"] {
+    --light-square: #a9bccd;
+    --dark-square: #61809e;
+    --last-move: rgba(255, 206, 70, 0.65);
+    --selected: rgba(255, 190, 50, 0.85);
+    --hover-edge: #f4c84c;
+}
+
+:root[data-board="verde"],
+[data-board="verde"] {
+    --light-square: #eeeed2;
+    --dark-square: #769656;
+    --last-move: rgba(255, 255, 51, 0.5);
+    --selected: rgba(255, 236, 40, 0.75);
+    --hover-edge: #f6f669;
+}
+
+:root[data-theme="dark"][data-board="verde"],
+:root[data-theme="dark"] [data-board="verde"] {
+    --light-square: #c3c7a8;
+    --dark-square: #5f7c45;
+    --last-move: rgba(255, 255, 51, 0.5);
+    --selected: rgba(255, 236, 40, 0.75);
+    --hover-edge: #f6f669;
+}
+
+:root[data-board="noce"],
+[data-board="noce"] {
+    --light-square: #e9d8bd;
+    --dark-square: #a6866a;
+    --last-move: rgba(200, 212, 40, 0.55);
+    --selected: rgba(185, 205, 20, 0.75);
+    --hover-edge: #cdd26a;
+}
+
+:root[data-theme="dark"][data-board="noce"],
+:root[data-theme="dark"] [data-board="noce"] {
+    --light-square: #c4b096;
+    --dark-square: #80654d;
+    --last-move: rgba(200, 212, 40, 0.55);
+    --selected: rgba(185, 205, 20, 0.75);
+    --hover-edge: #cdd26a;
+}
+
+:root[data-board="ardesia"],
+[data-board="ardesia"] {
+    --light-square: #dfe3e8;
+    --dark-square: #8b97a4;
+    --last-move: rgba(255, 206, 70, 0.6);
+    --selected: rgba(255, 190, 50, 0.8);
+    --hover-edge: #f4c84c;
+}
+
+:root[data-theme="dark"][data-board="ardesia"],
+:root[data-theme="dark"] [data-board="ardesia"] {
+    --light-square: #a7b0ba;
+    --dark-square: #65707c;
+    --last-move: rgba(255, 206, 70, 0.6);
+    --selected: rgba(255, 190, 50, 0.8);
+    --hover-edge: #f4c84c;
+}
+
+:root[data-board="grigio"],
+[data-board="grigio"] {
+    --light-square: #ededed;
+    --dark-square: #9a9a9a;
+    --last-move: rgba(255, 206, 70, 0.6);
+    --selected: rgba(255, 190, 50, 0.8);
+    --hover-edge: #f4c84c;
+}
+
+:root[data-theme="dark"][data-board="grigio"],
+:root[data-theme="dark"] [data-board="grigio"] {
+    --light-square: #b9b9b9;
+    --dark-square: #707070;
+    --last-move: rgba(255, 206, 70, 0.6);
+    --selected: rgba(255, 190, 50, 0.8);
+    --hover-edge: #f4c84c;
+}
+
+:root[data-board="lavanda"],
+[data-board="lavanda"] {
+    --light-square: #ece6f2;
+    --dark-square: #9a86b8;
+    --last-move: rgba(255, 214, 90, 0.6);
+    --selected: rgba(255, 200, 60, 0.8);
+    --hover-edge: #f4c84c;
+}
+
+:root[data-theme="dark"][data-board="lavanda"],
+:root[data-theme="dark"] [data-board="lavanda"] {
+    --light-square: #b8adc6;
+    --dark-square: #6f5e8c;
+    --last-move: rgba(255, 214, 90, 0.6);
+    --selected: rgba(255, 200, 60, 0.8);
+    --hover-edge: #f4c84c;
+}
+
+:root[data-board="ciliegio"],
+[data-board="ciliegio"] {
+    --light-square: #ecd3b6;
+    --dark-square: #9a5a3e;
+    --last-move: rgba(230, 220, 70, 0.55);
+    --selected: rgba(220, 210, 40, 0.75);
+    --hover-edge: #e6dc46;
+}
+
+:root[data-theme="dark"][data-board="ciliegio"],
+:root[data-theme="dark"] [data-board="ciliegio"] {
+    --light-square: #c6ab8f;
+    --dark-square: #73412c;
+    --last-move: rgba(230, 220, 70, 0.55);
+    --selected: rgba(220, 210, 40, 0.75);
+    --hover-edge: #e6dc46;
+}
+
+:root[data-board="menta"],
+[data-board="menta"] {
+    --light-square: #e9f3ec;
+    --dark-square: #7cb396;
+    --last-move: rgba(255, 218, 80, 0.6);
+    --selected: rgba(255, 204, 50, 0.8);
+    --hover-edge: #f4c84c;
+}
+
+:root[data-theme="dark"][data-board="menta"],
+:root[data-theme="dark"] [data-board="menta"] {
+    --light-square: #b3c6b9;
+    --dark-square: #58876d;
+    --last-move: rgba(255, 218, 80, 0.6);
+    --selected: rgba(255, 204, 50, 0.8);
+    --hover-edge: #f4c84c;
+}
+
+:root[data-board="carta"],
+[data-board="carta"] {
+    --light-square: #f3f1ea;
+    --dark-square: #b8b2a2;
+    --last-move: rgba(110, 165, 225, 0.5);
+    --selected: rgba(80, 145, 215, 0.7);
+    --hover-edge: #4a8ad0;
+}
+
+:root[data-theme="dark"][data-board="carta"],
+:root[data-theme="dark"] [data-board="carta"] {
+    --light-square: #c9c5b9;
+    --dark-square: #8a8577;
+    --last-move: rgba(110, 165, 225, 0.5);
+    --selected: rgba(80, 145, 215, 0.7);
+    --hover-edge: #4a8ad0;
+}
+
+/* Piece colours for Nitida and Torretta */
+:root[data-pieces="classico"],
+[data-pieces="classico"] {
+    --white-piece: #fff;
+    --black-piece: #000;
+}
+
+:root[data-pieces="avorio"],
+[data-pieces="avorio"] {
+    --white-piece: #f4ead3;
+    --black-piece: #2a1c12;
+}
+
+:root[data-pieces="notte"],
+[data-pieces="notte"] {
+    --white-piece: #fff;
+    --black-piece: #1a3050;
+}
+
+:root[data-pieces="bordeaux"],
+[data-pieces="bordeaux"] {
+    --white-piece: #fff;
+    --black-piece: #5e161c;
+}
+
+/* Marks with the right button */
+:root[data-marks="arancione"],
+[data-marks="arancione"] {
+    --mark: #f07c1e;
+    --mark-square: rgba(240, 124, 30, 0.65);
+}
+
+:root[data-marks="rosso"],
+[data-marks="rosso"] {
+    --mark: #d6342c;
+    --mark-square: rgba(214, 52, 44, 0.6);
+}
+
+:root[data-marks="blu"],
+[data-marks="blu"] {
+    --mark: #2335a8;
+    --mark-square: rgba(35, 53, 168, 0.62);
+}
+
+:root[data-marks="verde"],
+[data-marks="verde"] {
+    --mark: #0f6b30;
+    --mark-square: rgba(15, 107, 48, 0.7);
+}
+
+/* Beside the board, a column's content keeps its width and its outer edge while the column folds: it slides under the board, the text never flows again */
+@media (min-width: 841px) {
+    .talk > * {
+        width: var(--left);
+    }
+}
+
+@media (min-width: 1100px) {
+    .side {
+        align-items: flex-end;
+    }
+
+    .side > * {
+        width: var(--right);
+    }
+}
+
+/* Where three columns would leave the board small, the game's column goes under the board, always open */
 @media (min-width: 841px) and (max-width: 1099px) {
-    .app {
-        grid-template-columns: var(--left) auto var(--tab);
+    .app,
+    .app.folded {
+        --right-now: 0px;
+        grid-template-columns: var(--left-now) auto;
+        grid-template-rows: auto minmax(440px, auto) auto;
+        grid-template-areas: ". head" "talk board" ". side";
+        /* The page scrolls here: the board measures the page without its scroll bar */
+        container-type: inline-size;
     }
 
     .board-wrap {
-        width: min(calc(100vw - var(--left) - var(--tab) - 4 * var(--gap)), calc(100vh - var(--head) - var(--gap)), 860px);
+        width: min(calc(100cqw - var(--left-now) - var(--between)), calc(100vh - var(--bar) - 3 * var(--between)));
     }
 
-    .side {
-        position: fixed;
-        z-index: 5;
-        top: var(--head);
-        right: var(--gap);
-        bottom: var(--gap);
-        width: var(--right);
-        padding: 12px;
-        background: var(--page);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
+    .side,
+    .app.folded .side {
+        visibility: visible;
+        contain: none;
+    }
+
+    .fold-tab.of-game {
+        display: none;
+    }
+
+    .moves ol {
+        columns: 2;
+        column-gap: 12px;
+    }
+
+    .moves li {
+        break-inside: avoid;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app,
+    .board-wrap,
+    .fold-tab,
+    .app.talk-rail .talk {
+        transition: none;
+    }
+
+    .app.talk-rail .faces,
+    .verdict,
+    .game-card.lit {
+        animation: none;
     }
 }
 
@@ -1004,26 +2142,53 @@ button {
 @media (max-width: 840px) {
     :root {
         --gap: 12px;
-        --head: 54px;
     }
 
     .command span {
         display: none;
     }
 
+    /* The header has no room for the word on a game over: it takes a line of its own under the buttons */
+    .top {
+        height: auto;
+        min-height: var(--bar);
+        flex-wrap: wrap;
+        gap: var(--between) 8px;
+    }
+
+    /* The name gives way to the buttons, which keep to the first line */
+    .title {
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    .verdict {
+        order: 1;
+        flex-basis: 100%;
+        text-align: center;
+    }
+
     .app,
-    .app.folded {
+    .app.folded,
+    .app.talk-rail,
+    .app.talk-folded {
         grid-template-columns: 1fr;
         grid-template-rows: none;
-        grid-template-areas: "ai" "board" "you" "side";
+        grid-template-areas: "head" "ai" "board" "you" "side";
     }
 
     .app.flipped {
-        grid-template-areas: "you" "board" "ai" "side";
+        grid-template-areas: "head" "you" "board" "ai" "side";
     }
 
-    .talk {
+    .talk,
+    .app.talk-rail .talk,
+    .app.talk-folded .talk {
         display: contents;
+        visibility: visible;
+        opacity: 1;
     }
 
     .ai-block {
@@ -1034,8 +2199,7 @@ button {
         grid-area: you;
     }
 
-    .board-wrap,
-    .app.folded .board-wrap {
+    .board-wrap {
         width: 100%;
     }
 
@@ -1046,11 +2210,13 @@ button {
     .side,
     .app.folded .side {
         display: flex;
+        visibility: visible;
         contain: none;
     }
 
-    .fold,
-    .app.folded .tab-away {
+    .fold-tab,
+    .app.talk-rail .faces,
+    .app.talk-folded .faces {
         display: none;
     }
 

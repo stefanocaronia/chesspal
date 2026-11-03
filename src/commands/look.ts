@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { boardText, type Facts } from "../core/index.ts";
-import { loadGame } from "../games/index.ts";
+import { gameAt } from "./clock.ts";
 import { type GameSummary, headLines, summaryOf, wordLines } from "./game-summary.ts";
 import { defineCommand } from "./registry.ts";
 import { newWords } from "./say.ts";
@@ -20,16 +20,17 @@ export const look = defineCommand({
         + 'before you attack or capture a piece that is not attacked yet, or plan an exchange. With only: "board", the board as text for the player, to '
         + "copy into your message where they do not see it. Example: look {}.",
     input: z.object({ only: z.enum(["board"]).optional().describe("board: only the board as text, for the player") }),
+    // Read only for the host: a flag that has fallen is written, as the time already decided.
     readOnly: true,
     idempotent: true,
     run: ({ only }, context): Look => {
-        const current = loadGame(context.folder);
+        const current = gameAt(context.folder, context.now());
 
         if (current === undefined) {
             throw new Error("There is no game to look at: start one with new_game.");
         }
 
-        return only === "board" ? { board: boardText(current.game.position.fen) } : { game: { ...summaryOf(current), facts: current.game.facts }, words: newWords(context) };
+        return only === "board" ? { board: boardText(current.game.position.fen) } : { game: { ...summaryOf(current, context.now()), facts: current.game.facts }, words: newWords(context) };
     },
     format: (look) => ("board" in look ? look.board : [...headLines(look.game), ...fullView(look.game.facts, look.game.turn), ...wordLines(look.words)].join("\n")),
 });

@@ -3,7 +3,7 @@
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { Game, readPgn, type Side, writePgn } from "../core/index.ts";
+import { type Clock, Game, readPgn, type Side, writePgn } from "../core/index.ts";
 import { writeAtomically } from "./files.ts";
 
 /** The player's current game, going on or over: the live game, and what game.json keeps beside its PGN. */
@@ -16,6 +16,8 @@ export interface CurrentGame
     readonly started: string;
     /** What the player and the AI said on the board page, beside the PGN and never in the archive (D-51). */
     readonly talk: TalkLine[];
+    /** The clock, in a game with a time control (D-13). */
+    readonly clock?: Clock;
 }
 
 /** Who speaks on the board page. */
@@ -63,7 +65,14 @@ export function loadGame(folder: string): CurrentGame | undefined
 export function saveGame(folder: string, current: CurrentGame): void
 {
     const path = join(folder, fileName);
-    const file: GameFile = { format: 1, ai: current.ai, started: current.started, pgn: writePgn(current.game.record), ...(current.talk.length === 0 ? {} : { talk: current.talk }) };
+    const file: GameFile = {
+        format: 1,
+        ai: current.ai,
+        started: current.started,
+        pgn: writePgn(current.game.record),
+        ...(current.talk.length === 0 ? {} : { talk: current.talk }),
+        ...(current.clock === undefined ? {} : { clock: savedClockOf(current.clock) }),
+    };
 
     try {
         writeAtomically(path, `${JSON.stringify(file, null, 2)}\n`);
@@ -93,7 +102,15 @@ export function endOf(game: Game): GameEnd | undefined
 const fileName = "game.json";
 
 const savedLine = z.object({ who: z.enum(["player", "ai"]), text: z.string(), ply: z.int().min(0), at: z.iso.datetime() });
-const gameFile = z.object({ format: z.literal(1), ai: z.enum(["white", "black"]), started: z.iso.datetime(), pgn: z.string(), talk: z.array(savedLine).optional() });
+const savedClock = z.object({ base: z.int().positive(), increment: z.int().min(0), white: z.number().min(0), black: z.number().min(0), since: z.iso.datetime() });
+const gameFile = z.object({
+    format: z.literal(1),
+    ai: z.enum(["white", "black"]),
+    started: z.iso.datetime(),
+    pgn: z.string(),
+    talk: z.array(savedLine).optional(),
+    clock: savedClock.optional(),
+});
 type GameFile = z.infer<typeof gameFile>;
 
 // The games read or written in this process, by their file, with the file's stamp then: a call reads a file again only when another process changed it.
@@ -117,10 +134,22 @@ function parsed(text: string, path: string): CurrentGame
             throw new Error(`its PGN holds ${records.length} games`);
         }
 
-        return { game: new Game(record), ai: file.ai, started: file.started, talk: file.talk ?? [] };
+        const game = { game: new Game(record), ai: file.ai, started: file.started, talk: file.talk ?? [] };
+        return file.clock === undefined ? game : { ...game, clock: clockOf(file.clock) };
     } catch (error) {
         throw new Error(`${path} is not a game Chesspal can read (${problemOf(error)}): ask the player to fix it or move it away, since Chesspal never overwrites it.`);
     }
+}
+
+/** The clock as game.json keeps it, flat, in milliseconds. */
+function savedClockOf({ control, left, since }: Clock): z.infer<typeof savedClock>
+{
+    return { base: control.base, increment: control.increment, white: left.white, black: left.black, since };
+}
+
+function clockOf({ base, increment, white, black, since }: z.infer<typeof savedClock>): Clock
+{
+    return { control: { base, increment }, left: { white, black }, since };
 }
 
 function problemOf(error: unknown): string

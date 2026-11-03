@@ -1,8 +1,7 @@
 import { z } from "zod";
-import { Game } from "../core/index.ts";
-import { type CurrentGame, saveGame } from "../games/index.ts";
+import { Game, timeLeft } from "../core/index.ts";
+import { archiveEnded, type CurrentGame, saveGame } from "../games/index.ts";
 import { gameGoingOn, type GameSummary, nextStep, positionLines, summaryOf } from "./game-summary.ts";
-import { archived } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
 import { colourName } from "./view.ts";
 
@@ -21,16 +20,21 @@ export const endGame = defineCommand({
     idempotent: true,
     positionals: ["result"],
     run: ({ result }, context): Ended => {
-        const current = gameGoingOn(context.folder);
+        const now = context.now();
+        const current = gameGoingOn(context.folder, now);
         const loser = result === "player_resigns" ? (current.ai === "white" ? "black" : "white") : current.ai;
         const ending = result === "draw_agreed"
             ? { Result: "1/2-1/2", Termination: "draw agreed" }
             : { Result: loser === "white" ? "0-1" : "1-0", Termination: `${colourName(loser)} resigns` };
         const { record } = current.game;
-        const ended: CurrentGame = { ...current, game: new Game({ ...record, tags: { ...record.tags, ...ending } }) };
+        const game = new Game({ ...record, tags: { ...record.tags, ...ending } });
+        // The clock stops at the end, with the time the side to move had spent.
+        const ended: CurrentGame = current.clock === undefined
+            ? { ...current, game }
+            : { ...current, game, clock: { ...current.clock, left: timeLeft(current.clock, current.game.position.turn, now), since: now.toISOString() } };
         saveGame(context.folder, ended);
-        const { archive, warning } = archived(context.folder, ended);
-        return warning === undefined ? { game: summaryOf(ended, archive) } : { game: summaryOf(ended, archive), warning };
+        const { archive, warning } = archiveEnded(context.folder, ended);
+        return warning === undefined ? { game: summaryOf(ended, now, archive) } : { game: summaryOf(ended, now, archive), warning };
     },
     format: ({ game, warning }) => [...positionLines(game), ...(warning === undefined ? [] : [warning]), nextStep(game)].join("\n"),
 });

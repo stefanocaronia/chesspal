@@ -24,7 +24,7 @@ export const aiSay = defineCommand({
         // The player's words are read before the AI's line is saved: those written while it thought would fall before it, unread.
         const waiting = waitingWords(context);
         const current = say(context.folder, "ai", text, context.now());
-        return { game: summaryOf(current), words: give(context, waiting) };
+        return { game: summaryOf(current, context.now()), words: give(context, waiting) };
     },
     format: ({ game, words }) => ["Said on the board page, where the player reads it: don't write it again in the chat.", ...wordLines(words), afterWords(game, words)].join("\n"),
 });

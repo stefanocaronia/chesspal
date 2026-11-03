@@ -38,6 +38,12 @@ export interface TalkLine
     readonly heard?: "sent" | "read" | "answered";
 }
 
+/** How many times the AI has spoken in the game, its comments on its moves and its lines on the page: the page sees it speak when the count grows (T-84). */
+export function aiSpoke(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): number
+{
+    return plies.filter((ply) => ply.side === ai && ply.comment !== undefined).length + talk.filter((line) => line.who === "ai").length;
+}
+
 /**
  * The AI's words the page shows (D-53): its comments on its moves and what it said on the page, since the player's last move before its last words. Once it
  * has spoken there is always something: the last of its words stay until new ones come.
@@ -57,11 +63,21 @@ export function aiWords(plies: readonly Ply[], ai: Side, talk: readonly TalkLine
     return words.filter((word) => word.ply > playerMoved).map((word) => word.text);
 }
 
-/** The player's words the page shows (D-53): those since their last move, the words sent with it included. */
+/**
+ * The player's words the page shows (D-53): their last ones, those since the move they made before them, the words sent with it included; they stay while
+ * the game goes on, as the AI's do, until the player writes again.
+ */
 export function playerWords(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): TalkLine[]
 {
-    const moved = plies.findLastIndex((ply) => ply.side !== ai);
-    return talk.filter((line) => line.who === "player" && line.ply > moved);
+    const lines = talk.filter((line) => line.who === "player");
+    const last = lines.at(-1);
+
+    if (last === undefined) {
+        return [];
+    }
+
+    const moved = plies.findLastIndex((ply, index) => ply.side !== ai && index < last.ply);
+    return lines.filter((line) => line.ply > moved);
 }
 
 /** How many characters the player has written since the AI's last move, of the 200 they may until its next one (D-54). */

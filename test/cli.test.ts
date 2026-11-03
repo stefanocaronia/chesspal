@@ -23,7 +23,7 @@ describe("the command line", () => {
     });
 
     it("runs a command and renders its result, as text or as JSON", async () => {
-        expect((await runCommandLine(["status"], context)).output).toBe(`Chesspal ${version}. Folder: /the/player\nNo game.\nNext: ask the player which colour they want, then call new_game.`);
+        expect((await runCommandLine(["status"], context)).output).toBe(`Chesspal ${version}. Folder: /the/player\nNo game.\nNext: ask the player which colour they want and whether they want a clock, then call new_game.`);
         expect(JSON.parse((await runCommandLine(["status", "--json"], context)).output)).toEqual({ version, folder: "/the/player" });
     });
 

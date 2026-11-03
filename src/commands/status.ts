@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { archivedName, loadGame } from "../games/index.ts";
+import { archivedName } from "../games/index.ts";
 import { version } from "../version.ts";
+import { gameAt } from "./clock.ts";
 import { closingLines, type GameSummary, nextStep, positionLines, sidesLine, summaryOf } from "./game-summary.ts";
 import { defineCommand } from "./registry.ts";
 import { unansweredWords } from "./say.ts";
@@ -24,6 +25,7 @@ export const status = defineCommand({
     description: "Shows what Chesspal sees now: its version, the player's folder and the game, with your next step. Call it at the start of every chat, "
         + "before anything else.",
     input: z.object({}),
+    // Read only for the host: a flag that has fallen is written, as the time already decided.
     readOnly: true,
     alwaysLoad: true,
     run: (_input, context): Status => {
@@ -34,10 +36,10 @@ export const status = defineCommand({
         }
 
         try {
-            const current = loadGame(context.folder);
+            const current = gameAt(context.folder, context.now());
 
             if (current !== undefined) {
-                status.game = summaryOf(current, archivedName(context.folder, current));
+                status.game = summaryOf(current, context.now(), archivedName(context.folder, current));
                 status.words = unansweredWords(context);
             }
         } catch (error) {

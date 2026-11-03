@@ -10,6 +10,7 @@ const folders: string[] = [];
 
 // The doorbell of the moves on the page (D-47), as init writes it into Claude Code's settings.
 const bellHook = { type: "command", command: "chesspal listen", asyncRewake: true, timeout: 86_400 };
+const chatHook = { type: "command", command: "chesspal chat" };
 
 afterEach(() => {
     for (const folder of folders.splice(0)) {
@@ -32,7 +33,7 @@ describe("chesspal init", () => {
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${opponentInstructions()}\n<!-- chesspal: end -->\n`);
         expect(text(chess, "CLAUDE.md")).toBe("@AGENTS.md\n");
-        expect(json(chess, ".claude/settings.json")).toEqual({ enabledMcpjsonServers: ["chesspal"], permissions: { allow: ["mcp__chesspal"] }, hooks: { Stop: [{ hooks: [bellHook] }] } });
+        expect(json(chess, ".claude/settings.json")).toEqual({ enabledMcpjsonServers: ["chesspal"], permissions: { allow: ["mcp__chesspal"] }, hooks: { Stop: [{ hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] } });
         expect(text(chess, ".codex/config.toml")).toBe('[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
         expect(opponentInstructions()).toContain("call `status`");
     });
@@ -65,7 +66,7 @@ describe("chesspal init", () => {
             model: "opus",
             enabledMcpjsonServers: ["chesspal"],
             permissions: { allow: ["Bash(ls)", "mcp__chesspal"] },
-            hooks: { Stop: [ownStop, { hooks: [bellHook] }] },
+            hooks: { Stop: [ownStop, { hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] },
         });
         expect(text(folder, ".codex/config.toml")).toBe('model = "gpt-5"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n\n[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
         expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/is set up already: nothing to change\.\n/);

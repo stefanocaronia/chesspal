@@ -1,8 +1,11 @@
 // The talk on the board page (D-51, D-53): the AI's words in bubbles that point at the Torretta, the player's above the box they write in.
-import { type RefObject } from "preact";
+import { type ComponentChildren, type RefObject } from "preact";
 import { useLayoutEffect, useRef } from "preact/hooks";
+import type { Side } from "../core/index.ts";
+import { Avatar } from "./player-card.tsx";
 import { talkLimits, type TalkLine } from "./plies.ts";
 import type { Text } from "./text.ts";
+import { Torretta } from "./torretta.tsx";
 
 /** The AI's words since the player's move, a bubble each; the first points at the Torretta. */
 export function AiWords({ words }: { words: readonly string[]; })
@@ -95,6 +98,47 @@ export function Compose({ lines, spent, draft, onDraft, onSend, canMove, name, p
 }
 
 /** A list that scrolls, kept at its newest line whenever its lines change. */
+/**
+ * The talk narrowed to a card beside the board (T-84): the Torretta above, the player below, each with their name and side written down the card, a ring on
+ * whoever moves and a dot on the Torretta when the AI spoke meanwhile.
+ */
+export function TalkFaces({ name, ai, player, aiMoves, playerMoves, unread, text }: {
+    name: string;
+    ai: Side;
+    player: Side;
+    aiMoves: boolean;
+    playerMoves: boolean;
+    unread: boolean;
+    text: Text;
+})
+{
+    return (
+        <div class="faces">
+            <RailPlayer place="ai" picture={<Torretta size={40} />} name={name} side={text.sides[ai]} moves={aiMoves} unread={unread} />
+            <RailPlayer place="you" picture={<Avatar />} name={text.you} side={text.sides[player]} moves={playerMoves} />
+        </div>
+    );
+}
+
+function RailPlayer({ place, picture, name, side, moves, unread = false }: {
+    place: "ai" | "you";
+    picture: ComponentChildren;
+    name: string;
+    side: string;
+    moves: boolean;
+    unread?: boolean;
+})
+{
+    return (
+        <div class={`rail-player ${place}${moves ? " moving" : ""}`}>
+            <span class={`face${unread ? " unread" : ""}`}>{picture}</span>
+            <span class="rail-name">
+                {name} <span class="note">· {side}</span>
+            </span>
+        </div>
+    );
+}
+
 function useScrolledToEnd(list: RefObject<HTMLElement>, lines: readonly string[]): void
 {
     useLayoutEffect(() => {

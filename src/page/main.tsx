@@ -1,10 +1,8 @@
-// The page's start: the theme and the language, then the app drawn into its place.
+// The page's start: the settings this browser remembers, shown before the first frame, then the app drawn into its place.
 import { render } from "preact";
 import { App } from "./app.tsx";
-import { textFor } from "./text.ts";
-import { showStartTheme } from "./theme.ts";
+import { loadSettings, showSettings } from "./settings.ts";
 
-const text = textFor(navigator.languages);
-document.documentElement.lang = text.language;
-showStartTheme();
-render(<App text={text} />, document.getElementById("app")!);
+const settings = loadSettings();
+showSettings(settings);
+render(<App start={settings} />, document.getElementById("app")!);

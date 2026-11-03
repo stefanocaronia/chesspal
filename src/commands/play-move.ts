@@ -1,5 +1,6 @@
-// A move of the AI or of the player on the current game: played, saved, and archived when it ends the game.
-import { archiveGame, type CurrentGame, endOf, saveGame, talkLine } from "../games/index.ts";
+// A move of the AI or of the player on the current game: played, timed by the clock, saved, and archived when it ends the game.
+import { clockAfterMove, clockTag } from "../core/index.ts";
+import { archiveEnded, type CurrentGame, endOf, saveGame, talkLine } from "../games/index.ts";
 import { gameGoingOn, type MovePlayed, summaryOf } from "./game-summary.ts";
 import { colourName } from "./view.ts";
 
@@ -11,24 +12,34 @@ export interface WithMove
 {
     comment?: string;
     said?: { text: string; at: Date; };
+    /** Milliseconds of the mover's turn that were not theirs, not taken off their clock (D-36). */
+    allowance?: number;
 }
 
-/** Plays a move for one side and saves the game. A refused move, or words refused with it, change nothing: it throws the message `refused` writes from the core's. */
-export function playMove(folder: string, mover: Mover, text: string, refused: (message: string, legal: readonly string[]) => string, { comment, said }: WithMove = {}): MovePlayed
+/**
+ * Plays a move for one side `now` and saves the game, with the time it took and the clock after it in its comment ([%clk]). A refused move, or words refused
+ * with it, change nothing: it throws the message `refused` writes from the core's.
+ */
+export function playMove(folder: string, now: Date, mover: Mover, text: string, refused: (message: string, legal: readonly string[]) => string, { comment, said, allowance = 0 }: WithMove = {}): MovePlayed
 {
-    const current = gameToMove(folder, mover);
-    const { game } = current;
-    const before = game.position;
+    // A flag falls only past the allowance.
+    const before = gameToMove(folder, mover, new Date(now.getTime() - allowance));
+    const { game } = before;
+    const position = game.position;
     // The words are checked before the move, which changes the live game; they count as said after it.
-    const line = said === undefined ? undefined : talkLine(current, mover, said.text, said.at, game.record.moves.length + 1);
+    const line = said === undefined ? undefined : talkLine(before, mover, said.text, said.at, game.record.moves.length + 1);
     const played = game.play(text);
 
     if (!played.played) {
         throw new Error(refused(played.message, played.legal));
     }
 
-    if (comment !== undefined) {
-        game.annotate(game.record.moves.length, { comment });
+    const clock = before.clock === undefined ? undefined : clockAfterMove(before.clock, position.turn, now, allowance);
+    const current = clock === undefined ? before : { ...before, clock };
+    const words = [comment, clock === undefined ? undefined : clockTag(clock.left[position.turn])].filter((part) => part !== undefined);
+
+    if (words.length > 0) {
+        game.annotate(game.record.moves.length, { comment: words.join(" ") });
     }
 
     if (line !== undefined) {
@@ -36,8 +47,8 @@ export function playMove(folder: string, mover: Mover, text: string, refused: (m
     }
 
     saveGame(folder, current);
-    const { archive, warning } = endOf(game) === undefined ? {} : archived(folder, current);
-    const result: MovePlayed = { move: `${before.moveNumber}${before.turn === "white" ? "." : "..."}${played.move.san}`, game: summaryOf(current, archive) };
+    const { archive, warning } = endOf(game) === undefined ? {} : archiveEnded(folder, current);
+    const result: MovePlayed = { move: `${position.moveNumber}${position.turn === "white" ? "." : "..."}${played.move.san}`, game: summaryOf(current, now, archive) };
 
     if (played.note !== undefined) {
         result.note = played.note;
@@ -50,19 +61,9 @@ export function playMove(folder: string, mover: Mover, text: string, refused: (m
     return result;
 }
 
-/** Archives a game that has ended: its name in the archive or, when that fails, a warning, since the game is saved in game.json all the same. */
-export function archived(folder: string, current: CurrentGame): { archive?: string; warning?: string; }
+function gameToMove(folder: string, mover: Mover, now: Date): CurrentGame
 {
-    try {
-        return { archive: archiveGame(folder, current) };
-    } catch (error) {
-        return { warning: `${(error as Error).message} The game is saved in game.json: it goes to the archive when a new game starts.` };
-    }
-}
-
-function gameToMove(folder: string, mover: Mover): CurrentGame
-{
-    const current = gameGoingOn(folder);
+    const current = gameGoingOn(folder, now);
     const { turn } = current.game.position;
     const aiToMove = turn === current.ai;
 

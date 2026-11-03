@@ -19,7 +19,7 @@
     "instructions"
   ],
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc && tsc -p src/page && node -e \"require('node:fs').cpSync('src/page', 'dist/page', { recursive: true, filter: (path) => !/[.]tsx?$|tsconfig[.]json$/.test(path) })\"",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc && tsc -p src/page && node -e \"require('node:fs').cpSync('src/page', 'dist/page', { recursive: true, filter: (path) => !/[.]tsx?$|tsconfig[.]json$/.test(path) })\" && node --experimental-strip-types --no-warnings scripts/build-openings.ts",
     "dev": "tsc --watch",
     "test": "vitest run",
     "format": "eslint --fix . && dprint fmt",
