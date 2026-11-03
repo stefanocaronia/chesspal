@@ -1,9 +1,9 @@
-// The pieces, drawn from a set: one vector map with a symbol for each piece, wK to bP (D-49). The Torretta is the first set (T-9, D-46); cburnett,
-// the free set beside it (D-52), waits for the settings to be chosen (D-48). The moves always show the Torretta's figures, in the colour of the text (D-50).
+// The pieces, drawn from a set: one vector map with a symbol for each piece, wK to bP (D-49). The page shows Nitida, Codex's set; the Torretta (T-9, D-46)
+// and cburnett (D-52) wait for the settings to be chosen (D-48). The moves always show the Torretta's figures, in the colour of the text (D-50).
 const folder = "/page/pieces/";
-const set = "torretta";
+const set = "nitida";
 
-/** A piece by its FEN letter, uppercase for White, drawn to fill its box; the Torretta takes its colours from the theme. */
+/** A piece by its FEN letter, uppercase for White, drawn to fill its box; the set takes its colours from the theme. */
 export function Piece({ letter }: { letter: string; })
 {
     const white = letter === letter.toUpperCase();

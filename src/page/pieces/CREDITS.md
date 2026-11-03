@@ -1,12 +1,15 @@
 # The piece sets
 
-Chesspal's own set is the Torretta, drawn for Chesspal by Zoe Whitaker; it is under Chesspal's licence. Beside it is cburnett, a free set by Colin M.L.
-Burnett, used under the BSD licence below. Chesspal gathered its twelve pieces in one SVG file, as symbols `wK` to `bP`, wrote their styles on the
-elements and prefixed their ids; the drawings are unchanged. Each file names its author, licence and source in its first comment.
+Chesspal's own sets are the Torretta, drawn for Chesspal by Zoe Whitaker, and Nitida, drawn for Chesspal by Codex, with Nitida semplice, the same
+pieces redrawn in simpler strokes; they are under Chesspal's licence. Beside them is cburnett, a free set by Colin M.L. Burnett, used under the BSD
+licence below. Chesspal gathered its twelve pieces in one SVG file, as symbols `wK` to `bP`, wrote their styles on the elements and prefixed their
+ids; the drawings are unchanged. Each file names its author, licence and source in its first comment.
 
 | Set | Author | Licence | Source |
 |---|---|---|---|
 | Torretta | Zoe Whitaker for Chesspal | MIT, as Chesspal | this repository |
+| Nitida | Codex for Chesspal | MIT, as Chesspal | this repository |
+| Nitida semplice | Codex for Chesspal, redrawn | MIT, as Chesspal | this repository |
 | cburnett | Colin M.L. Burnett | BSD 3-Clause, below (the author offers GFDL, CC BY-SA 3.0, BSD and GPL) | [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces) |
 
 ## cburnett: BSD 3-Clause
