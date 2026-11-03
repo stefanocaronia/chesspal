@@ -1,9 +1,10 @@
 import { EventEmitter } from "node:events";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Context } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import { Bell, waitForBell } from "../src/server/bell.ts";
 import { type Page, startPage } from "../src/server/page.ts";
@@ -97,7 +98,39 @@ describe("the player's moves on the page", () => {
         expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain("1. e4 e5 {Symmetry.} *");
     });
 
-    it("tells the pages when the game changes, on the page or through the AI's tools", async () => {
+    it("takes the player's words, alone or with their move, and refuses them in the player's words", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+
+        expect(await post(page, "/api/message", { text: "Hi" })).toMatchObject({ status: 409, body: '{"error":"There is no game going on: start one in the chat."}' });
+        await run(folder, "new_game", { ai_colour: "black" });
+
+        expect(await post(page, "/api/message", { text: "  Hi!  " })).toMatchObject({ status: 200, body: '{"said":true}' });
+        expect(await post(page, "/api/move", { move: "e4", message: "Your turn." })).toMatchObject({ status: 200, body: '{"played":true}' });
+        expect(JSON.parse((await get(page, "/api/game")).body).game.talk).toEqual([{ who: "player", text: "Hi!", ply: 0 }, { who: "player", text: "Your turn.", ply: 1 }]);
+        expect(JSON.parse(readFileSync(join(folder, "game.json"), "utf8")).talk[0]).toEqual({ who: "player", text: "Hi!", ply: 0, at: new Date(2026, 10, 2, 15, 30, 12).toISOString() });
+
+        expect(await post(page, "/api/message", { text: "x".repeat(501) })).toMatchObject({ status: 409, body: '{"error":"The words are 501 characters long: write at most 500."}' });
+        expect((await post(page, "/api/message", { text: "Are you there?" })).status).toBe(200);
+        expect(await post(page, "/api/message", { text: "Hello?" })).toMatchObject({ status: 409, body: '{"error":"The AI has not answered your last 3 messages yet: wait for its answer."}' });
+        // Words with a move are answered with it, however many wait.
+        await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." });
+        await post(page, "/api/message", { text: "One." });
+        await post(page, "/api/message", { text: "Two." });
+        await post(page, "/api/message", { text: "Three." });
+        expect(await post(page, "/api/move", { move: "Nf3", message: "And a move." })).toMatchObject({ status: 200, body: '{"played":true}' });
+        expect((await post(page, "/api/message", { text: "Hi" }, { "content-type": "text/plain" })).status).toBe(415);
+        expect((await post(page, "/api/message", { text: "  " })).status).toBe(400);
+        // A body past 4 KB is cut off where it stands.
+        await expect(post(page, "/api/message", { text: "x".repeat(4100) })).rejects.toThrow();
+
+        await run(folder, "ai_move", { move: "Nc6", plan: "A plan.", comment: "Development." });
+        expect((await post(page, "/api/move", { move: "Bb5", message: 7 })).status).toBe(400);
+        expect(await post(page, "/api/move", { move: "Bb5", message: "x".repeat(501) })).toMatchObject({ status: 409, body: '{"error":"The words are 501 characters long: write at most 500."}' });
+        expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain("1. e4 e5 {Symmetry.} 2. Nf3 Nc6 {Development.} *");
+    });
+
+    it("tells the pages when the game changes, by a move or words on the page or through the AI's tools", async () => {
         const folder = playerFolder();
         const page = await open(folder);
         await run(folder, "new_game", { ai_colour: "black" });
@@ -107,6 +140,8 @@ describe("the player's moves on the page", () => {
         await post(page, "/api/move", { move: "e4" });
         expect(await events.next()).toBe("data: changed");
         await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." });
+        expect(await events.next()).toBe("data: changed");
+        await post(page, "/api/message", { text: "Why e5?" });
         expect(await events.next()).toBe("data: changed");
         events.close();
     });
@@ -122,8 +157,9 @@ describe("the doorbell of the chat", () => {
         vi.unstubAllEnvs();
     });
 
-    it("rings the hook that waits, or the next one, forgets a move answered, and lets go of a hook another takes the place of", () => {
-        const bell = new Bell();
+    it("rings the hook that waits, or the next one while it is news, and lets go of a hook another takes the place of", () => {
+        let news = true;
+        const bell = new Bell(() => news);
         const first = hookAt(bell);
         const second = hookAt(bell);
 
@@ -133,8 +169,29 @@ describe("the doorbell of the chat", () => {
         bell.ring();
         expect(hookAt(bell).heard).toBe("ring");
         bell.ring();
-        bell.clear();
+        news = false;
         expect(hookAt(bell).heard).toBeUndefined();
+    });
+
+    it("rings for the player's words, and keeps quiet once the chat has read them", async () => {
+        const folder = playerFolder();
+        const chat = testContext(folder);
+        const page = await open(folder, undefined, chat);
+        const port = Number(new URL(page.url).port);
+        const hook = JSON.stringify({ cwd: folder });
+        await run(folder, "new_game", { ai_colour: "black" }, chat);
+        await run(folder, "player_move", { move: "e4" }, chat);
+        await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." }, chat);
+
+        // Written while the chat works: status gives the words before its turn ends, so the hook that comes then waits.
+        await post(page, "/api/message", { text: "Why e5?" });
+        await run(folder, "status", {}, chat);
+        const waiting = waitForBell(hook, [port]);
+        const heard = await Promise.race([waiting, new Promise((done) => setTimeout(() => done("waiting"), 300))]);
+
+        expect(heard).toBe("waiting");
+        await post(page, "/api/message", { text: "Are you there?" });
+        expect(await waiting).toBe(true);
     });
 
     it("tells the hook whose page it is, the chat's folder first, and rings when the player moves there", async () => {
@@ -172,9 +229,9 @@ describe("the doorbell of the chat", () => {
     });
 });
 
-async function open(folder: string, opponent?: () => string | undefined): Promise<Page>
+async function open(folder: string, opponent?: () => string | undefined, context: Context = testContext(folder)): Promise<Page>
 {
-    const page = await startPage(folder, opponent);
+    const page = await startPage(context, opponent);
     opened.push(page);
     return page;
 }
@@ -186,10 +243,10 @@ function playerFolder(): string
     return folder;
 }
 
-async function run(folder: string, name: string, input: Record<string, unknown>): Promise<void>
+async function run(folder: string, name: string, input: Record<string, unknown>, context: Context = testContext(folder)): Promise<void>
 {
     const command = commands.find((each) => each.name === name)!;
-    await command.run(command.input.parse(input), testContext(folder));
+    await command.run(command.input.parse(input), context);
 }
 
 function get(page: Page, path: string, headers: Record<string, string> = {}, method = "GET", sentBody?: string): Promise<{ status: number; body: string; headers: Record<string, unknown>; }>

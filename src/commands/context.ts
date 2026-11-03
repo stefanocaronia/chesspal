@@ -11,10 +11,12 @@ export interface Context
     platform: string;
     /** The address of the board page, when the MCP server serves it (D-47). */
     page?: string;
+    /** The player's words on the board page given to the AI in this process, by line: each comes once (T-65). */
+    readonly given: Set<string>;
 }
 
 /** The context of a process started in the player's folder. */
 export function defaultContext(): Context
 {
-    return { folder: process.cwd(), random: Math.random, now: () => new Date(), platform: process.platform };
+    return { folder: process.cwd(), random: Math.random, now: () => new Date(), platform: process.platform, given: new Set() };
 }

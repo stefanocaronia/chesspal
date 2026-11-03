@@ -1,12 +1,12 @@
 // The page: the game of the player's folder, replayed with the chess core from its PGN (D-17), kept up to date as it changes, and the player's moves (D-47),
-// laid out as Zoe's Salotto (D-46): the board, the AI's card with its last comment, the moves, the player's card.
+// laid out as Zoe's Salotto (D-46): the board, the AI's card with its last words, the moves, the player's card.
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { Game, materialOf, readPgn, type Side } from "../core/index.ts";
 import { Board, piecesOf } from "./board.tsx";
 import { Header } from "./header.tsx";
 import { MoveList } from "./move-list.tsx";
 import { Avatar, PlayerCard } from "./player-card.tsx";
-import { pliesOf } from "./plies.ts";
+import { lastWords, pliesOf, type TalkLine } from "./plies.ts";
 import type { Text } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
 
@@ -106,7 +106,7 @@ export function App({ text }: { text: Text; })
                     side={ai}
                     taken={material.taken[ai]}
                     ahead={ahead(ai)}
-                    comment={plies.findLast((ply) => ply.side === ai)?.comment}
+                    comment={lastWords(plies, ai, game?.talk ?? [])}
                     text={text}
                 />
                 <section class="side" aria-label={text.game}>
@@ -118,10 +118,13 @@ export function App({ text }: { text: Text; })
     );
 }
 
-/** What the server sends: the game, its PGN for the player and the AI's side, null before the first game; and the AI's name, when the host gave it. */
+/**
+ * What the server sends: the game, its PGN for the player, the AI's side and the talk on the page, each line with the moves the game had then, null before
+ * the first game; and the AI's name, when the host gave it.
+ */
 interface Served
 {
-    readonly game: { readonly pgn: string; readonly ai: Side; } | null;
+    readonly game: { readonly pgn: string; readonly ai: Side; readonly talk: readonly TalkLine[]; } | null;
     readonly opponent?: string;
 }
 

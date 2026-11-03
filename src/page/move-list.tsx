@@ -1,7 +1,8 @@
-// The moves of the game beside the board, in pairs, in the player's notation.
+// The moves of the game beside the board, in pairs, with the pieces drawn as figures, the same in every language (D-50).
 import { useEffect, useRef } from "preact/hooks";
+import { Figurine } from "./pieces.tsx";
 import type { Ply } from "./plies.ts";
-import { localSan, type Text } from "./text.ts";
+import type { Text } from "./text.ts";
 
 /** The moves numbered in pairs, the last one marked, and the result once the game is over; the list keeps its last move in sight. */
 export function MoveList({ plies, result, text }: { plies: readonly Ply[]; result?: string; text: Text; })
@@ -19,8 +20,8 @@ export function MoveList({ plies, result, text }: { plies: readonly Ply[]; resul
                 {rows.map(({ number, white, black }) => (
                     <li key={number}>
                         <span class="number">{number}.</span>
-                        <Move ply={white} last={plies.at(-1)} text={text} />
-                        <Move ply={black} last={plies.at(-1)} text={text} />
+                        <Move ply={white} last={plies.at(-1)} />
+                        <Move ply={black} last={plies.at(-1)} />
                     </li>
                 ))}
             </ol>
@@ -29,13 +30,19 @@ export function MoveList({ plies, result, text }: { plies: readonly Ply[]; resul
     );
 }
 
-function Move({ ply, last, text }: { ply: Ply | undefined; last: Ply | undefined; text: Text; })
+function Move({ ply, last }: { ply: Ply | undefined; last: Ply | undefined; })
 {
     if (ply === undefined) {
         return <span>…</span>;
     }
 
-    return ply === last ? <span class="last" aria-current="true">{localSan(ply.san, text)}</span> : <span>{localSan(ply.san, text)}</span>;
+    // A screen reader reads the move in SAN; the eye sees each piece's letter as its figure.
+    return (
+        <span class={ply === last ? "last" : undefined} aria-current={ply === last ? "true" : undefined}>
+            <span class="visually-hidden">{ply.san}</span>
+            <span aria-hidden="true">{ply.san.split(/([KQRBN])/).map((part, index) => index % 2 === 1 ? <Figurine key={index} letter={part} /> : part)}</span>
+        </span>
+    );
 }
 
 /** The plies in rows of one number: White's move and Black's. */

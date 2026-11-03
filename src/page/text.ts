@@ -14,8 +14,6 @@ export interface Text
     readonly you: string;
     readonly ai: string;
     readonly sides: Readonly<Record<Side, string>>;
-    /** The letters of the pieces in the notation, for the K, Q, R, B and N of SAN. */
-    readonly letters: Readonly<Record<string, string>>;
     piece(letter: PieceLetter, side: Side): string;
     taken(pieces: readonly string[], ahead: number): string;
 }
@@ -25,12 +23,6 @@ export function textFor(languages: readonly string[]): Text
 {
     const known = languages.map((language) => language.slice(0, 2).toLowerCase()).find((language) => language === "it" || language === "en");
     return known === "it" ? italian : english;
-}
-
-/** A move in SAN with the pieces' letters of the player's language. */
-export function localSan(san: string, text: Text): string
-{
-    return san.replace(/[KQRBN]/g, (letter) => text.letters[letter] ?? letter);
 }
 
 const englishNames: Readonly<Record<PieceLetter, string>> = { K: "king", Q: "queen", R: "rook", B: "bishop", N: "knight", P: "pawn" };
@@ -47,7 +39,6 @@ const english: Text = {
     you: "You",
     ai: "AI",
     sides: { white: "White", black: "Black" },
-    letters: { K: "K", Q: "Q", R: "R", B: "B", N: "N" },
     piece: (letter, side) => `${side} ${englishNames[letter]}`,
     taken: (pieces, ahead) => `Pieces taken: ${pieces.length === 0 ? "none" : pieces.join(", ")}${ahead > 0 ? `; ahead by ${ahead}` : ""}`,
 };
@@ -63,7 +54,6 @@ const italian: Text = {
     you: "Tu",
     ai: "AI",
     sides: { white: "Bianco", black: "Nero" },
-    letters: { K: "R", Q: "D", R: "T", B: "A", N: "C" },
     // Queen and rook are feminine in Italian.
     piece: (letter, side) => `${italianNames[letter]} ${side === "white" ? (letter === "Q" || letter === "R" ? "bianca" : "bianco") : (letter === "Q" || letter === "R" ? "nera" : "nero")}`,
     taken: (pieces, ahead) => `Pezzi presi: ${pieces.length === 0 ? "nessuno" : pieces.join(", ")}${ahead > 0 ? `; avanti di ${ahead}` : ""}`,

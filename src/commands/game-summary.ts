@@ -40,6 +40,8 @@ export interface MovePlayed
     game: GameSummary;
     /** What went wrong after the move was saved, such as the archive not written. */
     warning?: string;
+    /** What the player wrote on the board page that the AI has not been given yet (T-65). */
+    words?: string[];
 }
 
 /** The game as the commands tell it; a game over with the name it has in the archive, when it is there. */
@@ -112,24 +114,40 @@ export function lastMoveText({ move, from, to }: LastMove): string
     return `${move} (${from}-${to})`;
 }
 
-/** The lines after a move, which the line before named: its note, where the game stands, a warning, the next step. */
+/** The lines after a move, which the line before named: its note, where the game stands, a warning. closingLines end them. */
 export function moveLines({ note, game, warning }: MovePlayed): string[]
 {
-    return [...(note === undefined ? [] : [`Note: ${note}`]), ...positionLines(game, false), ...(warning === undefined ? [] : [warning]), nextStep(game)];
+    return [...(note === undefined ? [] : [`Note: ${note}`]), ...positionLines(game, false), ...(warning === undefined ? [] : [warning])];
 }
 
-/** What the AI does next: the one line every host reads, even where the server's instructions are not shown. */
-export function nextStep(game: GameSummary | undefined): string
+/** The last lines of a tool's answer: the player's words from the board page, then the next step, which stays the last line. */
+export function closingLines(game: GameSummary | undefined, words: readonly string[] = []): string[]
+{
+    return [...wordLines(words), nextStep(game, words)];
+}
+
+/** The player's words from the board page, one line each: lines they broke are joined, so no line of theirs reads as one of Chesspal's. */
+export function wordLines(words: readonly string[]): string[]
+{
+    return words.map((text) => `Player wrote on the board page: «${text.replace(/\s+/g, " ")}»`);
+}
+
+/** What the AI does next: the one line every host reads, even where the server's instructions are not shown. Words of the player's ask for an answer. */
+export function nextStep(game: GameSummary | undefined, words: readonly string[] = []): string
 {
     if (game === undefined) {
         return "Next: ask the player which colour they want, then call new_game.";
     }
 
     if (game.end !== undefined) {
-        return "Next: tell the player how the game ended; new_game starts another.";
+        return words.length === 0 ? "Next: tell the player how the game ended; new_game starts another." : "Next: answer the player with ai_say; new_game starts another game.";
     }
 
-    return game.turn === game.ai ? "Next: choose your move, then call ai_move with it, your plan and your comment." : "Next: wait for the player's move, then call player_move with it.";
+    if (game.turn === game.ai) {
+        return "Next: choose your move, then call ai_move with it, your plan and your comment.";
+    }
+
+    return words.length === 0 ? "Next: wait for the player's move, then call player_move with it." : "Next: answer the player with ai_say, then wait for their move.";
 }
 
 /** Who plays what, from the AI's side. */

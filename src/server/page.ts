@@ -1,13 +1,15 @@
 // The page on localhost (D-8, D-47): its HTML with the import map, its scripts, the chess core and the packages they import, the game it shows and keeps
-// up to date, the player's moves, and the doorbell that wakes the chat when the player moves.
+// up to date, the player's moves and words (T-65), and the doorbell that wakes the chat when the player moves or writes.
 import { createHash } from "node:crypto";
 import { readFileSync, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createRequire } from "node:module";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Context } from "../commands/context.ts";
 import { playMove } from "../commands/play-move.ts";
-import { endOf, loadGame, playerPgn } from "../games/index.ts";
+import { say } from "../commands/say.ts";
+import { endOf, loadGame, playerPgn, talkLimits, unheardWords } from "../games/index.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
 
 /** The page of a player's folder, served: its address, and how to stop it. */
@@ -18,12 +20,13 @@ export interface Page
 }
 
 /**
- * Serves the page of a player's folder on 127.0.0.1, on a port of its own when free, else on any free one, where the doorbell cannot find it. The page
- * names the opponent as the host does, once it has connected.
+ * Serves the page of the context's folder on 127.0.0.1, on a port of its own when free, else on any free one, where the doorbell cannot find it. The page
+ * names the opponent as the host does, once it has connected; the doorbell knows from the context what the chat has read of the player's words.
  */
-export async function startPage(folder: string, opponent: () => string | undefined = () => undefined): Promise<Page>
+export async function startPage(context: Context, opponent: () => string | undefined = () => undefined): Promise<Page>
 {
-    const served: Served = { folder, opponent, bell: new Bell(), watchers: new Set(), port: 0 };
+    const { folder } = context;
+    const served: Served = { folder, context, opponent, bell: new Bell(() => hasNews(context)), watchers: new Set(), port: 0 };
     const server = createServer((request, response) => answer(request, response, served));
 
     for (const port of [...pagePorts(folder), 0]) {
@@ -42,6 +45,7 @@ export async function startPage(folder: string, opponent: () => string | undefin
 interface Served
 {
     readonly folder: string;
+    readonly context: Context;
     readonly opponent: () => string | undefined;
     readonly bell: Bell;
     readonly watchers: Set<ServerResponse>;
@@ -100,9 +104,14 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         return;
     }
 
+    if (request.method === "POST" && path === "/api/message") {
+        void messageFromPage(request, response, served);
+        return;
+    }
+
     // The API answers GET alone: a HEAD at the doorbell would wait there as a hook does.
     if (request.method !== "GET" && (request.method !== "HEAD" || path.startsWith("/api/"))) {
-        send(response, 405, "text/plain; charset=utf-8", "The page only reads, and moves with POST /api/move.");
+        send(response, 405, "text/plain; charset=utf-8", "The page only reads, moves with POST /api/move and writes with POST /api/message.");
         return;
     }
 
@@ -123,21 +132,23 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
     }
 }
 
-/** The player's move from the page: played as player_move plays it (D-47), refused in the player's words, and the doorbell rung for the chat. */
+/**
+ * The player's move from the page, with their words when they wrote some: played as player_move plays it (D-47) and saved with the words, refused in the
+ * player's words, and the doorbell rung for the chat.
+ */
 async function moveFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
-    const json = "application/json; charset=utf-8";
-
     // A form of another site can post text, never JSON without asking first: the type keeps it out, with the origin.
-    if (!(request.headers["content-type"] ?? "").startsWith("application/json")) {
+    if (!isJson(request)) {
         send(response, 415, json, JSON.stringify({ error: 'Send the move as JSON: {"move": "e2e4"}.' }));
         return;
     }
 
-    const move = moveOf(await bodyOf(request));
+    const body = jsonOf(await bodyOf(request));
+    const move = textOf(body?.move);
 
-    if (move === undefined) {
-        send(response, 400, json, JSON.stringify({ error: 'Send the move as JSON, in SAN or as squares: {"move": "e2e4"}.' }));
+    if (move === undefined || (body?.message !== undefined && typeof body.message !== "string")) {
+        send(response, 400, json, JSON.stringify({ error: 'Send the move as JSON, in SAN or as squares, with your words if you like: {"move": "e2e4", "message": "…"}.' }));
         return;
     }
 
@@ -148,8 +159,10 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
         return;
     }
 
+    const message = textOf(body?.message);
+
     try {
-        playMove(served.folder, "player", move, (message) => message);
+        playMove(served.folder, "player", move, (problem) => problem, message === undefined ? {} : { said: { text: message, at: served.context.now() } });
     } catch (error) {
         send(response, 409, json, JSON.stringify({ error: (error as Error).message }));
         return;
@@ -159,6 +172,34 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
     served.bell.ring();
     send(response, 200, json, JSON.stringify({ played: true }));
 }
+
+/** The player's words from the page, without a move: saved with the game as player_say saves them, refused in the player's words, and the doorbell rung. */
+async function messageFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
+{
+    if (!isJson(request)) {
+        send(response, 415, json, JSON.stringify({ error: 'Send the message as JSON: {"text": "…"}.' }));
+        return;
+    }
+
+    const text = textOf(jsonOf(await bodyOf(request))?.text);
+
+    if (text === undefined) {
+        send(response, 400, json, JSON.stringify({ error: `Send the message as JSON, ${talkLimits.player} characters at most: {"text": "…"}.` }));
+        return;
+    }
+
+    try {
+        say(served.folder, "player", text, served.context.now());
+    } catch (error) {
+        send(response, 409, json, JSON.stringify({ error: (error as Error).message }));
+        return;
+    }
+
+    served.bell.ring();
+    send(response, 200, json, JSON.stringify({ said: true }));
+}
+
+const json = "application/json; charset=utf-8";
 
 /** Why the player cannot move now, in their words; undefined when they can. */
 function refusalOf(folder: string): string | undefined
@@ -176,28 +217,42 @@ function refusalOf(folder: string): string | undefined
     }
 }
 
-/** Whether the AI has moved since the player did, or the game is gone: the doorbell has nothing left to say. A game the player ended is still news. */
-function aiHasAnswered(folder: string): boolean
+/**
+ * Whether the chat has news from the page: a move of the player's the AI has not answered, a game the player ended there, or words of theirs it has not
+ * been given. A game that cannot be read is news too: status says what is wrong.
+ */
+function hasNews(context: Context): boolean
 {
     try {
-        const current = loadGame(folder);
-        return current === undefined || current.game.position.turn !== current.ai;
+        const current = loadGame(context.folder);
+        return current !== undefined && (current.game.position.turn === current.ai || unheardWords(current, context.given).length > 0);
     } catch {
-        return false;
+        return true;
     }
 }
 
-function moveOf(text: string | undefined): string | undefined
+function isJson(request: IncomingMessage): boolean
+{
+    return (request.headers["content-type"] ?? "").startsWith("application/json");
+}
+
+function jsonOf(text: string | undefined): Record<string, unknown> | undefined
 {
     try {
-        const parsed = text === undefined ? undefined : JSON.parse(text) as { move?: unknown; };
-        return typeof parsed?.move === "string" && parsed.move.trim() !== "" ? parsed.move.trim() : undefined;
+        const parsed: unknown = text === undefined ? undefined : JSON.parse(text);
+        return typeof parsed === "object" && parsed !== null ? parsed as Record<string, unknown> : undefined;
     } catch {
         return undefined;
     }
 }
 
-/** A request's body, up to a size a move never reaches; undefined past it. */
+/** A text field of a body, trimmed; undefined when it is not text, or empty. */
+function textOf(value: unknown): string | undefined
+{
+    return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+}
+
+/** A request's body, up to a size a move with the player's words never reaches; undefined past it. */
 function bodyOf(request: IncomingMessage): Promise<string | undefined>
 {
     return new Promise((done) => {
@@ -206,7 +261,7 @@ function bodyOf(request: IncomingMessage): Promise<string | undefined>
         request.on("data", (chunk: string) => {
             text += chunk;
 
-            if (text.length > 1024) {
+            if (text.length > 4096) {
                 request.destroy();
                 done(undefined);
             }
@@ -232,21 +287,13 @@ function tellWatchers(served: Served): void
     }
 }
 
-/**
- * Watches the player's folder for changes to the game, whoever makes them (the AI's tools, the CLI, a hand edit): the pages hear of them, and the doorbell
- * forgets a move the AI has answered. It returns how to stop watching.
- */
+/** Watches the player's folder for changes to the game, whoever makes them (the AI's tools, the CLI, a hand edit): the pages hear of them. It returns how to stop watching. */
 function watchGame(served: Served): () => void
 {
     let waiting: NodeJS.Timeout | undefined;
 
     const changed = (): void => {
         waiting = undefined;
-
-        if (aiHasAnswered(served.folder)) {
-            served.bell.clear();
-        }
-
         tellWatchers(served);
     };
 
@@ -269,12 +316,16 @@ function watchGame(served: Served): () => void
     }
 }
 
-/** The game in progress or just ended, as the player may see it: its PGN without the AI's plans while it goes on, and the AI's side; and the AI's name. */
+/**
+ * The game in progress or just ended, as the player may see it: its PGN without the AI's plans while it goes on, the AI's side, and the talk on the page;
+ * and the AI's name.
+ */
 function sendGame(response: ServerResponse, served: Served): void
 {
     try {
         const current = loadGame(served.folder);
-        const body = { game: current === undefined ? null : { pgn: playerPgn(current), ai: current.ai }, opponent: served.opponent() };
+        const talk = current?.talk.map(({ who, text, ply }) => ({ who, text, ply }));
+        const body = { game: current === undefined ? null : { pgn: playerPgn(current), ai: current.ai, talk }, opponent: served.opponent() };
         send(response, 200, "application/json; charset=utf-8", JSON.stringify(body));
     } catch (error) {
         send(response, 500, "application/json; charset=utf-8", JSON.stringify({ error: (error as Error).message }));

@@ -34,7 +34,7 @@ export const newGame = defineCommand({
 
         const ai = colour === "random" ? (context.random() < 0.5 ? "white" : "black") : colour;
         const started = startOfNewGame(context.folder, context.now(), before);
-        const current: CurrentGame = { game: startingGame(from, ai, started), ai, started: started.toISOString() };
+        const current: CurrentGame = { game: startingGame(from, ai, started), ai, started: started.toISOString(), talk: [] };
         const archived = before === undefined || (going === undefined && archivedName(context.folder, before) !== undefined) ? undefined : archiveBefore(context.folder, before);
         saveGame(context.folder, current);
         return archived === undefined ? { game: summaryOf(current) } : { game: summaryOf(current), archived: { name: archived, finished: going === undefined } };

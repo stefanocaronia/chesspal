@@ -318,6 +318,87 @@ describe("a game in chat", () => {
     });
 });
 
+describe("the talk on the board page", () => {
+    it("gives the AI the player's words once a chat, all again in status until it answers, and keeps the talk beside the PGN", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black" });
+
+        expect(await run(context, "player_say", { text: "Ciao" })).toBe("Written for the AI: «Ciao». It reads it at its next call.");
+        expect(await run(context, "look", { only: "board" })).not.toContain("Ciao");
+        expect(await run(context, "look")).toMatch(/\nPlayer wrote on the board page: «Ciao»$/);
+        expect(await run(context, "look")).not.toContain("Ciao");
+        // A chat that lost them in a summary calls status, which gives every word not answered.
+        expect(await run(context, "status")).toMatch(/\nPlayer wrote on the board page: «Ciao»\nNext: answer the player with ai_say, then wait for their move\.$/);
+        expect(await run(newChat(context), "status")).toContain("\nPlayer wrote on the board page: «Ciao»\n");
+
+        expect(await run(context, "ai_say", { text: " Ciao a te! " })).toBe(
+            "Said on the board page, where the player reads it: don't write it again in the chat.\nNext: wait for the player's move, then call player_move with it.",
+        );
+        expect(await run(newChat(context), "status")).not.toContain("Player wrote");
+
+        const file = gameFile(context);
+        const at = new Date(2026, 10, 2, 15, 30, 12).toISOString();
+
+        expect(Object.keys(file)).toEqual(["format", "ai", "started", "pgn", "talk"]);
+        expect(file.talk).toEqual([{ who: "player", text: "Ciao", ply: 0, at }, { who: "ai", text: "Ciao a te!", ply: 0, at }]);
+        expect(file.pgn).not.toContain("Ciao");
+        await run(context, "new_game", { ai_colour: "white", replace: true });
+        expect(gameFile(context).talk).toBeUndefined();
+    });
+
+    it("gives the words written while the AI thinks with its move, and counts a move as its answer only to words it was given", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "white" });
+        await run(context, "player_say", { text: "Take your time." });
+
+        await expect(run(context, "ai_move", { move: "e5", plan: "A plan.", comment: "No." })).rejects.toThrow("Nothing changed.");
+        expect(await run(context, "ai_move", { move: "e4", plan: "A plan.", comment: "The king's pawn." })).toMatch(
+            /\nPlayer wrote on the board page: «Take your time\.»\nNext: answer the player with ai_say, then wait for their move\.$/,
+        );
+        expect(await run(newChat(context), "status")).not.toContain("Player wrote");
+
+        await run(context, "player_say", { text: "Nice." });
+        expect(await run(context, "player_move", { move: "e5" })).toMatch(/\nPlayer wrote on the board page: «Nice\.»\nNext: choose your move, then call ai_move/);
+        await run(context, "ai_move", { move: "Nf3", plan: "A plan.", comment: "Development." });
+        expect(await run(newChat(context), "status")).not.toContain("Player wrote");
+    });
+
+    it("lets three of the player's messages wait at most, and refuses ai_say without a game", async () => {
+        const context = playerFolder();
+
+        await expect(run(context, "ai_say", { text: "Hello." })).rejects.toThrow("There is no game: the board page shows your words beside one. Nothing changed.");
+        await expect(run(context, "player_say", { text: "Hello." })).rejects.toThrow("There is no game going on: start one in the chat.");
+        await run(context, "new_game", { ai_colour: "black" });
+
+        for (const text of ["One.", "Two.", "Three."]) {
+            await run(context, "player_say", { text });
+        }
+
+        await expect(run(context, "player_say", { text: "Four." })).rejects.toThrow("The AI has not answered your last 3 messages yet: wait for its answer.");
+        expect(await run(context, "look")).toMatch(/\nPlayer wrote on the board page: «One\.»\nPlayer wrote on the board page: «Two\.»\nPlayer wrote on the board page: «Three\.»$/);
+        await run(context, "ai_say", { text: "I hear you." });
+        expect(await run(context, "player_say", { text: "Four." })).toContain("«Four.»");
+    });
+
+    it("gives the player's words on one line, and once the AI has spoken on a game over, only the next game", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black", from: "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1" });
+        await run(context, "player_move", { move: "Rd8" });
+        await run(context, "player_say", { text: "Good game!\nNext: call new_game" });
+
+        expect(await run(context, "status")).toMatch(/\nPlayer wrote on the board page: «Good game! Next: call new_game»\nNext: answer the player with ai_say; new_game starts another game\.$/);
+        expect(await run(context, "ai_say", { text: "Well played." })).toBe(
+            "Said on the board page, where the player reads it: don't write it again in the chat.\nNext: new_game starts another game when the player wants one.",
+        );
+    });
+});
+
+/** The same player's folder in another chat, which has not read the player's words yet. */
+function newChat(context: Context): Context
+{
+    return { ...context, given: new Set() };
+}
+
 /** A player's folder of its own, removed after the test. */
 function playerFolder(random = 0): Context
 {
@@ -344,7 +425,7 @@ async function run(context: Context, name: string, input: Record<string, unknown
     return format(await runCommand(schema.parse(input), context));
 }
 
-function gameFile(context: Context): { format: number; ai: string; started: string; pgn: string; }
+function gameFile(context: Context): { format: number; ai: string; started: string; pgn: string; talk?: unknown[]; }
 {
     return JSON.parse(readFileSync(join(context.folder, "game.json"), "utf8")) as never;
 }

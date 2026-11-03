@@ -1,17 +1,26 @@
 // A move of the AI or of the player on the current game: played, saved, and archived when it ends the game.
-import { archiveGame, type CurrentGame, endOf, saveGame } from "../games/index.ts";
+import { archiveGame, type CurrentGame, endOf, saveGame, talkLine } from "../games/index.ts";
 import { gameGoingOn, type MovePlayed, summaryOf } from "./game-summary.ts";
 import { colourName } from "./view.ts";
 
 /** Who plays a move: the AI, or the player through the AI. */
 export type Mover = "ai" | "player";
 
-/** Plays a move for one side and saves the game. A refused move changes nothing: it throws the message `refused` writes from the core's. */
-export function playMove(folder: string, mover: Mover, text: string, refused: (message: string, legal: readonly string[]) => string, comment?: string): MovePlayed
+/** What comes with a move: the AI's comment, or the player's words from the board page, saved with it (T-65). */
+export interface WithMove
+{
+    comment?: string;
+    said?: { text: string; at: Date; };
+}
+
+/** Plays a move for one side and saves the game. A refused move, or words refused with it, change nothing: it throws the message `refused` writes from the core's. */
+export function playMove(folder: string, mover: Mover, text: string, refused: (message: string, legal: readonly string[]) => string, { comment, said }: WithMove = {}): MovePlayed
 {
     const current = gameToMove(folder, mover);
     const { game } = current;
     const before = game.position;
+    // The words are checked before the move, which changes the live game; they count as said after it.
+    const line = said === undefined ? undefined : talkLine(current, mover, said.text, said.at, game.record.moves.length + 1);
     const played = game.play(text);
 
     if (!played.played) {
@@ -20,6 +29,10 @@ export function playMove(folder: string, mover: Mover, text: string, refused: (m
 
     if (comment !== undefined) {
         game.annotate(game.record.moves.length, { comment });
+    }
+
+    if (line !== undefined) {
+        current.talk.push(line);
     }
 
     saveGame(folder, current);

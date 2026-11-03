@@ -41,7 +41,7 @@ export async function startMcpServer(context: Context = defaultContext(), list: 
     process.stdin.on("end", leave);
     process.stdin.on("close", leave);
     const server = createMcpServer(context, list);
-    context.page = await pageOf(context.folder, () => opponentOf(server.server.getClientVersion()?.name));
+    context.page = await pageOf(context, () => opponentOf(server.server.getClientVersion()?.name));
     await server.connect(new StdioServerTransport());
 }
 
@@ -52,12 +52,12 @@ export function opponentOf(host: string | undefined): string | undefined
 }
 
 /** The board page of the player's folder, served by this process for as long as the chat lasts (D-47); without it the game goes on in the chat. */
-async function pageOf(folder: string, opponent: () => string | undefined): Promise<string | undefined>
+async function pageOf(context: Context, opponent: () => string | undefined): Promise<string | undefined>
 {
     try {
-        const { url } = await startPage(folder, opponent);
+        const { url } = await startPage(context, opponent);
 
-        if (!pagePorts(folder).includes(Number(new URL(url).port))) {
+        if (!pagePorts(context.folder).includes(Number(new URL(url).port))) {
             process.stderr.write(`The board page is at ${url}, off its usual ports: the doorbell cannot find it, so moves on the page do not wake the chat.\n`);
         }
 

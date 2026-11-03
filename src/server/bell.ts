@@ -1,19 +1,29 @@
-// Claude Code's doorbell for the moves played on the page (D-47): `chesspal listen`, the Stop hook init writes, waits at the page of its chat and, when the
-// player moves there, tells the chat to call status. It never carries the move or the position: status reads them fresh.
+// Claude Code's doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes, waits at the page of its chat and, when the player moves or
+// writes there (T-65), tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
 import { createHash } from "node:crypto";
 import { get, type IncomingMessage, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
 
-/** What the chat hears from the doorbell: never the move, only where to read it. */
-export const bellLine = "The player moved on the board page, where they see the board: call status to see their move and your position.";
+/** What the chat hears from the doorbell: one line for whatever the player did, never what, only where to read it. */
+export const bellLine = "The player acted on the board page: call status to see it.";
 
-/** The doorbell's end on the page's server: the hook of the chat that ended its turn waits here, one at a time, and hears "ring" when the player moves. */
+/**
+ * The doorbell's end on the page's server: the hook of the chat that ended its turn waits here, one at a time, and hears "ring" when the player moves or
+ * writes on the page. A ring no hook heard waits for the next one, while it is still news: the chat, awake, may have read it already.
+ */
 export class Bell
 {
     private listener: ServerResponse | undefined;
     private pending = false;
+    private readonly news: () => boolean;
 
-    /** The player moved on the page: the hook waiting hears it now, or the next one as soon as it comes. */
+    /** `news` says whether a ring no hook heard is still worth waking the chat for. */
+    constructor(news: () => boolean = () => true)
+    {
+        this.news = news;
+    }
+
+    /** The player acted on the page: the hook waiting hears it now, or the next one as soon as it comes. */
     ring(): void
     {
         if (this.listener === undefined) {
@@ -25,19 +35,14 @@ export class Bell
         this.listener = undefined;
     }
 
-    /** The move is no longer news: the AI answered it from a chat already awake. */
-    clear(): void
-    {
-        this.pending = false;
-    }
-
     /** A hook waits for the bell; the one before it, of a turn already ended, is let go. */
     listen(request: IncomingMessage, response: ServerResponse): void
     {
         response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+        const missed = this.pending;
+        this.pending = false;
 
-        if (this.pending) {
-            this.pending = false;
+        if (missed && this.news()) {
             response.end("ring");
             return;
         }

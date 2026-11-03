@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { boardText, type Facts } from "../core/index.ts";
 import { loadGame } from "../games/index.ts";
-import { type GameSummary, headLines, summaryOf } from "./game-summary.ts";
+import { type GameSummary, headLines, summaryOf, wordLines } from "./game-summary.ts";
 import { defineCommand } from "./registry.ts";
+import { newWords } from "./say.ts";
 import { fullView } from "./view.ts";
 
-/** The whole view of the position, or only the board as text for the player. */
-type Look = { board: string; } | { game: Viewed; };
+/** The whole view of the position, with what the player wrote on the board page the AI has not been given yet; or only the board as text for the player. */
+type Look = { board: string; } | { game: Viewed; words: string[]; };
 
 /** The game with the facts of its position, whoever is to move. */
 type Viewed = GameSummary & { facts: Facts; };
@@ -28,7 +29,7 @@ export const look = defineCommand({
             throw new Error("There is no game to look at: start one with new_game.");
         }
 
-        return only === "board" ? { board: boardText(current.game.position.fen) } : { game: { ...summaryOf(current), facts: current.game.facts } };
+        return only === "board" ? { board: boardText(current.game.position.fen) } : { game: { ...summaryOf(current), facts: current.game.facts }, words: newWords(context) };
     },
-    format: (look) => ("board" in look ? look.board : [...headLines(look.game), ...fullView(look.game.facts, look.game.turn)].join("\n")),
+    format: (look) => ("board" in look ? look.board : [...headLines(look.game), ...fullView(look.game.facts, look.game.turn), ...wordLines(look.words)].join("\n")),
 });

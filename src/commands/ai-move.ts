@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { boardText } from "../core/index.ts";
 import { commentWithPlan } from "../games/index.ts";
-import { moveLines, type MovePlayed } from "./game-summary.ts";
+import { closingLines, moveLines, type MovePlayed } from "./game-summary.ts";
 import { playMove } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
+import { give, waitingWords } from "./say.ts";
 
 /** The AI's move, with its plan, kept hidden (D-29), and its comment for the player (D-12, D-36): a short answer, since the player moves next. */
 export const aiMove = defineCommand({
@@ -18,11 +19,16 @@ export const aiMove = defineCommand({
     }),
     alwaysLoad: true,
     positionals: ["move"],
-    run: ({ move, plan, comment }, context): MovePlayed => playMove(context.folder, "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, commentWithPlan(comment, plan)),
+    run: ({ move, plan, comment }, context): MovePlayed => {
+        // The player's words are read before the move, which would count as the answer to them; a move refused leaves them for the next call.
+        const waiting = waitingWords(context);
+        const played = playMove(context.folder, "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: commentWithPlan(comment, plan) });
+        return { ...played, words: give(context, waiting) };
+    },
     format: (result) => {
-        // The board goes before the next step, which stays the last line.
-        const lines = moveLines(result);
-        return [`Played ${result.move}.`, ...lines.slice(0, -1), "Board, for your message when the player plays in the chat:", boardText(result.game.fen), ...lines.slice(-1)].join("\n");
+        // The board goes before the player's words and the next step, which stays the last line.
+        return [`Played ${result.move}.`, ...moveLines(result), "Board, for your message when the player plays in the chat:", boardText(result.game.fen), ...closingLines(result.game, result.words)]
+            .join("\n");
     },
 });
 

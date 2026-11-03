@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { lastMoveText, moveLines, type MovePlayed } from "./game-summary.ts";
+import { closingLines, lastMoveText, moveLines, type MovePlayed } from "./game-summary.ts";
 import { playMove } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
+import { newWords } from "./say.ts";
 
 /** The player's move, written in the chat and given by the AI: it answers with the position the AI decides on (D-34). */
 export const playerMove = defineCommand({
@@ -12,6 +13,6 @@ export const playerMove = defineCommand({
     input: z.object({ move: z.string().min(1).describe("the player's move, in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q)") }),
     alwaysLoad: true,
     positionals: ["move"],
-    run: ({ move }, context): MovePlayed => playMove(context.folder, "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`),
-    format: (result) => [`Player: ${result.game.lastMove === undefined ? result.move : lastMoveText(result.game.lastMove)}.`, ...moveLines(result)].join("\n"),
+    run: ({ move }, context): MovePlayed => ({ ...playMove(context.folder, "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`), words: newWords(context) }),
+    format: (result) => [`Player: ${result.game.lastMove === undefined ? result.move : lastMoveText(result.game.lastMove)}.`, ...moveLines(result), ...closingLines(result.game, result.words)].join("\n"),
 });
