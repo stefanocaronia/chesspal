@@ -13,6 +13,8 @@ export interface Context
     page?: string;
     /** The player's words on the board page given to the AI in this process, by line: each comes once (T-65). */
     readonly given: Set<string>;
+    /** Told when the AI is given words it had not had: the board page shows them read (D-53). */
+    heard?: () => void;
 }
 
 /** The context of a process started in the player's folder. */

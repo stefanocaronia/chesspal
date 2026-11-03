@@ -1,4 +1,4 @@
-// The moves of a game as the page shows them: each with its side and number, and the comment the player may read; and the AI's last words.
+// The moves of a game as the page shows them: each with its side and number, and the comment the player may read; and the words said on the page.
 import type { GameRecord, Side } from "../core/index.ts";
 
 /** A move of a record with its side and number, as the record's start position counts them, and its comment for the player. */
@@ -26,18 +26,40 @@ export function pliesOf(record: GameRecord): Ply[]
     });
 }
 
-/** A line said on the board page, with the moves the game had then (T-65). */
+/** How many of the player's lines may wait for the AI's answer, and how long a line may be: the server's limits (T-65), which a test keeps equal. */
+export const talkLimits = { waiting: 3, line: 500 } as const;
+
+/** A line said on the board page, with the moves the game had then (T-65); the player's with how far it got: written, read by the AI, or answered. */
 export interface TalkLine
 {
     readonly who: "player" | "ai";
     readonly text: string;
     readonly ply: number;
+    readonly heard?: "sent" | "read" | "answered";
 }
 
-/** The AI's last words: what it said on the page after its last move, or else the comment on that move. */
-export function lastWords(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): string | undefined
+/**
+ * The AI's words the page shows (D-53): its comments on its moves and what it said on the page, since the player's last move before its last words. Once it
+ * has spoken there is always something: the last of its words stay until new ones come.
+ */
+export function aiWords(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): string[]
 {
-    const lastMove = plies.findLastIndex((ply) => ply.side === ai);
-    const said = talk.findLast((line) => line.who === "ai");
-    return said !== undefined && said.ply > lastMove ? said.text : plies[lastMove]?.comment;
+    // A comment counts as said just after its move, before what the AI said there; the sort keeps that order.
+    const comments = plies.flatMap((ply, index) => ply.side === ai && ply.comment !== undefined ? [{ text: ply.comment, ply: index + 1 }] : []);
+    const words = [...comments, ...talk.filter((line) => line.who === "ai")].sort((one, other) => one.ply - other.ply);
+    const last = words.at(-1);
+
+    if (last === undefined) {
+        return [];
+    }
+
+    const playerMoved = plies.findLastIndex((ply, index) => ply.side !== ai && index < last.ply);
+    return words.filter((word) => word.ply > playerMoved).map((word) => word.text);
+}
+
+/** The player's words the page shows (D-53): those since their last move, the words sent with it included. */
+export function playerWords(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): TalkLine[]
+{
+    const moved = plies.findLastIndex((ply) => ply.side !== ai);
+    return talk.filter((line) => line.who === "player" && line.ply > moved);
 }

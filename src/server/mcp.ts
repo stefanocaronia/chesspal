@@ -55,7 +55,9 @@ export function opponentOf(host: string | undefined): string | undefined
 async function pageOf(context: Context, opponent: () => string | undefined): Promise<string | undefined>
 {
     try {
-        const { url } = await startPage(context, opponent);
+        const { url, heard } = await startPage(context, opponent);
+        // Words the AI is given change no file: the pages hear of them from the commands.
+        context.heard = heard;
 
         if (!pagePorts(context.folder).includes(Number(new URL(url).port))) {
             process.stderr.write(`The board page is at ${url}, off its usual ports: the doorbell cannot find it, so moves on the page do not wake the chat.\n`);

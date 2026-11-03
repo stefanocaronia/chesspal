@@ -363,6 +363,15 @@ describe("the talk on the board page", () => {
         expect(await run(newChat(context), "status")).not.toContain("Player wrote");
     });
 
+    it("gives the words written while the AI thinks with what it says", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_say", { text: "Ready?" });
+
+        expect(await run(context, "ai_say", { text: "Always." })).toContain("\nPlayer wrote on the board page: «Ready?»\n");
+        expect(await run(context, "look")).not.toContain("Ready?");
+    });
+
     it("lets three of the player's messages wait at most, and refuses ai_say without a game", async () => {
         const context = playerFolder();
 

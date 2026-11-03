@@ -9,13 +9,14 @@ import { fileURLToPath } from "node:url";
 import type { Context } from "../commands/context.ts";
 import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
-import { endOf, loadGame, playerPgn, talkLimits, unheardWords } from "../games/index.ts";
+import { endOf, heardLines, loadGame, playerPgn, talkLimits, unheardWords } from "../games/index.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
 
-/** The page of a player's folder, served: its address, and how to stop it. */
+/** The page of a player's folder, served: its address, how to tell it the AI was given words, which change no file, and how to stop it. */
 export interface Page
 {
     readonly url: string;
+    heard(): void;
     close(): Promise<void>;
 }
 
@@ -34,7 +35,7 @@ export async function startPage(context: Context, opponent: () => string | undef
             server.unref();
             served.port = portOf(server);
             const stopWatching = watchGame(served);
-            return { url: `http://127.0.0.1:${served.port}/`, close: () => closed(server, stopWatching) };
+            return { url: `http://127.0.0.1:${served.port}/`, heard: () => tellWatchers(served), close: () => closed(server, stopWatching) };
         }
     }
 
@@ -317,15 +318,16 @@ function watchGame(served: Served): () => void
 }
 
 /**
- * The game in progress or just ended, as the player may see it: its PGN without the AI's plans while it goes on, the AI's side, and the talk on the page;
- * and the AI's name.
+ * The game in progress or just ended, as the player may see it: its PGN without the AI's plans while it goes on, the AI's side, when it started, and the
+ * talk on the page, each line of the player's with how far it got (D-53); and the AI's name.
  */
 function sendGame(response: ServerResponse, served: Served): void
 {
     try {
         const current = loadGame(served.folder);
-        const talk = current?.talk.map(({ who, text, ply }) => ({ who, text, ply }));
-        const body = { game: current === undefined ? null : { pgn: playerPgn(current), ai: current.ai, talk }, opponent: served.opponent() };
+        const heard = current === undefined ? [] : heardLines(current, served.context.given);
+        const talk = current?.talk.map(({ who, text, ply }, index) => heard[index] === undefined ? { who, text, ply } : { who, text, ply, heard: heard[index] });
+        const body = { game: current === undefined ? null : { pgn: playerPgn(current), ai: current.ai, started: current.started, talk }, opponent: served.opponent() };
         send(response, 200, "application/json; charset=utf-8", JSON.stringify(body));
     } catch (error) {
         send(response, 500, "application/json; charset=utf-8", JSON.stringify({ error: (error as Error).message }));

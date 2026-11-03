@@ -14,8 +14,19 @@ export interface Text
     readonly you: string;
     readonly ai: string;
     readonly sides: Readonly<Record<Side, string>>;
+    readonly yourTurn: string;
+    readonly send: string;
+    readonly sent: string;
+    readonly withMove: string;
+    readonly fold: string;
+    readonly unfold: string;
+    readonly started: string;
+    readonly move: string;
     piece(letter: PieceLetter, side: Side): string;
     taken(pieces: readonly string[], ahead: number): string;
+    writeTo(name: string): string;
+    readBy(name: string): string;
+    waitingFull(name: string, most: number, canMove: boolean): string;
 }
 
 /** The words for the first of the browser's languages the page speaks, else English. */
@@ -33,14 +44,25 @@ const english: Text = {
     flip: "Flip",
     theme: "Light or dark theme",
     board: "Chessboard",
-    game: "Game",
+    game: "The game",
     moves: "Moves",
     noGame: "No game yet: start one in the chat.",
     you: "You",
     ai: "AI",
     sides: { white: "White", black: "Black" },
+    yourTurn: "your move",
+    send: "Send",
+    sent: "Sent",
+    withMove: "Or move: your words go with it",
+    fold: "Fold the column",
+    unfold: "Show the game",
+    started: "Started",
+    move: "Move",
     piece: (letter, side) => `${side} ${englishNames[letter]}`,
     taken: (pieces, ahead) => `Pieces taken: ${pieces.length === 0 ? "none" : pieces.join(", ")}${ahead > 0 ? `; ahead by ${ahead}` : ""}`,
+    writeTo: (name) => `Write to ${name}…`,
+    readBy: (name) => `Read by ${name}`,
+    waitingFull: (name, most, canMove) => `${name} has not answered your last ${most} messages yet: wait for the answer${canMove ? ", or make your move" : ""}.`,
 };
 
 const italian: Text = {
@@ -48,13 +70,24 @@ const italian: Text = {
     flip: "Gira",
     theme: "Tema chiaro o scuro",
     board: "Scacchiera",
-    game: "Partita",
+    game: "La partita",
     moves: "Mosse",
     noGame: "Nessuna partita: iniziane una nella chat.",
     you: "Tu",
     ai: "AI",
     sides: { white: "Bianco", black: "Nero" },
+    yourTurn: "tocca a te",
+    send: "Manda",
+    sent: "Mandato",
+    withMove: "Oppure muovi: parte con la mossa",
+    fold: "Ripiega la colonna",
+    unfold: "Mostra la partita",
+    started: "Iniziata",
+    move: "Mossa",
     // Queen and rook are feminine in Italian.
     piece: (letter, side) => `${italianNames[letter]} ${side === "white" ? (letter === "Q" || letter === "R" ? "bianca" : "bianco") : (letter === "Q" || letter === "R" ? "nera" : "nero")}`,
     taken: (pieces, ahead) => `Pezzi presi: ${pieces.length === 0 ? "nessuno" : pieces.join(", ")}${ahead > 0 ? `; avanti di ${ahead}` : ""}`,
+    writeTo: (name) => `Scrivi a ${name}…`,
+    readBy: (name) => `Letto da ${name}`,
+    waitingFull: (name, most, canMove) => `${name} non ha ancora risposto ai tuoi ultimi ${most} messaggi: aspetta la sua risposta${canMove ? ", o fai la tua mossa" : ""}.`,
 };

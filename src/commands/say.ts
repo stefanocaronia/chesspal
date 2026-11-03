@@ -43,8 +43,14 @@ export function waitingWords(context: Context, given: ReadonlySet<string> = cont
 /** Gives the words to the AI: from now on they count as given in this chat. Their text. */
 export function give(context: Context, words: readonly Words[]): string[]
 {
+    const before = context.given.size;
+
     for (const { key } of words) {
         context.given.add(key);
+    }
+
+    if (context.given.size > before) {
+        context.heard?.();
     }
 
     return words.map(({ text }) => text);

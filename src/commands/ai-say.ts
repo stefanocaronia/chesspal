@@ -2,7 +2,7 @@ import { z } from "zod";
 import { talkLimits } from "../games/index.ts";
 import { type GameSummary, nextStep, summaryOf, wordLines } from "./game-summary.ts";
 import { defineCommand } from "./registry.ts";
-import { newWords, say } from "./say.ts";
+import { give, say, waitingWords } from "./say.ts";
 
 interface Said
 {
@@ -21,8 +21,10 @@ export const aiSay = defineCommand({
         ),
     }),
     run: ({ text }, context): Said => {
+        // The player's words are read before the AI's line is saved: those written while it thought would fall before it, unread.
+        const waiting = waitingWords(context);
         const current = say(context.folder, "ai", text, context.now());
-        return { game: summaryOf(current), words: newWords(context) };
+        return { game: summaryOf(current), words: give(context, waiting) };
     },
     format: ({ game, words }) => ["Said on the board page, where the player reads it: don't write it again in the chat.", ...wordLines(words), afterWords(game, words)].join("\n"),
 });

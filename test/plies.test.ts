@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readPgn } from "../src/core/index.ts";
-import { lastWords, pliesOf } from "../src/page/plies.ts";
+import { talkLimits } from "../src/games/index.ts";
+import { aiWords, playerWords, pliesOf, talkLimits as pageLimits } from "../src/page/plies.ts";
 
 describe("the moves on the page", () => {
     it("number the moves of a game that starts with Black to move", () => {
@@ -19,15 +20,31 @@ describe("the moves on the page", () => {
         expect(pliesOf(record!).map((ply) => ply.comment)).toEqual([undefined, "The open game."]);
     });
 
-    it("show the AI's last words: what it said on the page after its last move, or else that move's comment", () => {
+    it("show the AI's words since the player's move before its last ones, comments and lines in the order said, never none once it spoke", () => {
+        // Black is the AI: 23... h6 is its move, 24. Rd8+ the player's.
         const plies = pliesOf(readPgn('[FEN "6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 23"]\n\n23... h6 {Air for the king.} 24. Rd8+ *')[0]!);
         const before = { who: "ai", text: "Your move.", ply: 0 } as const;
         const after = { who: "ai", text: "Check, I see.", ply: 2 } as const;
+        const alsoAfter = { who: "ai", text: "Let me think.", ply: 2 } as const;
 
-        expect(lastWords(plies, "black", [])).toBe("Air for the king.");
-        expect(lastWords(plies, "black", [before])).toBe("Air for the king.");
-        expect(lastWords(plies, "black", [before, { who: "player", text: "Hi", ply: 2 }])).toBe("Air for the king.");
-        expect(lastWords(plies, "black", [before, after])).toBe("Check, I see.");
-        expect(lastWords([], "black", [before])).toBe("Your move.");
+        expect(aiWords([], "black", [])).toEqual([]);
+        expect(aiWords([], "black", [before])).toEqual(["Your move."]);
+        expect(aiWords(plies, "black", [before])).toEqual(["Your move.", "Air for the king."]);
+        // The player moved since: the last words stay until new ones come.
+        expect(aiWords(plies, "black", [before, { who: "player", text: "Hi", ply: 2 }])).toEqual(["Your move.", "Air for the king."]);
+        expect(aiWords(plies, "black", [before, after, alsoAfter])).toEqual(["Check, I see.", "Let me think."]);
+    });
+
+    it("show the player's words since their last move, those sent with it included", () => {
+        const plies = pliesOf(readPgn("1. e4 e5 2. Nf3 *")[0]!);
+        const sent = { who: "player", text: "Before Nf3.", ply: 2, heard: "answered" } as const;
+        const withMove = { who: "player", text: "With Nf3.", ply: 3, heard: "sent" } as const;
+
+        expect(playerWords(plies, "black", [sent, { who: "ai", text: "Hm.", ply: 3 }, withMove])).toEqual([withMove]);
+        expect(playerWords(plies.slice(0, 2), "black", [sent])).toEqual([sent]);
+    });
+
+    it("hold the player's words to the server's limits", () => {
+        expect(pageLimits).toEqual({ waiting: talkLimits.waiting, line: talkLimits.player });
     });
 });

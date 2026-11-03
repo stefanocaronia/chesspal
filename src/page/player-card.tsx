@@ -1,18 +1,18 @@
-// A player's card beside the board: their picture, name and side, the pieces they took and how far ahead they are (D-20), and what they said last.
+// A player's card beside the board: their picture, name and side, whose move it is, the pieces they took and how far ahead they are (D-20).
 import type { ComponentChildren } from "preact";
 import type { PieceLetter, Side } from "../core/index.ts";
 import { Piece } from "./pieces.tsx";
 import type { Text } from "./text.ts";
 
-/** The card of one player: the AI's at the top, the player's at the bottom, each placed by its class. */
-export function PlayerCard({ place, picture, name, side, taken, ahead, comment, text }: {
+/** The card of one player: the AI's above its words, the player's below theirs; the player's says when it is their move. */
+export function PlayerCard({ place, picture, name, side, taken, ahead, turn = false, text }: {
     place: "ai" | "you";
     picture: ComponentChildren;
     name: string;
     side: Side;
     taken: readonly PieceLetter[];
     ahead: number;
-    comment?: string;
+    turn?: boolean;
     text: Text;
 })
 {
@@ -23,7 +23,17 @@ export function PlayerCard({ place, picture, name, side, taken, ahead, comment, 
                 {picture}
                 <div class="who">
                     <div class="name">
-                        {name} <span class="note">· {text.sides[side]}</span>
+                        {name}{" "}
+                        <span class="note">
+                            · {text.sides[side]}
+                            {turn
+                                ? (
+                                    <>
+                                        {" "}· <b class="turn">{text.yourTurn}</b>
+                                    </>
+                                )
+                                : null}
+                        </span>
                     </div>
                     <div class="taken" role="img" aria-label={text.taken(taken.map((piece) => text.piece(piece, opponent)), ahead)}>
                         {groupsOf(taken).map((group) => (
@@ -35,7 +45,6 @@ export function PlayerCard({ place, picture, name, side, taken, ahead, comment, 
                     </div>
                 </div>
             </div>
-            {comment === undefined ? null : <p class="comment">{comment}</p>}
         </section>
     );
 }
@@ -44,7 +53,7 @@ export function PlayerCard({ place, picture, name, side, taken, ahead, comment, 
 export function Avatar()
 {
     return (
-        <svg class="avatar" viewBox="0 0 64 64" width="46" height="46" aria-hidden="true">
+        <svg class="avatar" viewBox="0 0 64 64" width="48" height="48" aria-hidden="true">
             <circle class="back" cx="32" cy="32" r="32" />
             <circle class="figure" cx="32" cy="26" r="11" />
             <path class="figure" d="M12 56C14 44 22 39 32 39C42 39 50 44 52 56Z" />

@@ -43,6 +43,19 @@ export function unheardWords(current: CurrentGame, given: ReadonlySet<string>): 
     return unanswered(current).filter(({ key }) => !given.has(key)).map(({ key, line }) => ({ key, text: line.text }));
 }
 
+/** How far a line of the player's got: written, read by the AI in this chat, or answered by its words or its move. */
+export type Heard = "sent" | "read" | "answered";
+
+/** How far each line of the talk got: the player's by `Heard`, the AI's undefined (D-53). */
+export function heardLines(current: CurrentGame, given: ReadonlySet<string>): (Heard | undefined)[]
+{
+    const waiting = new Set(unanswered(current).map(({ key }) => key));
+    return current.talk.map((line, index) => {
+        const key = keyOf(current, index);
+        return line.who === "ai" ? undefined : !waiting.has(key) ? "answered" : given.has(key) ? "read" : "sent";
+    });
+}
+
 /** The player's lines after the AI's last words and its last move, each with a key of its own across games. */
 function unanswered(current: CurrentGame): { key: string; line: TalkLine; }[]
 {
@@ -52,5 +65,10 @@ function unanswered(current: CurrentGame): { key: string; line: TalkLine; }[]
     // The last move is the AI's when the AI is not to move: two moves on, one of them is.
     const aiMovedSince = (ply: number): boolean => moves > ply + 1 || (moves === ply + 1 && game.position.turn !== ai);
 
-    return talk.flatMap((line, index) => index > lastSaid && line.who === "player" && !aiMovedSince(line.ply) ? [{ key: `${current.started}#${index}`, line }] : []);
+    return talk.flatMap((line, index) => index > lastSaid && line.who === "player" && !aiMovedSince(line.ply) ? [{ key: keyOf(current, index), line }] : []);
+}
+
+function keyOf(current: CurrentGame, index: number): string
+{
+    return `${current.started}#${index}`;
 }

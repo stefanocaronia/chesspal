@@ -107,7 +107,10 @@ describe("the player's moves on the page", () => {
 
         expect(await post(page, "/api/message", { text: "  Hi!  " })).toMatchObject({ status: 200, body: '{"said":true}' });
         expect(await post(page, "/api/move", { move: "e4", message: "Your turn." })).toMatchObject({ status: 200, body: '{"played":true}' });
-        expect(JSON.parse((await get(page, "/api/game")).body).game.talk).toEqual([{ who: "player", text: "Hi!", ply: 0 }, { who: "player", text: "Your turn.", ply: 1 }]);
+        expect(JSON.parse((await get(page, "/api/game")).body).game.talk).toEqual([
+            { who: "player", text: "Hi!", ply: 0, heard: "sent" },
+            { who: "player", text: "Your turn.", ply: 1, heard: "sent" },
+        ]);
         expect(JSON.parse(readFileSync(join(folder, "game.json"), "utf8")).talk[0]).toEqual({ who: "player", text: "Hi!", ply: 0, at: new Date(2026, 10, 2, 15, 30, 12).toISOString() });
 
         expect(await post(page, "/api/message", { text: "x".repeat(501) })).toMatchObject({ status: 409, body: '{"error":"The words are 501 characters long: write at most 500."}' });
@@ -143,6 +146,29 @@ describe("the player's moves on the page", () => {
         expect(await events.next()).toBe("data: changed");
         await post(page, "/api/message", { text: "Why e5?" });
         expect(await events.next()).toBe("data: changed");
+        events.close();
+    });
+
+    it("says when the game started and how far each of the player's words got, and tells the pages when the chat reads them", async () => {
+        const folder = playerFolder();
+        const chat = testContext(folder);
+        const page = await open(folder, undefined, chat);
+        chat.heard = page.heard;
+        await run(folder, "new_game", { ai_colour: "black" }, chat);
+        const game = async (): Promise<{ started: string; talk: { heard?: string; }[]; }> => JSON.parse((await get(page, "/api/game")).body).game;
+        const events = listenTo(page);
+
+        await events.next();
+        expect((await game()).started).toBe(new Date(2026, 10, 2, 15, 30, 12).toISOString());
+        await post(page, "/api/message", { text: "Ready?" });
+        expect(await events.next()).toBe("data: changed");
+        expect((await game()).talk.map((line) => line.heard)).toEqual(["sent"]);
+        // The chat reads the words: no file changes, but the pages hear of it.
+        await run(folder, "look", {}, chat);
+        expect(await events.next()).toBe("data: changed");
+        expect((await game()).talk.map((line) => line.heard)).toEqual(["read"]);
+        await run(folder, "ai_say", { text: "Always." }, chat);
+        expect((await game()).talk.map((line) => line.heard)).toEqual(["answered", undefined]);
         events.close();
     });
 });

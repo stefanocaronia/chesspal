@@ -1,4 +1,4 @@
-/* The page in Zoe's Salotto azzurro (D-46): the board on the left, the players and the moves beside it, one column on a phone; light and dark. */
+/* The page in Zoe's Salotto azzurro (D-46), in three columns (D-53): the talk, the board, the game; one column on a phone; light and dark. */
 :root {
     --page: #f4f3ef;
     --card: #ffffff;
@@ -6,7 +6,11 @@
     --soft: #626d7b;
     --line: #e4e2dc;
     --accent: #2d6aa8;
+    --on-accent: #ffffff;
     --quote: #f1f5f9;
+    --say: #d3e4f6;
+    --say-ink: #1d2733;
+    --warn-back: #fff4d6;
     --light-square: #eaf1f8;
     --dark-square: #86abd0;
     --last-move: rgba(255, 196, 80, 0.5);
@@ -20,9 +24,12 @@
     --torretta-light: #f4c84c;
     --shadow: 0 1px 2px rgba(29, 39, 51, 0.06), 0 6px 18px rgba(29, 39, 51, 0.06);
     --gap: 20px;
-    --column: 300px;
+    --left: 300px;
+    --right: 264px;
+    --tab: 44px;
     --head: 60px;
     --radius: 10px;
+    --bubble: 14px;
     color-scheme: light;
 }
 
@@ -33,7 +40,11 @@
     --soft: #8d98a7;
     --line: #262f3b;
     --accent: #7cb0e4;
+    --on-accent: #0f1a28;
     --quote: #1f2834;
+    --say: #22344a;
+    --say-ink: #e6ebf1;
+    --warn-back: #2a2616;
     --light-square: #a9bccd;
     --dark-square: #61809e;
     --torretta-screen: #0f1a28;
@@ -55,9 +66,13 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-button {
+button,
+textarea {
     font: inherit;
     color: inherit;
+}
+
+button {
     cursor: pointer;
 }
 
@@ -106,8 +121,7 @@ button {
     background: var(--card);
 }
 
-.command:focus-visible,
-.theme:focus-visible {
+:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
@@ -132,25 +146,61 @@ button {
     display: none;
 }
 
-/* The layout: the board spans the rows of the column beside it */
+/* Three columns: the talk, the board, the game. The side columns take the board's height and scroll inside it */
 .app {
     display: grid;
     gap: 14px var(--gap);
     padding: 0 var(--gap) var(--gap);
-    grid-template-columns: auto var(--column);
-    grid-template-rows: auto 1fr auto;
-    grid-template-areas: "board ai" "board side" "board you";
+    grid-template-columns: var(--left) auto var(--right);
+    /* The talk keeps room for the AI's words, the box and both cards, however small the board. */
+    grid-template-rows: minmax(440px, auto);
+    grid-template-areas: "talk board side";
     justify-content: center;
 }
 
-.app.flipped {
-    grid-template-areas: "board you" "board side" "board ai";
+.app.folded {
+    grid-template-columns: var(--left) auto var(--tab);
 }
 
 .board-wrap {
     grid-area: board;
     position: relative;
-    width: min(calc(100vw - var(--column) - 3 * var(--gap)), calc(100vh - var(--head) - var(--gap)), 880px);
+    width: min(calc(100vw - var(--left) - var(--right) - 4 * var(--gap)), calc(100vh - var(--head) - var(--gap)), 860px);
+}
+
+.app.folded .board-wrap {
+    width: min(calc(100vw - var(--left) - var(--tab) - 4 * var(--gap)), calc(100vh - var(--head) - var(--gap)), 860px);
+}
+
+.talk {
+    grid-area: talk;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 14px;
+    contain: size;
+    min-height: 0;
+}
+
+.ai-block,
+.you-block {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.ai-block {
+    flex: 0 1 auto;
+}
+
+/* The player's words give way before the AI's last ones: the box and the card never do. */
+.you-block {
+    flex: 0 1 auto;
+}
+
+.you-block > .compose,
+.you-block > .player {
+    flex: none;
 }
 
 /* The board */
@@ -224,7 +274,7 @@ button {
     height: 100%;
 }
 
-/* The pieces: one shape each, in the colour of its side with a darker edge (D-49) */
+/* The pieces: one shape each, in the colour of its side with a black edge (D-49) */
 .piece {
     --piece-edge-width: 6.5px;
 }
@@ -260,16 +310,8 @@ button {
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 14px 16px;
+    padding: 12px 14px;
     box-shadow: var(--shadow);
-}
-
-.player.ai {
-    grid-area: ai;
-}
-
-.player.you {
-    grid-area: you;
 }
 
 .player-line {
@@ -296,6 +338,11 @@ button {
     color: var(--soft);
     font-size: 13px;
     font-weight: 400;
+}
+
+.turn {
+    color: var(--accent);
+    font-weight: 600;
 }
 
 .taken {
@@ -331,16 +378,6 @@ button {
     color: var(--soft);
     font-size: 13px;
     font-weight: 600;
-}
-
-.comment {
-    margin: 12px 0 0;
-    padding: 10px 12px;
-    border-radius: 7px;
-    background: var(--quote);
-    font-size: 14.5px;
-    line-height: 1.5;
-    text-wrap: pretty;
 }
 
 .avatar .back {
@@ -404,13 +441,333 @@ button {
     }
 }
 
-/* The moves */
+/* The bubbles: the AI's under its card, the tail under the Torretta's centre (14 px of padding, 48 px picture), and the player's above their box */
+.says,
+.sent {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.says {
+    overflow: auto;
+    min-height: 84px;
+    padding-top: 12px;
+}
+
+.says:empty {
+    display: none;
+}
+
+.say {
+    position: relative;
+    background: var(--say);
+    color: var(--say-ink);
+    border-radius: var(--bubble);
+    padding: 10px 13px;
+    font-size: 14.5px;
+    line-height: 1.45;
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+}
+
+.say:first-child::before {
+    content: "";
+    position: absolute;
+    left: 29px;
+    top: -10px;
+    border: 10px solid transparent;
+    border-top: 0;
+    border-bottom-color: var(--say);
+}
+
+.sent {
+    align-items: flex-end;
+    margin-bottom: 8px;
+    overflow: auto;
+    min-height: 48px;
+}
+
+.sent:empty {
+    min-height: 0;
+}
+
+.sent li {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    max-width: 88%;
+}
+
+.said {
+    margin: 0;
+    background: var(--accent);
+    color: var(--on-accent);
+    border-radius: var(--bubble) var(--bubble) 4px var(--bubble);
+    padding: 8px 12px;
+    font-size: 14.5px;
+    line-height: 1.4;
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+}
+
+.status {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--soft);
+}
+
+.status .icon {
+    width: 15px;
+    height: 15px;
+    stroke-width: 2;
+}
+
+.status.read {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* The box the player writes in: a bubble whose tail points at their picture */
+.compose {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--bubble);
+    padding: 8px 8px 8px 12px;
+    margin: 0 0 12px;
+    box-shadow: var(--shadow);
+}
+
+.compose::after {
+    content: "";
+    position: absolute;
+    left: 31px;
+    bottom: -8px;
+    width: 14px;
+    height: 14px;
+    background: var(--card);
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    transform: rotate(45deg);
+    border-bottom-right-radius: 3px;
+}
+
+.compose:focus-within,
+.compose:focus-within::after {
+    border-color: var(--accent);
+}
+
+.compose textarea {
+    display: block;
+    width: 100%;
+    resize: none;
+    border: 0;
+    background: none;
+    padding: 2px 0;
+    font-size: 14.5px;
+    line-height: 1.45;
+    min-height: 44px;
+    max-height: 96px;
+    field-sizing: content;
+    outline: none;
+}
+
+.compose textarea::placeholder {
+    color: var(--soft);
+}
+
+.foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.hint,
+.count {
+    font-size: 12px;
+    color: var(--soft);
+}
+
+.count {
+    font-variant-numeric: tabular-nums;
+}
+
+.send {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 0;
+    border-radius: 8px;
+    padding: 6px 10px 6px 12px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.send .icon {
+    width: 15px;
+    height: 15px;
+    stroke-width: 2;
+}
+
+.send:disabled {
+    background: var(--quote);
+    color: var(--soft);
+    cursor: default;
+}
+
+.limit {
+    margin: 0 4px 6px 0;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--warn-back);
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.limit:empty {
+    display: none;
+}
+
+/* Turned round: the player on top, the AI below; the tails turn with them */
+.flipped .talk,
+.flipped .ai-block,
+.flipped .you-block {
+    flex-direction: column-reverse;
+}
+
+.flipped .says {
+    padding: 0 0 12px;
+}
+
+.flipped .say:first-child::before {
+    content: none;
+}
+
+.flipped .say:last-child::after {
+    content: "";
+    position: absolute;
+    left: 29px;
+    bottom: -10px;
+    border: 10px solid transparent;
+    border-bottom: 0;
+    border-top-color: var(--say);
+}
+
+.flipped .compose {
+    margin: 12px 0 0;
+}
+
+.flipped .compose::after {
+    bottom: auto;
+    top: -8px;
+    transform: rotate(225deg);
+}
+
+.flipped .sent {
+    margin: 8px 0 0;
+}
+
+/* The game's column, which folds into a slim tab at the right edge */
 .side {
     grid-area: side;
     display: flex;
     flex-direction: column;
     gap: 10px;
+    contain: size;
     min-height: 0;
+}
+
+.side-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 28px;
+}
+
+.side-head h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--soft);
+    letter-spacing: 0.02em;
+}
+
+.fold,
+.tab {
+    display: grid;
+    place-items: center;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--soft);
+}
+
+.fold {
+    width: 30px;
+    height: 30px;
+}
+
+.fold:hover,
+.tab:hover {
+    color: var(--ink);
+    border-color: var(--line);
+    background: var(--card);
+}
+
+.game-card {
+    margin: 0;
+    display: grid;
+    gap: 3px;
+    font-size: 13px;
+}
+
+.game-card div {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.game-card dt {
+    color: var(--soft);
+}
+
+.game-card dd {
+    margin: 0;
+}
+
+.tab-away {
+    display: none;
+    grid-area: side;
+    align-self: start;
+}
+
+.app.folded .side {
+    display: none;
+}
+
+.app.folded .tab-away {
+    display: block;
+}
+
+.tab {
+    width: var(--tab);
+    padding: 10px 0;
+    gap: 14px;
+    border-color: var(--line);
+    background: var(--card);
+    box-shadow: var(--shadow);
 }
 
 .moves {
@@ -485,14 +842,32 @@ button {
     padding: 0 16px;
 }
 
-/* Beside the board, the column takes the board's height and the moves scroll in it, however long the game */
-@media (min-width: 841px) {
+/* Where three columns would leave the board small, the game's column opens over the board's right edge and the board keeps its size */
+@media (min-width: 841px) and (max-width: 1099px) {
+    .app {
+        grid-template-columns: var(--left) auto var(--tab);
+    }
+
+    .board-wrap {
+        width: min(calc(100vw - var(--left) - var(--tab) - 4 * var(--gap)), calc(100vh - var(--head) - var(--gap)), 860px);
+    }
+
     .side {
-        contain: size;
+        position: fixed;
+        z-index: 5;
+        top: var(--head);
+        right: var(--gap);
+        bottom: var(--gap);
+        width: var(--right);
+        padding: 12px;
+        background: var(--page);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
     }
 }
 
-/* A phone: one column, the AI above the board and the player below it */
+/* A phone, or a narrow window: one column. The AI above the board, the player's words and card below it, then the game */
 @media (max-width: 840px) {
     :root {
         --gap: 12px;
@@ -503,9 +878,10 @@ button {
         display: none;
     }
 
-    .app {
+    .app,
+    .app.folded {
         grid-template-columns: 1fr;
-        grid-template-rows: auto;
+        grid-template-rows: none;
         grid-template-areas: "ai" "board" "you" "side";
     }
 
@@ -513,8 +889,36 @@ button {
         grid-template-areas: "you" "board" "ai" "side";
     }
 
-    .board-wrap {
+    .talk {
+        display: contents;
+    }
+
+    .ai-block {
+        grid-area: ai;
+    }
+
+    .you-block {
+        grid-area: you;
+    }
+
+    .board-wrap,
+    .app.folded .board-wrap {
         width: 100%;
+    }
+
+    .says {
+        max-height: 30vh;
+    }
+
+    .side,
+    .app.folded .side {
+        display: flex;
+        contain: none;
+    }
+
+    .fold,
+    .app.folded .tab-away {
+        display: none;
     }
 
     .moves ol {
