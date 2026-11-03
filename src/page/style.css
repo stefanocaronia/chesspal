@@ -11,8 +11,8 @@
     --dark-square: #86abd0;
     --last-move: rgba(255, 196, 80, 0.5);
     --selected: rgba(255, 196, 80, 0.7);
-    --white-piece: #fbfaf6;
-    --black-piece: #28313d;
+    --white-piece: #fff;
+    --black-piece: #000;
     --torretta-body: #6d9fd1;
     --torretta-shade: #4b7cb0;
     --torretta-screen: #16263a;
@@ -231,12 +231,12 @@ button {
 
 .piece.white {
     --piece-fill: var(--white-piece);
-    --piece-edge: color-mix(in oklab, var(--white-piece) 8%, #0b1118);
+    --piece-edge: #000;
 }
 
 .piece.black {
     --piece-fill: var(--black-piece);
-    --piece-edge: color-mix(in oklab, var(--black-piece) 45%, #05080c);
+    --piece-edge: #000;
 }
 
 .toast {
