@@ -1,14 +1,16 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
-import { type Facts, type GameRecord, materialOf, type Side, type Square } from "../core/index.ts";
+import { type AiLevel, type Facts, type GameRecord, levelOf, materialOf, sees, type Side, type Square } from "../core/index.ts";
 import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker } from "../games/index.ts";
 import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
-import { openingLine } from "./opening-book.ts";
-import { colourName, compactView, materialText } from "./view.ts";
+import { knownMoves, openingLine } from "./opening-book.ts";
+import { boardView, colourName, compactView, materialText } from "./view.ts";
 
 /** The current game, as the commands give it. */
 export interface GameSummary
 {
     ai: Side;
+    /** The AI's level: the layers of facts it gets (D-60). */
+    level: AiLevel;
     turn: Side;
     moveNumber: number;
     fen: string;
@@ -18,8 +20,10 @@ export interface GameSummary
     lastMove?: LastMove;
     /** The opening by Lichess's book (D-15): ECO and name, and the move the game left the book at. */
     opening?: string;
-    /** When the AI is to move: the facts of the position (D-26), the legal moves of each piece among them. */
+    /** When the AI is to move: the facts of the position (D-26); below the club level, only the check and the legal moves of each piece are shown. */
     facts?: Facts;
+    /** When the AI is to move at the master level, in the book: the moves it knows from the position (D-15, D-60). */
+    book?: readonly string[];
     /** When the AI is to move: the plan it wrote last. */
     plan?: string;
     /** In a game with a time control: the time each side had left when the command ran (D-13). */
@@ -58,7 +62,8 @@ export function summaryOf(current: CurrentGame, now: Date, archive?: string): Ga
     const { game, ai } = current;
     const { position, record, lastMove } = game;
     const end = endOf(game);
-    const summary: GameSummary = { ai, turn: position.turn, moveNumber: position.moveNumber, fen: position.fen, lastMoves: lastMoves(record, 6) };
+    const level = levelOf(record);
+    const summary: GameSummary = { ai, level, turn: position.turn, moveNumber: position.moveNumber, fen: position.fen, lastMoves: lastMoves(record, 6) };
 
     if (lastMove !== undefined) {
         summary.lastMove = { move: lastMoves(record, 1), from: lastMove.from, to: lastMove.to };
@@ -83,12 +88,7 @@ export function summaryOf(current: CurrentGame, now: Date, archive?: string): Ga
     if (end !== undefined) {
         summary.end = archive === undefined ? end : { ...end, archive };
     } else if (position.turn === ai) {
-        summary.facts = game.facts;
-        const plan = currentPlan(record);
-
-        if (plan !== undefined) {
-            summary.plan = plan;
-        }
+        addAiFacts(summary, current);
     }
 
     return summary;
@@ -121,7 +121,8 @@ export function positionLines(game: GameSummary, withLastMove = true): string[]
 
     return [
         ...headLines(game, withLastMove),
-        ...(game.facts === undefined ? [] : compactView(game.facts, game.turn)),
+        ...(game.facts === undefined ? [] : (sees(game.level, "tactics") ? compactView : boardView)(game.facts, game.turn)),
+        ...(game.book === undefined ? [] : [`Book moves, most named lines first: ${game.book.join(", ")}`]),
         ...(game.plan === undefined ? [] : [`Plan: ${game.plan}`]),
     ];
 }
@@ -168,7 +169,7 @@ export function wordLines(words: readonly string[]): string[]
 export function nextStep(game: GameSummary | undefined, words: readonly string[] = []): string
 {
     if (game === undefined) {
-        return "Next: ask the player which colour they want and whether they want a clock, then call new_game.";
+        return "Next: ask the player which colour they want, whether they want a clock and at which level you play, then call new_game.";
     }
 
     if (game.end !== undefined) {
@@ -194,6 +195,25 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
 export function sidesLine(ai: Side): string
 {
     return `you play ${colourName(ai)}, the player ${colourName(ai === "white" ? "black" : "white")}`;
+}
+
+/** What the AI gets when it is to move: the facts its level sees (D-60), and its plan. */
+function addAiFacts(summary: GameSummary, { game }: CurrentGame): void
+{
+    const plan = currentPlan(game.record);
+    summary.facts = game.facts;
+
+    if (sees(summary.level, "theory")) {
+        const book = knownMoves(summary.fen);
+
+        if (book.length > 0) {
+            summary.book = book;
+        }
+    }
+
+    if (plan !== undefined) {
+        summary.plan = plan;
+    }
 }
 
 /** The draw offer that stands, and how to answer it or what becomes of it (D-65). */

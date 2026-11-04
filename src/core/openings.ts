@@ -24,30 +24,53 @@ export interface Opening
 /** No line of the book is longer: past it, no position is looked up. */
 export const bookDepth = 40;
 
+/** The book's moves: each position on a line of Lichess's files to the moves its lines play from it, the theory the AI knows at the master level (D-15, D-60). */
+export type OpeningBook = Readonly<Record<string, readonly string[]>>;
+
 /** The index of the openings in Lichess's TSV files (eco, name, pgn), each line keyed by the position its moves reach. */
 export function indexOpenings(tsv: string): Record<string, [string, string]>
 {
     const index: Record<string, [string, string]> = {};
 
-    for (const line of tsv.split(/\r?\n/)) {
-        const [eco, name, pgn] = line.split("\t");
-
-        if (eco === undefined || name === undefined || pgn === undefined || eco === "eco") {
-            continue;
-        }
-
+    for (const { eco, name, moves } of linesOf(tsv)) {
         const chess = new Chess();
-        const moves = pgn.split(/\s+/).filter((token) => token !== "" && !/^\d+\.+$/.test(token));
-
-        if (moves.length > bookDepth) {
-            throw new Error(`The opening ${eco} ${name} is ${moves.length} plies long, past the book's depth of ${bookDepth}: raise bookDepth.`);
-        }
-
         moves.forEach((move) => chess.move(move));
         index[positionKey(chess.fen())] = [eco, name];
     }
 
     return index;
+}
+
+/**
+ * The book of Lichess's TSV files: every position on their lines, keyed as the index keys them, to the moves the lines play from it, the move most lines go
+ * through first: how much theory a move has, never how good it is. A move under one line in fifty from its position is left out; one whose lines are all named
+ * traps is marked: Nxe5 (trap).
+ */
+export function indexBook(tsv: string): Record<string, string[]>
+{
+    const lines = new Map<string, Map<string, LineCount>>();
+
+    for (const { name, moves } of linesOf(tsv)) {
+        const trap = /\bTrap\b/.test(name);
+        const chess = new Chess();
+
+        for (const move of moves) {
+            const key = positionKey(chess.fen());
+            const san = chess.move(move).san;
+            const counts = lines.get(key) ?? new Map<string, LineCount>();
+            const count = counts.get(san) ?? { lines: 0, traps: 0 };
+            counts.set(san, { lines: count.lines + 1, traps: count.traps + (trap ? 1 : 0) });
+            lines.set(key, counts);
+        }
+    }
+
+    return Object.fromEntries([...lines].map(([key, counts]) => [key, bookOf(counts)]));
+}
+
+/** The moves the book knows from a position, in SAN; none out of the book. */
+export function bookMoves(fen: string, book: OpeningBook): readonly string[]
+{
+    return book[positionKey(fen)] ?? [];
 }
 
 /** The opening of a game from the standard position, the last named one its moves reached; none before the first, or from another position. */
@@ -85,6 +108,44 @@ export function openingOf(record: GameRecord, index: OpeningIndex): Opening | un
 export function outOfBookMove(opening: Opening): number
 {
     return Math.floor(opening.ply / 2) + 1;
+}
+
+/** How many of the book's lines go through a move, and how many of them are named traps. */
+interface LineCount
+{
+    lines: number;
+    traps: number;
+}
+
+/** The moves from a position that at least one line in fifty plays, the most played first, marked when all their lines are traps. */
+function bookOf(counts: ReadonlyMap<string, LineCount>): string[]
+{
+    const total = [...counts.values()].reduce((sum, count) => sum + count.lines, 0);
+
+    return [...counts]
+        .filter(([, count]) => count.lines * 50 >= total)
+        .sort(([, one], [, other]) => other.lines - one.lines)
+        .map(([san, count]) => count.traps === count.lines ? `${san} (trap)` : san);
+}
+
+/** The lines of Lichess's TSV files, their moves in SAN; one past the book's depth throws. */
+function linesOf(tsv: string): { eco: string; name: string; moves: string[]; }[]
+{
+    return tsv.split(/\r?\n/).flatMap((line) => {
+        const [eco, name, pgn] = line.split("\t");
+
+        if (eco === undefined || name === undefined || pgn === undefined || eco === "eco") {
+            return [];
+        }
+
+        const moves = pgn.split(/\s+/).filter((token) => token !== "" && !/^\d+\.+$/.test(token));
+
+        if (moves.length > bookDepth) {
+            throw new Error(`The opening ${eco} ${name} is ${moves.length} plies long, past the book's depth of ${bookDepth}: raise bookDepth.`);
+        }
+
+        return [{ eco, name, moves }];
+    });
 }
 
 /** A position without its move counters: the same position reached in another order is the same key. */

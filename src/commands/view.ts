@@ -11,6 +11,13 @@ export function compactView(facts: Facts, turn: Side): string[]
     return [...checkLines(facts, turn, names), ...pieces, ...tacticLines(facts, turn, names)];
 }
 
+/** The view of a level without the tactical facts (D-60): the check and the legal moves by piece, which are the rules (D-17). */
+export function boardView(facts: Facts, turn: Side): string[]
+{
+    const names = namesOf(facts);
+    return [...checkLines(facts, turn, names), ...legalLines(facts, names)];
+}
+
 /** The whole view, for look: every piece with its attackers and defenders, then the same lines as the compact view. */
 export function fullView(facts: Facts, turn: Side): string[]
 {

@@ -114,6 +114,22 @@ describe("the player's moves on the page", () => {
         expect((await post(page, "/api/new", {}, { "content-type": "text/plain" })).status).toBe(415);
     });
 
+    it("starts a new game with the colour, the level and the clock the player chose (T-58)", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+
+        expect(await post(page, "/api/new", { ai_colour: "white", level: "club", clock: "10+5" })).toMatchObject({ status: 200 });
+        const game = JSON.parse((await get(page, "/api/game")).body).game;
+        expect(game.ai).toBe("white");
+        expect(game.pgn).toContain('[AILevel "club"]\n[TimeControl "600+5"]');
+        expect(game.clock.control).toEqual({ base: 600_000, increment: 5_000 });
+
+        expect(await post(page, "/api/new", {})).toMatchObject({ status: 200 });
+        expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain('[AILevel "club"]');
+        expect(await post(page, "/api/new", { level: "grandmaster" })).toMatchObject({ status: 400, body: expect.stringContaining("Send the new game as JSON") });
+        expect(await post(page, "/api/new", { clock: "forever" })).toMatchObject({ status: 409, body: expect.stringContaining("is not a time control") });
+    });
+
     it("offers a draw on the player's turn, answers the AI's, and resigns, ringing the chat (D-65)", async () => {
         const folder = playerFolder();
         const page = await open(folder);

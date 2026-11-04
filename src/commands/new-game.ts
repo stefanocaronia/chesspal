@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { Game, type GameRecord, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag } from "../core/index.ts";
+import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag } from "../core/index.ts";
 import { archivedName, archiveGame, cleanSince, type CurrentGame, endOf, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../games/index.ts";
 import { gameFolder, gameFolders } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 import { type GameSummary, nextStep, positionLines, sidesLine, summaryOf } from "./game-summary.ts";
+import { levelText, levelToPlay } from "./levels.ts";
 import { pastGameLines } from "./past-games.ts";
 import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
@@ -23,17 +24,21 @@ interface NewGame
 /** A new game against the player, from the standard position or from a FEN or PGN; a game going on is never lost (D-41). */
 export const newGame = defineCommand({
     name: "new_game",
-    description: "Starts a new game against the player, from the standard position or from a FEN or PGN they give. Ask them first which colour they want, and whether "
-        + 'they want a clock. Example: new_game {ai_colour: "black", clock: "10+5"}.',
+    description: "Starts a new game against the player, from the standard position or from a FEN or PGN they give. Ask them first which colour they want, whether "
+        + 'they want a clock and at which level you play. Example: new_game {ai_colour: "black", clock: "10+5", level: "club"}.',
     input: z.object({
         ai_colour: z.enum(["white", "black", "random"]).describe("the colour you play: random draws it"),
         from: z.string().optional().describe("a FEN or a PGN to go on from, instead of the standard position"),
         clock: z.string().optional().describe("the time control, minutes each and seconds added after each move, such as 10+5 or 3+0; none for a game without a clock"),
+        level: z.enum(aiLevels).optional().describe(
+            "the facts you get: beginner the board and the legal moves, club also the tactical facts, strong also the positional ones, master also the opening "
+                + "book's moves; none keeps the last game's, or suits the player's profile for the first",
+        ),
         replace: z.boolean().default(false).describe("start even though a game is going on: it goes to the archive unfinished"),
     }),
     alwaysLoad: true,
     positionals: ["ai_colour"],
-    run: ({ ai_colour: colour, from, clock, replace }, context): NewGame => {
+    run: ({ ai_colour: colour, from, clock, level: chosen, replace }, context): NewGame => {
         const control = clock === undefined ? undefined : timeControlFrom(clock);
         const now = context.now();
         const folder = gameFolder(context.folder);
@@ -50,8 +55,9 @@ export const newGame = defineCommand({
         }
 
         const ai = colour === "random" ? (context.random() < 0.5 ? "white" : "black") : colour;
+        const level = chosen ?? levelToPlay(context, before);
         const started = startOfNewGame(folder, now, before);
-        const game = startingGame(from, ai, started, control);
+        const game = startingGame(from, { ai, level }, started, control);
         const current: CurrentGame = control === undefined
             ? { game, ai, started: started.toISOString(), talk: [] }
             : { game, ai, started: started.toISOString(), talk: [], clock: startClock(control, now) };
@@ -68,7 +74,7 @@ export const newGame = defineCommand({
     },
     format: ({ game, archived, past, player }) =>
         [
-            `New game: ${sidesLine(game.ai)}.`,
+            `New game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`,
             ...(player === undefined ? [] : [player]),
             ...(archived === undefined ? [] : [`The game before is in ${archived.name}${archived.finished ? "" : ", unfinished"}.`]),
             ...(past.length === 0 ? [] : ["Last games with this player (past_games gives more, and their moves):", ...past]),
@@ -123,14 +129,18 @@ function archiveBefore(folder: string, before: CurrentGame): string
     }
 }
 
-/** The new game: the standard position, or the one a FEN or PGN gives, which must still be going on. Its tags are Chesspal's: an imported game gives its position only. */
-function startingGame(from: string | undefined, ai: Side, started: Date, control: TimeControl | undefined): Game
+/**
+ * The new game: the standard position, or the one a FEN or PGN gives, which must still be going on. Its tags are Chesspal's, the AI's level among them:
+ * an imported game gives its position only.
+ */
+function startingGame(from: string | undefined, { ai, level }: { ai: Side; level: AiLevel; }, started: Date, control: TimeControl | undefined): Game
 {
     const tags = {
         Event: "Chesspal",
         Date: pgnDate(started),
         White: ai === "white" ? "AI" : "Player",
         Black: ai === "black" ? "AI" : "Player",
+        [levelTag]: level,
         ...(control === undefined ? {} : { TimeControl: timeControlTag(control) }),
     };
     let game: Game;

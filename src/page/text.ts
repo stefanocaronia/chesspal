@@ -1,5 +1,5 @@
 // The page's words in the player's language (D-32): Italian or English, from the browser's or as the settings say (D-56).
-import type { IllegalReason, PieceLetter, Side } from "../core/index.ts";
+import type { AiLevel, IllegalReason, PieceLetter, Side } from "../core/index.ts";
 import type { Step } from "./browse.ts";
 import type { HowEnded } from "./ending.ts";
 import type { AvatarId, Level, RatingSite } from "./profile.ts";
@@ -12,7 +12,6 @@ export interface Text
     readonly theme: string;
     readonly sounds: string;
     readonly newGame: string;
-    readonly abandonGame: string;
     /** The player's draws and resignation in a game going on (D-65). */
     readonly offerDraw: string;
     /** The ½'s title while the player cannot offer: when they can. */
@@ -89,6 +88,25 @@ export interface Text
     illegal(move: RefusedMove): string;
     /** The profiles (D-23, D-45): the wizard at the first start, the player's picture, the menu of the profiles. */
     readonly profile: ProfileText;
+    /** The new game's dialog (D-48, T-58). */
+    readonly start: StartText;
+}
+
+/** The words of the new game's dialog. */
+export interface StartText
+{
+    readonly colour: string;
+    readonly colours: Readonly<Record<Side | "random", string>>;
+    readonly level: string;
+    /** Each level of the AI's: its name, a note under it, and what the AI sees there (D-61). */
+    readonly levels: Readonly<Record<AiLevel, readonly [name: string, note: string, sees: string]>>;
+    readonly clock: string;
+    /** Beside the clock's title: how to read 10+5. */
+    readonly clockNote: string;
+    readonly noClock: string;
+    /** Above the button, while a game goes on. */
+    readonly abandons: string;
+    readonly start: string;
 }
 
 /** The words of the profiles. */
@@ -171,7 +189,6 @@ const english: Text = {
     theme: "Light or dark theme",
     sounds: "Sounds",
     newGame: "New game",
-    abandonGame: "Start a new game? The one going on goes to the archive unfinished.",
     offerDraw: "Offer a draw",
     offerDrawWhen: "Offer a draw: on your turn, once each side has moved",
     drawOffered: "You offered a draw",
@@ -315,6 +332,22 @@ const english: Text = {
         whilePlaying: "Finish the game, or resign, before changing player.",
         badImage: "That picture won't open: try another photo (the ones from a phone usually work).",
     },
+    start: {
+        colour: "You play",
+        colours: { white: "White", black: "Black", random: "Either" },
+        level: "The AI's level",
+        levels: {
+            beginner: ["Beginner", "Board and legal moves", "The AI sees the board and its legal moves; Chesspal tells it no hanging pieces or threats."],
+            club: ["Club", "Plus hanging pieces and threats", "The AI sees the board and tactics; no strategy, no theory."],
+            strong: ["Strong", "Plus structure: pawns, files, king", "The AI sees the board, tactics and strategy; no theory."],
+            master: ["Master", "As Strong, plus the opening book", "The AI sees the board, tactics, strategy and theory."],
+        },
+        clock: "Clock",
+        clockNote: "minutes each + seconds a move",
+        noClock: "None",
+        abandons: "The game going on goes to the archive unfinished.",
+        start: "Start",
+    },
 };
 
 const italian: Text = {
@@ -323,7 +356,6 @@ const italian: Text = {
     theme: "Tema chiaro o scuro",
     sounds: "Suoni",
     newGame: "Nuova partita",
-    abandonGame: "Iniziare una nuova partita? Quella in corso va nell'archivio, non finita.",
     offerDraw: "Proponi patta",
     offerDrawWhen: "Proponi patta: nel tuo turno, dopo una mossa a testa",
     drawOffered: "Hai proposto patta",
@@ -467,6 +499,22 @@ const italian: Text = {
         avatars: { "short-hair": "Capelli corti", bun: "Chignon", glasses: "Occhiali", beanie: "Berretto", beard: "Barba", curls: "Ricci", cat: "Gatto", owl: "Gufo" },
         whilePlaying: "Finisci la partita, o abbandona, prima di cambiare giocatore.",
         badImage: "Questa immagine non si apre: prova con un'altra foto (quelle del telefono di solito vanno bene).",
+    },
+    start: {
+        colour: "Giochi col",
+        colours: { white: "Bianco", black: "Nero", random: "A caso" },
+        level: "Livello dell'AI",
+        levels: {
+            beginner: ["Principiante", "Scacchiera e mosse legali", "L'AI vede la scacchiera e le sue mosse legali; Chesspal non le dice pezzi in presa né minacce."],
+            club: ["Circolo", "Più pezzi in presa e minacce", "L'AI vede scacchiera e tattica; niente strategia, niente teoria."],
+            strong: ["Forte", "Più la struttura: pedoni, colonne, re", "L'AI vede scacchiera, tattica e strategia; niente teoria."],
+            master: ["Maestro", "Come Forte, più il libro delle aperture", "L'AI vede scacchiera, tattica, strategia e teoria."],
+        },
+        clock: "Orologio",
+        clockNote: "minuti a testa + secondi a mossa",
+        noClock: "Senza",
+        abandons: "La partita in corso va nell'archivio, non finita.",
+        start: "Inizia",
     },
 };
 

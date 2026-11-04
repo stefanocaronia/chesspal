@@ -4,6 +4,7 @@ import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { gameAt } from "./clock.ts";
 import { closingLines, type GameSummary, nextStep, positionLines, sidesLine, summaryOf } from "./game-summary.ts";
+import { levelText } from "./levels.ts";
 import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
 import { unansweredWords } from "./say.ts";
@@ -76,5 +77,5 @@ function gameLines(game: GameSummary | undefined, words: readonly string[]): str
     }
 
     const moves = game.lastMoves === "" ? [] : [`Moves: ${game.lastMoves}`];
-    return [`Game: ${sidesLine(game.ai)}.`, ...moves, ...positionLines(game), ...closingLines(game, words)];
+    return [`Game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`, ...moves, ...positionLines(game), ...closingLines(game, words)];
 }

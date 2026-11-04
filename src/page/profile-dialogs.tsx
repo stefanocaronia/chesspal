@@ -1,7 +1,7 @@
 // The profiles on the page (D-23, D-45): the wizard that makes the first, the player's picture to change, and the menu that puts another in use or makes one.
-import type { ComponentChildren } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { DrawnAvatar, PlayerPicture } from "./avatars.tsx";
+import { Dialog } from "./dialog.tsx";
 import { type AvatarId, avatarIds, chooseAvatar, imageAddress, type Level, levels, makeProfile, nameLimit, type Profile, ratingLimits, type RatingSite, ratingSites, type Refused, sendPhoto, useProfile } from "./profile.ts";
 import type { Text } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
@@ -280,50 +280,6 @@ function PhotoChoice({ on, photo, current, onPhoto, text }: { on: boolean; photo
             {shown === undefined ? <span class="ring">{cameraIcon}</span> : <img class="avatar photo" src={shown} width={36} height={36} alt="" />}
             <span>{text.profile.ownImage}</span>
         </label>
-    );
-}
-
-/** A dialog over the page, as the settings' one: Esc and a click outside close it; a step inside it goes back with the arrow beside its title. */
-function Dialog({ open, title, onBack, onClose, text, children }: {
-    open: boolean;
-    title: string;
-    onBack?: (() => void) | undefined;
-    onClose: () => void;
-    text: Text;
-    children: ComponentChildren;
-})
-{
-    const dialog = useRef<HTMLDialogElement>(null);
-
-    useEffect(() => {
-        const element = dialog.current!;
-
-        if (open && !element.open) {
-            element.showModal();
-        } else if (!open && element.open) {
-            element.close();
-        }
-    }, [open]);
-
-    return (
-        <dialog ref={dialog} class="settings profiles" aria-label={title} onClose={onClose} onClick={(event) => event.target === dialog.current && onClose()}>
-            <header>
-                {onBack === undefined ? null : (
-                    <button class="theme" type="button" title={text.profile.back} aria-label={text.profile.back} onClick={onBack}>
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M15 6L9 12L15 18" />
-                        </svg>
-                    </button>
-                )}
-                <h2>{title}</h2>
-                <button class="theme" type="button" title={text.close} aria-label={text.close} onClick={onClose}>
-                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M6 6L18 18M18 6L6 18" />
-                    </svg>
-                </button>
-            </header>
-            {open ? children : null}
-        </dialog>
     );
 }
 

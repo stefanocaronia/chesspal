@@ -7,13 +7,15 @@ import { lowTime, timeShown } from "./clock-time.ts";
 import { Piece } from "./pieces.tsx";
 import type { Text } from "./text.ts";
 
-/** The card of one player: the AI's above its words, the player's below theirs; the player's says when it is their move. */
-export function PlayerCard({ place, picture, name, side, taken, ahead, turn = false, clock, text }: {
+/** The card of one player: the AI's above its words, with its level; the player's below theirs, saying when it is their move. */
+export function PlayerCard({ place, picture, name, side, level, taken, ahead, turn = false, clock, text }: {
     place: "ai" | "you";
     picture: ComponentChildren;
     /** The name, or the button that opens the profiles. */
     name: ComponentChildren;
     side: Side;
+    /** The AI's level in a game: its name, and what the AI sees there (D-61). */
+    level?: readonly [name: string, note: string, sees: string];
     taken: readonly PieceLetter[];
     ahead: number;
     turn?: boolean;
@@ -28,18 +30,21 @@ export function PlayerCard({ place, picture, name, side, taken, ahead, turn = fa
             <div class="player-line">
                 {picture}
                 <div class="who">
-                    <div class="name">
-                        {name}{" "}
-                        <span class="note">
-                            · {text.sides[side]}
-                            {turn
-                                ? (
-                                    <>
-                                        {" "}· <b class="turn">{text.yourTurn}</b>
-                                    </>
-                                )
-                                : null}
-                        </span>
+                    <div class="name">{name}</div>
+                    <div class="note">
+                        {text.sides[side]}
+                        {level === undefined ? null : (
+                            <>
+                                {" "}· <LevelTip level={level} />
+                            </>
+                        )}
+                        {turn
+                            ? (
+                                <>
+                                    {" "}· <b class="turn">{text.yourTurn}</b>
+                                </>
+                            )
+                            : null}
                     </div>
                     <div class="taken" role="img" aria-label={text.taken(taken.map((piece) => text.piece(piece, opponent)), ahead)}>
                         {groupsOf(taken).map((group) => (
@@ -103,6 +108,17 @@ export function Avatar()
             <circle class="eye" cx="36.5" cy="29.5" r="1.7" />
             <path class="smile" d="M28.5 34.5Q32 37.5 35.5 34.5" />
         </svg>
+    );
+}
+
+/** The AI's level, a button that shows under it what the AI sees there (D-61), for a touch as for a mouse. */
+function LevelTip({ level }: { level: readonly [name: string, note: string, sees: string]; })
+{
+    return (
+        <>
+            <button class="level-name" type="button" popovertarget="ai-level">{level[0]}</button>
+            <span id="ai-level" class="level-tip" popover="auto">{level[2]}</span>
+        </>
     );
 }
 

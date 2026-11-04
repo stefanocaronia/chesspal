@@ -122,7 +122,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
     }
 
     if (request.method === "POST" && path === "/api/new") {
-        newGameFromPage(request, response, served);
+        void newGameFromPage(request, response, served);
         return;
     }
 
@@ -248,17 +248,30 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
     send(response, 200, json, JSON.stringify({ said: true }));
 }
 
-/** A new game from the page, the sides as in the game before (T-64): one going on goes to the archive unfinished, and the doorbell tells the chat. */
-function newGameFromPage(request: IncomingMessage, response: ServerResponse, served: Served): void
+/**
+ * A new game from the page, with the sides, the level and the clock the player chose (T-64, T-58): the sides and the level they leave out are as in the game
+ * before, and no clock means a game without one. One going on goes to the archive unfinished, and the doorbell tells the chat.
+ */
+async function newGameFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
-    if (!isJson(request)) {
-        send(response, 415, json, JSON.stringify({ error: "Send the request as JSON: {}." }));
+    const asked = 'Send the new game as JSON: {"ai_colour": "black", "level": "club", "clock": "10+5"}, each one optional; no clock for a game without one.';
+    const body = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;
+
+    if (body === undefined) {
+        send(response, isJson(request) ? 400 : 415, json, JSON.stringify({ error: asked }));
         return;
     }
 
     try {
         const before = loadGame(gameFolder(served.folder));
-        newGame.run({ ai_colour: before?.ai ?? "black", replace: true }, served.context);
+        const input = newGame.input.safeParse({ ai_colour: body.ai_colour ?? before?.ai ?? "black", level: body.level, clock: body.clock, replace: true });
+
+        if (!input.success) {
+            send(response, 400, json, JSON.stringify({ error: asked }));
+            return;
+        }
+
+        newGame.run(input.data, served.context);
     } catch (error) {
         send(response, 409, json, JSON.stringify(refusalFrom(error)));
         return;

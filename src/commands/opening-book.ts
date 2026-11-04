@@ -1,8 +1,9 @@
-// The book of the openings the build indexed (D-16), read once at the first lookup.
+// The book of the openings the build indexed (D-16), read once at the first lookup; the book's moves, only for a game at the master level (D-60).
 import { readFileSync } from "node:fs";
-import { type GameRecord, type OpeningIndex, openingOf, outOfBookMove } from "../core/index.ts";
+import { bookMoves, type GameRecord, type OpeningBook, type OpeningIndex, openingOf, outOfBookMove } from "../core/index.ts";
 
 let book: OpeningIndex | null | undefined;
+let moves: OpeningBook | null | undefined;
 // Each record is looked up once: the live game keeps its record until a move changes it.
 const lines = new WeakMap<GameRecord, string | null>();
 
@@ -17,6 +18,21 @@ export function openingLine(record: GameRecord): string | undefined
     }
 
     return line ?? undefined;
+}
+
+/** The moves the book knows from a position (D-15), for the AI at the master level; none out of the book, or where the build made no book. */
+export function knownMoves(fen: string): readonly string[]
+{
+    if (moves === undefined) {
+        try {
+            moves = JSON.parse(readFileSync(new URL("../../dist/core/book.json", import.meta.url), "utf8")) as OpeningBook;
+        } catch {
+            // Not built yet: the master goes without the book.
+            moves = null;
+        }
+    }
+
+    return moves === null ? [] : bookMoves(fen, moves);
 }
 
 /** The opening a game reached, ECO and name, without where it left the book: for the games in the archive. */

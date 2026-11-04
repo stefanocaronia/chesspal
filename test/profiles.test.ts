@@ -223,7 +223,7 @@ describe("the profiles' commands", () => {
             "Profile anna made, and in use: Anna, plays often, Lichess 1450.",
         );
         expect(await run(context, "status")).toContain(`Folder: ${profileFolder(context.folder, "anna")}\nPlayer: Anna, plays often, Lichess 1450.\nNo game.`);
-        expect(await run(context, "new_game", { ai_colour: "black" })).toMatch(/^New game: you play Black, the player White\.\nPlayer: Anna, plays often, Lichess 1450\.\n/);
+        expect(await run(context, "new_game", { ai_colour: "black" })).toMatch(/^New game: you play Black, the player White, at the club level \(board and tactical facts: no position\)\.\nPlayer: Anna, plays often, Lichess 1450\.\n/);
         expect(existsSync(join(profileFolder(context.folder, "anna"), "game.json"))).toBe(true);
         await expect(run(context, "new_profile", { name: "Bruno", rating: 1450 })).rejects.toThrow("Give the rating and its site together");
     });

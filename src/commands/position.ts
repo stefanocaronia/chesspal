@@ -2,13 +2,14 @@ import { z } from "zod";
 import { type PieceLetter, type Profile, type Side, type SideProfile } from "../core/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
+import { refuseUnseen } from "./levels.ts";
 import { defineCommand } from "./registry.ts";
 import { colourName, materialText } from "./view.ts";
 
 /** The positional profile of the game in progress (D-19, T-12): separate facts, never a score. */
 export const position = defineCommand({
     name: "position",
-    description: "Shows the positional facts of the position: material, pawns (isolated, doubled, backward, passed, islands), open files, rooks and queens on the seventh, bishops, "
+    description: "Shows the positional facts of the position, from the strong level up: material, pawns (isolated, doubled, backward, passed, islands), open files, rooks and queens on the seventh, bishops, "
         + "outposts, centre, space, control, mobility, development and castling, king safety, the phase, the draw rules and, with only kings and pawns, "
         + "the rule of the square and the opposition. Facts only, never a score: weigh them yourself. Call it when you set or change your plan: out of "
         + "the opening, after a big exchange, in the endgame; not at every move. Example: position {}.",
@@ -22,6 +23,7 @@ export const position = defineCommand({
             throw new Error("There is no game to describe: start one with new_game.");
         }
 
+        refuseUnseen(current, "strategy", "position");
         return current.game.profile;
     },
     format: (profile) => profileLines(profile).join("\n"),

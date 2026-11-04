@@ -3,6 +3,7 @@ import { boardText, type Facts } from "../core/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import { type GameSummary, headLines, summaryOf, wordLines } from "./game-summary.ts";
+import { refuseUnseen } from "./levels.ts";
 import { defineCommand } from "./registry.ts";
 import { newWords } from "./say.ts";
 import { fullView } from "./view.ts";
@@ -16,7 +17,7 @@ type Viewed = GameSummary & { facts: Facts; };
 /** The whole view (D-26), when the compact one after the player's move is not enough; or the board for the player, where the host does not show it (D-36). */
 export const look = defineCommand({
     name: "look",
-    description: "Shows the whole view of the position: the FEN and, for every piece, what attacks and defends it, then the pins, the checks and the legal "
+    description: "Shows the whole view of the position, from the club level up: the FEN and, for every piece, what attacks and defends it, then the pins, the checks and the legal "
         + "moves of each piece. The views of player_move, status and new_game give attackers and defenders only for the pieces attacked: call look "
         + 'before you attack or capture a piece that is not attacked yet, or plan an exchange. With only: "board", the board as text for the player, to '
         + "copy into your message where they do not see it. Example: look {}.",
@@ -29,6 +30,10 @@ export const look = defineCommand({
 
         if (current === undefined) {
             throw new Error("There is no game to look at: start one with new_game.");
+        }
+
+        if (only !== "board") {
+            refuseUnseen(current, "tactics", 'look without only: "board"');
         }
 
         return only === "board" ? { board: boardText(current.game.position.fen) } : { game: { ...summaryOf(current, context.now()), facts: current.game.facts }, words: newWords(context) };

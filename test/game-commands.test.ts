@@ -21,9 +21,9 @@ describe("a game in chat", () => {
     it("plays the player's and the AI's moves, and saves them in game.json with the AI's comment and plan", async () => {
         const context = playerFolder();
 
-        expect(await run(context, "status")).toContain("No game.\nNext: ask the player which colour they want and whether they want a clock, then call new_game.");
+        expect(await run(context, "status")).toContain("No game.\nNext: ask the player which colour they want, whether they want a clock and at which level you play, then call new_game.");
         expect(await run(context, "new_game", { ai_colour: "black" })).toBe(
-            "New game: you play Black, the player White.\nPlayer (White) to move, move 1.\nNext: wait for the player's move, then call player_move with it.",
+            "New game: you play Black, the player White, at the strong level (board, tactical and positional facts).\nPlayer (White) to move, move 1.\nNext: wait for the player's move, then call player_move with it.",
         );
         expect(await run(context, "player_move", { move: "e4" })).toMatch(
             /^Player: 1\.e4 \(e2-e4\)\.\nYou \(Black\) to move, move 1\.\nOpening: B00 King's Pawn Game\nMaterial: even, nothing taken\nFEN: rnbqkbnr\/pppppppp\/8\/8\/4P3\/8\/PPPP1PPP\/RNBQKBNR b KQkq - 0 1\nAttacked pieces: none\n(?:.*\n){4}Legal by piece \(20\): Nb8 \(2\) Nc6 Na6; .* Ph7 \(2\) h6 h5; no moves: Ke8 Qd8 Ra8 Rh8 Bc8 Bf8\nNext: choose your move/,
@@ -56,7 +56,7 @@ describe("a game in chat", () => {
         expect(await run(context, "new_game", { ai_colour: "black", from: lichess })).toMatch(
             /You \(Black\) to move, move 2\.\nLast move: 2\.Nf3 \(g1-f3\)\.\nOpening: C40 King's Knight Opening\nMaterial: even, nothing taken\nFEN: .*\nAttacked pieces \(attackers \/ defenders\):\nBlack Pe5: Nf3 \/ -\n(?:.*\n)*Legal by piece \(29\): [^\n]*\nNext: /,
         );
-        expect(gameFile(context).pgn).toContain('[White "Player"]\n[Black "AI"]\n[Result "*"]\n\n1. e4 e5 2. Nf3 *');
+        expect(gameFile(context).pgn).toContain('[White "Player"]\n[Black "AI"]\n[Result "*"]\n[AILevel "strong"]\n\n1. e4 e5 2. Nf3 *');
     });
 
     it("refuses to go on from a game that is over, from several games, or from an impossible position", async () => {
@@ -133,7 +133,7 @@ describe("a game in chat", () => {
 
         rmSync(games);
 
-        expect(await run(context, "new_game", { ai_colour: "white" })).toContain(`New game: you play White, the player Black.\nThe game before is in ${archive}.\n`);
+        expect(await run(context, "new_game", { ai_colour: "white" })).toContain(`New game: you play White, the player Black, at the strong level (board, tactical and positional facts).\nThe game before is in ${archive}.\n`);
         expect(readArchive(context)).toContain("[%plan Mate.]");
     });
 
@@ -193,7 +193,7 @@ describe("a game in chat", () => {
                 + "4 . . . . . . P q 4\n3 . . . . . P . . 3\n2 P P P P P . . P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\n"
                 + "Next: tell the player how the game ended, with ai_say if they play on the board page; new_game starts another.",
         );
-        expect(readArchive(context)).toContain('[Result "0-1"]\n[Termination "checkmate"]');
+        expect(readArchive(context)).toContain('[Result "0-1"]\n[AILevel "strong"]\n[Termination "checkmate"]');
         expect(readArchive(context)).toContain("[%plan Mate.]");
         // A mate leaves no draw offer, even one made with it (D-65).
         expect(readArchive(context)).not.toContain("(=)");
@@ -224,7 +224,7 @@ describe("a game in chat", () => {
         await expect(run(context, "end_game", { result: "draw_agreed" })).rejects.toThrow("A draw is agreed only once each side has made a move. Nothing changed.");
         await run(context, "end_game", { result: "ai_resigns" });
 
-        expect(readArchive(context)).toContain('[Result "1-0"]\n[Termination "Black resigns"]');
+        expect(readArchive(context)).toContain('[Result "1-0"]\n[AILevel "strong"]\n[Termination "Black resigns"]');
         await expect(run(context, "end_game", { result: "draw_agreed" })).rejects.toThrow("The game is over (1-0, Black resigns)");
     });
 
@@ -343,9 +343,9 @@ describe("a game in chat", () => {
         expect(Number(/Legal by piece \((\d+)\)/.exec(played)?.[1])).toBeGreaterThan(40);
         expect(played.match(/^(?:White|Black) [KQRBNP][a-h][1-8]: /gm)).toHaveLength(8);
         expect(played).toContain("\nWhite Ph3: Be6(+Qd7) / Pg2 Rh1\n");
-        // About 0.72 Claude tokens a character, as Priya measures them: within 800 and 900 tokens (D-26).
+        // About 0.72 Claude tokens a character, as Priya measures them: within 800 and 900 tokens (D-26); the level in status costs about 60 more (D-61).
         expect(played.length).toBeLessThan(1_150);
-        expect((await run(context, "status")).length).toBeLessThan(1_300);
+        expect((await run(context, "status")).length).toBeLessThan(1_375);
     });
 
     it("shows the positional profile, facts only, in few tokens", async () => {

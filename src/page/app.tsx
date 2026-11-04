@@ -2,7 +2,7 @@
 // words (T-65), in Zoe's three columns (D-53): the talk, the board, the game, the side ones folded as the player likes (T-84).
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { type Clock, Game, materialOf, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square } from "../core/index.ts";
+import { type Clock, Game, materialOf, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square, suggestedLevel, timeControlText } from "../core/index.ts";
 import { PlayerPicture } from "./avatars.tsx";
 import { Board, type Notice, piecesOf } from "./board.tsx";
 import { flipKeys, type Step, stepKeys, stepped } from "./browse.ts";
@@ -12,6 +12,7 @@ import { FoldTab } from "./fold-tab.tsx";
 import { type Column, foldKeys, gameUnderBoard, nextFold, oneColumn, rememberFold, startFolds } from "./folds.ts";
 import { GameColumn } from "./game-column.tsx";
 import { type GameActions, Header } from "./header.tsx";
+import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
 import { useOpeningBook } from "./opening-book.ts";
 import { ChosenSet } from "./pieces.tsx";
 import { ClockFace, PlayerCard } from "./player-card.tsx";
@@ -62,7 +63,7 @@ export function App({ start }: { start: Settings; })
     const [folds, setFolds] = useState(startFolds);
     const [draft, setDraft] = useState("");
     const [unsent, setUnsent] = useState<string | undefined>(undefined);
-    const [dialog, setDialog] = useState<"picture" | "profiles" | undefined>(undefined);
+    const [dialog, setDialog] = useState<"picture" | "profiles" | "new-game" | undefined>(undefined);
     // Reads the game again: when the server says it changed, and when a clock runs out on the page (T-37).
     const reload = useRef(() => {});
 
@@ -173,15 +174,6 @@ export function App({ start }: { start: Settings; })
         void post(path, body, text).then((refused) => setRefusal(refused === undefined ? undefined : { text: refused.text }));
     };
 
-    // A game going on is archived unfinished: the player says so first (T-64).
-    const startNewGame = (): void => {
-        const going = game !== null && game !== undefined && !live.outcome.over && (live.record.tags.Result ?? "*") === "*";
-
-        if (!going || confirm(text.abandonGame)) {
-            act("/api/new", {});
-        }
-    };
-
     const result = live.outcome.over ? live.outcome.result : live.record.tags.Result;
     const ended = result !== undefined && result !== "*";
     const how = ended ? howEnded(live.outcome, live.record.tags.Termination) : undefined;
@@ -209,7 +201,7 @@ export function App({ start }: { start: Settings; })
             verdict={ended ? text.verdict(how, winner) : offer === "ai" ? text.offers : offer === "player" ? text.drawOffered : declined ? text.declines : undefined}
             {...(!ended && (offer === "ai" || declined) ? { who: served?.opponent ?? text.ai } : {})}
             actions={actions}
-            onNewGame={served === undefined ? undefined : startNewGame}
+            onNewGame={served === undefined ? undefined : () => setDialog("new-game")}
             flipped={flipped}
             onFlip={() => setFlipped(!flipped)}
             sound={sound}
@@ -323,6 +315,16 @@ export function App({ start }: { start: Settings; })
         });
     };
 
+    // The new game starts from the choices of the game before; the first, from the level that suits the player (T-58).
+    const level = suggestedLevel(game === null ? undefined : live.record, profile.level);
+    const lastClock = clock === undefined ? undefined : timeControlText(clock.control);
+    const choice: NewGameChoice = { colour: player, level, ...(lastClock === undefined ? {} : { clock: lastClock }) };
+
+    const startNewGame = ({ colour, level: chosen, clock: control }: NewGameChoice): void => {
+        setDialog(undefined);
+        act("/api/new", { ai_colour: colour === "random" ? "random" : colour === "white" ? "black" : "white", level: chosen, ...(control === undefined ? {} : { clock: control }) });
+    };
+
     return (
         <ChosenSet.Provider value={settings.set}>
             {panel}
@@ -335,6 +337,7 @@ export function App({ start }: { start: Settings; })
                 onClose={() => setDialog(undefined)}
                 text={text}
             />
+            <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
             <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`}>
                 {header}
                 <TalkFaces name={name} you={profile.name} picture={picture} ai={ai} player={player} aiMoves={!ended && game !== null && !playerToMove} playerMoves={playerToMove} unread={unread} text={text} />
@@ -343,7 +346,17 @@ export function App({ start }: { start: Settings; })
                 <span class="visually-hidden" aria-live="polite">{unread ? text.wrote(name) : ""}</span>
                 <div class="talk" id="talk">
                     <section class="ai-block" aria-label={name}>
-                        <PlayerCard place="ai" picture={<Torretta size={48} />} name={name} side={ai} taken={material.taken[ai]} ahead={ahead(ai)} clock={clockOf(ai)} text={text} />
+                        <PlayerCard
+                            place="ai"
+                            picture={<Torretta size={48} />}
+                            name={name}
+                            side={ai}
+                            {...(game === null ? {} : { level: text.start.levels[level] })}
+                            taken={material.taken[ai]}
+                            ahead={ahead(ai)}
+                            clock={clockOf(ai)}
+                            text={text}
+                        />
                         <AiWords words={aiWords(plies, ai, talk)} />
                     </section>
                     <section class="you-block" aria-label={profile.name}>
