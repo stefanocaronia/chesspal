@@ -15,7 +15,10 @@ export const aiMove = defineCommand({
     input: z.object({
         move: z.string().min(1).describe("your move, in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q)"),
         plan: sentence(200).describe("your plan, in one sentence: kept for you, hidden from the player"),
-        comment: sentence(talkLimits.ai).optional().describe("your words for the player, in one sentence, only when there is something to say"),
+        comment: sentence(talkLimits.ai).optional().describe(
+            'your words for the player, in one sentence, only when there is something to say: pieces and moves in words ("your knight takes on f6"), never in '
+                + "notation (Nxf6+); never your plans or threats",
+        ),
     }),
     alwaysLoad: true,
     positionals: ["move"],

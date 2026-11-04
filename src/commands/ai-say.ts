@@ -17,7 +17,8 @@ export const aiSay = defineCommand({
         + 'Example: ai_say {text: "Sure, I\'ll play faster."}.',
     input: z.object({
         text: z.string().trim().min(1, "write what you say").max(talkLimits.ai, `write ${talkLimits.ai} characters at most`).describe(
-            "your answer to the player, one or two short sentences",
+            'your answer to the player, one or two short sentences: pieces and moves in words ("your knight takes on f6"), never in notation (Nxf6+); never your '
+                + "plans or threats",
         ),
     }),
     run: ({ text }, context): Said => {
