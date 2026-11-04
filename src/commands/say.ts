@@ -1,5 +1,6 @@
 // The talk on the board page (D-51, T-65): a line of the player's or the AI's, saved with the game, and the player's words the AI has not been given yet.
 import { type CurrentGame, loadGame, saveGame, type Speaker, talkLine, unheardWords, type Words } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 
@@ -33,7 +34,7 @@ export function unansweredWords(context: Context): string[]
 export function waitingWords(context: Context, given: ReadonlySet<string> = context.given): Words[]
 {
     try {
-        const current = loadGame(context.folder);
+        const current = loadGame(gameFolder(context.folder));
         return current === undefined ? [] : unheardWords(current, given);
     } catch {
         // A game.json that cannot be read: the tool says so in its own words.

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { boardText } from "../core/index.ts";
 import { commentWithPlan, talkLimits } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { closingLines, moveLines, type MovePlayed } from "./game-summary.ts";
 import { playMove } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
@@ -26,7 +27,7 @@ export const aiMove = defineCommand({
     run: ({ move, plan, comment, offer_draw: offerDraw = false }, context): MovePlayed => {
         // The player's words are read before the move, which would count as the answer to them; a move refused leaves them for the next call.
         const waiting = waitingWords(context);
-        const played = playMove(context.folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: commentWithPlan(comment, plan), offerDraw });
+        const played = playMove(gameFolder(context.folder), context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: commentWithPlan(comment, plan), offerDraw });
         return { ...played, words: give(context, waiting) };
     },
     format: (result) => {

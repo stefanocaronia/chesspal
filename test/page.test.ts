@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -47,7 +47,7 @@ describe("the page's server", () => {
         const folder = playerFolder();
         const page = await open(folder);
 
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, profiles: [] });
         await run(folder, "new_game", { ai_colour: "black" });
         await run(folder, "player_move", { move: "e4" });
         await run(folder, "ai_move", { move: "e5", plan: "A secret plan.", comment: "The open game." });
@@ -62,9 +62,9 @@ describe("the page's server", () => {
         let host: string | undefined;
         const page = await open(playerFolder(), () => host);
 
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, profiles: [] });
         host = "Claude";
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, opponent: "Claude" });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, opponent: "Claude", profiles: [] });
     });
 
     it("answers only at its own address, and changes nothing but by a move", async () => {
@@ -227,6 +227,92 @@ describe("the player's moves on the page", () => {
     });
 });
 
+describe("the profiles on the page (D-23, D-45)", () => {
+    it("makes the first profile from the wizard, with the game played before, without waking the chat, and keeps the profile while a game goes on", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const port = Number(new URL(page.url).port);
+        await run(folder, "new_game", { ai_colour: "black" });
+
+        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ profiles: [] });
+        expect(await post(page, "/api/profile/new", { name: " " })).toMatchObject({ status: 400 });
+
+        // Who plays is read at the chat's next call: no turn of its own (D-66).
+        const waiting = waitForBell(JSON.stringify({ cwd: folder }), [port]);
+        expect(await post(page, "/api/profile/new", { name: "Anna", level: "regular" })).toMatchObject({ status: 200, body: '{"profile":"anna"}' });
+        expect(await shortly(waiting)).toBe("waiting");
+
+        const served = JSON.parse((await get(page, "/api/game")).body) as { game: object | null; profile: object; profiles: object[]; };
+        expect(served.game).not.toBeNull();
+        expect(served.profile).toEqual({ id: "anna", name: "Anna", level: "regular" });
+        expect(served.profiles).toEqual([served.profile]);
+        expect(await post(page, "/api/profile/use", { profile: "anna" })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/profile/new", { name: "Bruno" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"profile-game"') });
+    });
+
+    it("keeps the picture and the settings of the profile the page shows, never another's, and serves only its image", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+        const served = async (): Promise<{ profile: { avatar?: string; image?: string; }; settings?: object; }> => JSON.parse((await get(page, "/api/game")).body);
+        const image = (body: string | Buffer, type = "image/png"): ReturnType<typeof get> => get(page, "/api/profile/image?profile=anna", { "content-type": type }, "POST", body);
+
+        expect((await image(png)).status).toBe(409);
+        await post(page, "/api/profile/new", { name: "Anna" });
+
+        const sent = await image(png);
+        expect(sent.status).toBe(200);
+        expect((await served()).profile.image).toBe(JSON.parse(sent.body).image);
+
+        expect(await get(page, "/api/profile/image?profile=anna")).toMatchObject({ status: 200, headers: { "content-type": "image/png" } });
+        expect((await get(page, "/api/profile/image?profile=..%2Fanna")).status).toBe(404);
+        expect((await image("<svg/>", "text/plain")).status).toBe(415);
+        expect((await image("<svg/>")).status).toBe(400);
+
+        expect(await post(page, "/api/profile/avatar?profile=anna", { avatar: "owl" })).toMatchObject({ status: 200 });
+        expect((await served()).profile).toMatchObject({ avatar: "owl" });
+        expect((await served()).profile.image).toBeUndefined();
+        expect((await post(page, "/api/profile/avatar?profile=anna", { avatar: "dragon" })).status).toBe(400);
+
+        expect(await post(page, "/api/settings?profile=anna", { theme: "dark", dots: false })).toMatchObject({ status: 200 });
+        expect((await served()).settings).toEqual({ theme: "dark", dots: false });
+        expect((await post(page, "/api/settings?profile=anna", [1])).status).toBe(400);
+
+        // A page that has not yet heard of another profile put in use elsewhere never writes in it.
+        expect(await post(page, "/api/settings?profile=bruno", { theme: "light" })).toMatchObject({ status: 409, body: expect.stringContaining("anna is in use now") });
+        expect((await post(page, "/api/profile/avatar", { avatar: "cat" })).status).toBe(409);
+        expect((await served()).settings).toEqual({ theme: "dark", dots: false });
+    });
+
+    it("tells the page of a file it cannot write, and goes on serving", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        await post(page, "/api/profile/new", { name: "Anna" });
+        mkdirSync(join(folder, "profiles", "anna", "settings.json"));
+
+        expect((await post(page, "/api/settings?profile=anna", { theme: "dark" })).status).toBe(500);
+        expect((await get(page, "/api/game")).status).toBe(200);
+    });
+
+    it("does not wake the chat when another profile is put in use, but its game is news at the next ring", async () => {
+        const folder = playerFolder();
+        const context = testContext(folder);
+        const page = await open(folder, undefined, context);
+        const port = Number(new URL(page.url).port);
+        await run(folder, "new_profile", { name: "Anna" }, context);
+        await run(folder, "new_game", { ai_colour: "black" }, context);
+        await run(folder, "end_game", { result: "ai_resigns" }, context);
+        await run(folder, "new_profile", { name: "Bruno" }, context);
+
+        const waiting = waitForBell(JSON.stringify({ cwd: folder }), [port]);
+        expect(await post(page, "/api/profile/use", { profile: "anna" })).toMatchObject({ status: 200 });
+        expect(await shortly(waiting)).toBe("waiting");
+
+        expect(await post(page, "/api/new", {})).toMatchObject({ status: 200 });
+        expect(await waiting).toBe(true);
+    });
+});
+
 describe("the doorbell of the chat", () => {
     beforeEach(() => {
         // The tests may run inside a chat of Claude Code, which names its own folder.
@@ -370,7 +456,7 @@ async function run(folder: string, name: string, input: Record<string, unknown>,
     }
 }
 
-function get(page: Page, path: string, headers: Record<string, string> = {}, method = "GET", sentBody?: string): Promise<{ status: number; body: string; headers: Record<string, unknown>; }>
+function get(page: Page, path: string, headers: Record<string, string> = {}, method = "GET", sentBody?: string | Buffer): Promise<{ status: number; body: string; headers: Record<string, unknown>; }>
 {
     const url = new URL(path, page.url);
     return new Promise((done, fail) => {
@@ -393,6 +479,12 @@ function hookAt(bell: Bell): { heard?: string; }
     const response = { writeHead: () => response, end: (text: string) => hook.heard = text };
     bell.listen(new EventEmitter() as never, response as never);
     return hook;
+}
+
+/** What the hook heard within a short while: "waiting" while the bell has not rung. */
+function shortly(waiting: Promise<boolean>): Promise<boolean | string>
+{
+    return Promise.race([waiting, new Promise<string>((done) => setTimeout(() => done("waiting"), 300))]);
 }
 
 function post(page: Page, path: string, value: unknown, headers: Record<string, string> = {}): ReturnType<typeof get>

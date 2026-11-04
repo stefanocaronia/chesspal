@@ -1,7 +1,8 @@
-// The page's words in the player's language (D-32): Italian or English, from the browser's, until the profiles say which (T-19).
+// The page's words in the player's language (D-32): Italian or English, from the browser's or as the settings say (D-56).
 import type { IllegalReason, PieceLetter, Side } from "../core/index.ts";
 import type { Step } from "./browse.ts";
 import type { HowEnded } from "./ending.ts";
+import type { AvatarId, Level, RatingSite } from "./profile.ts";
 
 /** The words of the page in one language. */
 export interface Text
@@ -86,6 +87,43 @@ export interface Text
     verdict(how: HowEnded | undefined, winner: Side | undefined): string;
     /** Why the board refuses a move (T-11, D-18): the piece moved, the square it went to, the piece that forbids it. */
     illegal(move: RefusedMove): string;
+    /** The profiles (D-23, D-45): the wizard at the first start, the player's picture, the menu of the profiles. */
+    readonly profile: ProfileText;
+}
+
+/** The words of the profiles. */
+export interface ProfileText
+{
+    readonly welcome: string;
+    readonly lead: string;
+    /** Under the lead, when a game was played before the first profile. */
+    readonly gameMoves: string;
+    readonly name: string;
+    readonly namePlaceholder: string;
+    readonly avatar: string;
+    readonly ownImage: string;
+    readonly level: string;
+    /** Each level, and a note under it. */
+    readonly levels: Readonly<Record<Level, readonly [string, string]>>;
+    readonly rating: string;
+    readonly optional: string;
+    readonly ratingPlaceholder: string;
+    readonly ratingLabel: string;
+    readonly siteLabel: string;
+    readonly sites: Readonly<Record<RatingSite, string>>;
+    readonly start: string;
+    readonly create: string;
+    readonly newProfile: string;
+    readonly profiles: string;
+    /** Under the profiles' title: what each one keeps. */
+    readonly eachOwn: string;
+    readonly changePlayer: string;
+    readonly back: string;
+    readonly changePicture: string;
+    readonly yourPicture: string;
+    readonly avatars: Readonly<Record<AvatarId, string>>;
+    readonly whilePlaying: string;
+    readonly badImage: string;
 }
 
 /** The refusals the page server gives a code to, for the page to say them in the player's language. */
@@ -100,7 +138,8 @@ export type ServerRefusal =
     | "words-longer-than-left"
     | "draw-offered"
     | "draw-none"
-    | "draw-early";
+    | "draw-early"
+    | "profile-game";
 
 /**
  * A move the board refused (T-11), as the page names it: why, the piece moved, the square it went to and whether a piece stood there, the piece that forbids
@@ -179,7 +218,7 @@ const english: Text = {
     game: "The game",
     moves: "Moves",
     steps: { first: "Start", back: "Previous move", forward: "Next move", last: "Back to the game" },
-    noGame: "No game yet: start one in the chat.",
+    noGame: "No game yet: press + to start one, or ask for one in the chat.",
     you: "You",
     ai: "AI",
     sides: { white: "White", black: "Black" },
@@ -210,7 +249,7 @@ const english: Text = {
     boardLabel: (turn, lastMove) => `Chessboard, ${english.toMove(turn)}${lastMove === undefined ? "" : `, last move ${lastMove}`}`,
     clearChat: "Before a new game, clear the chat: write /clear there, or open a new chat. A clean chat plays faster.",
     refused: {
-        "no-game": () => "There is no game going on: start one in the chat.",
+        "no-game": () => "There is no game going on: press + to start one, or ask for one in the chat.",
         "ai-to-move": () => "Wait for the AI's move.",
         illegal: () => "That move is not legal here.",
         "clear-chat": () => english.clearChat,
@@ -221,6 +260,7 @@ const english: Text = {
         "draw-offered": () => "A draw offer stands already.",
         "draw-none": () => "There is no draw offer to answer.",
         "draw-early": () => "You can offer a draw once each side has made a move.",
+        "profile-game": () => english.profile.whilePlaying,
     },
     piece: (letter, side) => `${side} ${englishNames[letter]}`,
     taken: (pieces, ahead) => `Pieces taken: ${pieces.length === 0 ? "none" : pieces.join(", ")}${ahead > 0 ? `; ahead by ${ahead}` : ""}`,
@@ -241,6 +281,40 @@ const english: Text = {
         return how === "agreement" ? "Draw agreed" : how === undefined ? "Draw" : `Draw · ${english.ended[how]}`;
     },
     illegal: (move) => move.reason === "shape" ? englishMoves[move.piece] : englishIllegal[move.reason]({ ...move, by: englishCulprit(move.by) }),
+    profile: {
+        welcome: "Welcome to Chesspal",
+        lead: "One minute, and we play. You can change it all whenever you like.",
+        gameMoves: "The game you started goes into your profile.",
+        name: "What's your name?",
+        namePlaceholder: "Your name",
+        avatar: "Choose a picture",
+        ownImage: "Use a picture of yours",
+        level: "How do you play?",
+        levels: {
+            learning: ["I've just learned", "I know the rules, little more"],
+            casual: ["I play now and then", "With friends or on my phone"],
+            regular: ["I play often", "Online or at a club"],
+            tournament: ["I play tournaments", "I have a FIDE rating"],
+        },
+        rating: "Do you have a rating?",
+        optional: "optional",
+        ratingPlaceholder: "e.g. 1450",
+        ratingLabel: "Rating",
+        siteLabel: "Where",
+        sites: { "lichess": "on Lichess", "chess.com": "on Chess.com", "fide": "FIDE" },
+        start: "Start playing",
+        create: "Done",
+        newProfile: "Add a player",
+        profiles: "Who's playing?",
+        eachOwn: "Each player has their own games and settings.",
+        changePlayer: "Change player",
+        back: "Back",
+        changePicture: "Change picture",
+        yourPicture: "Your picture: change it",
+        avatars: { "short-hair": "Short hair", bun: "Bun", glasses: "Glasses", beanie: "Beanie", beard: "Beard", curls: "Curls", cat: "Cat", owl: "Owl" },
+        whilePlaying: "Finish the game, or resign, before changing player.",
+        badImage: "That picture won't open: try another photo (the ones from a phone usually work).",
+    },
 };
 
 const italian: Text = {
@@ -296,7 +370,7 @@ const italian: Text = {
     game: "La partita",
     moves: "Mosse",
     steps: { first: "Inizio", back: "Mossa precedente", forward: "Mossa successiva", last: "Torna alla partita" },
-    noGame: "Nessuna partita: iniziane una nella chat.",
+    noGame: "Nessuna partita: premi + per iniziarne una, o chiedila nella chat.",
     you: "Tu",
     ai: "AI",
     sides: { white: "Bianco", black: "Nero" },
@@ -327,7 +401,7 @@ const italian: Text = {
     boardLabel: (turn, lastMove) => `Scacchiera, ${italian.toMove(turn)}${lastMove === undefined ? "" : `, ultima mossa ${lastMove}`}`,
     clearChat: "Prima di una nuova partita azzera la chat: scrivi /clear, o aprine una nuova. Con la chat pulita l'AI gioca più veloce.",
     refused: {
-        "no-game": () => "Nessuna partita in corso: iniziane una nella chat.",
+        "no-game": () => "Nessuna partita in corso: premi + per iniziarne una, o chiedila nella chat.",
         "ai-to-move": () => "Aspetta la mossa dell'AI.",
         illegal: () => "Questa mossa qui non è legale.",
         "clear-chat": () => italian.clearChat,
@@ -338,6 +412,7 @@ const italian: Text = {
         "draw-offered": () => "C'è già una proposta di patta.",
         "draw-none": () => "Non c'è una proposta di patta a cui rispondere.",
         "draw-early": () => "Puoi proporre patta dopo una mossa a testa.",
+        "profile-game": () => italian.profile.whilePlaying,
     },
     // Queen and rook are feminine in Italian.
     piece: (letter, side) => `${italianNames[letter]} ${side === "white" ? (letter === "Q" || letter === "R" ? "bianca" : "bianco") : (letter === "Q" || letter === "R" ? "nera" : "nero")}`,
@@ -359,6 +434,40 @@ const italian: Text = {
         return how === "agreement" ? "Patta d'accordo" : how === undefined ? "Patta" : `Patta · ${italian.ended[how]}`;
     },
     illegal: (move) => move.reason === "shape" ? italianMoves[move.piece] : italianIllegal[move.reason]({ ...move, by: italianCulprit(move.by) }),
+    profile: {
+        welcome: "Ti diamo il benvenuto in Chesspal",
+        lead: "Un minuto, e giochiamo. Puoi cambiare tutto quando vuoi.",
+        gameMoves: "La partita che avevi iniziato va nel tuo profilo.",
+        name: "Come ti chiami?",
+        namePlaceholder: "Il tuo nome",
+        avatar: "Scegli un'immagine",
+        ownImage: "Usa una tua immagine",
+        level: "Come giochi?",
+        levels: {
+            learning: ["Ho appena imparato", "Conosco le regole, poco di più"],
+            casual: ["Gioco ogni tanto", "Con amici o sul telefono"],
+            regular: ["Gioco spesso", "Online o al circolo"],
+            tournament: ["Gioco a torneo", "Ho un punteggio FIDE"],
+        },
+        rating: "Hai un punteggio?",
+        optional: "facoltativo",
+        ratingPlaceholder: "es. 1450",
+        ratingLabel: "Punteggio",
+        siteLabel: "Dove",
+        sites: { "lichess": "su Lichess", "chess.com": "su Chess.com", "fide": "FIDE" },
+        start: "Inizia a giocare",
+        create: "Fatto",
+        newProfile: "Aggiungi un giocatore",
+        profiles: "Chi gioca?",
+        eachOwn: "Ognuno ha le sue partite e le sue impostazioni.",
+        changePlayer: "Cambia giocatore",
+        back: "Indietro",
+        changePicture: "Cambia immagine",
+        yourPicture: "La tua immagine: cambiala",
+        avatars: { "short-hair": "Capelli corti", bun: "Chignon", glasses: "Occhiali", beanie: "Berretto", beard: "Barba", curls: "Ricci", cat: "Gatto", owl: "Gufo" },
+        whilePlaying: "Finisci la partita, o abbandona, prima di cambiare giocatore.",
+        badImage: "Questa immagine non si apre: prova con un'altra foto (quelle del telefono di solito vanno bene).",
+    },
 };
 
 // Why a move is refused, from the piece moved, the square it went to and the piece that forbids it, each named with its article.

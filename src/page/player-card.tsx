@@ -11,7 +11,8 @@ import type { Text } from "./text.ts";
 export function PlayerCard({ place, picture, name, side, taken, ahead, turn = false, clock, text }: {
     place: "ai" | "you";
     picture: ComponentChildren;
-    name: string;
+    /** The name, or the button that opens the profiles. */
+    name: ComponentChildren;
     side: Side;
     taken: readonly PieceLetter[];
     ahead: number;
@@ -88,7 +89,7 @@ export function ClockFace({ clock, side, toMove, held, onFlag, text }: { clock: 
     return <span class={classes} role="timer" aria-label={text.clock(shown, running)}>{shown}</span>;
 }
 
-/** The player's picture until the profiles bring theirs (T-19): a simple face, in a circle. */
+/** The player's picture on a page without profiles: a simple face, in a circle. */
 export function Avatar()
 {
     return (

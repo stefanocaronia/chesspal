@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { canMate, Game, type Side, timeLeft } from "../core/index.ts";
 import { archiveEnded, bothSidesMoved, type CurrentGame, drawOfferOf, saveGame } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { gameGoingOn, type GameSummary, nextStep, positionLines, summaryOf } from "./game-summary.ts";
 import { defineCommand } from "./registry.ts";
 import { colourName } from "./view.ts";
@@ -21,7 +22,8 @@ export const endGame = defineCommand({
     positionals: ["result"],
     run: ({ result }, context): Ended => {
         const now = context.now();
-        const current = gameGoingOn(context.folder, now);
+        const folder = gameFolder(context.folder);
+        const current = gameGoingOn(folder, now);
 
         if (result === "draw_agreed") {
             refuseDraw(current);
@@ -34,8 +36,8 @@ export const endGame = defineCommand({
         const ended: CurrentGame = current.clock === undefined
             ? { ...current, game }
             : { ...current, game, clock: { ...current.clock, left: timeLeft(current.clock, current.game.position.turn, now), since: now.toISOString() } };
-        saveGame(context.folder, ended);
-        const { archive, warning } = archiveEnded(context.folder, ended);
+        saveGame(folder, ended);
+        const { archive, warning } = archiveEnded(folder, ended);
         return warning === undefined ? { game: summaryOf(ended, now, archive) } : { game: summaryOf(ended, now, archive), warning };
     },
     format: ({ game, warning }) => [...positionLines(game), ...(warning === undefined ? [] : [warning]), nextStep(game)].join("\n"),

@@ -3,5 +3,6 @@ export { archivedGame, archivedGames, archivedName, archivedWhen, archiveEnded, 
 export { type ChatStart, cleanSince, lastChatStart, saveChatStart } from "./chat-start.ts";
 export { bothSidesMoved, type CurrentGame, drawOfferOf, endOf, type GameEnd, gameStamp, loadGame, saveGame, type Speaker, type TalkLine } from "./current-game.ts";
 export { makeFolder, writeAtomically } from "./files.ts";
+export { moveGames } from "./move-games.ts";
 export { commentWithPlan, currentPlan, withoutPlans } from "./plans.ts";
 export { type Heard, heardLines, playerLinesThisMove, talkLimits, talkLine, unheardWords, type Words, WordsRefused } from "./talk.ts";

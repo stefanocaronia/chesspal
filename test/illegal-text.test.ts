@@ -55,6 +55,7 @@ describe("the page's words for a refusal", () => {
             "draw-offered": true,
             "draw-none": true,
             "draw-early": true,
+            "profile-game": true,
         };
 
         for (const language of ["en", "it"]) {

@@ -1,4 +1,4 @@
-// The player's settings on the page (D-56): the look, the game's aids and the language, remembered by this browser until the profiles take them (T-19).
+// The player's settings on the page (D-56): the look, the game's aids and the language, kept in the profile in use (T-19) and remembered by this browser.
 
 /** The piece sets: our two, whose colours the player picks, and cburnett with its own (D-52). */
 export const pieceSets = ["nitida", "torretta", "cburnett"] as const;
@@ -32,17 +32,23 @@ export interface Settings
 export function loadSettings(): Settings
 {
     const saved = read(remembered);
-    const stored: Partial<Record<keyof Settings, unknown>> = saved === null ? {} : parsed(saved);
     const oldTheme = read("chesspal-theme");
+    return settingsFrom(saved === null ? {} : parsed(saved), { theme: oldTheme === "light" || oldTheme === "dark" ? oldTheme : "system", sound: read("chesspal-sound") !== "off" });
+}
+
+/** Settings from what was kept, by this browser or in the profile: each one not known takes its default. */
+export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | "sound"> = { theme: "system", sound: true }): Settings
+{
+    const stored: Partial<Record<keyof Settings, unknown>> = typeof value === "object" && value !== null ? value : {};
     return {
-        theme: oneOf(stored.theme, ["system", "light", "dark"], oldTheme === "light" || oldTheme === "dark" ? oldTheme : "system"),
+        theme: oneOf(stored.theme, ["system", "light", "dark"], defaults.theme),
         board: oneOf(stored.board, looks.board, looks.board[0]),
         set: oneOf(stored.set, pieceSets, pieceSets[0]),
         pieces: oneOf(stored.pieces, looks.pieces, looks.pieces[0]),
         marks: oneOf(stored.marks, looks.marks, looks.marks[0]),
         dots: typeof stored.dots === "boolean" ? stored.dots : true,
         explain: typeof stored.explain === "boolean" ? stored.explain : true,
-        sound: typeof stored.sound === "boolean" ? stored.sound : read("chesspal-sound") !== "off",
+        sound: typeof stored.sound === "boolean" ? stored.sound : defaults.sound,
         language: oneOf(stored.language, ["auto", "it", "en"], "auto"),
     };
 }

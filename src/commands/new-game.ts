@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { Game, type GameRecord, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag } from "../core/index.ts";
-import { archivedName, archiveGame, cleanSince, type CurrentGame, endOf, lastChatStart, saveGame, startOfNewGame, withoutPlans } from "../games/index.ts";
+import { archivedName, archiveGame, cleanSince, type CurrentGame, endOf, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../games/index.ts";
+import { gameFolder, gameFolders } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 import { type GameSummary, nextStep, positionLines, sidesLine, summaryOf } from "./game-summary.ts";
 import { pastGameLines } from "./past-games.ts";
+import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
 
 interface NewGame
@@ -14,6 +16,8 @@ interface NewGame
     archived?: { name: string; finished: boolean; };
     /** The last games played with this player, for a chat that starts clean (D-57). */
     past: string[];
+    /** Who plays, from the profile in use (D-23). */
+    player?: string;
 }
 
 /** A new game against the player, from the standard position or from a FEN or PGN; a game going on is never lost (D-41). */
@@ -32,7 +36,8 @@ export const newGame = defineCommand({
     run: ({ ai_colour: colour, from, clock, replace }, context): NewGame => {
         const control = clock === undefined ? undefined : timeControlFrom(clock);
         const now = context.now();
-        const before = gameAt(context.folder, now);
+        const folder = gameFolder(context.folder);
+        const before = gameAt(folder, now);
         const going = before !== undefined && endOf(before.game) === undefined ? before : undefined;
 
         if (going !== undefined && !replace) {
@@ -40,24 +45,31 @@ export const newGame = defineCommand({
             throw new Error(`A game is going on, at move ${moveNumber}: end it with end_game, or call new_game with replace: true, which archives it unfinished. Nothing changed.`);
         }
 
-        if (before !== undefined && chatToClear(context, before)) {
+        if (chatToClear(context)) {
             throw new ChatNotClear();
         }
 
         const ai = colour === "random" ? (context.random() < 0.5 ? "white" : "black") : colour;
-        const started = startOfNewGame(context.folder, now, before);
+        const started = startOfNewGame(folder, now, before);
         const game = startingGame(from, ai, started, control);
         const current: CurrentGame = control === undefined
             ? { game, ai, started: started.toISOString(), talk: [] }
             : { game, ai, started: started.toISOString(), talk: [], clock: startClock(control, now) };
-        const archived = before === undefined || (going === undefined && archivedName(context.folder, before) !== undefined) ? undefined : archiveBefore(context.folder, before);
-        saveGame(context.folder, current);
-        const past = pastGameLines(context.folder, remembered);
-        return archived === undefined ? { game: summaryOf(current, now), past } : { game: summaryOf(current, now), archived: { name: archived, finished: going === undefined }, past };
+        const archived = before === undefined || (going === undefined && archivedName(folder, before) !== undefined) ? undefined : archiveBefore(folder, before);
+        saveGame(folder, current);
+        const past = pastGameLines(folder, remembered);
+        const player = playerLine(context);
+        return {
+            game: summaryOf(current, now),
+            ...(archived === undefined ? {} : { archived: { name: archived, finished: going === undefined } }),
+            past,
+            ...(player === undefined ? {} : { player }),
+        };
     },
-    format: ({ game, archived, past }) =>
+    format: ({ game, archived, past, player }) =>
         [
             `New game: ${sidesLine(game.ai)}.`,
+            ...(player === undefined ? [] : [player]),
             ...(archived === undefined ? [] : [`The game before is in ${archived.name}${archived.finished ? "" : ", unfinished"}.`]),
             ...(past.length === 0 ? [] : ["Last games with this player (past_games gives more, and their moves):", ...past]),
             ...positionLines(game),
@@ -86,11 +98,20 @@ export const pliesBeforeClearing = 20;
 // A FEN's board: eight ranks of pieces and empty counts.
 const fenPattern = /^[pnbrqkPNBRQK1-8]+(?:\/[pnbrqkPNBRQK1-8]+){7}(?:\s|$)/;
 
-/** Whether the chat must be cleared first: a game of some length was played in it, and the host says how chats start (Claude Code's hook, T-85). */
-function chatToClear(context: Context, before: CurrentGame): boolean
+/**
+ * Whether the chat must be cleared first: the last game begun, in any profile, was played in it at some length, and the host says how chats start (Claude
+ * Code's hook, T-85). Another profile does not clear the chat (D-66).
+ */
+function chatToClear(context: Context): boolean
 {
     const start = lastChatStart(context.folder);
-    return context.host?.() === "claude-code" && start !== undefined && before.game.record.moves.length >= pliesBeforeClearing && !cleanSince(start, before.started);
+
+    if (context.host?.() !== "claude-code" || start === undefined) {
+        return false;
+    }
+
+    const last = gameFolders(context.folder).flatMap((folder) => loadGame(folder) ?? []).sort((one, other) => Date.parse(other.started) - Date.parse(one.started))[0];
+    return last !== undefined && last.game.record.moves.length >= pliesBeforeClearing && !cleanSince(start, last.started);
 }
 
 function archiveBefore(folder: string, before: CurrentGame): string

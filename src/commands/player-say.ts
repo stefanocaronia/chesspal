@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { talkLimits } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { defineCommand } from "./registry.ts";
 import { say } from "./say.ts";
 
@@ -11,6 +12,6 @@ export const playerSay = defineCommand({
     input: z.object({ text: z.string().trim().min(1, "write what you say").max(talkLimits.player, `write ${talkLimits.player} characters at most`).describe("what the player says to the AI") }),
     cliOnly: true,
     positionals: ["text"],
-    run: ({ text }, context): string => say(context.folder, "player", text, context.now()).talk.at(-1)!.text,
+    run: ({ text }, context): string => say(gameFolder(context.folder), "player", text, context.now()).talk.at(-1)!.text,
     format: (text) => `Written for the AI: «${text}». It reads it at its next call.`,
 });

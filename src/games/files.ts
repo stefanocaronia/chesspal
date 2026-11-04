@@ -1,7 +1,7 @@
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 
 /** Writes a file whole or not at all: a temporary file beside it, then renamed over it (D-27). A failure says what to do about it. */
-export function writeAtomically(path: string, text: string): void
+export function writeAtomically(path: string, text: string | Uint8Array): void
 {
     const temporary = `${path}.${process.pid}.tmp`;
 

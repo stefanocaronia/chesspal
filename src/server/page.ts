@@ -1,7 +1,7 @@
 // The page on localhost (D-8, D-47): its HTML with the import map, its scripts, the chess core and the packages they import, the game it shows and keeps
 // up to date, the player's moves and words (T-65), draws and resignations (D-65), and the doorbell that wakes the chat when the player acts there.
 import { createHash } from "node:crypto";
-import { readFileSync, watch } from "node:fs";
+import { type FSWatcher, readFileSync, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createRequire } from "node:module";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
@@ -14,7 +14,10 @@ import { ChatNotClear, newGame } from "../commands/new-game.ts";
 import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
 import { type CurrentGame, drawOfferOf, endOf, gameStamp, heardLines, loadGame, playerLinesThisMove, playerPgn, talkLimits, WordsRefused } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
+import { bodyOf, isJson, json, jsonOf, send, textOf } from "./http.ts";
+import { answerProfiles, profilesShown } from "./profile-routes.ts";
 
 /** The page of a player's folder, served: its address, how to tell it the AI was given words, which change no file, and how to stop it. */
 export interface Page
@@ -47,7 +50,7 @@ export async function startPage(context: Context, opponent: () => string | undef
 }
 
 /** What the server keeps of its folder: the doorbell, and the pages that wait to hear the game has changed. */
-interface Served
+export interface Served
 {
     readonly folder: string;
     readonly context: Context;
@@ -73,7 +76,7 @@ const importMap = JSON.stringify({
 });
 
 // The page runs only its own files and the import map written in it, known by its hash.
-const policy = `default-src 'self'; script-src 'self' 'sha256-${createHash("sha256").update(importMap).digest("base64")}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; `
+const policy = `default-src 'self'; script-src 'self' 'sha256-${createHash("sha256").update(importMap).digest("base64")}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; `
     + "base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 const html = [
@@ -101,6 +104,10 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
     // such as the chat's, still opens the page.
     if (!fromHere(request, served.port, path.startsWith("/api/"))) {
         send(response, 403, "text/plain; charset=utf-8", "Chesspal's page answers only at its own address on this machine.");
+        return;
+    }
+
+    if (answerProfiles(request, response, url, served)) {
         return;
     }
 
@@ -136,7 +143,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
             405,
             "text/plain; charset=utf-8",
             "The page only reads, moves with POST /api/move, writes with POST /api/message, starts a game with POST /api/new, "
-                + "offers or answers a draw with POST /api/draw and resigns with POST /api/resign.",
+                + "offers or answers a draw with POST /api/draw, resigns with POST /api/resign, and keeps the profiles with POST /api/profile/… and /api/settings.",
         );
         return;
     }
@@ -149,7 +156,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         keepPosted(request, response, served);
     } else if (path === "/api/bell") {
         if (url.searchParams.has("probe")) {
-            send(response, 200, "application/json; charset=utf-8", JSON.stringify(bellProbe(served.folder)));
+            send(response, 200, json, JSON.stringify(bellProbe(served.folder)));
         } else {
             served.bell.listen(request, response);
         }
@@ -196,7 +203,7 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
             return problem;
         };
 
-        playMove(served.folder, now, "player", move, refuse, message === undefined ? {} : { said: { text: message, at: now } });
+        playMove(gameFolder(served.folder), now, "player", move, refuse, message === undefined ? {} : { said: { text: message, at: now } });
     } catch (error) {
         // The game may have changed since the page read it: the move refused, the AI's turn, a flag fallen.
         send(response, 409, json, JSON.stringify(refusalFrom(error, illegal ? "illegal" : refusalOf(served)?.refusal)));
@@ -226,7 +233,7 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
     let current;
 
     try {
-        current = say(served.folder, "player", text, served.context.now());
+        current = say(gameFolder(served.folder), "player", text, served.context.now());
     } catch (error) {
         const noGame = refusalOf(served)?.refusal === "no-game";
         send(response, 409, json, JSON.stringify(refusalFrom(error, noGame ? "no-game" : undefined)));
@@ -250,7 +257,7 @@ function newGameFromPage(request: IncomingMessage, response: ServerResponse, ser
     }
 
     try {
-        const before = loadGame(served.folder);
+        const before = loadGame(gameFolder(served.folder));
         newGame.run({ ai_colour: before?.ai ?? "black", replace: true }, served.context);
     } catch (error) {
         send(response, 409, json, JSON.stringify(refusalFrom(error)));
@@ -315,8 +322,6 @@ function resignFromPage(request: IncomingMessage, response: ServerResponse, serv
     send(response, 200, json, JSON.stringify({ resigned: true }));
 }
 
-const json = "application/json; charset=utf-8";
-
 /**
  * A request refused, as the page reads it: the server's words, and the code of a refusal the page says in the player's language (T-11), with the characters
  * left for words too long; without a code, the page shows the words.
@@ -324,7 +329,7 @@ const json = "application/json; charset=utf-8";
 export interface Refused
 {
     readonly error: string;
-    readonly refusal?: "no-game" | "ai-to-move" | "illegal" | "clear-chat" | `words-${WordsRefused["reason"]}` | `draw-${DrawRefused["reason"]}`;
+    readonly refusal?: "no-game" | "ai-to-move" | "illegal" | "clear-chat" | `words-${WordsRefused["reason"]}` | `draw-${DrawRefused["reason"]}` | "profile-game";
     readonly most?: number;
 }
 
@@ -367,8 +372,9 @@ function refusalFrom(error: unknown, refusal?: Refused["refusal"]): Refused
 /** The game as the page reads it now: a flag that has fallen ends it (D-13), and the doorbell tells the chat, which hears how from status (T-37). */
 function gameNow(served: Served): CurrentGame | undefined
 {
-    const before = loadGame(served.folder);
-    const current = gameAt(served.folder, served.context.now());
+    const folder = gameFolder(served.folder);
+    const before = loadGame(folder);
+    const current = gameAt(folder, served.context.now());
 
     if (before !== undefined && endOf(before.game) === undefined && current !== undefined && endOf(current.game) !== undefined) {
         served.bell.ring();
@@ -380,56 +386,24 @@ function gameNow(served: Served): CurrentGame | undefined
 /** The chat has read the game as it is now, at the end of a tool's call: the doorbell wakes it only for what changes it after. */
 export function chatHasRead(context: Context): void
 {
-    context.seen = gameStamp(context.folder);
+    context.seen = gameSeen(context);
 }
 
 /**
  * Whether the chat has news from the page: a game changed since the chat's last tool, by the player's move, words, draw or resignation, a new game or a
- * flag that fell. The player's words the chat was given change nothing it has not read.
+ * flag that fell, or another profile in use, which wakes the chat at the next ring (D-66). The player's words the chat was given change nothing it has not read.
  */
 function hasNews(context: Context): boolean
 {
-    return gameStamp(context.folder) !== context.seen;
+    return gameSeen(context) !== context.seen;
 }
 
-function isJson(request: IncomingMessage): boolean
+// The game the chat sees: the profile's folder, and the stamp of its game.json.
+function gameSeen(context: Context): string
 {
-    return (request.headers["content-type"] ?? "").startsWith("application/json");
-}
-
-function jsonOf(text: string | undefined): Record<string, unknown> | undefined
-{
-    try {
-        const parsed: unknown = text === undefined ? undefined : JSON.parse(text);
-        return typeof parsed === "object" && parsed !== null ? parsed as Record<string, unknown> : undefined;
-    } catch {
-        return undefined;
-    }
-}
-
-/** A text field of a body, trimmed; undefined when it is not text, or empty. */
-function textOf(value: unknown): string | undefined
-{
-    return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
-}
-
-/** A request's body, up to a size a move with the player's words never reaches; undefined past it. */
-function bodyOf(request: IncomingMessage): Promise<string | undefined>
-{
-    return new Promise((done) => {
-        let text = "";
-        request.setEncoding("utf8");
-        request.on("data", (chunk: string) => {
-            text += chunk;
-
-            if (text.length > 4096) {
-                request.destroy();
-                done(undefined);
-            }
-        });
-        request.on("end", () => done(text));
-        request.on("error", () => done(undefined));
-    });
+    const folder = gameFolder(context.folder);
+    return `${folder}
+${gameStamp(folder) ?? ""}`;
 }
 
 /** A page that waits to hear the game has changed: a stream of events, one "changed" for each change, after which the page reads the game again. */
@@ -448,38 +422,60 @@ function tellWatchers(served: Served): void
     }
 }
 
-/** Watches the player's folder for changes to the game, whoever makes them (the AI's tools, the CLI, a hand edit): the pages hear of them. It returns how to stop watching. */
+/**
+ * Watches the player's folder, its profiles and the profile in use for changes to the game and the profiles, whoever makes them (the AI's tools, the CLI, a
+ * hand edit): the pages hear of them. Each folder is watched on its own, never its whole tree, and watched again after each change, since the profile in
+ * use may be another. It returns how to stop watching.
+ */
 function watchGame(served: Served): () => void
 {
     let waiting: NodeJS.Timeout | undefined;
+    let watching: FSWatcher[] = [];
 
-    const changed = (): void => {
-        waiting = undefined;
-        tellWatchers(served);
+    const watchAll = (): void => {
+        watching.forEach((watcher) => watcher.close());
+        const folders = new Set([served.folder, join(served.folder, "profiles"), gameFolder(served.folder)]);
+        watching = [...folders].flatMap((folder) => watchFolder(folder, heard));
     };
 
-    try {
-        // A save writes a new file and renames it: the events of one save come together, and the pages hear of it once.
-        const watcher = watch(served.folder, (_event, name) => {
-            if (name === "game.json" && waiting === undefined) {
-                waiting = setTimeout(changed, 30);
-            }
-        });
-        watcher.unref();
+    // A save writes a new file and renames it: the events of one save come together, and the pages hear of it once.
+    const heard = (name: string | null): void => {
+        if ((name === null || watched.test(name)) && waiting === undefined) {
+            waiting = setTimeout(() => {
+                waiting = undefined;
+                watchAll();
+                tellWatchers(served);
+            }, 30);
+        }
+    };
 
-        return () => {
-            clearTimeout(waiting);
-            watcher.close();
-        };
+    watchAll();
+
+    return () => {
+        clearTimeout(waiting);
+        watching.forEach((watcher) => watcher.close());
+    };
+}
+
+// A folder watched, without its subfolders; none when it cannot be, or is not there yet: the pages see its files only as they load them.
+function watchFolder(folder: string, heard: (name: string | null) => void): FSWatcher[]
+{
+    try {
+        const watcher = watch(folder, (_event, name) => heard(name));
+        watcher.on("error", () => watcher.close());
+        watcher.unref();
+        return [watcher];
     } catch {
-        // A folder that cannot be watched: the pages see the game only as they load it.
-        return () => undefined;
+        return [];
     }
 }
 
+// The current game, the profile in use, and what a profile keeps (who plays, their picture, their settings); a folder's name, for a profile made or gone.
+const watched = /^(?:game\.json|active\.json|profile\.md|settings\.json|avatar\.\w+|[a-z0-9-]+)$/;
+
 /**
  * The game in progress or just ended, as the player may see it: its PGN without the AI's plans while it goes on, the AI's side, when it started, and the
- * talk on the page, each line of the player's with how far it got (D-53), and the draw offer that stands (D-65); and the AI's name.
+ * talk on the page, each line of the player's with how far it got (D-53), and the draw offer that stands (D-65); the AI's name; and the profiles.
  */
 function sendGame(response: ServerResponse, served: Served): void
 {
@@ -496,10 +492,10 @@ function sendGame(response: ServerResponse, served: Served): void
             ...(current.clock === undefined ? {} : { clock: current.clock }),
             ...(offer === undefined ? {} : { drawOffer: offer }),
         };
-        const body = { game, opponent: served.opponent() };
-        send(response, 200, "application/json; charset=utf-8", JSON.stringify(body));
+        const body = { game, opponent: served.opponent(), ...profilesShown(served.folder) };
+        send(response, 200, json, JSON.stringify(body));
     } catch (error) {
-        send(response, 500, "application/json; charset=utf-8", JSON.stringify({ error: (error as Error).message }));
+        send(response, 500, json, JSON.stringify({ error: (error as Error).message }));
     }
 }
 
@@ -570,19 +566,6 @@ function fromHere(request: IncomingMessage, port: number, api: boolean): boolean
     const site = request.headers["sec-fetch-site"];
     return hosts.includes(request.headers.host ?? "") && (origin === undefined || hosts.some((host) => origin === `http://${host}`))
         && (!api || site === undefined || site === "same-origin" || site === "none");
-}
-
-function send(response: ServerResponse, status: number, type: string, body: string | Buffer, headers: Record<string, string> = {}): void
-{
-    response.writeHead(status, {
-        "Content-Type": type,
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-        "Referrer-Policy": "no-referrer",
-        "Content-Security-Policy": "default-src 'self'",
-        ...headers,
-    });
-    response.end(body);
 }
 
 function listened(server: Server, port: number): Promise<boolean>

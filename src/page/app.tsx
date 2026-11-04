@@ -3,6 +3,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { type Clock, Game, materialOf, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square } from "../core/index.ts";
+import { PlayerPicture } from "./avatars.tsx";
 import { Board, type Notice, piecesOf } from "./board.tsx";
 import { flipKeys, type Step, stepKeys, stepped } from "./browse.ts";
 import { howEnded, useDeclined, useJustEnded } from "./ending.ts";
@@ -13,10 +14,12 @@ import { GameColumn } from "./game-column.tsx";
 import { type GameActions, Header } from "./header.tsx";
 import { useOpeningBook } from "./opening-book.ts";
 import { ChosenSet } from "./pieces.tsx";
-import { Avatar, ClockFace, PlayerCard } from "./player-card.tsx";
+import { ClockFace, PlayerCard } from "./player-card.tsx";
 import { aiSpoke, aiWords, playerSpent, playerWords, pliesOf, type TalkLine } from "./plies.ts";
+import { NameButton, PictureButton, PictureDialog, ProfilesDialog, Wizard } from "./profile-dialogs.tsx";
+import { keepSettings, type Profile } from "./profile.ts";
 import { SettingsPanel } from "./settings-panel.tsx";
-import { languagesOf, saveSettings, type Settings, showSettings } from "./settings.ts";
+import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "./settings.ts";
 import { playSound, soundOf, wakeSounds } from "./sounds.ts";
 import { AiWords, Compose, TalkFaces } from "./talk.tsx";
 import { type ServerRefusal, type Text, textFor } from "./text.ts";
@@ -34,10 +37,19 @@ export function App({ start }: { start: Settings; })
     const sound = settings.sound;
     useEffect(() => void (document.documentElement.lang = text.language), [text]);
 
-    const change = (next: Settings): void => {
+    const apply = (next: Settings): void => {
         setSettings(next);
         saveSettings(next);
         showSettings(next);
+    };
+
+    // A choice of the player's is kept in the profile in use too, so that it follows them (D-56).
+    const change = (next: Settings): void => {
+        apply(next);
+
+        if (served?.profile !== undefined) {
+            keepSettings(served.profile.id, next);
+        }
     };
 
     const [served, setServed] = useState<Served | undefined>(undefined);
@@ -50,6 +62,7 @@ export function App({ start }: { start: Settings; })
     const [folds, setFolds] = useState(startFolds);
     const [draft, setDraft] = useState("");
     const [unsent, setUnsent] = useState<string | undefined>(undefined);
+    const [dialog, setDialog] = useState<"picture" | "profiles" | undefined>(undefined);
     // Reads the game again: when the server says it changed, and when a clock runs out on the page (T-37).
     const reload = useRef(() => {});
 
@@ -82,6 +95,20 @@ export function App({ start }: { start: Settings; })
         events.onmessage = load;
         return () => events.close();
     }, []);
+
+    // The profile in use brings its settings, as it comes and each time another comes in its place; one without any takes this browser's.
+    const profileId = served?.profile?.id;
+    useEffect(() => {
+        if (served === undefined || profileId === undefined) {
+            return;
+        }
+
+        if (served.settings === undefined) {
+            keepSettings(profileId, settings);
+        } else {
+            apply(settingsFrom(served.settings));
+        }
+    }, [profileId]);
 
     // The game is replayed from its PGN once for each one the server sends, not at every click.
     const game = served?.game;
@@ -207,6 +234,15 @@ export function App({ start }: { start: Settings; })
         );
     }
 
+    // At the first start the page asks who plays (D-23): the game comes after.
+    if (served.profile === undefined) {
+        return <Wizard text={text} hasGame={served.game !== null} onMade={() => reload.current()} />;
+    }
+
+    const profile = served.profile;
+    const picture = <PlayerPicture profile={profile} />;
+    const going = game !== null && !ended;
+
     const player = game === null || game.ai === "black" ? "white" : "black";
     const ai = player === "white" ? "black" : "white";
     const playerToMove = game !== null && !ended && live.position.turn === player;
@@ -290,9 +326,18 @@ export function App({ start }: { start: Settings; })
     return (
         <ChosenSet.Provider value={settings.set}>
             {panel}
+            <PictureDialog open={dialog === "picture"} profile={profile} onClose={() => setDialog(undefined)} text={text} />
+            <ProfilesDialog
+                open={dialog === "profiles"}
+                profiles={served.profiles}
+                active={profile}
+                playing={going}
+                onClose={() => setDialog(undefined)}
+                text={text}
+            />
             <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`}>
                 {header}
-                <TalkFaces name={name} ai={ai} player={player} aiMoves={!ended && game !== null && !playerToMove} playerMoves={playerToMove} unread={unread} text={text} />
+                <TalkFaces name={name} you={profile.name} picture={picture} ai={ai} player={player} aiMoves={!ended && game !== null && !playerToMove} playerMoves={playerToMove} unread={unread} text={text} />
                 <FoldTab column="talk" folded={folds.talk === "folded"} label={text.talk} unread={unread && folds.talk === "folded"} onFold={fold} />
                 <FoldTab column="game" folded={folds.game === "folded"} label={text.game} onFold={fold} />
                 <span class="visually-hidden" aria-live="polite">{unread ? text.wrote(name) : ""}</span>
@@ -301,7 +346,7 @@ export function App({ start }: { start: Settings; })
                         <PlayerCard place="ai" picture={<Torretta size={48} />} name={name} side={ai} taken={material.taken[ai]} ahead={ahead(ai)} clock={clockOf(ai)} text={text} />
                         <AiWords words={aiWords(plies, ai, talk)} />
                     </section>
-                    <section class="you-block" aria-label={text.you}>
+                    <section class="you-block" aria-label={profile.name}>
                         {game === null ? null : (
                             <Compose
                                 lines={said}
@@ -320,8 +365,8 @@ export function App({ start }: { start: Settings; })
                         )}
                         <PlayerCard
                             place="you"
-                            picture={<Avatar />}
-                            name={text.you}
+                            picture={<PictureButton profile={profile} onOpen={() => setDialog("picture")} text={text} />}
+                            name={<NameButton profile={profile} onOpen={() => setDialog("profiles")} text={text} />}
                             side={player}
                             taken={material.taken[player]}
                             ahead={ahead(player)}
@@ -379,7 +424,8 @@ export function App({ start }: { start: Settings; })
 
 /**
  * What the server sends: the game, its PGN for the player, the AI's side, when it started, the talk on the page, each line with the moves the game had
- * then, its clock in a game with one and the draw offer that stands (D-65), null before the first game; and the AI's name, when the host gave it.
+ * then, its clock in a game with one and the draw offer that stands (D-65), null before the first game; the AI's name, when the host gave it; and the
+ * profile in use with its settings, and all the profiles, none before the first (D-23).
  */
 interface Served
 {
@@ -392,6 +438,9 @@ interface Served
         readonly drawOffer?: "player" | "ai";
     } | null;
     readonly opponent?: string;
+    readonly profile?: Profile;
+    readonly profiles: readonly Profile[];
+    readonly settings?: object;
 }
 
 /** Plays the sound of each move the game gains while the page watches it, the AI's and the player's: none for a game loaded or begun again (T-71). */

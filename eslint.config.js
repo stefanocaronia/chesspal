@@ -51,7 +51,20 @@ export default [
         rules: {
             "no-console": "error",
             "no-restricted-imports": ["error", {
-                patterns: [{ group: ["../commands/*", "../server/*", "../cli/*"], message: "The games module sits below the commands: they use it, never the other way." }],
+                patterns: [
+                    { group: ["../commands/*", "../server/*", "../cli/*"], message: "The games module sits below the commands: they use it, never the other way." },
+                    { group: ["../profiles/*"], message: "The profiles use the games, never the other way: pass the game folder in." },
+                ],
+            }],
+        },
+    },
+    // The profiles sit below the commands, beside the games, and print nothing.
+    {
+        files: ["src/profiles/**/*.ts"],
+        rules: {
+            "no-console": "error",
+            "no-restricted-imports": ["error", {
+                patterns: [{ group: ["../commands/*", "../server/*", "../cli/*"], message: "The profiles module sits below the commands: they use it, never the other way." }],
             }],
         },
     },

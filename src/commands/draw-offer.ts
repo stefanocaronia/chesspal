@@ -1,5 +1,6 @@
 // The draw offers of the board page (D-65): the player's, made on their turn as on Lichess, and their answer to the AI's, which ai_move makes with its move.
 import { bothSidesMoved, drawOfferOf, saveGame } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 import { endGame } from "./end-game.ts";
 import { gameGoingOn } from "./game-summary.ts";
@@ -19,7 +20,8 @@ export class DrawRefused extends Error
 /** The player offers a draw on their turn, once each side has moved: it stands until the AI accepts it or moves, and one stands at a time. */
 export function offerDraw(context: Context): void
 {
-    const current = gameGoingOn(context.folder, context.now());
+    const folder = gameFolder(context.folder);
+    const current = gameGoingOn(folder, context.now());
     const offer = drawOfferOf(current);
 
     if (current.game.position.turn === current.ai) {
@@ -34,13 +36,14 @@ export function offerDraw(context: Context): void
         throw new DrawRefused(offer === "player" ? "You have offered a draw already: it stands until the AI's move. Nothing changed." : "The AI offers a draw: accept it or decline it. Nothing changed.", "offered");
     }
 
-    saveGame(context.folder, { ...current, drawOffer: "player" });
+    saveGame(folder, { ...current, drawOffer: "player" });
 }
 
 /** The player's answer to the AI's draw offer: accepted, the game ends drawn by agreement; declined, it goes on. */
 export function answerDraw(context: Context, accept: boolean): void
 {
-    const current = gameGoingOn(context.folder, context.now());
+    const folder = gameFolder(context.folder);
+    const current = gameGoingOn(folder, context.now());
 
     if (drawOfferOf(current) !== "ai") {
         throw new DrawRefused("The AI offers no draw to answer. Nothing changed.", "none");
@@ -49,6 +52,6 @@ export function answerDraw(context: Context, accept: boolean): void
     if (accept) {
         endGame.run({ result: "draw_agreed" }, context);
     } else {
-        saveGame(context.folder, { ...current, drawOffer: undefined });
+        saveGame(folder, { ...current, drawOffer: undefined });
     }
 }

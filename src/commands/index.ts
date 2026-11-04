@@ -9,8 +9,9 @@ import { pastGames } from "./past-games.ts";
 import { playerMove } from "./player-move.ts";
 import { playerSay } from "./player-say.ts";
 import { position } from "./position.ts";
+import { newProfile, profiles, setAvatar, useProfile } from "./profiles.ts";
 import type { AnyCommand } from "./registry.ts";
 import { status } from "./status.ts";
 
 /** Every command of Chesspal, in the order the command line lists them and the MCP server offers them. */
-export const commands: AnyCommand[] = [init, status, newGame, playerMove, playerSay, aiMove, aiSay, look, position, endGame, exportGame, pastGames];
+export const commands: AnyCommand[] = [init, status, newGame, playerMove, playerSay, aiMove, aiSay, look, position, endGame, exportGame, pastGames, profiles, newProfile, useProfile, setAvatar];

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { recordChatStart } from "../src/cli/chat-hook.ts";
 import type { Context } from "../src/commands/context.ts";
 import { newGame } from "../src/commands/new-game.ts";
+import { createProfile } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -43,6 +44,15 @@ describe("a new game after one played in the chat (D-57)", () => {
         expect(() => startAgain(codex)).not.toThrow();
 
         expect(() => startAgain(chatWith(longGame))).not.toThrow();
+    });
+
+    it("waits for the chat to be cleared even when another profile starts the next game (D-66)", async () => {
+        const context = chatWith(longGame);
+        await chatStarted(context, "startup", before);
+        createProfile(context.folder, { name: "Anna" });
+        createProfile(context.folder, { name: "Marco" });
+
+        expect(() => startAgain(context)).toThrow(/\/clear/);
     });
 
     it("notes how the chat started from the hook's input, and its session", async () => {

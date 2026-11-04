@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { boardText, type Facts } from "../core/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import { type GameSummary, headLines, summaryOf, wordLines } from "./game-summary.ts";
 import { defineCommand } from "./registry.ts";
@@ -24,7 +25,7 @@ export const look = defineCommand({
     readOnly: true,
     idempotent: true,
     run: ({ only }, context): Look => {
-        const current = gameAt(context.folder, context.now());
+        const current = gameAt(gameFolder(context.folder), context.now());
 
         if (current === undefined) {
             throw new Error("There is no game to look at: start one with new_game.");

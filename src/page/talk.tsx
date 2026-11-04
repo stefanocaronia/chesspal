@@ -2,7 +2,6 @@
 import { type ComponentChildren, type RefObject } from "preact";
 import { useLayoutEffect, useRef } from "preact/hooks";
 import type { Side } from "../core/index.ts";
-import { Avatar } from "./player-card.tsx";
 import { talkLimits, type TalkLine } from "./plies.ts";
 import type { Text } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
@@ -102,8 +101,11 @@ export function Compose({ lines, spent, draft, onDraft, onSend, canMove, name, p
  * The talk narrowed to a card beside the board (T-84): the Torretta above, the player below, each with their name and side written down the card, a ring on
  * whoever moves and a dot on the Torretta when the AI spoke meanwhile.
  */
-export function TalkFaces({ name, ai, player, aiMoves, playerMoves, unread, text }: {
+export function TalkFaces({ name, you, picture, ai, player, aiMoves, playerMoves, unread, text }: {
     name: string;
+    /** The player's name and picture. */
+    you: string;
+    picture: ComponentChildren;
     ai: Side;
     player: Side;
     aiMoves: boolean;
@@ -115,7 +117,7 @@ export function TalkFaces({ name, ai, player, aiMoves, playerMoves, unread, text
     return (
         <div class="faces">
             <RailPlayer place="ai" picture={<Torretta size={40} />} name={name} side={text.sides[ai]} moves={aiMoves} unread={unread} />
-            <RailPlayer place="you" picture={<Avatar />} name={text.you} side={text.sides[player]} moves={playerMoves} />
+            <RailPlayer place="you" picture={picture} name={you} side={text.sides[player]} moves={playerMoves} />
         </div>
     );
 }

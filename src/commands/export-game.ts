@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { playerPgn } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import { defineCommand } from "./registry.ts";
 
@@ -19,7 +20,7 @@ export const exportGame = defineCommand({
     readOnly: true,
     positionals: ["format"],
     run: ({ format }, context): Exported => {
-        const current = gameAt(context.folder, context.now());
+        const current = gameAt(gameFolder(context.folder), context.now());
 
         if (current === undefined) {
             throw new Error("There is no game to export: start one with new_game.");

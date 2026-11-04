@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { type GameRecord, writePgn } from "../core/index.ts";
 import { archivedGame, archivedGames, archivedWhen } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { openingName } from "./opening-book.ts";
 import { defineCommand } from "./registry.ts";
 
@@ -14,7 +15,10 @@ export const pastGames = defineCommand({
     input: z.object({ game: z.string().optional().describe("a game's name, as the list writes it: its PGN") }),
     readOnly: true,
     idempotent: true,
-    run: ({ game }, context): Past => game === undefined ? { games: pastGameLines(context.folder, listed) } : { pgn: writePgn(archivedGame(context.folder, game)) },
+    run: ({ game }, context): Past => {
+        const folder = gameFolder(context.folder);
+        return game === undefined ? { games: pastGameLines(folder, listed) } : { pgn: writePgn(archivedGame(folder, game)) };
+    },
     format: (past) => ("pgn" in past ? past.pgn : past.games.length === 0 ? "No game played yet." : past.games.join("\n")),
 });
 

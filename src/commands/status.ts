@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { archivedName } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { gameAt } from "./clock.ts";
 import { closingLines, type GameSummary, nextStep, positionLines, sidesLine, summaryOf } from "./game-summary.ts";
+import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
 import { unansweredWords } from "./say.ts";
 
@@ -12,6 +14,8 @@ interface Status
     folder: string;
     /** The board page's address, where the player plays when the chat serves it. */
     page?: string;
+    /** Who plays, from the profile in use (D-23). */
+    player?: string;
     game?: GameSummary;
     /** Why the game on disk cannot be read, when it cannot. */
     problem?: string;
@@ -29,17 +33,25 @@ export const status = defineCommand({
     readOnly: true,
     alwaysLoad: true,
     run: (_input, context): Status => {
-        const status: Status = { version, folder: context.folder };
+        // With profiles, the folder is the profile's: the names of its games are relative to it.
+        const folder = gameFolder(context.folder);
+        const status: Status = { version, folder };
 
         if (context.page !== undefined) {
             status.page = context.page;
         }
 
+        const player = playerLine(context);
+
+        if (player !== undefined) {
+            status.player = player;
+        }
+
         try {
-            const current = gameAt(context.folder, context.now());
+            const current = gameAt(folder, context.now());
 
             if (current !== undefined) {
-                status.game = summaryOf(current, context.now(), archivedName(context.folder, current));
+                status.game = summaryOf(current, context.now(), archivedName(folder, current));
                 status.words = unansweredWords(context);
             }
         } catch (error) {
@@ -48,10 +60,11 @@ export const status = defineCommand({
 
         return status;
     },
-    format: ({ version, folder, page, game, problem, words = [] }) =>
+    format: ({ version, folder, page, player, game, problem, words = [] }) =>
         [
             `Chesspal ${version}. Folder: ${folder}`,
             ...(page === undefined ? [] : [`Board page: ${page}`]),
+            ...(player === undefined ? [] : [player]),
             ...(problem === undefined ? gameLines(game, words) : [problem]),
         ].join("\n"),
 });

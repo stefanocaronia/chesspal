@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { gameFolder } from "../profiles/index.ts";
 import { closingLines, lastMoveText, moveLines, type MovePlayed } from "./game-summary.ts";
 import { playMove } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
@@ -17,7 +18,7 @@ export const playerMove = defineCommand({
     alwaysLoad: true,
     positionals: ["move"],
     run: ({ move, offer_draw: offerDraw = false }, context): MovePlayed => ({
-        ...playMove(context.folder, context.now(), "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`, { allowance: chatAllowance, offerDraw }),
+        ...playMove(gameFolder(context.folder), context.now(), "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`, { allowance: chatAllowance, offerDraw }),
         words: newWords(context),
     }),
     format: (result) => [`Player: ${result.game.lastMove === undefined ? result.move : lastMoveText(result.game.lastMove)}.`, ...moveLines(result), ...closingLines(result.game, result.words)].join("\n"),

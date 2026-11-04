@@ -516,7 +516,8 @@ button {
 }
 
 /* Both faces fill their circle, with no edge */
-.face svg {
+.face svg,
+.face img {
     width: var(--coin);
     height: var(--coin);
     clip-path: circle(50%);
@@ -2157,6 +2158,415 @@ button {
     width: 18px;
     height: 18px;
     accent-color: var(--accent);
+}
+
+/* The profiles (D-23, D-45): the player's picture, which a click changes, their name, which opens the profiles, the wizard and the profiles' dialogs */
+.avatar.photo {
+    clip-path: none;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 0 0 1px var(--line);
+}
+
+.me {
+    position: relative;
+    flex: none;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    line-height: 0;
+    cursor: pointer;
+}
+
+.me-cover {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.12s;
+}
+
+.me-cover .icon {
+    width: 45%;
+    height: 45%;
+}
+
+.me:hover .me-cover,
+.me:focus-visible .me-cover {
+    opacity: 1;
+}
+
+/* Where nothing hovers, a camera in the corner says the picture changes */
+.me-badge {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    display: none;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: 0 0 0 2px var(--card);
+}
+
+.me-badge .icon {
+    width: 12px;
+    height: 12px;
+}
+
+@media (hover: none) {
+    .me-badge {
+        display: grid;
+    }
+}
+
+.profile-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.profile-name span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.profile-name .icon {
+    flex: none;
+    width: 15px;
+    height: 15px;
+    color: var(--soft);
+}
+
+.profile-name:hover,
+.profile-name:hover .icon {
+    color: var(--accent);
+}
+
+.wizard {
+    max-width: 480px;
+    margin: 32px auto;
+    padding: 28px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: var(--shadow);
+}
+
+.wizard h1 {
+    margin: 12px 0 4px;
+    font-size: 24px;
+}
+
+.wizard .lead {
+    margin: 0 0 24px;
+    color: var(--soft);
+}
+
+.wizard .lead span {
+    display: block;
+    margin-top: 4px;
+}
+
+.profile-form fieldset {
+    min-width: 0;
+    margin: 0 0 20px;
+    padding: 0;
+    border: 0;
+}
+
+.profile-form legend,
+.profile-form .field > span {
+    display: block;
+    margin-bottom: 8px;
+    padding: 0;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.profile-form legend small {
+    font-weight: 400;
+    color: var(--soft);
+}
+
+.profile-form .field {
+    display: block;
+    margin-bottom: 20px;
+}
+
+.profile-form input[type="text"],
+.profile-form input[type="number"],
+.profile-form select {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--page);
+    color: var(--ink);
+    font: inherit;
+    font-size: 16px;
+}
+
+.profile-form input:focus-visible,
+.profile-form select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+}
+
+.avatars {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+    gap: 8px;
+    justify-items: center;
+}
+
+.avatar-choice {
+    position: relative;
+    padding: 3px;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    background: none;
+    line-height: 0;
+    cursor: pointer;
+}
+
+.avatar-choice input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.avatar-choice:has(input:checked),
+.avatar-choice[aria-pressed="true"],
+.avatar-choice.on {
+    border-color: var(--accent);
+}
+
+.avatar-choice:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.avatar-choice .avatar {
+    display: block;
+    width: 52px;
+    height: 52px;
+}
+
+/* The player's own photo: a line of its own under the drawn avatars, at every width */
+.avatar-choice.upload {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: fit-content;
+    margin-top: 10px;
+    padding-right: 14px;
+    border-radius: 30px;
+    color: var(--accent);
+    font-size: 14px;
+    line-height: 1.2;
+}
+
+.avatar-choice.upload .avatar {
+    width: 36px;
+    height: 36px;
+}
+
+.ring {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 2px dashed var(--line);
+    border-radius: 50%;
+    box-sizing: border-box;
+    color: var(--soft);
+}
+
+.ring .icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* How the player plays: two by two, each with its note under it */
+.levels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.level {
+    position: relative;
+    cursor: pointer;
+}
+
+.level input {
+    position: absolute;
+    opacity: 0;
+}
+
+.level span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--page);
+}
+
+.level small {
+    color: var(--soft);
+    font-size: 13px;
+}
+
+.level:has(input:checked) span {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.level:has(input:focus-visible) span {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.rating {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.profile-form .start {
+    width: 100%;
+    padding: 13px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.profile-form .start:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.profile-form .problem,
+.profiles .problem {
+    margin: 0 0 12px;
+    padding: 0;
+    color: var(--low-time);
+    font-size: 14px;
+}
+
+.profiles header {
+    justify-content: flex-start;
+    gap: 4px;
+}
+
+.profiles header h2 {
+    flex: 1;
+    min-width: 0;
+}
+
+.profiles .avatars {
+    margin-top: 8px;
+}
+
+.profiles .avatar-choice.upload {
+    margin-bottom: 12px;
+}
+
+.profile-list {
+    display: grid;
+    gap: 6px;
+    margin: 8px 0 12px;
+}
+
+.profile-list .choice {
+    min-width: 0;
+    font-size: 15px;
+    text-align: left;
+}
+
+/* The profile in use: a tick at the end of its line, not the ring of a field being typed in */
+.profile-list .choice[aria-checked="true"] {
+    border-color: var(--line);
+    box-shadow: none;
+}
+
+.profile-list .choice span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.profile-list .in-use {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+}
+
+.profile-list .choice:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.profile-list .avatar {
+    flex: none;
+    width: 32px;
+    height: 32px;
+}
+
+.profiles .note {
+    margin: 0 0 12px;
+}
+
+.profiles .new-profile {
+    border-color: var(--line);
+    color: var(--ink);
+}
+
+.profiles .new-profile:disabled {
+    color: var(--soft);
+    cursor: default;
+}
+
+@media (max-width: 520px) {
+    .wizard {
+        margin: 0;
+        padding: 20px 16px;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
 }
 
 /* Zoe's palettes (T-82): on the page's root and on each swatch of the settings. Board skins, each with its own highlights */
