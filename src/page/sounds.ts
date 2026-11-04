@@ -1,5 +1,8 @@
-// The board's sounds (T-71): a move, a capture, a check, a mate, a draw. Synthesised with Web Audio until Stefano's recordings take their place.
+// The board's sounds (T-71): a move, a capture, a check, a mate, a draw, recorded by Stefano (T-80). A browser that cannot decode them, or a sound
+// still loading, plays a tone synthesised with Web Audio instead.
 import type { Game } from "../core/index.ts";
+
+const folder = "/page/sounds/";
 
 /** What a move sounds like. */
 export type Sound = "move" | "capture" | "check" | "mate" | "draw";
@@ -21,13 +24,14 @@ export function soundOf(game: Game): Sound | undefined
     return game.position.check ? "check" : last.san.includes("x") ? "capture" : "move";
 }
 
-/** Lets the page play sounds: a browser plays none before the player has touched the page, so the first touch wakes them. */
+/** Lets the page play sounds: loads the recordings, and since a browser plays none before the player has touched the page, the first touch wakes them. */
 export function wakeSounds(): void
 {
+    loadRecordings();
     addEventListener("pointerdown", () => void audio()?.resume(), { once: true });
 }
 
-/** Plays a sound; a browser without Web Audio plays none. */
+/** Plays a sound: its recording, else its tone; a browser without Web Audio plays none. */
 export function playSound(sound: Sound): void
 {
     const context = audio();
@@ -36,6 +40,39 @@ export function playSound(sound: Sound): void
         return;
     }
 
+    const recording = recordings.get(sound);
+
+    if (recording === undefined) {
+        playTone(context, sound);
+        return;
+    }
+
+    const source = new AudioBufferSourceNode(context, { buffer: recording });
+    source.connect(context.destination);
+    source.start();
+}
+
+/** Fetches and decodes the recordings, offline so that the page wakes no sound before a touch; one that fails leaves its tone. */
+function loadRecordings(): void
+{
+    let decoder: OfflineAudioContext;
+
+    try {
+        decoder = new OfflineAudioContext({ length: 1, sampleRate: 48000 });
+    } catch {
+        return;
+    }
+
+    for (const sound of Object.keys(tones) as Sound[]) {
+        void fetch(`${folder}${sound}.ogg`)
+            .then((response) => response.ok ? response.arrayBuffer() : Promise.reject(new Error(`No ${sound}.ogg.`)))
+            .then((bytes) => decoder.decodeAudioData(bytes))
+            .then((buffer) => recordings.set(sound, buffer), () => undefined);
+    }
+}
+
+function playTone(context: AudioContext, sound: Sound): void
+{
     for (const { frequency, at, length, wave, volume } of tones[sound]) {
         const oscillator = new OscillatorNode(context, { type: wave, frequency });
         const gain = new GainNode(context, { gain: 0 });
@@ -67,6 +104,7 @@ const tones: Readonly<Record<Sound, readonly Tone[]>> = {
     draw: [{ frequency: 440, at: 0, length: 0.3, wave: "sine", volume: 0.2 }, { frequency: 349, at: 0.22, length: 0.45, wave: "sine", volume: 0.2 }],
 };
 
+const recordings = new Map<Sound, AudioBuffer>();
 let shared: AudioContext | undefined;
 
 function audio(): AudioContext | undefined

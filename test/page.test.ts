@@ -39,6 +39,7 @@ describe("the page's server", () => {
         expect((await get(page, "/vendor/chess.js")).body).toContain("class Chess");
         expect((await get(page, "/vendor/preact.js")).status).toBe(200);
         expect((await get(page, "/vendor/zod.js")).status).toBe(404);
+        expect(await get(page, "/page/sounds/move.ogg")).toMatchObject({ status: 200, headers: { "content-type": "audio/ogg" } });
         expect((await get(page, "/core/../../package.json")).status).toBe(404);
         expect((await get(page, "/core/%2e%2e/%2e%2e/package.json")).status).toBe(404);
     });

@@ -93,7 +93,7 @@ const html = [
     "",
 ].join("\n");
 
-const types: Readonly<Record<string, string>> = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8" };
+const types: Readonly<Record<string, string>> = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8", ".ogg": "audio/ogg" };
 
 function answer(request: IncomingMessage, response: ServerResponse, served: Served): void
 {
@@ -512,7 +512,7 @@ function sendGame(response: ServerResponse, served: Served): void
     }
 }
 
-/** A script or style of the page, a module of the core, or a package's module: only from their folders, and only of the types the page uses. */
+/** A script, style, picture or sound of the page, a module of the core, or a package's module: only from their folders, and only of the types the page uses. */
 function sendFile(response: ServerResponse, path: string): void
 {
     const file = path.startsWith("/vendor/") ? vendorModule(path.slice("/vendor/".length)) : builtFile(path);
