@@ -1,5 +1,5 @@
 // The page on localhost (D-8, D-47): its HTML with the import map, its scripts, the chess core and the packages they import, the game it shows and keeps
-// up to date, the player's moves and words (T-65), and the doorbell that wakes the chat when the player moves or writes.
+// up to date, the player's moves and words (T-65), draws and resignations (D-65), and the doorbell that wakes the chat when the player acts there.
 import { createHash } from "node:crypto";
 import { readFileSync, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -8,10 +8,12 @@ import { extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gameAt } from "../commands/clock.ts";
 import type { Context } from "../commands/context.ts";
+import { answerDraw, DrawRefused, offerDraw } from "../commands/draw-offer.ts";
+import { endGame } from "../commands/end-game.ts";
 import { ChatNotClear, newGame } from "../commands/new-game.ts";
 import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
-import { type CurrentGame, endOf, heardLines, loadGame, playerLinesThisMove, playerPgn, talkLimits, unheardWords, WordsRefused } from "../games/index.ts";
+import { type CurrentGame, drawOfferOf, endOf, gameStamp, heardLines, loadGame, playerLinesThisMove, playerPgn, talkLimits, WordsRefused } from "../games/index.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
 
 /** The page of a player's folder, served: its address, how to tell it the AI was given words, which change no file, and how to stop it. */
@@ -117,9 +119,25 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         return;
     }
 
+    if (request.method === "POST" && path === "/api/draw") {
+        void drawFromPage(request, response, served);
+        return;
+    }
+
+    if (request.method === "POST" && path === "/api/resign") {
+        resignFromPage(request, response, served);
+        return;
+    }
+
     // The API answers GET alone: a HEAD at the doorbell would wait there as a hook does.
     if (request.method !== "GET" && (request.method !== "HEAD" || path.startsWith("/api/"))) {
-        send(response, 405, "text/plain; charset=utf-8", "The page only reads, moves with POST /api/move, writes with POST /api/message and starts a game with POST /api/new.");
+        send(
+            response,
+            405,
+            "text/plain; charset=utf-8",
+            "The page only reads, moves with POST /api/move, writes with POST /api/message, starts a game with POST /api/new, "
+                + "offers or answers a draw with POST /api/draw and resigns with POST /api/resign.",
+        );
         return;
     }
 
@@ -243,6 +261,60 @@ function newGameFromPage(request: IncomingMessage, response: ServerResponse, ser
     send(response, 200, json, JSON.stringify({ started: true }));
 }
 
+/** The player's draw from the page (D-65): an offer on their turn, which rings the doorbell, or their answer to the AI's, which rings it when accepted. */
+async function drawFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
+{
+    const asked = 'Send the draw as JSON: {"action": "offer"}, "accept" or "decline".';
+
+    if (!isJson(request)) {
+        send(response, 415, json, JSON.stringify({ error: asked }));
+        return;
+    }
+
+    const action = jsonOf(await bodyOf(request))?.action;
+
+    if (action !== "offer" && action !== "accept" && action !== "decline") {
+        send(response, 400, json, JSON.stringify({ error: asked }));
+        return;
+    }
+
+    try {
+        if (action === "offer") {
+            offerDraw(served.context);
+        } else {
+            answerDraw(served.context, action === "accept");
+        }
+    } catch (error) {
+        send(response, 409, json, JSON.stringify(refusalFrom(error, refusalOf(served)?.refusal)));
+        return;
+    }
+
+    if (action !== "decline") {
+        served.bell.ring();
+    }
+
+    send(response, 200, json, JSON.stringify({ done: true }));
+}
+
+/** The player resigns from the page (D-65), whoever is to move: the game ends and goes to the archive, and the doorbell tells the chat. */
+function resignFromPage(request: IncomingMessage, response: ServerResponse, served: Served): void
+{
+    if (!isJson(request)) {
+        send(response, 415, json, JSON.stringify({ error: "Send the request as JSON: {}." }));
+        return;
+    }
+
+    try {
+        endGame.run({ result: "player_resigns" }, served.context);
+    } catch (error) {
+        send(response, 409, json, JSON.stringify(refusalFrom(error, refusalOf(served)?.refusal === "no-game" ? "no-game" : undefined)));
+        return;
+    }
+
+    served.bell.ring();
+    send(response, 200, json, JSON.stringify({ resigned: true }));
+}
+
 const json = "application/json; charset=utf-8";
 
 /**
@@ -252,7 +324,7 @@ const json = "application/json; charset=utf-8";
 export interface Refused
 {
     readonly error: string;
-    readonly refusal?: "no-game" | "ai-to-move" | "illegal" | "clear-chat" | `words-${WordsRefused["reason"]}`;
+    readonly refusal?: "no-game" | "ai-to-move" | "illegal" | "clear-chat" | `words-${WordsRefused["reason"]}` | `draw-${DrawRefused["reason"]}`;
     readonly most?: number;
 }
 
@@ -285,6 +357,10 @@ function refusalFrom(error: unknown, refusal?: Refused["refusal"]): Refused
         return { error: message, refusal: `words-${error.reason}`, most: error.most };
     }
 
+    if (error instanceof DrawRefused) {
+        return { error: message, refusal: `draw-${error.reason}` };
+    }
+
     return refusal === undefined ? { error: message } : { error: message, refusal };
 }
 
@@ -301,19 +377,19 @@ function gameNow(served: Served): CurrentGame | undefined
     return current;
 }
 
+/** The chat has read the game as it is now, at the end of a tool's call: the doorbell wakes it only for what changes it after. */
+export function chatHasRead(context: Context): void
+{
+    context.seen = gameStamp(context.folder);
+}
+
 /**
- * Whether the chat has news from the page: a move of the player's the AI has not answered, a game the player ended there or lost on time, or words of
- * theirs it has not been given. A game that cannot be read is news too: status says what is wrong.
+ * Whether the chat has news from the page: a game changed since the chat's last tool, by the player's move, words, draw or resignation, a new game or a
+ * flag that fell. The player's words the chat was given change nothing it has not read.
  */
 function hasNews(context: Context): boolean
 {
-    try {
-        const current = loadGame(context.folder);
-        const onTime = /\btime\b/.test(current?.game.record.tags.Termination ?? "");
-        return current !== undefined && (current.game.position.turn === current.ai || onTime || unheardWords(current, context.given).length > 0);
-    } catch {
-        return true;
-    }
+    return gameStamp(context.folder) !== context.seen;
 }
 
 function isJson(request: IncomingMessage): boolean
@@ -403,7 +479,7 @@ function watchGame(served: Served): () => void
 
 /**
  * The game in progress or just ended, as the player may see it: its PGN without the AI's plans while it goes on, the AI's side, when it started, and the
- * talk on the page, each line of the player's with how far it got (D-53); and the AI's name.
+ * talk on the page, each line of the player's with how far it got (D-53), and the draw offer that stands (D-65); and the AI's name.
  */
 function sendGame(response: ServerResponse, served: Served): void
 {
@@ -411,7 +487,16 @@ function sendGame(response: ServerResponse, served: Served): void
         const current = gameNow(served);
         const heard = current === undefined ? [] : heardLines(current, served.context.given);
         const talk = current?.talk.map(({ who, text, ply }, index) => heard[index] === undefined ? { who, text, ply } : { who, text, ply, heard: heard[index] });
-        const body = { game: current === undefined ? null : { pgn: playerPgn(current), ai: current.ai, started: current.started, talk, ...(current.clock === undefined ? {} : { clock: current.clock }) }, opponent: served.opponent() };
+        const offer = current === undefined ? undefined : drawOfferOf(current);
+        const game = current === undefined ? null : {
+            pgn: playerPgn(current),
+            ai: current.ai,
+            started: current.started,
+            talk,
+            ...(current.clock === undefined ? {} : { clock: current.clock }),
+            ...(offer === undefined ? {} : { drawOffer: offer }),
+        };
+        const body = { game, opponent: served.opponent() };
         send(response, 200, "application/json; charset=utf-8", JSON.stringify(body));
     } catch (error) {
         send(response, 500, "application/json; charset=utf-8", JSON.stringify({ error: (error as Error).message }));

@@ -12,6 +12,16 @@ export interface Text
     readonly sounds: string;
     readonly newGame: string;
     readonly abandonGame: string;
+    /** The player's draws and resignation in a game going on (D-65). */
+    readonly offerDraw: string;
+    /** The ½'s title while the player cannot offer: when they can. */
+    readonly offerDrawWhen: string;
+    readonly drawOffered: string;
+    readonly acceptDraw: string;
+    readonly declineDraw: string;
+    readonly declineDrawTitle: string;
+    readonly resign: string;
+    readonly resignGame: string;
     readonly settings: string;
     readonly close: string;
     readonly look: string;
@@ -65,6 +75,9 @@ export interface Text
     writeTo(name: string): string;
     readBy(name: string): string;
     wrote(name: string): string;
+    /** The header's words after the AI's name: its draw offer that stands, the player's it declined by its move (D-65). */
+    readonly offers: string;
+    readonly declines: string;
     started(when: string): string;
     lasted(count: number): string;
     won(side: Side): string;
@@ -76,7 +89,18 @@ export interface Text
 }
 
 /** The refusals the page server gives a code to, for the page to say them in the player's language. */
-export type ServerRefusal = "no-game" | "ai-to-move" | "illegal" | "clear-chat" | "words-empty" | "words-spent" | "words-long" | "words-longer-than-left";
+export type ServerRefusal =
+    | "no-game"
+    | "ai-to-move"
+    | "illegal"
+    | "clear-chat"
+    | "words-empty"
+    | "words-spent"
+    | "words-long"
+    | "words-longer-than-left"
+    | "draw-offered"
+    | "draw-none"
+    | "draw-early";
 
 /**
  * A move the board refused (T-11), as the page names it: why, the piece moved, the square it went to and whether a piece stood there, the piece that forbids
@@ -109,6 +133,14 @@ const english: Text = {
     sounds: "Sounds",
     newGame: "New game",
     abandonGame: "Start a new game? The one going on goes to the archive unfinished.",
+    offerDraw: "Offer a draw",
+    offerDrawWhen: "Offer a draw: on your turn, once each side has moved",
+    drawOffered: "You offered a draw",
+    acceptDraw: "Accept",
+    declineDraw: "Decline",
+    declineDrawTitle: "Decline: moving declines it too",
+    resign: "Resign",
+    resignGame: "Resign this game?",
     settings: "Settings",
     close: "Close",
     look: "Look",
@@ -186,12 +218,17 @@ const english: Text = {
         "words-spent": () => "You have used up your words for this move: write again after the AI's move.",
         "words-long": (most) => `Write at most ${most} characters.`,
         "words-longer-than-left": (most) => `You have ${most} characters left until the AI's move.`,
+        "draw-offered": () => "A draw offer stands already.",
+        "draw-none": () => "There is no draw offer to answer.",
+        "draw-early": () => "You can offer a draw once each side has made a move.",
     },
     piece: (letter, side) => `${side} ${englishNames[letter]}`,
     taken: (pieces, ahead) => `Pieces taken: ${pieces.length === 0 ? "none" : pieces.join(", ")}${ahead > 0 ? `; ahead by ${ahead}` : ""}`,
     writeTo: (name) => `Write to ${name}…`,
     readBy: (name) => `Read by ${name}`,
     wrote: (name) => `${name} wrote`,
+    offers: "offers a draw",
+    declines: "declines the draw",
     started: (when) => `started ${when}`,
     lasted: (count) => `${count} ${count === 1 ? "move" : "moves"}`,
     won: (side) => `${side === "white" ? "White" : "Black"} wins`,
@@ -213,6 +250,14 @@ const italian: Text = {
     sounds: "Suoni",
     newGame: "Nuova partita",
     abandonGame: "Iniziare una nuova partita? Quella in corso va nell'archivio, non finita.",
+    offerDraw: "Proponi patta",
+    offerDrawWhen: "Proponi patta: nel tuo turno, dopo una mossa a testa",
+    drawOffered: "Hai proposto patta",
+    acceptDraw: "Accetta",
+    declineDraw: "Rifiuta",
+    declineDrawTitle: "Rifiuta: anche muovere rifiuta",
+    resign: "Abbandona",
+    resignGame: "Abbandonare la partita?",
     settings: "Impostazioni",
     close: "Chiudi",
     look: "Aspetto",
@@ -290,6 +335,9 @@ const italian: Text = {
         "words-spent": () => "Hai finito le parole per questa mossa: scrivi di nuovo dopo quella dell'AI.",
         "words-long": (most) => `Scrivi al massimo ${most} caratteri.`,
         "words-longer-than-left": (most) => `Ti restano ${most} caratteri fino alla mossa dell'AI.`,
+        "draw-offered": () => "C'è già una proposta di patta.",
+        "draw-none": () => "Non c'è una proposta di patta a cui rispondere.",
+        "draw-early": () => "Puoi proporre patta dopo una mossa a testa.",
     },
     // Queen and rook are feminine in Italian.
     piece: (letter, side) => `${italianNames[letter]} ${side === "white" ? (letter === "Q" || letter === "R" ? "bianca" : "bianco") : (letter === "Q" || letter === "R" ? "nera" : "nero")}`,
@@ -297,6 +345,8 @@ const italian: Text = {
     writeTo: (name) => `Scrivi a ${name}…`,
     readBy: (name) => `Letto da ${name}`,
     wrote: (name) => `${name} ha scritto`,
+    offers: "propone patta",
+    declines: "rifiuta la patta",
     started: (when) => `iniziata ${when}`,
     lasted: (count) => `${count} ${count === 1 ? "mossa" : "mosse"}`,
     won: (side) => `vince il ${side === "white" ? "Bianco" : "Nero"}`,

@@ -5,12 +5,12 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { type Clock, Game, materialOf, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square } from "../core/index.ts";
 import { Board, type Notice, piecesOf } from "./board.tsx";
 import { flipKeys, type Step, stepKeys, stepped } from "./browse.ts";
-import { howEnded, useJustEnded } from "./ending.ts";
+import { howEnded, useDeclined, useJustEnded } from "./ending.ts";
 import { explain } from "./explain.ts";
 import { FoldTab } from "./fold-tab.tsx";
 import { type Column, foldKeys, gameUnderBoard, nextFold, oneColumn, rememberFold, startFolds } from "./folds.ts";
 import { GameColumn } from "./game-column.tsx";
-import { Header } from "./header.tsx";
+import { type GameActions, Header } from "./header.tsx";
 import { useOpeningBook } from "./opening-book.ts";
 import { ChosenSet } from "./pieces.tsx";
 import { Avatar, ClockFace, PlayerCard } from "./player-card.tsx";
@@ -140,16 +140,19 @@ export function App({ start }: { start: Settings; })
     // The header's theme switch picks the other of the two the page shows, leaving the system's.
     const switchTheme = (): void => change({ ...settings, theme: document.documentElement.dataset.theme === "dark" ? "light" : "dark" });
 
+    // An action of the player's on the game: the game the server sends next shows it; a refusal shows on the board.
+    const act = (path: string, body: object): void => {
+        setSelected(undefined);
+        void post(path, body, text).then((refused) => setRefusal(refused === undefined ? undefined : { text: refused.text }));
+    };
+
     // A game going on is archived unfinished: the player says so first (T-64).
     const startNewGame = (): void => {
         const going = game !== null && game !== undefined && !live.outcome.over && (live.record.tags.Result ?? "*") === "*";
 
-        if (going && !confirm(text.abandonGame)) {
-            return;
+        if (!going || confirm(text.abandonGame)) {
+            act("/api/new", {});
         }
-
-        setSelected(undefined);
-        void post("/api/new", {}, text).then((refused) => setRefusal(refused === undefined ? undefined : { text: refused.text }));
     };
 
     const result = live.outcome.over ? live.outcome.result : live.record.tags.Result;
@@ -157,11 +160,28 @@ export function App({ start }: { start: Settings; })
     const how = ended ? howEnded(live.outcome, live.record.tags.Termination) : undefined;
     const winner = result === "1-0" ? "white" : result === "0-1" ? "black" : undefined;
     const justEnded = useJustEnded(game === undefined || game === null ? undefined : ended ? "over" : "going");
+    const offer = game?.drawOffer;
+    const declined = useDeclined(offer, total, ended);
+
+    // In a game going on the player offers a draw on their turn once each side has moved, answers the AI's, or resigns, saying so first (D-65).
+    const actions: GameActions | undefined = game === undefined || game === null || ended ? undefined : {
+        ...(offer === undefined ? {} : { offer }),
+        canOffer: offer === undefined && pending === undefined && live.position.turn !== game.ai && total >= 2,
+        onOffer: () => act("/api/draw", { action: "offer" }),
+        onAnswer: (accept) => act("/api/draw", { action: accept ? "accept" : "decline" }),
+        onResign: () => {
+            if (confirm(text.resignGame)) {
+                act("/api/resign", {});
+            }
+        },
+    };
 
     const header = (
         <Header
             text={text}
-            verdict={ended ? text.verdict(how, winner) : undefined}
+            verdict={ended ? text.verdict(how, winner) : offer === "ai" ? text.offers : offer === "player" ? text.drawOffered : declined ? text.declines : undefined}
+            {...(!ended && (offer === "ai" || declined) ? { who: served?.opponent ?? text.ai } : {})}
+            actions={actions}
             onNewGame={served === undefined ? undefined : startNewGame}
             flipped={flipped}
             onFlip={() => setFlipped(!flipped)}
@@ -359,11 +379,18 @@ export function App({ start }: { start: Settings; })
 
 /**
  * What the server sends: the game, its PGN for the player, the AI's side, when it started, the talk on the page, each line with the moves the game had
- * then, and its clock in a game with one, null before the first game; and the AI's name, when the host gave it.
+ * then, its clock in a game with one and the draw offer that stands (D-65), null before the first game; and the AI's name, when the host gave it.
  */
 interface Served
 {
-    readonly game: { readonly pgn: string; readonly ai: Side; readonly started: string; readonly talk: readonly TalkLine[]; readonly clock?: Clock; } | null;
+    readonly game: {
+        readonly pgn: string;
+        readonly ai: Side;
+        readonly started: string;
+        readonly talk: readonly TalkLine[];
+        readonly clock?: Clock;
+        readonly drawOffer?: "player" | "ai";
+    } | null;
     readonly opponent?: string;
 }
 

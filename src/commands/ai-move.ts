@@ -19,13 +19,14 @@ export const aiMove = defineCommand({
             'your words for the player, in one sentence, only when there is something to say: pieces and moves in words ("your knight takes on f6"), never in '
                 + "notation (Nxf6+); never your plans or threats",
         ),
+        offer_draw: z.boolean().optional().describe("true offers the player a draw with this move: it stands until their move"),
     }),
     alwaysLoad: true,
     positionals: ["move"],
-    run: ({ move, plan, comment }, context): MovePlayed => {
+    run: ({ move, plan, comment, offer_draw: offerDraw = false }, context): MovePlayed => {
         // The player's words are read before the move, which would count as the answer to them; a move refused leaves them for the next call.
         const waiting = waitingWords(context);
-        const played = playMove(context.folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: commentWithPlan(comment, plan) });
+        const played = playMove(context.folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: commentWithPlan(comment, plan), offerDraw });
         return { ...played, words: give(context, waiting) };
     },
     format: (result) => {

@@ -1,15 +1,32 @@
-// The page's header: the Torretta and the name, the word on a game over, then the commands for the board, the sounds, the theme and the settings.
+// The page's header: the Torretta and the name, the word on a game over or on the AI's draw offer, the player's draw and resignation, then the commands for
+// the board, the sounds, the theme and the settings.
 import type { ComponentChildren } from "preact";
 import type { Text } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
 
+/** What the player may do in a game going on (D-65): offer a draw on their turn, answer the AI's offer, resign. */
+export interface GameActions
+{
+    /** Who offered the draw that stands. */
+    readonly offer?: "player" | "ai";
+    /** Whether the player may offer a draw now: on their turn, once each side has moved, with no offer standing. */
+    readonly canOffer: boolean;
+    onOffer(): void;
+    onAnswer(accept: boolean): void;
+    onResign(): void;
+}
+
 /**
- * The header, with how a game over ended and the new game standing out by it (T-77), a new game once the page has the folder's, the command that turns the board round and says whether it is turned, the switches of the
- * sounds and the theme, and the gear of the settings (D-56).
+ * The header, with how a game over ended and the new game standing out by it (T-77), or the AI's draw offer with the player's answer, the player's draw
+ * and resignation in a game going on (D-65), a new game once the page has the folder's, the command that turns the board round and says whether it is
+ * turned, the switches of the sounds and the theme, and the gear of the settings (D-56).
  */
-export function Header({ text, verdict, onNewGame, flipped, onFlip, sound, onSound, onTheme, onSettings }: {
+export function Header({ text, verdict, who, actions, onNewGame, flipped, onFlip, sound, onSound, onTheme, onSettings }: {
     text: Text;
     verdict?: string;
+    /** The AI's name before the verdict, cut short when long while the verb stays whole. */
+    who?: string;
+    actions?: GameActions;
     onNewGame?: () => void;
     flipped: boolean;
     onFlip: () => void;
@@ -23,9 +40,17 @@ export function Header({ text, verdict, onNewGame, flipped, onFlip, sound, onSou
         <header class="top">
             <Torretta size={34} />
             <b class="title">Chesspal</b>
-            <p class="verdict" role="status">{verdict}</p>
+            <p class="verdict" role="status">
+                {who === undefined || verdict === undefined ? verdict : (
+                    <>
+                        <span class="ai-name">{who}</span>
+                        <span>{verdict}</span>
+                    </>
+                )}
+            </p>
+            {actions === undefined ? null : <Actions actions={actions} text={text} />}
             {onNewGame === undefined ? null : (
-                <button class={`command${verdict === undefined ? "" : " primary"}`} type="button" title={text.newGame} onClick={onNewGame}>
+                <button class={`command${verdict === undefined || actions !== undefined ? "" : " primary"}`} type="button" title={text.newGame} onClick={onNewGame}>
                     <Icon class="new">
                         <path d="M12 5V19M5 12H19" />
                     </Icon>
@@ -60,6 +85,56 @@ export function Header({ text, verdict, onNewGame, flipped, onFlip, sound, onSou
                 </Icon>
             </button>
         </header>
+    );
+}
+
+/** The answer to the AI's draw offer while it stands, else the player's own offer; then the resignation. */
+function Actions({ actions, text }: { actions: GameActions; text: Text; })
+{
+    const { offer, canOffer, onOffer, onAnswer, onResign } = actions;
+
+    return (
+        <>
+            {offer === "ai"
+                ? (
+                    <>
+                        <button class="command answer" type="button" title={text.acceptDraw} onClick={() => onAnswer(true)}>
+                            <Icon class="accept">
+                                <path d="M5 12.5L10 17L19 7" />
+                            </Icon>
+                            <span>{text.acceptDraw}</span>
+                        </button>
+                        <button class="command answer" type="button" title={text.declineDrawTitle} onClick={() => onAnswer(false)}>
+                            <Icon class="decline">
+                                <path d="M7 7L17 17M17 7L7 17" />
+                            </Icon>
+                            <span>{text.declineDraw}</span>
+                        </button>
+                    </>
+                )
+                : (
+                    // Not disabled, which would hide its title: a click the player cannot make now has the server say why.
+                    <button
+                        class="command"
+                        type="button"
+                        title={offer === "player" ? text.drawOffered : canOffer ? text.offerDraw : text.offerDrawWhen}
+                        aria-pressed={offer === "player"}
+                        aria-disabled={!canOffer}
+                        onClick={offer === "player" ? undefined : onOffer}
+                    >
+                        <Icon class="half">
+                            <path d="M5 7L7.5 5V11M16 5L8 19M13.5 14.5C13.5 13 17.5 12.5 17.5 15C17.5 16.5 13.5 18 13.5 19H18" />
+                        </Icon>
+                        <span>{text.offerDraw}</span>
+                    </button>
+                )}
+            <button class="command" type="button" title={text.resign} onClick={onResign}>
+                <Icon class="resign">
+                    <path d="M6 21V4M6 4H18L15.5 8.5L18 13H6" />
+                </Icon>
+                <span>{text.resign}</span>
+            </button>
+        </>
     );
 }
 

@@ -17,6 +17,8 @@ export interface Context
     readonly given: Set<string>;
     /** Told when the AI is given words it had not had: the board page shows them read (D-53). */
     heard?: () => void;
+    /** The stamp of game.json when the chat's last tool ended: the doorbell wakes it only for a game changed since. */
+    seen?: string | undefined;
 }
 
 /** The context of a process started in the player's folder. */

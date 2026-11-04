@@ -12,7 +12,7 @@ export interface Ply
 
 /**
  * The moves of a record, each with its side and number: a game may start from a position where Black moves first. A comment keeps only its words: the
- * commands in it, such as the AI's plan that an ended game shows, are not for the page.
+ * commands in it, such as the AI's plan that an ended game shows, and the (=) of a draw offer (D-65), are not for the page.
  */
 export function pliesOf(record: GameRecord): Ply[]
 {
@@ -20,7 +20,7 @@ export function pliesOf(record: GameRecord): Ply[]
     const first = Number(number) || 1;
     const offset = turn === "b" ? 1 : 0;
     return record.moves.map((move, index) => {
-        const comment = move.comment?.replace(/\s*\[%[^\]]*\]/g, "").trim();
+        const comment = move.comment?.replace(/\s*\[%[^\]]*\]/g, "").replace(/^\s*\(=\)/, "").trim();
         const ply = { san: move.san, side: (index + offset) % 2 === 0 ? "white" : "black", number: first + Math.floor((index + offset) / 2) } as const;
         return comment === undefined || comment === "" ? ply : { ...ply, comment };
     });

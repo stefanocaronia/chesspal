@@ -1,5 +1,5 @@
 // How a game ended, as the page names it (T-77): by the board, or by a resignation or a draw agreed, which only the record's Termination tag says (D-37).
-import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { Ending, Outcome } from "../core/index.ts";
 
 /** The ways a game ends. */
@@ -21,7 +21,8 @@ export function howEnded(outcome: Outcome, termination: string | undefined): How
         return "time";
     }
 
-    return termination?.endsWith(" resigns") === true ? "resignation" : undefined;
+    // "White resigns", or a draw (D-65): "White resigns and Black cannot mate".
+    return / resigns\b/.test(termination ?? "") ? "resignation" : undefined;
 }
 
 /**
@@ -52,6 +53,26 @@ export function useJustEnded(state: "going" | "over" | undefined): boolean
     }, [state]);
 
     return just;
+}
+
+/**
+ * Whether the AI declined the player's draw offer by its move (D-65): their offer gone with a move more and the game going on, until the next move. `moves`
+ * is how many the game has.
+ */
+export function useDeclined(offer: "player" | "ai" | undefined, moves: number, over: boolean): boolean
+{
+    const before = useRef({ offer, moves });
+    const [declinedAt, setDeclinedAt] = useState<number | undefined>(undefined);
+
+    useEffect(() => {
+        if (before.current.offer === "player" && offer === undefined && moves > before.current.moves && !over) {
+            setDeclinedAt(moves);
+        }
+
+        before.current = { offer, moves };
+    }, [offer, moves, over]);
+
+    return declinedAt === moves && !over;
 }
 
 /** How long the effects of a game over last, the longest of the style's: the board's, then the card's light. */

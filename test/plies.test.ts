@@ -14,10 +14,10 @@ describe("the moves on the page", () => {
         ]);
     });
 
-    it("keep only the words of a comment, never the AI's plan an ended game shows", () => {
-        const [record] = readPgn("1. e4 {[%plan Take the centre.]} e5 {The open game. [%plan Develop the knights.]} 1/2-1/2");
+    it("keep only the words of a comment, never the AI's plan an ended game shows nor the mark of a draw offer", () => {
+        const [record] = readPgn("1. e4 {[%plan Take the centre.]} e5 {The open game. [%plan Develop the knights.]} 2. Nf3 {(=)} Nc6 {(=) No, thanks.} 1/2-1/2");
 
-        expect(pliesOf(record!).map((ply) => ply.comment)).toEqual([undefined, "The open game."]);
+        expect(pliesOf(record!).map((ply) => ply.comment)).toEqual([undefined, "The open game.", undefined, "No, thanks."]);
     });
 
     it("show the AI's words since the player's move before its last ones, comments and lines in the order said, never none once it spoke", () => {

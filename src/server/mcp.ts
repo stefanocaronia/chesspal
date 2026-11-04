@@ -7,7 +7,7 @@ import { commands } from "../commands/index.ts";
 import { type AnyCommand, inputProblems, isBoolean } from "../commands/registry.ts";
 import { version } from "../version.ts";
 import { pagePorts } from "./bell.ts";
-import { startPage } from "./page.ts";
+import { chatHasRead, startPage } from "./page.ts";
 
 /** What the host reads as the server starts, before any tool: where to begin, and the rule of every move (D-27). Short, since hosts may cut it. */
 export const serverInstructions = "Chesspal keeps the chess for you: the rules, the board, the clock, the games and the player's memory. Call `status` at the start of every "
@@ -99,6 +99,9 @@ async function runTool(command: AnyCommand, input: unknown, context: Context): P
         return { content: [{ type: "text", text: command.format(result) }] };
     } catch (error) {
         return { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], isError: true };
+    } finally {
+        // What the tool read or wrote, the chat has seen: the doorbell rings it only for what changes after.
+        chatHasRead(context);
     }
 }
 

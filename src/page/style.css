@@ -184,6 +184,60 @@ button {
     color: var(--on-accent);
 }
 
+/* A draw the player cannot offer now: before a move each, on the AI's turn, or with an offer standing (D-65); their own offer stands pressed, at full strength */
+.command[aria-disabled="true"]:not([aria-pressed="true"]) {
+    cursor: default;
+    opacity: 0.5;
+}
+
+.command[aria-disabled="true"]:not([aria-pressed="true"]):hover {
+    color: var(--soft);
+    border-color: transparent;
+    background: none;
+}
+
+/* The answer to the AI's offer: accepting and declining weigh the same */
+.command.answer {
+    color: var(--ink);
+    border-color: var(--line);
+}
+
+/* While the AI's draw offer stands, the answer keeps its words and the other commands only their icons; in a game going on, a narrow board keeps icons alone */
+.top:has(.answer) .command:not(.answer) span {
+    display: none;
+}
+
+@container (max-width: 800px) {
+    .top:has(.icon.resign) .command:not(.answer) span {
+        display: none;
+    }
+
+    /* Beside a narrow board the offer and its answer take the room of the other commands, which come back once it is answered */
+    .top:has(.answer) .command:not(.answer) {
+        display: none;
+    }
+}
+
+/* The AI's name gives way before its verb (D-65) */
+.verdict:has(.ai-name) {
+    display: flex;
+    gap: 0.3em;
+}
+
+.verdict .ai-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.verdict .ai-name + span {
+    flex-shrink: 0;
+}
+
+.top .torretta {
+    flex-shrink: 0;
+}
+
 /* The header's buttons never wrap or shrink: the word on a game over gives way */
 .top .command,
 .top .theme {
@@ -244,7 +298,7 @@ button {
 @media (min-width: 841px) {
     @container (max-width: 720px) {
         .top:has(.verdict:not(:empty)) .title,
-        .top:has(.verdict:not(:empty)) .command:not(.primary) span {
+        .top:has(.verdict:not(:empty)) .command:not(.primary):not(.answer) span {
             display: none;
         }
 
@@ -2416,6 +2470,16 @@ button {
         order: 1;
         flex-basis: 100%;
         text-align: center;
+        justify-content: center;
+    }
+
+    /* The AI's draw offer and its answer share the second line */
+    .answer {
+        order: 1;
+    }
+
+    .top:has(.answer) .verdict {
+        flex: 1 0 60%;
     }
 
     .app,

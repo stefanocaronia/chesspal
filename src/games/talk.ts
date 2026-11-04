@@ -1,5 +1,5 @@
 // The talk on the board page (D-51, T-65): the player's words and the AI's answers, kept in game.json beside the PGN.
-import { type CurrentGame, endOf, type Speaker, type TalkLine } from "./current-game.ts";
+import { type CurrentGame, drawOfferOf, endOf, type Speaker, type TalkLine } from "./current-game.ts";
 
 /** The most the player may write in a move, in all their lines, and the most a line of the AI's may hold (D-54). */
 export const talkLimits = { player: 200, ai: 200 } as const;
@@ -86,13 +86,20 @@ export function heardLines(current: CurrentGame, given: ReadonlySet<string>): (H
     });
 }
 
-/** The AI speaks apart from its move only to answer the player, once a move of theirs, and never while its move waits: it answers in the move's comment then. */
+/**
+ * The AI speaks apart from its move only to answer the player, their words or their draw offer (D-65), once a move of theirs, and never while its move
+ * waits: it answers in the move's comment then. Once the game is over it may say a word once, with nothing to answer (D-64).
+ */
 function refuseAiWords(current: CurrentGame): void
 {
     const { game, ai } = current;
     const since = sinceAiMoved(current);
 
-    if (unanswered(current).length === 0) {
+    if (endOf(game) !== undefined && !current.talk.some((line) => line.who === "ai" && line.ply >= game.record.moves.length)) {
+        return;
+    }
+
+    if (unanswered(current).length === 0 && drawOfferOf(current) !== "player") {
         throw new Error("The player has written nothing to answer: ai_say only answers their words, and a comment rides with your move. Nothing changed.");
     }
 

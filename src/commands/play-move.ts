@@ -7,10 +7,11 @@ import { colourName } from "./view.ts";
 /** Who plays a move: the AI, or the player through the AI. */
 export type Mover = "ai" | "player";
 
-/** What comes with a move: the AI's comment, or the player's words from the board page, saved with it (T-65). */
+/** What comes with a move: the AI's comment, or the player's words from the board page, saved with it (T-65), and a draw offer (D-65). */
 export interface WithMove
 {
     comment?: string;
+    offerDraw?: boolean;
     said?: { text: string; at: Date; };
     /** Milliseconds of the mover's turn that were not theirs, not taken off their clock (D-36). */
     allowance?: number;
@@ -20,7 +21,7 @@ export interface WithMove
  * Plays a move for one side `now` and saves the game, with the time it took and the clock after it in its comment ([%clk]). A refused move, or words refused
  * with it, change nothing: it throws the message `refused` writes from the core's.
  */
-export function playMove(folder: string, now: Date, mover: Mover, text: string, refused: (message: string, legal: readonly string[]) => string, { comment, said, allowance = 0 }: WithMove = {}): MovePlayed
+export function playMove(folder: string, now: Date, mover: Mover, text: string, refused: (message: string, legal: readonly string[]) => string, { comment, said, offerDraw = false, allowance = 0 }: WithMove = {}): MovePlayed
 {
     // A flag falls only past the allowance.
     const before = gameToMove(folder, mover, new Date(now.getTime() - allowance));
@@ -28,6 +29,11 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
     const position = game.position;
     // The words are checked before the move, which changes the live game; they count as said after it.
     const line = said === undefined ? undefined : talkLine(before, mover, said.text, said.at, game.record.moves.length + 1);
+
+    if (offerDraw && game.record.moves.length === 0) {
+        throw new Error("A draw can be offered once each side has made a move: play the move without offer_draw. Nothing changed.");
+    }
+
     const played = game.play(text);
 
     if (!played.played) {
@@ -35,8 +41,11 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
     }
 
     const clock = before.clock === undefined ? undefined : clockAfterMove(before.clock, position.turn, now, allowance);
-    const current = clock === undefined ? before : { ...before, clock };
-    const words = [comment, clock === undefined ? undefined : clockTag(clock.left[position.turn])].filter((part) => part !== undefined);
+    // A move declines the other side's draw offer; the mover's own stands, and the move carries it in the record as FIDE writes it, (=) (D-65). A move that
+    // ends the game leaves no offer.
+    const offers = (offerDraw || before.drawOffer === mover) && endOf(game) === undefined;
+    const current = { ...before, drawOffer: offers ? mover : undefined, ...(clock === undefined ? {} : { clock }) };
+    const words = [offers ? "(=)" : undefined, comment, clock === undefined ? undefined : clockTag(clock.left[position.turn])].filter((part) => part !== undefined);
 
     if (words.length > 0) {
         game.annotate(game.record.moves.length, { comment: words.join(" ") });

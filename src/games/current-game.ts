@@ -18,6 +18,8 @@ export interface CurrentGame
     readonly talk: TalkLine[];
     /** The clock, in a game with a time control (D-13). */
     readonly clock?: Clock;
+    /** Who offered a draw, while the offer stands: until the other side accepts it, declines it or moves (D-65). */
+    readonly drawOffer?: Speaker;
 }
 
 /** Who speaks on the board page. */
@@ -72,6 +74,7 @@ export function saveGame(folder: string, current: CurrentGame): void
         pgn: writePgn(current.game.record),
         ...(current.talk.length === 0 ? {} : { talk: current.talk }),
         ...(current.clock === undefined ? {} : { clock: savedClockOf(current.clock) }),
+        ...(drawOfferOf(current) === undefined ? {} : { drawOffer: current.drawOffer }),
     };
 
     try {
@@ -99,6 +102,24 @@ export function endOf(game: Game): GameEnd | undefined
     return termination === undefined ? { result: tags.Result } : { result: tags.Result, termination };
 }
 
+/** The draw offer that stands: none once the game is over (D-65). */
+export function drawOfferOf(current: CurrentGame): Speaker | undefined
+{
+    return endOf(current.game) === undefined ? current.drawOffer : undefined;
+}
+
+/** Whether each side has made a move in the game, before which no draw is agreed (FIDE 5.2.3, D-65). */
+export function bothSidesMoved(game: Game): boolean
+{
+    return game.record.moves.length >= 2;
+}
+
+/** A stamp of the folder's game.json that changes whenever it is written, whoever writes it; undefined when there is none. */
+export function gameStamp(folder: string): string | undefined
+{
+    return stampOf(join(folder, fileName));
+}
+
 const fileName = "game.json";
 
 const savedLine = z.object({ who: z.enum(["player", "ai"]), text: z.string(), ply: z.int().min(0), at: z.iso.datetime() });
@@ -110,6 +131,7 @@ const gameFile = z.object({
     pgn: z.string(),
     talk: z.array(savedLine).optional(),
     clock: savedClock.optional(),
+    drawOffer: z.enum(["player", "ai"]).optional(),
 });
 type GameFile = z.infer<typeof gameFile>;
 
@@ -134,8 +156,14 @@ function parsed(text: string, path: string): CurrentGame
             throw new Error(`its PGN holds ${records.length} games`);
         }
 
-        const game = { game: new Game(record), ai: file.ai, started: file.started, talk: file.talk ?? [] };
-        return file.clock === undefined ? game : { ...game, clock: clockOf(file.clock) };
+        return {
+            game: new Game(record),
+            ai: file.ai,
+            started: file.started,
+            talk: file.talk ?? [],
+            ...(file.clock === undefined ? {} : { clock: clockOf(file.clock) }),
+            ...(file.drawOffer === undefined ? {} : { drawOffer: file.drawOffer }),
+        };
     } catch (error) {
         throw new Error(`${path} is not a game Chesspal can read (${problemOf(error)}): ask the player to fix it or move it away, since Chesspal never overwrites it.`);
     }

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import { Bell, waitForBell } from "../src/server/bell.ts";
-import { type Page, startPage } from "../src/server/page.ts";
+import { chatHasRead, type Page, startPage } from "../src/server/page.ts";
 import { testContext } from "./commands.ts";
 
 const opened: Page[] = [];
@@ -112,6 +112,38 @@ describe("the player's moves on the page", () => {
         expect(game.ai).toBe("white");
         expect(game.pgn).not.toContain("e4");
         expect((await post(page, "/api/new", {}, { "content-type": "text/plain" })).status).toBe(415);
+    });
+
+    it("offers a draw on the player's turn, answers the AI's, and resigns, ringing the chat (D-65)", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const port = Number(new URL(page.url).port);
+        const game = async (): Promise<{ pgn: string; drawOffer?: string; }> => JSON.parse((await get(page, "/api/game")).body).game;
+        await run(folder, "new_game", { ai_colour: "black" });
+
+        expect(await post(page, "/api/draw", { action: "offer" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"draw-early"') });
+        await post(page, "/api/move", { move: "e2e4" });
+        expect(await post(page, "/api/draw", { action: "offer" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"ai-to-move"') });
+        await run(folder, "ai_move", { move: "e5", plan: "A plan.", offer_draw: true });
+        expect((await game()).drawOffer).toBe("ai");
+        expect((await game()).pgn).toContain("1. e4 e5 {(=)}");
+        expect(await post(page, "/api/draw", { action: "offer" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"draw-offered"') });
+        expect(await post(page, "/api/draw", { action: "decline" })).toMatchObject({ status: 200 });
+        expect((await game()).drawOffer).toBeUndefined();
+        expect(await post(page, "/api/draw", { action: "accept" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"draw-none"') });
+        expect((await post(page, "/api/draw", { action: "maybe" })).status).toBe(400);
+
+        const waiting = waitForBell(JSON.stringify({ cwd: folder }), [port]);
+        expect(await post(page, "/api/draw", { action: "offer" })).toMatchObject({ status: 200 });
+        expect(await waiting).toBe(true);
+        expect((await game()).drawOffer).toBe("player");
+
+        expect(await post(page, "/api/resign", {})).toMatchObject({ status: 200, body: '{"resigned":true}' });
+        const ended = await game();
+        expect(ended.pgn).toContain('[Termination "White resigns"]');
+        expect(ended.drawOffer).toBeUndefined();
+        expect(await waitForBell(JSON.stringify({ cwd: folder }), [port])).toBe(true);
+        expect(await post(page, "/api/resign", {})).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"no-game"') });
     });
 
     it("takes the player's words, alone or with their move, and refuses them in the player's words", async () => {
@@ -273,6 +305,22 @@ describe("the doorbell of the chat", () => {
         expect(await waitForBell(JSON.stringify({ cwd: folder }), [Number(new URL(page.url).port)])).toBe(true);
     });
 
+    it("keeps quiet for a game over the chat has read, and rings for what changes after (D-65)", async () => {
+        const folder = playerFolder();
+        const chat = testContext(folder);
+        const page = await open(folder, undefined, chat);
+        const hook = JSON.stringify({ cwd: folder });
+        const port = Number(new URL(page.url).port);
+        await run(folder, "new_game", { ai_colour: "black" }, chat);
+        await post(page, "/api/resign", {});
+        await run(folder, "status", {}, chat);
+        const waiting = waitForBell(hook, [port]);
+
+        expect(await Promise.race([waiting, new Promise((done) => setTimeout(() => done("waiting"), 300))])).toBe("waiting");
+        await post(page, "/api/new", {});
+        expect(await waiting).toBe(true);
+    });
+
     it("gives the page the clock, and rings the chat when a flag falls as the page reads the game (T-37)", async () => {
         const folder = playerFolder();
         const base = testContext(folder);
@@ -313,7 +361,13 @@ function playerFolder(): string
 async function run(folder: string, name: string, input: Record<string, unknown>, context: Context = testContext(folder)): Promise<void>
 {
     const command = commands.find((each) => each.name === name)!;
-    await command.run(command.input.parse(input), context);
+
+    try {
+        await command.run(command.input.parse(input), context);
+    } finally {
+        // As the MCP server does after each tool.
+        chatHasRead(context);
+    }
 }
 
 function get(page: Page, path: string, headers: Record<string, string> = {}, method = "GET", sentBody?: string): Promise<{ status: number; body: string; headers: Record<string, unknown>; }>

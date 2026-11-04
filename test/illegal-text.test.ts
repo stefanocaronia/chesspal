@@ -52,6 +52,9 @@ describe("the page's words for a refusal", () => {
             "words-spent": true,
             "words-long": true,
             "words-longer-than-left": true,
+            "draw-offered": true,
+            "draw-none": true,
+            "draw-early": true,
         };
 
         for (const language of ["en", "it"]) {

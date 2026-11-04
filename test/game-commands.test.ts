@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import type { Context } from "../src/commands/context.ts";
+import { answerDraw, offerDraw } from "../src/commands/draw-offer.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -186,37 +187,108 @@ describe("a game in chat", () => {
         await run(context, "ai_move", { move: "e5", plan: "Open the queen's diagonal.", comment: "The centre." });
         await run(context, "player_move", { move: "g4" });
 
-        expect(await run(context, "ai_move", { move: "Qh4+", plan: "Mate.", comment: "The fool's mate." })).toBe(
+        expect(await run(context, "ai_move", { move: "Qh4+", plan: "Mate.", comment: "The fool's mate.", offer_draw: true })).toBe(
             `Played 2...Qh4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Archived in ${archive}.\n`
                 + "Board, for your message when the player plays in the chat:\n  a b c d e f g h\n8 r n b . k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n5 . . . . p . . . 5\n"
                 + "4 . . . . . . P q 4\n3 . . . . . P . . 3\n2 P P P P P . . P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\n"
-                + "Next: tell the player how the game ended; new_game starts another.",
+                + "Next: tell the player how the game ended, with ai_say if they play on the board page; new_game starts another.",
         );
         expect(readArchive(context)).toContain('[Result "0-1"]\n[Termination "checkmate"]');
         expect(readArchive(context)).toContain("[%plan Mate.]");
+        // A mate leaves no draw offer, even one made with it (D-65).
+        expect(readArchive(context)).not.toContain("(=)");
+        expect(gameFile(context).drawOffer).toBeUndefined();
         await expect(run(context, "player_move", { move: "a3" })).rejects.toThrow("The game is over (0-1, checkmate): new_game starts another. Nothing changed.");
         expect(await run(context, "status")).toContain(`Moves: 1.f3 e5 2.g4 Qh4#\nGame over: 0-1, checkmate. Archived in ${archive}.`);
         expect(await run(context, "new_game", { ai_colour: "white" })).toContain("New game: you play White");
     });
 
-    it("ends by a resignation or a draw agreed, which the board cannot see", async () => {
-        const ended = async (result: string): Promise<string> => {
+    it("ends by a resignation, or a draw agreed on an offer once each side has moved, which the board cannot see (D-65)", async () => {
+        const ended = async (result: string, offer = false): Promise<string> => {
             const context = playerFolder();
             await run(context, "new_game", { ai_colour: "black" });
             await run(context, "player_move", { move: "e4" });
+            await run(context, "ai_move", { move: "e5", plan: "A plan.", offer_draw: offer });
             return run(context, "end_game", { result });
         };
 
-        expect(await ended("player_resigns")).toBe(`Game over: 0-1, White resigns. Archived in ${archive}.\nNext: tell the player how the game ended; new_game starts another.`);
+        expect(await ended("player_resigns")).toBe(
+            `Game over: 0-1, White resigns. Archived in ${archive}.\nNext: tell the player how the game ended, with ai_say if they play on the board page; new_game starts another.`,
+        );
         expect(await ended("ai_resigns")).toContain("Game over: 1-0, Black resigns.");
-        expect(await ended("draw_agreed")).toContain("Game over: 1/2-1/2, draw agreed.");
+        await expect(ended("draw_agreed")).rejects.toThrow("No draw offer stands: the player offers one with their move (player_move with offer_draw), you with yours");
+        expect(await ended("draw_agreed", true)).toContain("Game over: 1/2-1/2, draw agreed.");
 
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "black" });
-        await run(context, "end_game", { result: "draw_agreed" });
+        await expect(run(context, "end_game", { result: "draw_agreed" })).rejects.toThrow("A draw is agreed only once each side has made a move. Nothing changed.");
+        await run(context, "end_game", { result: "ai_resigns" });
 
-        expect(readArchive(context)).toContain('[Result "1/2-1/2"]\n[Termination "draw agreed"]');
-        await expect(run(context, "end_game", { result: "draw_agreed" })).rejects.toThrow("The game is over (1/2-1/2, draw agreed)");
+        expect(readArchive(context)).toContain('[Result "1-0"]\n[Termination "Black resigns"]');
+        await expect(run(context, "end_game", { result: "draw_agreed" })).rejects.toThrow("The game is over (1-0, Black resigns)");
+    });
+
+    it("draws a resignation the other side could never mate after (FIDE 5.1.2, D-65)", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black", from: "8/8/4k3/8/8/4K3/8/7R w - - 0 1" });
+
+        expect(await run(context, "end_game", { result: "player_resigns" })).toContain("Game over: 1/2-1/2, White resigns and Black cannot mate.");
+        expect(readArchive(context)).toMatch(/\[Result "1\/2-1\/2"\][^]*\[Termination "White resigns and Black cannot mate"\]/);
+    });
+
+    it("keeps a draw offer until the other side moves, and tells the AI of it (D-65)", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "e4" });
+
+        expect(await run(context, "ai_move", { move: "e5", plan: "A plan.", offer_draw: true })).toContain(
+            "Player (White) to move, move 2.\nYour draw offer stands until the player moves; if they accept it in the chat, end_game draw_agreed ends the game.",
+        );
+        expect(gameFile(context).drawOffer).toBe("ai");
+        expect(await run(context, "export", { format: "pgn" })).toContain("1. e4 e5 {(=)} *");
+        expect(() => offerDraw(context)).toThrow("The AI offers a draw: accept it or decline it. Nothing changed.");
+        expect(await run(context, "player_move", { move: "Nf3" })).not.toContain("draw");
+        expect(gameFile(context).drawOffer).toBeUndefined();
+        expect(() => offerDraw(context)).toThrow("Offer a draw on your turn: wait for the AI's move. Nothing changed.");
+        expect(() => answerDraw(context, true)).toThrow("The AI offers no draw to answer. Nothing changed.");
+
+        await run(context, "ai_move", { move: "Nc6", plan: "A plan." });
+        offerDraw(context);
+        expect(() => offerDraw(context)).toThrow("You have offered a draw already: it stands until the AI's move. Nothing changed.");
+        expect(await run(context, "status")).toContain("Player (White) to move, move 3.\nThe player offers a draw before their move; your next move declines it.");
+        // The AI may answer the offer in words, on the player's time.
+        expect(await run(context, "ai_say", { text: "Let me think about it." })).toContain("Next: accept the draw with end_game draw_agreed, or wait for the player's move.");
+        // The player's own move leaves their offer standing; the AI's declines it.
+        expect(await run(context, "player_move", { move: "Bb5" })).toContain("You (Black) to move, move 3.\nThe player offers a draw: end_game draw_agreed accepts it; your move declines it.");
+        await run(context, "ai_move", { move: "a6", plan: "A plan." });
+        expect(gameFile(context).drawOffer).toBeUndefined();
+        expect(await run(context, "export", { format: "pgn" })).toContain("3. Bb5 {(=)} 3... a6 *");
+
+        // In the chat the player offers with their move.
+        await run(context, "player_move", { move: "Ba4", offer_draw: true });
+        expect(gameFile(context).drawOffer).toBe("player");
+        expect(await run(context, "end_game", { result: "draw_agreed" })).toContain("Game over: 1/2-1/2, draw agreed.");
+    });
+
+    it("lets the player decline or accept the AI's draw offer, made once each side has moved (D-65)", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "white" });
+
+        await expect(run(context, "ai_move", { move: "e4", plan: "A plan.", offer_draw: true })).rejects.toThrow(
+            "A draw can be offered once each side has made a move: play the move without offer_draw. Nothing changed.",
+        );
+        await run(context, "ai_move", { move: "e4", plan: "A plan." });
+        expect(() => offerDraw(context)).toThrow("A draw can be offered once each side has made a move. Nothing changed.");
+        await run(context, "player_move", { move: "e5" });
+        await run(context, "ai_move", { move: "Nf3", plan: "A plan.", offer_draw: true });
+        answerDraw(context, false);
+
+        expect(gameFile(context).drawOffer).toBeUndefined();
+        await run(context, "player_move", { move: "Nc6" });
+        await run(context, "ai_move", { move: "Bb5", plan: "A plan.", offer_draw: true });
+        answerDraw(context, true);
+        expect(await run(context, "status")).toContain("Game over: 1/2-1/2, draw agreed.");
+        expect(gameFile(context).drawOffer).toBeUndefined();
     });
 
     it("exports the PGN without the plans while the game goes on, and the FEN", async () => {
@@ -228,7 +300,7 @@ describe("a game in chat", () => {
 
         expect(await run(context, "export", { format: "pgn" })).toContain("\n\n1. d4 {Into the centre.} *\n");
         expect(await run(context, "export", { format: "fen" })).toBe("rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1");
-        await run(context, "end_game", { result: "draw_agreed" });
+        await run(context, "end_game", { result: "ai_resigns" });
         expect(await run(context, "export", { format: "pgn" })).toContain("[%plan The queen's gambit.]");
     });
 
@@ -431,6 +503,15 @@ describe("the talk on the board page", () => {
             "Said on the board page, where the player reads it: don't write it again in the chat.\nNext: new_game starts another game when the player wants one.",
         );
     });
+
+    it("lets the AI say a word once when the game is over, with nothing to answer (D-64)", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black", from: "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1" });
+        await run(context, "player_move", { move: "Rd8" });
+
+        expect(await run(context, "ai_say", { text: "Well played, I didn't see it." })).toContain("Said on the board page");
+        await expect(run(context, "ai_say", { text: "Again." })).rejects.toThrow("The player has written nothing to answer");
+    });
 });
 
 /** The same player's folder in another chat, which has not read the player's words yet. */
@@ -465,7 +546,7 @@ async function run(context: Context, name: string, input: Record<string, unknown
     return format(await runCommand(schema.parse(input), context));
 }
 
-function gameFile(context: Context): { format: number; ai: string; started: string; pgn: string; talk?: unknown[]; }
+function gameFile(context: Context): { format: number; ai: string; started: string; pgn: string; talk?: unknown[]; drawOffer?: string; }
 {
     return JSON.parse(readFileSync(join(context.folder, "game.json"), "utf8")) as never;
 }

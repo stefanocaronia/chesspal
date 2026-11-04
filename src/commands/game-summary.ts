@@ -1,6 +1,6 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
 import { type Facts, type GameRecord, materialOf, type Side, type Square } from "../core/index.ts";
-import { type CurrentGame, currentPlan, endOf } from "../games/index.ts";
+import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker } from "../games/index.ts";
 import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
 import { openingLine } from "./opening-book.ts";
 import { colourName, compactView, materialText } from "./view.ts";
@@ -24,6 +24,8 @@ export interface GameSummary
     plan?: string;
     /** In a game with a time control: the time each side had left when the command ran (D-13). */
     clock?: ClockSummary;
+    /** Who offered a draw, while the offer stands (D-65). */
+    drawOffer?: Speaker;
     /** When the game is over: how it ended, and its name in the archive once it is there. */
     end?: { result: string; termination?: string; archive?: string; };
 }
@@ -64,6 +66,11 @@ export function summaryOf(current: CurrentGame, now: Date, archive?: string): Ga
 
     const opening = openingLine(record);
     const clock = clockSummaryOf(current, now);
+    const drawOffer = drawOfferOf(current);
+
+    if (drawOffer !== undefined) {
+        summary.drawOffer = drawOffer;
+    }
 
     if (clock !== undefined) {
         summary.clock = clock;
@@ -109,7 +116,7 @@ export function gameGoingOn(folder: string, now: Date): CurrentGame
 export function positionLines(game: GameSummary, withLastMove = true): string[]
 {
     if (game.end !== undefined || game.turn !== game.ai) {
-        return [whereLine(game), ...clockLines(game)];
+        return [whereLine(game), ...offerLines(game), ...clockLines(game)];
     }
 
     return [
@@ -124,6 +131,7 @@ export function headLines(game: GameSummary, withLastMove = true): string[]
 {
     return [
         whereLine(game),
+        ...offerLines(game),
         ...(withLastMove && game.lastMove !== undefined ? [`Last move: ${lastMoveText(game.lastMove)}.`] : []),
         ...(game.opening === undefined ? [] : [`Opening: ${game.opening}`]),
         `Material: ${materialText(materialOf(game.fen))}`,
@@ -164,13 +172,19 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
     }
 
     if (game.end !== undefined) {
-        return words.length === 0 ? "Next: tell the player how the game ended; new_game starts another." : "Next: answer the player with ai_say; new_game starts another game.";
+        return words.length === 0
+            ? "Next: tell the player how the game ended, with ai_say if they play on the board page; new_game starts another."
+            : "Next: answer the player with ai_say; new_game starts another game.";
     }
 
     if (game.turn === game.ai) {
         return words.length === 0
             ? "Next: choose your move, then call ai_move with it, your plan and any comment."
             : "Next: choose your move, then call ai_move with it, your plan and a comment that answers the player.";
+    }
+
+    if (game.drawOffer === "player") {
+        return "Next: accept the draw with end_game draw_agreed, or answer with ai_say and wait for the player's move.";
     }
 
     return words.length === 0 ? "Next: wait for the player's move, then call player_move with it." : "Next: answer the player with ai_say, then wait for their move.";
@@ -180,6 +194,20 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
 export function sidesLine(ai: Side): string
 {
     return `you play ${colourName(ai)}, the player ${colourName(ai === "white" ? "black" : "white")}`;
+}
+
+/** The draw offer that stands, and how to answer it or what becomes of it (D-65). */
+function offerLines({ drawOffer, turn, ai }: GameSummary): string[]
+{
+    if (drawOffer === "ai") {
+        return ["Your draw offer stands until the player moves; if they accept it in the chat, end_game draw_agreed ends the game."];
+    }
+
+    if (drawOffer === "player") {
+        return [turn === ai ? "The player offers a draw: end_game draw_agreed accepts it; your move declines it." : "The player offers a draw before their move; your next move declines it."];
+    }
+
+    return [];
 }
 
 /** Who is to move, or how the game ended. */
