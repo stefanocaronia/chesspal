@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { moods } from "../core/index.ts";
 import { talkLimits } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { type GameSummary, nextStep, summaryOf, wordLines } from "./game-summary.ts";
@@ -11,21 +12,23 @@ interface Said
     words: string[];
 }
 
-/** The AI's words on the board page without a move (T-65): its answer to what the player wrote there, read only there, on the player's time (D-54). */
+/** The AI's words on the board page without a move (T-65), read only there, on the player's time: an answer, or a word it has to say (D-54, D-72). */
 export const aiSay = defineCommand({
     name: "ai_say",
-    description: "Answers what the player wrote on the board page, or their draw offer, without a move, while they are to move: when you are, answer in "
-        + "ai_move's comment. Once the game is over, it also says a word once with nothing to answer. Example: ai_say {text: \"Sure, I'll play faster.\"}.",
+    description: "Says a word on the board page without a move, once while the player is to move: an answer to what they wrote or to their draw offer, or "
+        + "something you have to say; when you are to move, speak in ai_move's comment. Once the game is over, it says a word once, then only answers. "
+        + 'Example: ai_say {text: "Sure, I\'ll play faster."}.',
     input: z.object({
         text: z.string().trim().min(1, "write what you say").max(talkLimits.ai, `write ${talkLimits.ai} characters at most`).describe(
-            'your answer to the player, one or two short sentences: pieces and moves in words ("your knight takes on f6"), never in notation (Nxf6+); never your '
-                + "plans or threats",
+            'your words for the player, one or two short sentences: pieces and moves in words ("your knight takes on f6"), never in notation (Nxf6+); never your '
+                + "plans or threats; **two asterisks** put a word or two in bold on the page",
         ),
+        mood: z.enum(moods).optional().describe("only after the game has ended: the face the board page keeps for its end"),
     }),
-    run: ({ text }, context): Said => {
+    run: ({ text, mood }, context): Said => {
         // The player's words are read before the AI's line is saved: those written while it thought would fall before it, unread.
         const waiting = waitingWords(context);
-        const current = say(gameFolder(context.folder), "ai", text, context.now());
+        const current = say(gameFolder(context.folder), "ai", text, context.now(), mood);
         return { game: summaryOf(current, context.now()), words: give(context, waiting) };
     },
     format: ({ game, words }) => ["Said on the board page, where the player reads it: don't write it again in the chat.", ...wordLines(words), afterWords(game, words)].join("\n"),
@@ -35,7 +38,7 @@ export const aiSay = defineCommand({
 function afterWords(game: GameSummary, words: readonly string[]): string
 {
     if (words.length === 0 && game.end !== undefined) {
-        return "Next: new_game starts another game when the player wants one.";
+        return "Next: the player starts another game with the board page's New game button when they want one.";
     }
 
     if (words.length === 0 && game.drawOffer === "player" && game.turn !== game.ai) {

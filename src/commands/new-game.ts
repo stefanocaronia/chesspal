@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag } from "../core/index.ts";
-import { archivedName, archiveGame, cleanSince, type CurrentGame, endOf, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../games/index.ts";
+import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../core/index.ts";
+import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, endOf, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../games/index.ts";
 import { gameFolder, gameFolders } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
@@ -63,6 +63,7 @@ export const newGame = defineCommand({
             : { game, ai, started: started.toISOString(), talk: [], clock: startClock(control, now) };
         const archived = before === undefined || (going === undefined && archivedName(folder, before) !== undefined) ? undefined : archiveBefore(folder, before);
         saveGame(folder, current);
+        endAnalysis(folder);
         const past = pastGameLines(folder, remembered);
         const player = playerLine(context);
         return {
@@ -184,6 +185,6 @@ function importedRecord(from: string): GameRecord
         throw new Error(`it holds ${records.length} games: give one, in PGN, or a FEN.`);
     }
 
-    // Another game's [%plan] comments are not the AI's plans.
-    return withoutPlans(record);
+    // Another game's [%plan] and [%mood] comments are not the AI's.
+    return withoutMoods(withoutPlans(record));
 }

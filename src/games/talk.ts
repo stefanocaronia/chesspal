@@ -1,12 +1,12 @@
 // The talk on the board page (D-51, T-65): the player's words and the AI's answers, kept in game.json beside the PGN.
-import { type CurrentGame, drawOfferOf, endOf, type Speaker, type TalkLine } from "./current-game.ts";
+import { type CurrentGame, endOf, type Speaker, type TalkLine } from "./current-game.ts";
 
 /** The most the player may write in a move, in all their lines, and the most a line of the AI's may hold (D-54). */
-export const talkLimits = { player: 200, ai: 200 } as const;
+export const talkLimits = { player: 200, ai: 300 } as const;
 
 /**
  * A new line of the talk, said when the game has `ply` moves: refused when it is empty or too long. The player writes 200 characters a move in all, the
- * words sent with the move included; the AI only answers the player's words, once a move of theirs, on their time (D-54).
+ * words sent with the move included; the AI speaks once a move of theirs, on their time (D-54, D-72).
  */
 export function talkLine(current: CurrentGame, who: Speaker, text: string, at: Date, ply = current.game.record.moves.length): TalkLine
 {
@@ -87,28 +87,29 @@ export function heardLines(current: CurrentGame, given: ReadonlySet<string>): (H
 }
 
 /**
- * The AI speaks apart from its move only to answer the player, their words or their draw offer (D-65), once a move of theirs, and never while its move
- * waits: it answers in the move's comment then. Once the game is over it may say a word once, with nothing to answer (D-64).
+ * The AI speaks apart from its move once a move of the player's, on their time, with something to say or to answer (D-72), and never while its move waits:
+ * it speaks in the move's comment then. Once the game is over it may say a word once, with nothing to answer (D-64), then only answer.
  */
 function refuseAiWords(current: CurrentGame): void
 {
     const { game, ai } = current;
     const since = sinceAiMoved(current);
+    const over = endOf(game) !== undefined;
 
-    if (endOf(game) !== undefined && !current.talk.some((line) => line.who === "ai" && line.ply >= game.record.moves.length)) {
+    if (over && !current.talk.some((line) => line.who === "ai" && line.ply >= game.record.moves.length)) {
         return;
     }
 
-    if (unanswered(current).length === 0 && drawOfferOf(current) !== "player") {
-        throw new Error("The player has written nothing to answer: ai_say only answers their words, and a comment rides with your move. Nothing changed.");
+    if (over && unanswered(current).length === 0) {
+        throw new Error("The player has written nothing to answer: you have said your word on the game's end. Nothing changed.");
     }
 
     if (game.position.turn === ai && endOf(game) === undefined) {
-        throw new Error("It is your move: answer the player in ai_move's comment. Nothing changed.");
+        throw new Error("It is your move: speak in ai_move's comment. Nothing changed.");
     }
 
     if (current.talk.some((line) => line.who === "ai" && line.ply >= since)) {
-        throw new Error("You have answered the player once for this move: answer the rest in ai_move's comment. Nothing changed.");
+        throw new Error("You have spoken once for this move: say the rest in ai_move's comment. Nothing changed.");
     }
 }
 

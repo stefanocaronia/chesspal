@@ -13,7 +13,7 @@ export interface CommandLineResult
 
 // The commands that exist only on the command line: cli.ts starts the server, the doorbell or the chat's note, when one comes alone.
 const mcpDescription = "Start the MCP server for an AI host. Through it the host uses these commands as tools; the host starts it, with no options.";
-const listenDescription = "Wait for the player's move on the board page and wake the chat. Claude Code starts it at the end of each turn, as init sets it up.";
+const listenDescription = "Wait for the player's move on the board page and wake the chat. Claude Code starts it at the end of each turn, and Codex with --codex, as init sets them up.";
 const chatDescription = "Note how the chat started: new, cleared, resumed or compacted. Claude Code runs it when a chat starts, as init sets it up.";
 
 /** The `chesspal` command line: finds the command, validates its input, runs it and renders the result. */
@@ -36,8 +36,9 @@ export async function runCommandLine(argv: string[], context: Context = defaultC
     }
 
     if (commandName === "listen") {
-        const help = `chesspal listen\n\n${listenDescription}`;
-        return args.length === 0 || args.includes("--help") || args.includes("-h") ? success(help) : failure(`chesspal listen takes no options: ${args.join(" ")}.\n\n${help}`);
+        const help = `chesspal listen [--codex]\n\n${listenDescription}`;
+        const known = args.every((arg) => ["--codex", "--help", "-h"].includes(arg));
+        return known ? success(help) : failure(`chesspal listen takes only --codex: ${args.join(" ")}.\n\n${help}`);
     }
 
     if (commandName === "chat") {

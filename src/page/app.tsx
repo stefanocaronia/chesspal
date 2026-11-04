@@ -2,8 +2,9 @@
 // words (T-65), in Zoe's three columns (D-53): the talk, the board, the game, the side ones folded as the player likes (T-84).
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { type Clock, Game, materialOf, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square, suggestedLevel, timeControlText } from "../core/index.ts";
+import { type Clock, closingOf, Game, gameReviewOf, materialOf, type Mood, moodAt, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square, suggestedLevel, timeControlText } from "../core/index.ts";
 import { PlayerPicture } from "./avatars.tsx";
+import { BadgeCounts } from "./badges.tsx";
 import { Board, type Notice, piecesOf } from "./board.tsx";
 import { flipKeys, type Step, stepKeys, stepped } from "./browse.ts";
 import { howEnded, useDeclined, useJustEnded } from "./ending.ts";
@@ -12,6 +13,7 @@ import { FoldTab } from "./fold-tab.tsx";
 import { type Column, foldKeys, gameUnderBoard, nextFold, oneColumn, rememberFold, startFolds } from "./folds.ts";
 import { GameColumn } from "./game-column.tsx";
 import { type GameActions, Header } from "./header.tsx";
+import { Steps } from "./move-list.tsx";
 import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
 import { useOpeningBook } from "./opening-book.ts";
 import { ChosenSet } from "./pieces.tsx";
@@ -22,7 +24,9 @@ import { keepSettings, type Profile } from "./profile.ts";
 import { SettingsPanel } from "./settings-panel.tsx";
 import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "./settings.ts";
 import { endSoundOf, playSound, soundOf, wakeSounds } from "./sounds.ts";
-import { AiWords, Compose, TalkFaces } from "./talk.tsx";
+import { type StudiedSide, studiedSides } from "./studied.ts";
+import { type Studied, StudyDialog } from "./study-dialog.tsx";
+import { AiNote, AiWords, Compose, TalkFaces } from "./talk.tsx";
 import { type ServerRefusal, type Text, textFor } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
 
@@ -55,6 +59,7 @@ export function App({ start }: { start: Settings; })
 
     const [served, setServed] = useState<Served | undefined>(undefined);
     const [problem, setProblem] = useState<string | undefined>(undefined);
+    const [offline, setOffline] = useState(false);
     const [selected, setSelected] = useState<string | undefined>(undefined);
     const [refusal, setRefusal] = useState<Notice | undefined>(undefined);
     // A pawn taken to the last rank waits for the player to choose what it becomes (T-11).
@@ -63,7 +68,7 @@ export function App({ start }: { start: Settings; })
     const [folds, setFolds] = useState(startFolds);
     const [draft, setDraft] = useState("");
     const [unsent, setUnsent] = useState<string | undefined>(undefined);
-    const [dialog, setDialog] = useState<"picture" | "profiles" | "new-game" | undefined>(undefined);
+    const [dialog, setDialog] = useState<"picture" | "profiles" | "new-game" | "study" | undefined>(undefined);
     // Reads the game again: when the server says it changed, and when a clock runs out on the page (T-37).
     const reload = useRef(() => {});
 
@@ -90,10 +95,17 @@ export function App({ start }: { start: Settings; })
         };
 
         // The server says when the game changes, whoever changed it: the page reads it again, and as it connects, the first time or to a new chat's server.
+        // The server lives in the chat's MCP server: when the chat ends, after /clear in Claude's app too, the page waits for the next one and says so.
         reload.current = load;
         const events = new EventSource("/api/events");
-        events.onopen = load;
+
+        events.onopen = () => {
+            setOffline(false);
+            load();
+        };
+
         events.onmessage = load;
+        events.onerror = () => setOffline(events.readyState !== EventSource.OPEN);
         return () => events.close();
     }, []);
 
@@ -111,9 +123,14 @@ export function App({ start }: { start: Settings; })
         }
     }, [profileId]);
 
-    // The game is replayed from its PGN once for each one the server sends, not at every click.
+    // The game is replayed from its PGN once for each one the server sends, not at every click. Once no game goes on, the game in analysis shows in its place
+    // (D-69), with the AI's badges and notes: replayed again only when its review changed.
     const game = served?.game;
-    const live = useMemo(() => game === undefined || game === null ? new Game() : new Game(readPgn(game.pgn)[0]), [game]);
+    const studied = served?.analysis;
+    const live = useMemo(
+        () => studied !== undefined ? new Game(readPgn(studied.pgn)[0]) : game === undefined || game === null ? new Game() : new Game(readPgn(game.pgn)[0]),
+        [studied === undefined ? game : studied.pgn],
+    );
     const material = useMemo(() => materialOf(live.position.fen), [live]);
     const pieces = useMemo(() => piecesOf(live.position.fen), [live]);
     const plies = useMemo(() => pliesOf(live.record), [live]);
@@ -126,14 +143,16 @@ export function App({ start }: { start: Settings; })
     const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
     const next = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove, [live, viewing]);
     const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
-    // A game read again ends what the player was doing on the one before: the move sent, the look back, the choice of a promotion.
+    // A game read again ends what the player was doing on the one before: the move sent, the look back, the choice of a promotion. A review written on the
+    // game in analysis leaves the player where they are in it.
     useEffect(() => {
         setPending(undefined);
         setViewing(undefined);
         setPromoting(undefined);
-    }, [game]);
-    useGameSounds(game, live, sound);
-    const unread = useUnread(game === undefined || game === null ? undefined : aiSpoke(plies, game.ai, game.talk), folds.talk !== "open");
+    }, [studied === undefined ? game : studied.name]);
+    const played = studied === undefined ? game : null;
+    useGameSounds(played, live, sound);
+    const unread = useUnread(played === undefined || played === null ? undefined : aiSpoke(plies, played.ai, played.talk), folds.talk !== "open");
 
     const fold = (column: Column): void => {
         const next = nextFold(column, folds[column]);
@@ -151,6 +170,9 @@ export function App({ start }: { start: Settings; })
 
     const total = live.record.moves.length;
     const at = viewing ?? total;
+    // In analysis, the opening the move shown has reached, while the book knows the moves (D-69).
+    const bookAt = studied === undefined || book === undefined || at === 0 || at > studied.book ? undefined : { tags: live.record.tags, moves: live.record.moves.slice(0, at) };
+    const shownOpening = useMemo(() => bookAt === undefined || book === undefined ? undefined : openingOf(bookAt, book), [live, book, bookAt === undefined ? 0 : at]);
     // A jump of more than one move shows the position at once: only a step slides its pieces.
     const shownBefore = useRef(at);
     const jumped = Math.abs(shownBefore.current - at) > 1;
@@ -178,14 +200,14 @@ export function App({ start }: { start: Settings; })
     const ended = isOver(result);
     const how = ended ? howEnded(live.outcome, live.record.tags.Termination) : undefined;
     const winner = result === "1-0" ? "white" : result === "0-1" ? "black" : undefined;
-    const justEnded = useJustEnded(game === undefined || game === null ? undefined : ended ? "over" : "going");
-    const offer = game?.drawOffer;
+    const justEnded = useJustEnded(played === undefined || played === null ? undefined : ended ? "over" : "going");
+    const offer = played?.drawOffer;
     const declined = useDeclined(offer, total, ended);
 
     // In a game going on the player offers a draw on their turn once each side has moved, answers the AI's, or resigns, saying so first (D-65).
-    const actions: GameActions | undefined = game === undefined || game === null || ended ? undefined : {
+    const actions: GameActions | undefined = played === undefined || played === null || ended ? undefined : {
         ...(offer === undefined ? {} : { offer }),
-        canOffer: offer === undefined && pending === undefined && live.position.turn !== game.ai && total >= 2,
+        canOffer: offer === undefined && pending === undefined && live.position.turn !== played.ai && total >= 2,
         onOffer: () => act("/api/draw", { action: "offer" }),
         onAnswer: (accept) => act("/api/draw", { action: accept ? "accept" : "decline" }),
         onResign: () => {
@@ -198,10 +220,12 @@ export function App({ start }: { start: Settings; })
     const header = (
         <Header
             text={text}
-            verdict={ended ? text.verdict(how, winner) : offer === "ai" ? text.offers : offer === "player" ? text.drawOffered : declined ? text.declines : undefined}
+            kind={studied !== undefined ? "analysis" : ended ? "over" : offer !== undefined || declined ? "offer" : undefined}
+            verdict={studied !== undefined ? text.analysing : ended ? text.verdict(how, winner) : offer === "ai" ? text.offers : offer === "player" ? text.drawOffered : declined ? text.declines : undefined}
             {...(!ended && (offer === "ai" || declined) ? { who: served?.opponent ?? text.ai } : {})}
             actions={actions}
             onNewGame={served === undefined ? undefined : () => setDialog("new-game")}
+            onStudy={served === undefined || (played !== null && !ended) ? undefined : () => setDialog("study")}
             flipped={flipped}
             onFlip={() => setFlipped(!flipped)}
             sound={sound}
@@ -233,15 +257,23 @@ export function App({ start }: { start: Settings; })
 
     const profile = served.profile;
     const picture = <PlayerPicture profile={profile} />;
-    const going = game !== null && !ended;
-
-    const player = game === null || game.ai === "black" ? "white" : "black";
-    const ai = player === "white" ? "black" : "white";
-    const playerToMove = game !== null && !ended && live.position.turn === player;
-    const ahead = (side: Side): number => side === "white" ? material.balance : -material.balance;
+    const going = played !== null && !ended;
     const name = served.opponent ?? text.ai;
+    // In analysis the cards name the players of the game, the player's side at the bottom when they played it (D-69).
+    const sides = studied === undefined ? undefined : studiedSides(live.record.tags, profile.name, name, text.sides);
+
+    const player = sides?.bottom ?? (game === null || game.ai === "black" ? "white" : "black");
+    const ai = player === "white" ? "black" : "white";
+    // The Torretta's face on the move shown: the mood the AI gave, while it lasts (D-70); in analysis, of the side the AI played.
+    const mood = moodAt(live.record, sides?.white.who === "ai" ? "white" : sides?.black.who === "ai" ? "black" : ai, at).mood;
+    const playerToMove = going && live.position.turn === player;
+    const ahead = (side: Side): number => side === "white" ? material.balance : -material.balance;
+    const reviewed = studied === undefined ? undefined : plies[at - 1];
+    const review = reviewed?.review;
+    const summary = studied === undefined ? undefined : gameReviewOf(live.record);
+    const closing = studied === undefined ? undefined : closingOf(live.record);
     const talk = game?.talk ?? [];
-    const said = playerWords(plies, ai, talk);
+    const said = playerWords(talk);
     const clock = game?.clock;
     const clockOf = (side: Side): ComponentChildren =>
         clock === undefined ? undefined : (
@@ -276,14 +308,15 @@ export function App({ start }: { start: Settings; })
             return;
         }
 
-        // The words written and not sent go with the move (D-53): the box holds no more than the move has left (D-54).
-        const words = draft;
+        // The words written and not sent go with the move (D-53): the box holds no more than the move has left (D-54). A command for Claude's app stays here.
+        const command = isCommand(draft);
+        const words = command ? "" : draft;
         const move = `${from}${to}${piece ?? ""}`;
         setPromoting(undefined);
         setPending(move);
         void sendMove(move, words, text).then((refused) => {
             setRefusal(refused === undefined || refused.words ? undefined : { text: refused.text, square: from });
-            setUnsent(refused?.words === true ? refused.text : undefined);
+            setUnsent(refused?.words === true ? refused.text : command ? text.commandHere : undefined);
             clearSent(refused?.text, words);
 
             if (refused !== undefined) {
@@ -308,6 +341,13 @@ export function App({ start }: { start: Settings; })
 
     const sendWords = (): void => {
         const words = draft;
+
+        // /clear and the other commands are for Claude's app: written here they would reach the AI as words (Sebastiano's playtest).
+        if (isCommand(words)) {
+            setUnsent(text.commandHere);
+            return;
+        }
+
         setUnsent(undefined);
         void sendMessage(words, text).then((refused) => {
             setUnsent(refused?.text);
@@ -316,13 +356,42 @@ export function App({ start }: { start: Settings; })
     };
 
     // The new game starts from the choices of the game before; the first, from the level that suits the player (T-58).
-    const level = suggestedLevel(game === null ? undefined : live.record, profile.level);
+    const level = suggestedLevel(played === null ? undefined : live.record, profile.level);
     const lastClock = clock === undefined ? undefined : timeControlText(clock.control);
     const choice: NewGameChoice = { colour: player, level, ...(lastClock === undefined ? {} : { clock: lastClock }) };
 
     const startNewGame = ({ colour, level: chosen, clock: control }: NewGameChoice): void => {
         setDialog(undefined);
         act("/api/new", { ai_colour: colour === "random" ? "random" : colour === "white" ? "black" : "white", level: chosen, ...(control === undefined ? {} : { clock: control }) });
+    };
+
+    // In analysis the AI's note stays under the card on top and its word on the game over the one below, however the board is turned (D-69).
+    const top = flipped ? player : ai;
+    const bottom = flipped ? ai : player;
+
+    const studiedCard = (side: Side, place: "ai" | "you"): ComponentChildren =>
+        sides === undefined ? null : (
+            <PlayerCard
+                place={place}
+                picture={pictureOf(sides[side], profile, 48, mood)}
+                name={sides[side].name}
+                side={side}
+                taken={material.taken[side]}
+                ahead={ahead(side)}
+                badges={<BadgeCounts plies={plies} side={side} names={text.badges} />}
+                text={text}
+            />
+        );
+
+    // A game brought to analyse (T-92): the page shows it once the server has it in analysis; a refusal stays in the dialog.
+    const studyGame = async (studied: Studied): Promise<string | undefined> => {
+        const refused = await post("/api/study", studied, text);
+
+        if (refused === undefined) {
+            setDialog(undefined);
+        }
+
+        return refused?.text;
     };
 
     return (
@@ -338,67 +407,125 @@ export function App({ start }: { start: Settings; })
                 text={text}
             />
             <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
-            <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`}>
+            <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} text={text} />
+            {offline ? <p class="offline" role="alert">{text.offline}</p> : null}
+            <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`} inert={offline}>
                 {header}
-                <TalkFaces name={name} you={profile.name} picture={picture} ai={ai} player={player} aiMoves={!ended && game !== null && !playerToMove} playerMoves={playerToMove} unread={unread} text={text} />
+                {sides === undefined
+                    ? (
+                        <TalkFaces
+                            name={name}
+                            aiPicture={<Torretta size={40} mood={mood} />}
+                            you={profile.name}
+                            picture={picture}
+                            ai={ai}
+                            player={player}
+                            aiMoves={going && !playerToMove}
+                            playerMoves={playerToMove}
+                            unread={unread}
+                            text={text}
+                        />
+                    )
+                    : (
+                        <TalkFaces
+                            name={sides[ai].name}
+                            aiPicture={pictureOf(sides[ai], profile, 40, mood)}
+                            you={sides[player].name}
+                            picture={pictureOf(sides[player], profile, 40, mood)}
+                            ai={ai}
+                            player={player}
+                            aiMoves={false}
+                            playerMoves={false}
+                            unread={false}
+                            text={text}
+                        />
+                    )}
                 <FoldTab column="talk" folded={folds.talk === "folded"} label={text.talk} unread={unread && folds.talk === "folded"} onFold={fold} />
                 <FoldTab column="game" folded={folds.game === "folded"} label={text.game} onFold={fold} />
                 <span class="visually-hidden" aria-live="polite">{unread ? text.wrote(name) : ""}</span>
-                <div class="talk" id="talk">
-                    <section class="ai-block" aria-label={name}>
-                        <PlayerCard
-                            place="ai"
-                            picture={<Torretta size={48} />}
-                            name={name}
-                            side={ai}
-                            {...(game === null ? {} : { level: text.start.levels[level] })}
-                            taken={material.taken[ai]}
-                            ahead={ahead(ai)}
-                            clock={clockOf(ai)}
-                            text={text}
-                        />
-                        <AiWords words={aiWords(plies, ai, talk)} />
-                    </section>
-                    <section class="you-block" aria-label={profile.name}>
-                        {game === null ? null : (
-                            <Compose
-                                lines={said}
-                                spent={playerSpent(plies, ai, talk)}
-                                draft={draft}
-                                onDraft={(words) => {
-                                    setDraft(words);
-                                    setUnsent(undefined);
-                                }}
-                                onSend={sendWords}
-                                canMove={playerToMove}
-                                name={name}
-                                problem={unsent}
-                                text={text}
-                            />
+                <div class={sides === undefined ? "talk" : "talk studied"} id="talk">
+                    {sides !== undefined
+                        ? (
+                            <>
+                                <section class="ai-block" aria-label={sides[top].name}>
+                                    {studiedCard(top, "ai")}
+                                    <AiNote
+                                        {...(reviewed === undefined ? {} : { ply: reviewed })}
+                                        {...(shownOpening === undefined ? {} : { opening: shownOpening })}
+                                        {...(at === total && closing !== undefined ? { closing } : {})}
+                                        {...(at === 0 && summary !== undefined ? { summary } : {})}
+                                        name={name}
+                                        mood={mood}
+                                        {...(settings.voice ? { voice: text.language } : {})}
+                                        text={text}
+                                    />
+                                </section>
+                                <section class="you-block" aria-label={sides[bottom].name}>
+                                    {studiedCard(bottom, "you")}
+                                </section>
+                            </>
+                        )
+                        : (
+                            <>
+                                <section class="ai-block" aria-label={name}>
+                                    <PlayerCard
+                                        place="ai"
+                                        picture={<Torretta size={48} mood={mood} />}
+                                        name={name}
+                                        side={ai}
+                                        {...(game === null ? {} : { level: text.start.levels[level] })}
+                                        taken={material.taken[ai]}
+                                        ahead={ahead(ai)}
+                                        clock={clockOf(ai)}
+                                        text={text}
+                                    />
+                                    <AiWords words={aiWords(plies, ai, talk)} newestFirst={!flipped} {...(settings.voice ? { voice: text.language } : {})} />
+                                </section>
+                                <section class="you-block" aria-label={profile.name}>
+                                    {game === null ? null : (
+                                        <Compose
+                                            lines={said}
+                                            newestFirst={flipped}
+                                            spent={playerSpent(plies, ai, talk)}
+                                            draft={draft}
+                                            onDraft={(words) => {
+                                                setDraft(words);
+                                                setUnsent(undefined);
+                                            }}
+                                            onSend={sendWords}
+                                            canMove={playerToMove}
+                                            name={name}
+                                            problem={unsent}
+                                            text={text}
+                                        />
+                                    )}
+                                    <PlayerCard
+                                        place="you"
+                                        picture={<PictureButton profile={profile} onOpen={() => setDialog("picture")} text={text} />}
+                                        name={<NameButton profile={profile} onOpen={() => setDialog("profiles")} text={text} />}
+                                        side={player}
+                                        taken={material.taken[player]}
+                                        ahead={ahead(player)}
+                                        turn={playerToMove}
+                                        clock={clockOf(player)}
+                                        text={text}
+                                    />
+                                </section>
+                            </>
                         )}
-                        <PlayerCard
-                            place="you"
-                            picture={<PictureButton profile={profile} onOpen={() => setDialog("picture")} text={text} />}
-                            name={<NameButton profile={profile} onOpen={() => setDialog("profiles")} text={text} />}
-                            side={player}
-                            taken={material.taken[player]}
-                            ahead={ahead(player)}
-                            turn={playerToMove}
-                            clock={clockOf(player)}
-                            text={text}
-                        />
-                    </section>
                 </div>
                 <div
                     class="board-wrap"
                     onWheel={wheel}
                     // A press on the board while the player looks back brings the game as it is: the next one plays.
-                    onPointerDownCapture={viewing === undefined ? undefined : (event) => event.button === 0 && goTo(total)}
+                    onPointerDownCapture={viewing === undefined || studied !== undefined ? undefined : (event) => event.button === 0 && goTo(total)}
                 >
                     <Board
                         fen={shown.position.fen}
                         bottom={flipped ? ai : player}
                         lastMove={shown.lastMove}
+                        {...(review?.badge === undefined ? {} : { badge: { badge: review.badge, name: text.badges[review.badge] } })}
+                        {...(review === undefined ? {} : { drawn: review })}
                         nextMove={next}
                         jumped={jumped}
                         check={shown.position.check}
@@ -416,18 +543,27 @@ export function App({ start }: { start: Settings; })
                         text={text}
                     />
                 </div>
+                {/* On a phone the steps of a game in analysis sit under the board, by the thumb (Zoe, T-40) */}
+                {studied === undefined ? null : (
+                    <div class="board-steps">
+                        <Steps shown={at} total={total} onStep={step} text={text} />
+                    </div>
+                )}
                 <GameColumn
                     plies={plies}
                     result={ended ? result : undefined}
                     how={how}
                     lit={justEnded}
-                    started={game?.started}
+                    started={played?.started}
                     move={live.position.moveNumber}
                     toMove={live.position.turn}
                     opening={opening}
+                    {...(studied === undefined ? {} : { analysis: summary === undefined ? { by: name } : { by: name, summary } })}
                     shownPlies={at}
                     onShow={goTo}
                     onStep={step}
+                    {...(studied === undefined ? {} : { onDownload: () => download(studied.pgn, pgnName(live.record.tags)) })}
+                    {...(studied === undefined && played !== null && played !== undefined && ended ? { onAnalyse: () => void studyGame({ last: true }) } : {})}
                     text={text}
                 />
             </main>
@@ -450,10 +586,18 @@ interface Served
         readonly clock?: Clock;
         readonly drawOffer?: "player" | "ai";
     } | null;
+    /** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review. */
+    readonly analysis?: { readonly name: string; readonly pgn: string; readonly book: number; };
     readonly opponent?: string;
     readonly profile?: Profile;
     readonly profiles: readonly Profile[];
     readonly settings?: object;
+}
+
+/** The picture of a player of the game in analysis: the player's own, the AI's Torretta with its mood, or the plain face of someone else. */
+function pictureOf({ who }: StudiedSide, profile: Profile, size: number, mood: Mood): ComponentChildren
+{
+    return who === "ai" ? <Torretta size={size} mood={mood} /> : <PlayerPicture profile={who === "player" ? profile : undefined} size={size} />;
 }
 
 /**
@@ -481,8 +625,9 @@ function useGameSounds(game: Served["game"] | undefined, live: Game, on: boolean
             return;
         }
 
-        // A move sounds as the board stands after it; a game ended without one, by how it ended; a draw offered, with its move or on its own.
-        const sound = moves === before.moves + 1 ? soundOf(live) : over && !before.over ? endSoundOf(howEnded(live.outcome, live.record.tags.Termination)) : undefined;
+        // A move sounds as the board stands after it, and two read together as the last, so a mate that comes with the player's move sounds too; a game
+        // ended without a move, by how it ended; a draw offered, with its move or on its own.
+        const sound = moves > before.moves ? soundOf(live) : over && !before.over ? endSoundOf(howEnded(live.outcome, live.record.tags.Termination)) : undefined;
 
         if (sound !== undefined) {
             playSound(sound);
@@ -614,6 +759,12 @@ function sendMessage(words: string, text: Text): Promise<Refused | undefined>
     return post("/api/message", { text: words.trim() }, text);
 }
 
+/** Whether the words are a command for Claude's app, such as /clear, rather than words for the AI. */
+function isCommand(words: string): boolean
+{
+    return /^\s*\/[a-z]/i.test(words);
+}
+
 /** A request the server refused: why, and whether the player's words were the cause, which the talk says rather than the board (T-11). */
 interface Refused
 {
@@ -637,6 +788,23 @@ async function post(path: string, body: object, text: Text): Promise<Refused | u
     } catch (error) {
         return { text: String(error), words: false };
     }
+}
+
+/** Saves a game in analysis with its review as a PGN file in the player's downloads (T-106): the board page loads it back ready. */
+function download(pgn: string, name: string): void
+{
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([pgn], { type: "application/x-chess-pgn" }));
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
+/** The file's name from the game's tags: Ann-Bob-2026.11.02-analysis.pgn, without characters a file's name cannot hold. */
+function pgnName(tags: Readonly<Record<string, string>>): string
+{
+    const parts = [tags.White, tags.Black, tags.Date?.includes("?") === true ? undefined : tags.Date].filter((part) => part !== undefined && part !== "");
+    return `${[...parts, "analysis"].join("-").replace(/[\\/:*?"<>|\s]+/g, "_")}.pgn`;
 }
 
 /** The game with the player's move played on a copy, for the board to show before the server answers; the game itself when the move is not legal. */

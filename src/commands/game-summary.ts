@@ -1,6 +1,6 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
-import { type AiLevel, type Facts, type GameRecord, levelOf, materialOf, sees, type Side, type Square } from "../core/index.ts";
-import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker } from "../games/index.ts";
+import { type AiLevel, type Facts, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, sees, type Side, type Square } from "../core/index.ts";
+import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, type Thought, thoughtForLastMove } from "../games/index.ts";
 import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
 import { boardView, colourName, compactView, materialText } from "./view.ts";
@@ -26,10 +26,14 @@ export interface GameSummary
     book?: readonly string[];
     /** When the AI is to move: the plan it wrote last. */
     plan?: string;
+    /** When the AI is to move: what it thought of the player's move on their time (D-72). */
+    thought?: Thought;
     /** In a game with a time control: the time each side had left when the command ran (D-13). */
     clock?: ClockSummary;
     /** Who offered a draw, while the offer stands (D-65). */
     drawOffer?: Speaker;
+    /** The AI's mood while it lasts, in a game going on (D-70). */
+    mood?: MoodNow;
     /** When the game is over: how it ended, and its name in the archive once it is there. */
     end?: { result: string; termination?: string; archive?: string; };
 }
@@ -77,6 +81,12 @@ export function summaryOf(current: CurrentGame, now: Date, archive?: string): Ga
         summary.drawOffer = drawOffer;
     }
 
+    const mood = moodAt(record, ai);
+
+    if (end === undefined && mood.mood !== "neutral") {
+        summary.mood = mood;
+    }
+
     if (clock !== undefined) {
         summary.clock = clock;
     }
@@ -92,6 +102,13 @@ export function summaryOf(current: CurrentGame, now: Date, archive?: string): Ga
     }
 
     return summary;
+}
+
+/** The summary with what the AI thought of the player's last move on their time, when it is to move and thought of it (D-72). */
+export function withThought(summary: GameSummary, folder: string, current: CurrentGame): GameSummary
+{
+    const thought = summary.turn === summary.ai && summary.end === undefined ? thoughtForLastMove(folder, current) : undefined;
+    return thought === undefined ? summary : { ...summary, thought };
 }
 
 /** The current game `now`, refused when there is none or when it is over, on time too. */
@@ -116,7 +133,7 @@ export function gameGoingOn(folder: string, now: Date): CurrentGame
 export function positionLines(game: GameSummary, withLastMove = true): string[]
 {
     if (game.end !== undefined || game.turn !== game.ai) {
-        return [whereLine(game), ...offerLines(game), ...clockLines(game)];
+        return [whereLine(game), ...offerLines(game), ...clockLines(game), ...moodLines(game)];
     }
 
     return [
@@ -124,6 +141,8 @@ export function positionLines(game: GameSummary, withLastMove = true): string[]
         ...(game.facts === undefined ? [] : (sees(game.level, "tactics") ? compactView : boardView)(game.facts, game.turn)),
         ...(game.book === undefined ? [] : [`Book moves, most named lines first: ${game.book.join(", ")}`]),
         ...(game.plan === undefined ? [] : [`Plan: ${game.plan}`]),
+        ...(game.thought === undefined ? [] : [`Thought on their time: ${game.thought.move}, ${game.thought.why} Check it against the facts before you play it.`]),
+        ...moodLines(game),
     ];
 }
 
@@ -175,8 +194,9 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
 
     if (game.end !== undefined) {
         return words.length === 0
-            ? "Next: tell the player how the game ended, with ai_say if they play on the board page; new_game starts another."
-            : "Next: answer the player with ai_say; new_game starts another game.";
+            ? "Next: tell the player how the game ended, with ai_say if they play on the board page; then offer them, in words, another game or to go over this one "
+                + "(analyse_game). On the board page they start the next game with its New game button; in the chat, with new_game."
+            : "Next: answer the player with ai_say; they start another game with the board page's New game button.";
     }
 
     if (game.turn === game.ai) {
@@ -229,6 +249,17 @@ function offerLines({ drawOffer, turn, ai }: GameSummary): string[]
     }
 
     return [];
+}
+
+/** The AI's mood while it lasts, and how long its face shows it (D-70). */
+function moodLines({ mood }: GameSummary): string[]
+{
+    if (mood === undefined) {
+        return [];
+    }
+
+    const shown = mood.left === 0 ? "until your next move" : `for ${mood.left} more of your moves`;
+    return [`Your mood: ${mood.mood}, on your face ${shown}, then neutral by itself.`];
 }
 
 /** Who is to move, or how the game ended. */

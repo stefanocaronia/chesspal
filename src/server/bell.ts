@@ -1,5 +1,5 @@
-// Claude Code's doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes, waits at the page of its chat and, when the player moves or
-// writes there (T-65), tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
+// The doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes for Claude Code and Codex (T-62), waits at the page of its chat and, when
+// the player moves or writes there (T-65), tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
 import { createHash } from "node:crypto";
 import { get, type IncomingMessage, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
@@ -70,8 +70,14 @@ export function pagePorts(folder: string): number[]
     return [5870, 6870, 7870].map((base) => base + offset);
 }
 
-/** Reads the hook's input, waits for the bell, and ends the process as Claude Code's asyncRewake reads it: 2 with the line to wake the chat, else 0. */
-export async function listen(): Promise<void>
+/** What Codex's Stop hook answers to wake the chat (T-62): its turn goes on with the doorbell's line. */
+export const codexBellAnswer = JSON.stringify({ decision: "block", reason: bellLine });
+
+/**
+ * Reads the hook's input, waits for the bell, and ends the process as the host reads it: for Claude Code's asyncRewake, 2 with the line on stderr; for
+ * Codex's Stop hook, 0 with its answer on stdout, since Windows PowerShell, which runs Codex's hooks, turns an exit code 2 into 1. Else 0, saying nothing.
+ */
+export async function listen(codex = false): Promise<void>
 {
     let input = "";
 
@@ -80,10 +86,12 @@ export async function listen(): Promise<void>
     }
 
     // It ends as soon as it knows: the chat hears the hook only once it ends.
-    if (await waitForBell(input)) {
-        process.stderr.write(`${bellLine}\n`, () => process.exit(2));
-    } else {
+    if (!(await waitForBell(input))) {
         process.exit(0);
+    } else if (codex) {
+        process.stdout.write(`${codexBellAnswer}\n`, () => process.exit(0));
+    } else {
+        process.stderr.write(`${bellLine}\n`, () => process.exit(2));
     }
 }
 

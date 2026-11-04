@@ -1,15 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { makeFolder, writeAtomically } from "../games/index.ts";
+import { ponderAgentFiles } from "./ponder-agents.ts";
 
 /**
  * Sets up the player's folder for Claude Code and Codex (D-31): .mcp.json with the chesspal server, AGENTS.md with the opponent's instructions between
- * Chesspal's marks, CLAUDE.md importing it, and the hosts' settings with the server approved. What the player wrote there stays; it returns the files written.
+ * Chesspal's marks, CLAUDE.md importing it, the hosts' settings with the server approved, and their hooks. What the player wrote there stays; it returns
+ * the files written.
  */
 export function setUpHosts(folder: string, platform: string): string[]
 {
     makeFolder(folder);
-    const changes = [mcpFile(folder, platform), agentsFile(folder), claudeFile(folder), claudeSettingsFile(folder), codexConfigFile(folder, platform)];
+    const changes = [mcpFile(folder, platform), agentsFile(folder), claudeFile(folder), claudeSettingsFile(folder), ...ponderAgentChanges(folder), codexConfigFile(folder, platform), codexHooksFile(folder)];
     const written = changes.filter((change) => change !== undefined);
 
     for (const { path, text } of written) {
@@ -41,6 +43,12 @@ const markedBlock = /<!-- chesspal: (?!end)[^\n]*\n[\s\S]*?<!-- chesspal: end --
 function chesspalServer(platform: string): { command: string; args: string[]; }
 {
     return platform === "win32" ? { command: "cmd", args: ["/c", "chesspal", "mcp"] } : { command: "chesspal", args: ["mcp"] };
+}
+
+/** Claude Code's agents that think on the player's time, Chesspal's whole: written when they are missing or changed. */
+function ponderAgentChanges(folder: string): FileChange[]
+{
+    return ponderAgentFiles(folder).filter(({ path, text }) => textOf(path) !== text);
 }
 
 /** .mcp.json with the chesspal server, beside the servers already there. */
@@ -132,6 +140,25 @@ function codexConfigFile(folder: string, platform: string): FileChange | undefin
     const text = rest === "" ? table : `${rest}\n\n${table}`;
     return text === before ? undefined : { path, text };
 }
+
+/** Codex's hooks, read once the player has reviewed them in /hooks: the doorbell of the moves on the page (T-62) beside the player's own. */
+function codexHooksFile(folder: string): FileChange | undefined
+{
+    const path = join(folder, ".codex", "hooks.json");
+    const config = jsonOf(path);
+    const hooks = isObject(config.hooks) ? config.hooks : {};
+    return changed(path, { ...config, hooks: withHook(hooks, "Stop", codexBellHook) });
+}
+
+// Codex's Stop hook for the doorbell (T-62): it holds the turn until the player acts on the page, then Codex goes on; a day at most. On Windows Codex runs
+// it in PowerShell, where `chesspal` would be npm's .ps1 shim, which a strict execution policy stops.
+const codexBellHook = {
+    type: "command",
+    command: "chesspal listen --codex",
+    commandWindows: "chesspal.cmd listen --codex",
+    timeout: 86_400,
+    statusMessage: "Waiting for your move on the board page",
+};
 
 /** A JSON file's new content, when it differs from what is there. */
 function changed(path: string, value: Record<string, unknown>): FileChange | undefined

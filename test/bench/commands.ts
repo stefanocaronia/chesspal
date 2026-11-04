@@ -1,7 +1,7 @@
 // The commands' bench (D-34): a move as the MCP server plays it, game.json written, and the command line in a new process, against their budgets.
 // Run it with: npm run bench, which builds dist/ first. It exits with 1 when a median is over its budget.
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,8 @@ const folder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
 const context = testContext(folder);
 const long = new Game({ tags: {}, moves: randomGame(1, 120).map((san) => ({ san })) });
 const longFile = JSON.stringify({ format: 1, ai: "black", started: new Date().toISOString(), pgn: writePgn(long.record) });
+// A game over in the archive of a folder with no game going on, for the analysis.
+const studyFolder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
 const cli = fileURLToPath(new URL("../../dist/cli/cli.js", import.meta.url));
 let seed = 2_000;
 
@@ -23,10 +25,12 @@ try {
         { name: "a move through player_move or ai_move, game.json written", budget: 3, run: movesOfANewGame },
         { name: "status in a game", budget: 0.5, run: () => timed(1, () => call(context, "status")) },
         { name: "status after another process changed a game of 120 plies", budget: 25, run: readAgain },
+        { name: "analyse_game on a game of 120 plies over, its positions new", budget: 250, run: analyseLong },
         { name: "chesspal status from the command line, a new process", budget: 500, run: () => timed(1, () => spawnSync(process.execPath, [cli, "status"], { cwd: folder })) },
     ]);
 } finally {
     rmSync(folder, { recursive: true, force: true });
+    rmSync(studyFolder, { recursive: true, force: true });
 }
 
 /** The time of one move of a new random game of 40 plies, the player's and the AI's in turn, each saved. */
@@ -48,6 +52,15 @@ function readAgain(): number
 {
     writeFileSync(join(folder, "game.json"), longFile);
     return timed(1, () => call(context, "status"));
+}
+
+/** The time of the analysis of a long game of the archive, a new random one each time: no position of it computed before, as for a game imported. */
+function analyseLong(): number
+{
+    const game = new Game({ tags: { Result: "1/2-1/2" }, moves: randomGame(seed++, 120).map((san) => ({ san })) });
+    mkdirSync(join(studyFolder, "games"), { recursive: true });
+    writeFileSync(join(studyFolder, "games", "2026-11-02-153012.pgn"), writePgn(game.record));
+    return timed(1, () => call(testContext(studyFolder), "analyse_game", { game: "games/2026-11-02-153012.pgn" }));
 }
 
 /** A command as the MCP server runs it: its input checked, its result as text. */

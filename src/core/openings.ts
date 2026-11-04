@@ -73,6 +73,13 @@ export function bookMoves(fen: string, book: OpeningBook): readonly string[]
     return book[positionKey(fen)] ?? [];
 }
 
+/** Whether a line of the book reaches a position, by any order of moves: one its lines play on from, or one an opening is named after. */
+export function inOpenings(fen: string, index: OpeningIndex, book: OpeningBook): boolean
+{
+    const key = positionKey(fen);
+    return book[key] !== undefined || index[key] !== undefined;
+}
+
 /** The opening of a game from the standard position, the last named one its moves reached; none before the first, or from another position. */
 export function openingOf(record: GameRecord, index: OpeningIndex): Opening | undefined
 {

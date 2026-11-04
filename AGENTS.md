@@ -16,11 +16,15 @@ This file is about **developing** Chesspal. The instructions for **playing** are
 
 | Path | Content | GitHub | npm |
 |---|---|---|---|
+| `README.md` | what Chesspal is, how to build and test it, the credits | yes | yes |
 | `AGENTS.md`, `CLAUDE.md` | this guide (`CLAUDE.md` only imports it) | yes | no |
 | `project/` | the maintainer's private repository: project docs and colleagues | no | no |
 | `.claude/` | a junction to `project/.claude/`: see "Colleagues" | no | no |
 | `src/` | the chess core (`src/core/`, browser-safe), the games on disk (`src/games/`), the commands, the CLI, the MCP server | yes | built into `dist/` |
-| `test/` | tests | yes | no |
+| `instructions/` | the opponent's instructions, which `chesspal init` installs in a player's folder | yes | yes |
+| `data/` | Lichess's openings, which the build turns into an index by position | yes | built into `dist/` |
+| `scripts/` | the build's scripts | yes | no |
+| `test/` | tests, benches and demos | yes | no |
 | `tmp/` | scratch output | no | no |
 
 ## Commands
@@ -29,6 +33,9 @@ This file is about **developing** Chesspal. The instructions for **playing** are
 - `npm test`: run the tests.
 - `npm run format`: format the code (ESLint fixes, then dprint).
 - `npm run lint`: check the formatting, and the types of the tests too, as CI does.
+- `npm run bench`: time the commands against their budgets.
+- `npm run page -- <folder>`: serve the board page of a player's folder, to look at it while it is built.
+- `npm run endings`: show the ends of a game on the board page.
 
 ## Development vs game
 

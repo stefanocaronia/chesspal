@@ -2,6 +2,8 @@
 // with a click on one or with the buttons under them (T-88).
 import type { JSX } from "preact";
 import { useEffect, useRef } from "preact/hooks";
+import type { Side } from "../core/index.ts";
+import { BadgeIcon, NoteIcon } from "./badges.tsx";
 import type { Step } from "./browse.ts";
 import { Figurine } from "./pieces.tsx";
 import type { Ply } from "./plies.ts";
@@ -33,7 +35,7 @@ export function MoveList({ plies, result, shown, onShow, text }: { plies: readon
         list.current!.scrollTop += Math.min(0, move.top - box.top) + Math.max(0, move.bottom - box.bottom);
     }, [shown]);
 
-    const move = (ply: Ply | undefined): JSX.Element => <Move ply={ply} current={ply !== undefined && ply === current} onShow={() => onShow(plies.indexOf(ply!) + 1)} />;
+    const move = (ply: Ply | undefined): JSX.Element => <Move ply={ply} current={ply !== undefined && ply === current} onShow={() => onShow(plies.indexOf(ply!) + 1)} text={text} />;
 
     return (
         <div ref={list} class="moves card" role="region" aria-label={text.moves}>
@@ -72,18 +74,36 @@ export function Steps({ shown, total, onStep, text }: { shown: number; total: nu
     );
 }
 
-function Move({ ply, current, onShow }: { ply: Ply | undefined; current: boolean; onShow: () => void; })
+function Move({ ply, current, onShow, text }: { ply: Ply | undefined; current: boolean; onShow: () => void; text: Text; })
 {
     if (ply === undefined) {
         return <span>…</span>;
     }
 
-    // A screen reader reads the move in SAN; the eye sees each piece's letter as its figure.
+    // A screen reader reads the move in SAN and the AI's badge by its name; the eye sees each piece's letter as its figure, and the badge's disc (D-69).
     return (
-        <button type="button" class={current ? "ply current" : "ply"} aria-current={current ? "step" : undefined} onClick={onShow}>
-            <span class="visually-hidden">{ply.san}</span>
-            <span aria-hidden="true">{ply.san.split(/([KQRBN])/).map((part, index) => index % 2 === 1 ? <Figurine key={index} letter={part} side={ply.side} /> : part)}</span>
+        <button
+            type="button"
+            class={current ? "ply current" : "ply"}
+            aria-current={current ? "step" : undefined}
+            onClick={onShow}
+        >
+            <span class="visually-hidden">{ply.review?.badge === undefined ? ply.san : `${ply.san}, ${text.badges[ply.review.badge]}`}</span>
+            <span aria-hidden="true">
+                <Figurines san={ply.san} side={ply.side} />
+            </span>
+            {ply.review?.badge !== undefined ? <BadgeIcon badge={ply.review.badge} /> : ply.review?.note !== undefined ? <NoteIcon /> : null}
         </button>
+    );
+}
+
+/** A move in SAN with each piece's letter drawn as its figure, the same in every language (D-50), and a capture's x in grey, so the squares stand out. */
+export function Figurines({ san, side }: { san: string; side: Side; })
+{
+    return (
+        <>
+            {san.split(/([KQRBNx])/).map((part, index) => index % 2 === 0 ? part : part === "x" ? <span key={index} class="takes">x</span> : <Figurine key={index} letter={part} side={side} />)}
+        </>
     );
 }
 

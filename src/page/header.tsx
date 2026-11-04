@@ -21,13 +21,17 @@ export interface GameActions
  * and resignation in a game going on (D-65), a new game once the page has the folder's, the command that turns the board round and says whether it is
  * turned, the switches of the sounds and the theme, and the gear of the settings (D-56).
  */
-export function Header({ text, verdict, who, actions, onNewGame, flipped, onFlip, sound, onSound, onTheme, onSettings }: {
+export function Header({ text, verdict, kind, who, actions, onNewGame, onStudy, flipped, onFlip, sound, onSound, onTheme, onSettings }: {
     text: Text;
     verdict?: string;
+    /** What the verdict is about, which gives its chip a colour and an icon. */
+    kind?: VerdictKind;
     /** The AI's name before the verdict, cut short when long while the verb stays whole. */
     who?: string;
     actions?: GameActions;
     onNewGame?: () => void;
+    /** Brings a game played elsewhere to analyse, while none goes on (T-92). */
+    onStudy?: () => void;
     flipped: boolean;
     onFlip: () => void;
     sound: boolean;
@@ -40,7 +44,8 @@ export function Header({ text, verdict, who, actions, onNewGame, flipped, onFlip
         <header class="top">
             <Torretta size={34} />
             <b class="title">Chesspal</b>
-            <p class="verdict" role="status">
+            <p class={`verdict${kind === undefined ? "" : ` ${kind}`}`} role="status">
+                {verdict === undefined || kind === undefined ? null : <Icon class="kind">{kindIcons[kind]}</Icon>}
                 {who === undefined || verdict === undefined ? verdict : (
                     <>
                         <span class="ai-name">{who}</span>
@@ -55,6 +60,15 @@ export function Header({ text, verdict, who, actions, onNewGame, flipped, onFlip
                         <path d="M12 5V19M5 12H19" />
                     </Icon>
                     <span>{text.newGame}</span>
+                </button>
+            )}
+            {onStudy === undefined ? null : (
+                <button class="command" type="button" title={text.study.title} onClick={onStudy}>
+                    <Icon class="study">
+                        <circle cx="10.5" cy="10.5" r="5.5" />
+                        <path d="M14.5 14.5L20 20" />
+                    </Icon>
+                    <span>{text.study.title}</span>
                 </button>
             )}
             <button class="command" type="button" title={text.flip} aria-pressed={flipped} onClick={onFlip}>
@@ -137,6 +151,16 @@ function Actions({ actions, text }: { actions: GameActions; text: Text; })
         </>
     );
 }
+
+/** What the header's chip says: the game in analysis (D-69), a game over (T-77), a draw offered or declined (D-65). */
+export type VerdictKind = "analysis" | "over" | "offer";
+
+// A magnifying glass, a flag, two hands.
+const kindIcons: Record<VerdictKind, ComponentChildren> = {
+    analysis: <path d="M12 4V20M8 20H16M5 7H19M5 7L2.5 13A2.5 2 0 0 0 7.5 13ZM19 7L16.5 13A2.5 2 0 0 0 21.5 13Z" />,
+    over: <path d="M6 21V4M6 4H17L14.5 8L17 12H6" />,
+    offer: <path d="M3 12L7 8L11 10L14 7L21 12M7 14L10 17M10 13L13 16M13 12L16 15" />,
+};
 
 function Icon({ class: name, children }: { class: string; children: ComponentChildren; })
 {

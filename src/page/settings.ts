@@ -25,6 +25,8 @@ export interface Settings
     /** Whether the board says why a move is refused (T-11, D-18). */
     readonly explain: boolean;
     readonly sound: boolean;
+    /** Whether the AI's words are read aloud, by the browser's local voices. */
+    readonly voice: boolean;
     readonly language: "auto" | "it" | "en";
 }
 
@@ -49,6 +51,7 @@ export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | 
         dots: typeof stored.dots === "boolean" ? stored.dots : true,
         explain: typeof stored.explain === "boolean" ? stored.explain : true,
         sound: typeof stored.sound === "boolean" ? stored.sound : defaults.sound,
+        voice: typeof stored.voice === "boolean" ? stored.voice : false,
         language: oneOf(stored.language, ["auto", "it", "en"], "auto"),
     };
 }
@@ -63,12 +66,13 @@ export function saveSettings(settings: Settings): void
     }
 }
 
-/** Shows the settings' look on the page: the theme, the board's skin, the pieces' colours and the marks' colour, as attributes the style sheet reads. */
+/** Shows the settings' look on the page: the theme, the board's skin, the pieces' set and colours and the marks' colour, as attributes the style sheet reads. */
 export function showSettings(settings: Settings): void
 {
     const root = document.documentElement.dataset;
     root.theme = settings.theme === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : settings.theme;
     root.board = settings.board;
+    root.set = settings.set;
     root.pieces = settings.pieces;
     root.marks = settings.marks;
 }

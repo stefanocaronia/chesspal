@@ -43,6 +43,13 @@ export function timeControlTag({ base, increment }: TimeControl): string
     return `${Math.round(base / second)}+${Math.round(increment / second)}`;
 }
 
+/** A time control from PGN's TimeControl tag, in seconds: 600+5, or 600 with nothing added; none for a tag of another form, such as - or ?. */
+export function timeControlOfTag(tag: string): TimeControl | undefined
+{
+    const [, base, increment] = /^\s*(\d+)(?:\+(\d+))?\s*$/.exec(tag) ?? [];
+    return base === undefined || Number(base) === 0 ? undefined : { base: Number(base) * second, increment: Number(increment ?? 0) * second };
+}
+
 /** The clock at the start of a game: each side with the whole time. */
 export function startClock(control: TimeControl, now: Date): Clock
 {
@@ -80,6 +87,13 @@ export function clockTag(milliseconds: number): string
 {
     const text = clockText(milliseconds);
     return `[%clk ${text.split(":").length === 2 ? `0:${text.padStart(5, "0")}` : text}]`;
+}
+
+/** The time left a move's comment gives as [%clk 0:04:32], in milliseconds; none without one. */
+export function clockOfComment(comment: string): number | undefined
+{
+    const [, hours, minutes, seconds] = /\[%clk (\d+):(\d{1,2}):(\d{1,2}(?:\.\d+)?)\]/.exec(comment) ?? [];
+    return hours === undefined ? undefined : Math.round(((Number(hours) * 60 + Number(minutes)) * 60 + Number(seconds)) * second);
 }
 
 /**

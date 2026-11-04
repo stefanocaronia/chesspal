@@ -30,6 +30,15 @@ export function fullView(facts: Facts, turn: Side): string[]
     return [...checkLines(facts, turn, names), ...sides, ...tacticLines(facts, turn, names)];
 }
 
+/** What is at risk, in one line for a move of the analysis (D-68): undefended Black Nf6; by a cheaper piece White Qd1; outnumbered Black Pe5; none when nothing is. */
+export function riskLine(facts: Facts): string | undefined
+{
+    const names = namesOf(facts);
+    const kinds = [["undefended", facts.undefended], ["by a cheaper piece", facts.attackedByCheaper], ["outnumbered", facts.outnumbered]] as const;
+    const text = kinds.filter(([, squares]) => squares.length > 0).map(([kind, squares]) => `${kind} ${bySide(facts, squares, names)}`).join("; ");
+    return text === "" ? undefined : text;
+}
+
 export function colourName(side: Side): string
 {
     return side === "white" ? "White" : "Black";
@@ -38,13 +47,19 @@ export function colourName(side: Side): string
 /** The material as the player sees it beside the board (D-59): who is ahead and by how much, and the pieces each side took. */
 export function materialText(material: Material): string
 {
-    const ahead = material.balance === 0 ? "even" : `${material.balance > 0 ? "White" : "Black"} +${Math.abs(material.balance)}`;
+    const ahead = balanceText(material.balance);
 
     if (material.taken.white.length === 0 && material.taken.black.length === 0) {
         return `${ahead}, nothing taken`;
     }
 
     return `${ahead} (White took ${takenText(material.taken.white)}, Black took ${takenText(material.taken.black)})`;
+}
+
+/** Who is ahead in material, and by how many pawns: White +2, or even. */
+export function balanceText(balance: number): string
+{
+    return balance === 0 ? "even" : `${balance > 0 ? "White" : "Black"} +${Math.abs(balance)}`;
 }
 
 /** The pieces taken, counted by kind: Q 2R 7P. */

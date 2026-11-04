@@ -1,13 +1,15 @@
-// The moves of a game as the page shows them: each with its side and number, and the comment the player may read; and the words said on the page.
-import type { GameRecord, Side } from "../core/index.ts";
+// The moves of a game as the page shows them: each with its side and number, the comment the player may read and the AI's review; and the words said on
+// the page.
+import { type GameRecord, type MoveReview, reviewOf, type Side } from "../core/index.ts";
 
-/** A move of a record with its side and number, as the record's start position counts them, and its comment for the player. */
+/** A move of a record with its side and number, as the record's start position counts them, its comment for the player, and the AI's badge on it (D-69). */
 export interface Ply
 {
     readonly san: string;
     readonly comment?: string;
     readonly side: Side;
     readonly number: number;
+    readonly review?: MoveReview;
 }
 
 /**
@@ -21,7 +23,13 @@ export function pliesOf(record: GameRecord): Ply[]
     const offset = turn === "b" ? 1 : 0;
     return record.moves.map((move, index) => {
         const comment = move.comment?.replace(/\s*\[%[^\]]*\]/g, "").replace(/^\s*\(=\)/, "").trim();
-        const ply = { san: move.san, side: (index + offset) % 2 === 0 ? "white" : "black", number: first + Math.floor((index + offset) / 2) } as const;
+        const review = reviewOf(move.comment);
+        const ply = {
+            san: move.san,
+            side: (index + offset) % 2 === 0 ? "white" : "black",
+            number: first + Math.floor((index + offset) / 2),
+            ...(review === undefined ? {} : { review }),
+        } as const;
         return comment === undefined || comment === "" ? ply : { ...ply, comment };
     });
 }
@@ -44,40 +52,18 @@ export function aiSpoke(plies: readonly Ply[], ai: Side, talk: readonly TalkLine
     return plies.filter((ply) => ply.side === ai && ply.comment !== undefined).length + talk.filter((line) => line.who === "ai").length;
 }
 
-/**
- * The AI's words the page shows (D-53): its comments on its moves and what it said on the page, since the player's last move before its last words. Once it
- * has spoken there is always something: the last of its words stay until new ones come.
- */
+/** The AI's words in the game going on (D-53), in the order said: its comments on its moves and what it said on the page. */
 export function aiWords(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): string[]
 {
     // A comment counts as said just after its move, before what the AI said there; the sort keeps that order.
     const comments = plies.flatMap((ply, index) => ply.side === ai && ply.comment !== undefined ? [{ text: ply.comment, ply: index + 1 }] : []);
-    const words = [...comments, ...talk.filter((line) => line.who === "ai")].sort((one, other) => one.ply - other.ply);
-    const last = words.at(-1);
-
-    if (last === undefined) {
-        return [];
-    }
-
-    const playerMoved = plies.findLastIndex((ply, index) => ply.side !== ai && index < last.ply);
-    return words.filter((word) => word.ply > playerMoved).map((word) => word.text);
+    return [...comments, ...talk.filter((line) => line.who === "ai")].sort((one, other) => one.ply - other.ply).map((word) => word.text);
 }
 
-/**
- * The player's words the page shows (D-53): their last ones, those since the move they made before them, the words sent with it included; they stay while
- * the game goes on, as the AI's do, until the player writes again.
- */
-export function playerWords(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): TalkLine[]
+/** The player's words in the game going on (D-53), in the order said. */
+export function playerWords(talk: readonly TalkLine[]): TalkLine[]
 {
-    const lines = talk.filter((line) => line.who === "player");
-    const last = lines.at(-1);
-
-    if (last === undefined) {
-        return [];
-    }
-
-    const moved = plies.findLastIndex((ply, index) => ply.side !== ai && index < last.ply);
-    return lines.filter((line) => line.ply > moved);
+    return talk.filter((line) => line.who === "player");
 }
 
 /** How many characters the player has written since the AI's last move, of the 200 they may until its next one (D-54). */

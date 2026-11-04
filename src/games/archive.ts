@@ -1,4 +1,4 @@
-// The finished games, as PGN in games/ (D-9, D-41), with the AI's plans for the analyst (D-21).
+// The finished games, as PGN in games/ (D-9, D-41), with the AI's plans for the analyst (D-21); and the games played elsewhere, kept to study in study/ (D-68).
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { type GameRecord, pgnDate, readPgn, writePgn } from "../core/index.ts";
@@ -68,28 +68,111 @@ export function archivedName(folder: string, current: CurrentGame): string | und
 /** The names of the games in the archive, the latest first: games/2026-11-02-153012.pgn. */
 export function archivedGames(folder: string): string[]
 {
-    try {
-        return readdirSync(join(folder, "games")).filter((name) => namePattern.test(name)).sort().reverse().map((name) => `games/${name}`);
-    } catch {
-        return [];
-    }
+    return gameNames(folder, "games");
 }
 
 /** A game of the archive by its name, as listed; refused when it is not there, or cannot be read. */
 export function archivedGame(folder: string, name: string): GameRecord
 {
-    const file = name.replace(/^games\//, "");
+    return gameNamed(folder, "games", name);
+}
+
+/** The names of the games kept to study, in the player's folder for every profile, the latest kept first: study/2026-11-04-153012.pgn. */
+export function keptGames(root: string): string[]
+{
+    return gameNames(root, "study");
+}
+
+/** A game kept to study by its name, as listed; refused when it is not there, or cannot be read. */
+export function keptGame(root: string, name: string): GameRecord
+{
+    return gameNamed(root, "study", name);
+}
+
+/** When an archived game started, from its name, in the player's time: 2026-11-02 15:30. */
+export function archivedWhen(name: string): string
+{
+    const [, day, hour, minute] = /(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})/.exec(name) ?? [];
+    return day === undefined ? name : `${day} ${hour}:${minute}`;
+}
+
+/**
+ * Keeps a game played elsewhere to study (D-68), apart from the games played here and for every profile, and gives its name, by `now`:
+ * study/2026-11-04-153012.pgn; the same game again keeps the name it has.
+ */
+export function keepToStudy(root: string, record: GameRecord, now: Date): string
+{
+    const text = writePgn(record);
+    // The same game, whatever the review and the book's badges written on it since.
+    const [written] = readPgn(text);
+    const kept = keptGames(root).find((name) => sameGame(readPgn(readFileSync(join(root, name), "utf8"))[0], written));
+
+    if (kept !== undefined) {
+        return kept;
+    }
+
+    let name = nameAt(now, "study");
+
+    for (let second = 1; existsSync(join(root, name)); second++) {
+        name = nameAt(new Date(now.getTime() + second * 1_000), "study");
+    }
+
+    try {
+        makeFolder(join(root, "study"));
+        writeAtomically(join(root, name), text);
+    } catch (error) {
+        throw new Error(`Chesspal could not keep the game to study: ${(error as Error).message}`, { cause: error });
+    }
+
+    return name;
+}
+
+/** Writes again a game of the archive, in a profile's folder, or kept to study, in the player's, by its name as listed: with the AI's review (D-69). */
+export function rewriteGame(folder: string, name: string, record: GameRecord): void
+{
+    const [, shelf, file] = /^(games|study)\/(.*)$/.exec(name) ?? [];
+
+    if (shelf === undefined || !namePattern.test(file ?? "") || !existsSync(join(folder, name))) {
+        throw new Error(`There is no ${name} to write again: give a game's name as past_games or study_games writes it.`);
+    }
+
+    try {
+        writeAtomically(join(folder, name), writePgn(record));
+    } catch (error) {
+        throw new Error(`Chesspal could not write ${name}: ${(error as Error).message}`, { cause: error });
+    }
+}
+
+// The games played here, by profile, and the games kept to study, for every profile: each with how the AI lists them.
+type Shelf = "games" | "study";
+const shelves = { games: { what: "of the archive", list: "past_games" }, study: { what: "kept to study", list: "study_games" } };
+const namePattern = /^\d{4}-\d{2}-\d{2}-\d{6}\.pgn$/;
+
+function gameNames(folder: string, shelf: Shelf): string[]
+{
+    try {
+        return readdirSync(join(folder, shelf)).filter((name) => namePattern.test(name)).sort().reverse().map((name) => `${shelf}/${name}`);
+    } catch {
+        return [];
+    }
+}
+
+function gameNamed(folder: string, shelf: Shelf, name: string): GameRecord
+{
+    // The name as listed, or without its folder or its .pgn.
+    const file = `${(name.startsWith(`${shelf}/`) ? name.slice(shelf.length + 1) : name).trim().replace(/\.pgn$/, "")}.pgn`;
+    const { what, list } = shelves[shelf];
 
     if (!namePattern.test(file)) {
-        throw new Error(`${name} is no game of the archive: give a name as the list of past games writes it, such as games/2026-11-02-153012.pgn.`);
+        throw new Error(`${name} is no game ${what}: give a name as ${list} writes it, such as ${shelf}/2026-11-02-153012.pgn.`);
     }
 
     let text: string;
 
     try {
-        text = readFileSync(join(folder, "games", file), "utf8");
+        text = readFileSync(join(folder, shelf, file), "utf8");
     } catch {
-        throw new Error(`There is no ${name} in the archive: give a name as the list of past games writes it.`);
+        throw new Error(`There is no ${name} among the games ${what}: give a name as ${list} writes it.`);
     }
 
     const [record] = readPgn(text);
@@ -101,25 +184,23 @@ export function archivedGame(folder: string, name: string): GameRecord
     return record;
 }
 
-/** When an archived game started, from its name, in the player's time: 2026-11-02 15:30. */
-export function archivedWhen(name: string): string
-{
-    const [, day, hour, minute] = /(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})/.exec(name) ?? [];
-    return day === undefined ? name : `${day} ${hour}:${minute}`;
-}
-
-const namePattern = /^\d{4}-\d{2}-\d{2}-\d{6}\.pgn$/;
-
 /** The game as PGN for the player: while it goes on, without the AI's plans (D-29). */
 export function playerPgn(current: CurrentGame): string
 {
     return writePgn(endOf(current.game) === undefined ? withoutPlans(current.game.record) : endedRecord(current));
 }
 
-function nameAt(date: Date): string
+/** Whether two records are the same game: the same tags and the same moves, whatever their comments say. */
+function sameGame(one: GameRecord | undefined, other: GameRecord | undefined): boolean
+{
+    const shape = (record: GameRecord | undefined): string => JSON.stringify([record?.tags, record?.moves.map((move) => move.san)]);
+    return one !== undefined && shape(one) === shape(other);
+}
+
+function nameAt(date: Date, shelf: Shelf = "games"): string
 {
     const time = date.toTimeString().slice(0, 8).replaceAll(":", "");
-    return `games/${pgnDate(date).replaceAll(".", "-")}-${time}.pgn`;
+    return `${shelf}/${pgnDate(date).replaceAll(".", "-")}-${time}.pgn`;
 }
 
 /** The record with its Termination tag, when the board ended the game and the tag is missing. */

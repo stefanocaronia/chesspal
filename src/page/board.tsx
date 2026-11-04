@@ -1,7 +1,8 @@
 // The board: eight ranks of squares from a FEN, one side at the bottom, Zoe's pieces (T-9), the ranks and files on the edge squares. The player moves
 // with two clicks or by dragging a piece, which lifts off the board, in Zoe's design (T-70).
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { Move, PieceLetter, Promotion, Side } from "../core/index.ts";
+import type { Badge as MoveBadge, DrawColour, DrawnArrow, DrawnSquare, Move, PieceLetter, Promotion, Side } from "../core/index.ts";
+import { BadgeIcon } from "./badges.tsx";
 import type { HowEnded } from "./ending.ts";
 import { type BubblePlace, bubblePlace, type ExplainKind, type Explanation, keptSquares } from "./explain.ts";
 import { Piece } from "./pieces.tsx";
@@ -12,10 +13,14 @@ import type { Text } from "./text.ts";
  * picks one, and the legal moves of the piece picked show as dots, rings on captures; a second press on one of them, or a drag there, plays it. At any time
  * the right button lights a square, or draws an arrow when dragged, until a left click.
  */
-export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, player, selected, targets, dots, notice, promotion, onSelect, onMove, onRefuse, onPromote, text }: {
+export function Board({ fen, bottom, lastMove, badge, drawn, nextMove, jumped, check, end, player, selected, targets, dots, notice, promotion, onSelect, onMove, onRefuse, onPromote, text }: {
     fen: string;
     bottom: Side;
     lastMove?: Move;
+    /** The AI's badge on the last move, in a game in analysis (D-69): on the square it went to, by its name. */
+    badge?: { badge: MoveBadge; name: string; };
+    /** The arrows and squares the AI drew with its note on the move shown (D-69), under the player's own marks. */
+    drawn?: { arrows?: readonly DrawnArrow[]; squares?: readonly DrawnSquare[]; };
     /** The move after this position, while the player looks back (T-88): stepping back over it slides its pieces home. */
     nextMove?: Move;
     /** Whether the position comes from a jump of more moves through the game, which shows it at once. */
@@ -146,10 +151,11 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
         return column >= 0 && column < 8 && row >= 0 && row < 8 ? `${columns[column]}${ranks[row]}` : undefined;
     };
 
-    // Where a square's corner is, from the board's.
+    // Where a square's corner is in the window.
     const cornerOf = (square: string): [number, number] => {
-        const size = board.current!.getBoundingClientRect().width / 8;
-        return [columns.indexOf(square[0]!) * size, ranks.indexOf(Number(square[1])) * size];
+        const box = board.current!.getBoundingClientRect();
+        const size = box.width / 8;
+        return [box.left + columns.indexOf(square[0]!) * size, box.top + ranks.indexOf(Number(square[1])) * size];
     };
 
     const goBack = (): void => {
@@ -179,22 +185,6 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
             clearTimeout(landed);
         };
     }, [drag?.back, drag === undefined]);
-
-    // A piece dragged out of the window gives it no scrollbar; the page keeps those it had, so nothing moves under the piece.
-    useEffect(() => {
-        if (drag === undefined) {
-            return;
-        }
-
-        const root = document.documentElement;
-        root.style.overflowX = root.scrollWidth > root.clientWidth ? "" : "hidden";
-        root.style.overflowY = root.scrollHeight > root.clientHeight ? "" : "hidden";
-
-        return () => {
-            root.style.overflowX = "";
-            root.style.overflowY = "";
-        };
-    }, [drag === undefined]);
 
     const down = (event: PointerEvent): void => {
         const square = squareAt(event.clientX, event.clientY);
@@ -277,7 +267,7 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
         // A finger holds the piece three quarters of a square above it, and drops it where the piece is seen; until it has gone half a square, the
         // piece stays on its own, so a touch never pushes it a square on by mistake.
         const over = now.touch && !now.moved ? now.from : squareAt(event.clientX, now.touch ? event.clientY - 0.75 * size : event.clientY);
-        setDrag({ from: now.from, at: [event.clientX - box.left - size / 2, event.clientY - box.top - size / 2], over, touch: now.touch, back: false });
+        setDrag({ from: now.from, at: [event.clientX - size / 2, event.clientY - size / 2], over, touch: now.touch, back: false });
     };
 
     const release = (event: PointerEvent, cancelled: boolean): void => {
@@ -352,6 +342,11 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
                 onPointerUp={(event) => release(event, false)}
                 onPointerCancel={(event) => release(event, true)}
                 onContextMenu={(event) => event.preventDefault()}
+                // A click takes no focus, nor leaves it elsewhere: the arrows keep browsing the moves; a square has the focus only from the keyboard.
+                onMouseDown={(event) => {
+                    event.preventDefault();
+                    (document.activeElement as HTMLElement | null)?.blur();
+                }}
             >
                 {ranks.flatMap((rank, row) =>
                     columns.map((file, column) => {
@@ -361,6 +356,7 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
                         const marked = lastMove !== undefined && (lastMove.from === square || lastMove.to === square);
                         const target = targets.find((move) => move.to === square);
                         const sign = signs.get(square);
+                        const tinted = drawn?.squares?.find((one) => one.square === square)?.colour;
                         const classes = [
                             "square",
                             dark ? "dark" : "light",
@@ -368,6 +364,7 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
                             mated === square ? "mated" : "",
                             sign?.classes ?? "",
                             selected === square ? "selected" : "",
+                            tinted === undefined ? "" : `noted ${tinted}`,
                             marks.squares.includes(square) ? "marked" : "",
                             notice?.explanation?.ring === square ? "culprit" : "",
                             own(square) ? "own" : "",
@@ -418,11 +415,13 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
                                 ))}
                                 {piece === undefined ? null : <Piece key={moving ? fen : "still"} letter={piece} />}
                                 {sign === undefined ? null : <Badge kind={sign.badge} />}
+                                {badge === undefined || lastMove?.to !== square ? null : <BadgeIcon badge={badge.badge} title={badge.name} />}
                             </div>
                         );
                     })
                 )}
             </div>
+            {drawn?.arrows === undefined ? null : <Arrows arrows={drawn.arrows} at={centreOf} occupied={(square) => pieces.has(square)} />}
             <Arrows arrows={drawing === undefined ? marks.arrows : [...marks.arrows, drawing]} at={centreOf} />
             {notice?.explanation?.arrow === undefined ? null : <Arrows arrows={[notice.explanation.arrow]} at={centreOf} explain={{ occupied: pieces.has(notice.explanation.arrow.to) }} />}
             {drag === undefined || !pieces.has(drag.from) ? null : <Lifted drag={drag} letter={pieces.get(drag.from)!} />}
@@ -501,7 +500,7 @@ interface Press
     moved: boolean;
 }
 
-/** A piece in the air: where its corner is on the board, the square it would land on, and whether it is going back. */
+/** A piece in the air: where its corner is in the window, the square it would land on, and whether it is going back. */
 interface Drag
 {
     readonly from: string;
@@ -683,11 +682,12 @@ function Badge({ kind }: { kind: BadgeKind; })
     );
 }
 
-/** An arrow drawn with the right button, from one square to another. */
+/** An arrow drawn with the right button, from one square to another; in a colour of its own when the AI drew it (D-69). */
 interface Arrow
 {
     readonly from: string;
     readonly to: string;
+    readonly colour?: DrawColour;
 }
 
 /** What the player marked with the right button: squares lit and arrows, until a left click. */
@@ -714,15 +714,21 @@ function toggled(marks: Marks, from: string, to: string): Marks
  * The arrows over the board, in squares from its top left corner: a knight's turns once, the long leg first. In ink when they explain a refused move, and
  * cut short (T-91, Zoe): off the culprit's piece, and before the piece they point at, so both stay in sight.
  */
-function Arrows({ arrows, at, explain }: { arrows: readonly Arrow[]; at: (square: string) => [number, number]; explain?: { readonly occupied: boolean; }; })
+function Arrows({ arrows, at, explain, occupied }: {
+    arrows: readonly Arrow[];
+    at: (square: string) => [number, number];
+    explain?: { readonly occupied: boolean; };
+    /** The AI's arrows (D-69): their points stop short of a piece, as an explaining arrow's. */
+    occupied?: (square: string) => boolean;
+})
 {
     if (arrows.length === 0) {
         return null;
     }
 
     return (
-        <svg class={explain === undefined ? "arrows" : "arrows explain"} viewBox="0 0 8 8" aria-hidden="true">
-            {arrows.map(({ from, to }) => {
+        <svg class={explain !== undefined ? "arrows explain" : occupied !== undefined ? "arrows drawn" : "arrows"} viewBox="0 0 8 8" aria-hidden="true">
+            {arrows.map(({ from, to, colour }) => {
                 const [startX, startY] = at(from);
                 const [pointX, pointY] = at(to);
                 const knight = Math.abs(pointX - startX) * Math.abs(pointY - startY) === 2;
@@ -732,15 +738,17 @@ function Arrows({ arrows, at, explain }: { arrows: readonly Arrow[]; at: (square
                     ? [startX, pointY]
                     : [pointX, startY];
                 const [x0, y0] = explain === undefined ? [startX, startY] : towards([startX, startY], corner ?? [pointX, pointY], explainTrim.start);
-                const [x1, y1] = explain?.occupied === true ? towards([pointX, pointY], corner ?? [startX, startY], explainTrim.end) : [pointX, pointY];
+                const [x1, y1] = explain?.occupied === true || occupied?.(to) === true ? towards([pointX, pointY], corner ?? [startX, startY], explainTrim.end) : [pointX, pointY];
                 const [fromX, fromY] = corner ?? [x0, y0];
                 const length = Math.hypot(x1 - fromX, y1 - fromY);
                 const [dx, dy] = [(x1 - fromX) / length, (y1 - fromY) / length];
                 const [endX, endY] = [x1 - dx * arrowHead.length, y1 - dy * arrowHead.length];
                 const side = (sign: number): string => `${endX - dy * arrowHead.width * sign},${endY + dx * arrowHead.width * sign}`;
+                // The shaft runs halfway into the point, so no seam shows where they meet; the layer's opacity hides the overlap.
+                const [shaftX, shaftY] = [x1 - dx * arrowHead.length / 2, y1 - dy * arrowHead.length / 2];
                 return (
-                    <g key={`${from}${to}`}>
-                        <path d={`M${x0} ${y0}${corner === undefined ? "" : ` L${corner[0]} ${corner[1]}`} L${endX} ${endY}`} />
+                    <g key={`${from}${to}`} class={colour}>
+                        <path d={`M${x0} ${y0}${corner === undefined ? "" : ` L${corner[0]} ${corner[1]}`} L${shaftX} ${shaftY}`} />
                         <polygon points={`${side(1)} ${x1},${y1} ${side(-1)}`} />
                     </g>
                 );

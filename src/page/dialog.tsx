@@ -20,6 +20,8 @@ export function Dialog({ open, title, onBack, onClose, text, children }: {
 
         if (open && !element.open) {
             element.showModal();
+            // The field marked autofocus takes the focus, which the dialog itself would keep.
+            element.querySelector<HTMLElement>("[autofocus]")?.focus();
         } else if (!open && element.open) {
             element.close();
         }

@@ -1,11 +1,15 @@
 // The talk on the board page (D-51, T-65): a line of the player's or the AI's, saved with the game, and the player's words the AI has not been given yet.
-import { type CurrentGame, loadGame, saveGame, type Speaker, talkLine, unheardWords, type Words } from "../games/index.ts";
+import { endWithMood, type Mood } from "../core/index.ts";
+import { archiveEnded, type CurrentGame, endOf, loadGame, saveGame, type Speaker, talkLine, unheardWords, type Words } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 
-/** Adds a line to the talk of the current game, going on or just over, and saves it. A line refused changes nothing: it throws, in words for whoever spoke. */
-export function say(folder: string, who: Speaker, text: string, at: Date): CurrentGame
+/**
+ * Adds a line to the talk of the current game, going on or just over, and saves it; the AI's mood once the game is over, which the archive keeps too (D-70). A
+ * line refused changes nothing: it throws, in words for whoever spoke.
+ */
+export function say(folder: string, who: Speaker, text: string, at: Date, mood?: Mood): CurrentGame
 {
     const current = gameAt(folder, at);
 
@@ -13,8 +17,22 @@ export function say(folder: string, who: Speaker, text: string, at: Date): Curre
         throw new Error(who === "ai" ? "There is no game: the board page shows your words beside one. Nothing changed." : "There is no game going on: start one in the chat.");
     }
 
+    if (mood !== undefined && endOf(current.game) === undefined) {
+        throw new Error("While the game goes on your mood comes with ai_move: say it without mood. Nothing changed.");
+    }
+
     current.talk.push(talkLine(current, who, text, at));
+
+    if (mood !== undefined) {
+        endWithMood(current.game, mood);
+    }
+
     saveGame(folder, current);
+
+    if (mood !== undefined) {
+        archiveEnded(folder, current);
+    }
+
     return current;
 }
 

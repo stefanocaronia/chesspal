@@ -1,7 +1,9 @@
 import { z } from "zod";
-import { boardText } from "../core/index.ts";
+import { boardText, moods, moodTag } from "../core/index.ts";
 import { commentWithPlan, talkLimits } from "../games/index.ts";
+import { hasPonderAgent, ponderAgentFor } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
+import type { Context } from "./context.ts";
 import { closingLines, moveLines, type MovePlayed } from "./game-summary.ts";
 import { playMove } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
@@ -18,27 +20,65 @@ export const aiMove = defineCommand({
         plan: sentence(200).describe("your plan, in one sentence: kept for you, hidden from the player"),
         comment: sentence(talkLimits.ai).optional().describe(
             'your words for the player, in one sentence, only when there is something to say: pieces and moves in words ("your knight takes on f6"), never in '
-                + "notation (Nxf6+); never your plans or threats",
+                + "notation (Nxf6+); never your plans or threats; **two asterisks** put a word or two in bold on the page",
         ),
         offer_draw: z.boolean().optional().describe("true offers the player a draw with this move: it stands until their move"),
+        mood: z.enum(moods).optional().describe(
+            "only when your feeling about the game changes: your face on the board page shows it for three of your moves, this one included (a surprise for this one only), then "
+                + "turns neutral by itself; leave it out otherwise",
+        ),
     }),
     alwaysLoad: true,
     positionals: ["move"],
-    run: ({ move, plan, comment, offer_draw: offerDraw = false }, context): MovePlayed => {
+    run: ({ move, plan, comment, offer_draw: offerDraw = false, mood }, context): Played => {
         // The player's words are read before the move, which would count as the answer to them; a move refused leaves them for the next call.
         const waiting = waitingWords(context);
-        const played = playMove(gameFolder(context.folder), context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: commentWithPlan(comment, plan), offerDraw });
-        return { ...played, words: give(context, waiting) };
+        const withPlan = commentWithPlan(comment, plan);
+        const played = playMove(gameFolder(context.folder), context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, {
+            comment: mood === undefined ? withPlan : `${withPlan} ${moodTag(mood)}`,
+            offerDraw,
+        });
+        const agent = ponderAgent(context, played);
+        return { ...played, words: give(context, waiting), ...(agent === undefined ? {} : { ponder: agent }) };
     },
     format: (result) => {
+        // The mood the AI has just given is not told back: player_move and status tell it while it lasts (Priya, round of T-107).
+        const game = { ...result.game };
+        delete game.mood;
         // The board goes before the player's words and the next step, which stays the last line.
-        return [`Played ${result.move}.`, ...moveLines(result), "Board, for your message when the player plays in the chat:", boardText(result.game.fen), ...closingLines(result.game, result.words)]
-            .join("\n");
+        return [
+            `Played ${result.move}.`,
+            ...moveLines({ ...result, game }),
+            "Board, for your message when the player plays in the chat:",
+            boardText(result.game.fen),
+            ...(result.ponder === undefined ? [] : [ponderLine(result.ponder)]),
+            ...closingLines(result.game, result.words),
+        ].join("\n");
     },
 });
 
+/** The AI's move, and the agent that thinks on the player's time when the host runs one (D-72). */
+type Played = MovePlayed & { ponder?: string; };
+
+/** The agent to start after the move: in Claude Code, in a folder init set up with it, while the game goes on (D-72). */
+function ponderAgent(context: Context, played: MovePlayed): string | undefined
+{
+    if (context.host?.() !== "claude-code" || played.game.end !== undefined) {
+        return undefined;
+    }
+
+    const agent = ponderAgentFor(played.game.level);
+    return hasPonderAgent(context.folder, agent) ? agent : undefined;
+}
+
+/** How to start the agent, and that the player sees nothing of it: its end needs no answer either. */
+function ponderLine(agent: string): string
+{
+    return `Think on the player's time: start the ${agent} agent in the background with the prompt "Ponder."; write nothing about it in the chat, now or when it ends.`;
+}
+
 /** One sentence of the AI's, kept in a PGN comment: no brackets or braces, which would break it. */
-function sentence(most: number)
+export function sentence(most: number): z.ZodString
 {
     return z.string().trim().min(1, "write one sentence").max(most, `write one sentence of ${most} characters at most`).regex(/^[^[\]{}]*$/, "write it without [ ] { }");
 }

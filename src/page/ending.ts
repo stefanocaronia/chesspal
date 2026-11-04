@@ -12,17 +12,19 @@ export function howEnded(outcome: Outcome, termination: string | undefined): How
         return outcome.ending;
     }
 
-    if (termination === "draw agreed") {
+    // Ours, and those of games played elsewhere (D-68): "Game drawn by agreement", Lichess's "Time forfeit", chess.com's "X won by resignation" in any of
+    // its languages, "X ha vinto per abbandono".
+    if (/^draw agreed$|by agreement|per accordo/i.test(termination ?? "")) {
         return "agreement";
     }
 
     // A flag that fell (T-37): "Black lost on time", "Black ran out of time and White cannot mate".
-    if (/ (lost on|ran out of) time\b/.test(termination ?? "")) {
+    if (/ (lost on|ran out of|won on) time\b|time forfeit|per tempo/i.test(termination ?? "")) {
         return "time";
     }
 
     // "White resigns", or a draw (D-65): "White resigns and Black cannot mate".
-    return / resigns\b/.test(termination ?? "") ? "resignation" : undefined;
+    return / resigns\b|by resignation|per abbandono/i.test(termination ?? "") ? "resignation" : undefined;
 }
 
 /**

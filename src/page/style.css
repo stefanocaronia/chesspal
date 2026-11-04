@@ -31,6 +31,22 @@
     --torretta-screen: #16263a;
     --torretta-face: #f2f7fc;
     --torretta-light: #f4c84c;
+    --torretta-alarm: #ef6a4c;
+    --torretta-ponder: #8f9a8a;
+    /* The badges of the moves (D-69, T-41): white signs, dark on the yellow one; each disc at least 3:1 with its sign */
+    --badge-ink: #fff;
+    --badge-note: #7b8794;
+    --badge-brilliant: #0f9a9e;
+    --badge-great: #2f74c8;
+    --badge-best: #3c9a3a;
+    --badge-excellent: #6b9c2c;
+    --badge-good: #7d9a62;
+    --badge-book: #94704c;
+    --badge-inaccuracy: #e6b422;
+    --badge-inaccuracy-ink: #3b2c00;
+    --badge-mistake: #d4650f;
+    --badge-miss: #c2407d;
+    --badge-blunder: #d22c2c;
     --shadow: 0 1px 2px rgba(29, 39, 51, 0.06), 0 6px 18px rgba(29, 39, 51, 0.06);
     /* On a light page the board keeps a thin edge in its dark squares colour, and a deeper shadow, so its light squares do not melt into the page (T-83) */
     --board-shadow: 0 0 0 1px color-mix(in oklab, var(--dark-square) 55%, transparent), 0 2px 4px rgba(29, 39, 51, 0.1), 0 10px 28px rgba(29, 39, 51, 0.12);
@@ -69,6 +85,10 @@
     --hint: rgba(0, 0, 0, 0.17);
     --lift-shadow: rgba(0, 0, 0, 0.5);
     --torretta-screen: #0f1a28;
+    --badge-great: #3577c9;
+    --badge-book: #9c7650;
+    --badge-miss: #c9478a;
+    --badge-blunder: #d93434;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.25);
     --board-shadow: var(--shadow);
     color-scheme: dark;
@@ -141,6 +161,25 @@ button {
 
 .verdict:empty {
     display: none;
+}
+
+/* The chip's icon says what it is about; the game in analysis stands out in the accent's colour (D-69) */
+.verdict:has(.icon) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.verdict .icon {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    stroke-width: 2;
+}
+
+.verdict.analysis {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--ink);
 }
 
 .icon {
@@ -555,13 +594,11 @@ button {
     min-height: 0;
 }
 
-.ai-block {
-    flex: 0 1 auto;
-}
-
-/* The player's words give way before the AI's last ones: the box and the card never do. */
+/* Each side's talk has half the column at most: past it, its words scroll; the box and the cards never give way. */
+.ai-block,
 .you-block {
     flex: 0 1 auto;
+    max-height: calc(50% - var(--between) / 2);
 }
 
 .you-block > .compose,
@@ -624,7 +661,7 @@ button {
     /* Over every square, the sliding piece's too (z-index 1) */
     z-index: 2;
     pointer-events: none;
-    opacity: 0.8;
+    opacity: 0.7;
 }
 
 .arrows path {
@@ -635,6 +672,48 @@ button {
 
 .arrows polygon {
     fill: var(--mark);
+}
+
+/* What the AI draws with its note in an analysis (D-69): arrows and squares in the four colours of PGN's %cal and %csl */
+.arrows g.green {
+    --mark: #15a34a;
+}
+
+.arrows g.red {
+    --mark: #dc2626;
+}
+
+.arrows g.yellow {
+    --mark: #eab308;
+}
+
+.arrows g.blue {
+    --mark: #2563eb;
+}
+
+/* The AI's squares are rings (Zoe, T-40): the last move's fill and the player's marks stay seen under them */
+.square.noted::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 max(3px, 0.6cqw) var(--ring), inset 0 0 0 calc(max(3px, 0.6cqw) + 1.5px) rgba(255, 255, 255, 0.8);
+}
+
+.square.noted.green {
+    --ring: #15a34a;
+}
+
+.square.noted.red {
+    --ring: #dc2626;
+}
+
+.square.noted.yellow {
+    --ring: #eab308;
+}
+
+.square.noted.blue {
+    --ring: #2563eb;
 }
 
 /* Moving a piece (T-70, Zoe's design): dots for the legal moves, rings on captures, a gold edge on the square a dragged piece would land on */
@@ -694,9 +773,9 @@ button {
     cursor: grabbing !important;
 }
 
-/* The lifted piece follows the pointer without a transition; the piece inside it rises */
+/* The lifted piece follows the pointer without a transition; the piece inside it rises. Fixed to the window, it never gives the page a scrollbar */
 .lifted {
-    position: absolute;
+    position: fixed;
     left: 0;
     top: 0;
     width: 12.5cqw;
@@ -738,11 +817,12 @@ button {
     z-index: 1;
 }
 
-.square.slide .piece {
+/* The square's own piece only: one taken or fading on it keeps its own animation */
+.square.slide > .piece {
     animation: slide 220ms cubic-bezier(0.25, 0.8, 0.35, 1);
 }
 
-.square.shake .piece {
+.square.shake > .piece {
     animation: ring 320ms cubic-bezier(0.3, 0, 0.2, 1) 200ms;
 }
 
@@ -756,7 +836,7 @@ button {
     animation: taken 220ms forwards;
 }
 
-.square.appear .piece {
+.square.appear > .piece {
     animation: appear 220ms;
 }
 
@@ -803,9 +883,9 @@ button {
         transition: none;
     }
 
-    .square.slide .piece,
-    .square.shake .piece,
-    .square.appear .piece {
+    .square.slide > .piece,
+    .square.shake > .piece,
+    .square.appear > .piece {
         animation: none;
     }
 
@@ -816,9 +896,23 @@ button {
 }
 
 /* The end of the game (T-77): the kings' badges and the loser's king laid down stay; the effects play once, when the game ends under the player's eyes */
+/* The king laid down keeps its size and lies on the base the other pieces stand on, in the middle of its square: it turns about the point that puts it
+   there, which each set's drawing places */
 .square.fallen .piece {
     rotate: -90deg;
-    scale: 0.88;
+    transform-origin: var(--fallen-pivot, 50% 50%);
+}
+
+:root[data-set="nitida"] {
+    --fallen-pivot: 53.7% 54.8%;
+}
+
+:root[data-set="torretta"] {
+    --fallen-pivot: 52% 50.8%;
+}
+
+:root[data-set="cburnett"] {
+    --fallen-pivot: 50.2% 50.9%;
 }
 
 .badge {
@@ -868,6 +962,31 @@ button {
 
 .badge.half {
     background: #69727d;
+}
+
+/* A move's badge (D-69, T-41): 16px beside a move, a third of a square in the corner of its arrival, edged in white as the kings' badges */
+.move-badge {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    vertical-align: -3px;
+}
+
+.square .move-badge {
+    position: absolute;
+    top: 2.5%;
+    right: 2.5%;
+    z-index: 2;
+    width: clamp(16px, 4.25cqw, 30px);
+    height: clamp(16px, 4.25cqw, 30px);
+    border-radius: 50%;
+    box-shadow: 0 0 0 max(1.5px, 0.25cqw) #fff, 0 0.2cqw 0.6cqw rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
+/* With the king's badge on the same square, at the end, the move's stands beside it (Zoe, T-40) */
+.square:has(.badge) .move-badge {
+    right: calc(2.5% + clamp(14px, 3.8cqw, 30px) + max(4px, 0.6cqw));
 }
 
 /* Checkmate: the king rings with the check, its square fills with red from the edges, then it falls */
@@ -940,13 +1059,11 @@ button {
 @keyframes fall {
     from {
         rotate: 0deg;
-        scale: 1;
         animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
     }
 
     45% {
         rotate: -90deg;
-        scale: 0.88;
         animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
     }
 
@@ -969,7 +1086,6 @@ button {
 @keyframes lay {
     from {
         rotate: 0deg;
-        scale: 1;
     }
 }
 
@@ -1146,10 +1262,9 @@ button {
     stroke-width: 3;
 }
 
-/* The arrow that explains a refused move: ink with a light halo, apart from the player's orange ones */
+/* The arrow that explains a refused move: ink, apart from the player's orange ones */
 .arrows.explain {
-    opacity: 0.88;
-    filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.9));
+    opacity: 0.78;
 }
 
 .arrows.explain path {
@@ -1333,10 +1448,15 @@ button {
     box-shadow: var(--shadow);
 }
 
+/* The picture stays at the card's top left, however many lines the card has; the clock in the middle */
 .player-line {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
+}
+
+.player-line > .clock {
+    align-self: center;
 }
 
 .player-line > svg {
@@ -1398,12 +1518,13 @@ button {
     color: #fff;
 }
 
-/* The pieces taken overlap within a kind; with nearly all of them, they wrap rather than leave the card */
+/* The pieces taken overlap within a kind, close enough that all fifteen and the score stay on one line */
 .taken {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 2px 4px;
+    gap: 0;
+    white-space: nowrap;
     min-height: 20px;
     margin-top: 3px;
 }
@@ -1412,17 +1533,28 @@ button {
     display: inline-flex;
 }
 
+/* A kind starts close to the one before: the piece's own margin is the gap */
+.taken .group + .group {
+    margin-left: -3px;
+}
+
 /* The pieces taken are the set's small ones (T-94), whose colours and edges are their own */
 .taken .piece {
     width: 20px;
     height: 20px;
 }
 
+/* Pawns comb tight; the other pieces show more of themselves, a pair of rooks or bishops two pieces still (Zoe, T-40) */
 .taken .piece + .piece {
     margin-left: -11px;
 }
 
+.taken .pawns .piece + .piece {
+    margin-left: -15px;
+}
+
 .balance {
+    flex: none;
     margin-left: 2px;
     color: var(--soft);
     font-size: 13px;
@@ -1461,7 +1593,8 @@ button {
     stroke-linecap: round;
 }
 
-/* The Torretta, whose eyes blink now and then */
+/* The Torretta, whose eyes blink now and then, and its moods (D-70): a new face that pops in, never fading out, a red light when worried, out when sad, a light that breathes when
+   thoughtful */
 .torretta .antenna {
     fill: none;
     stroke: var(--torretta-shade);
@@ -1471,6 +1604,37 @@ button {
 
 .torretta .light {
     fill: var(--torretta-light);
+    transition: fill 0.2s;
+}
+
+.torretta.mood-worried .light {
+    fill: var(--torretta-alarm);
+}
+
+.torretta.mood-thoughtful .light {
+    animation: ponder 2.4s ease-in-out infinite;
+}
+
+.torretta.mood-sad .light {
+    fill: var(--torretta-shade);
+}
+
+@keyframes ponder {
+    50% {
+        fill: var(--torretta-ponder);
+    }
+}
+
+.torretta .expression.changed {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: face-in 0.16s ease-out;
+}
+
+@keyframes face-in {
+    from {
+        transform: scale(0.8);
+    }
 }
 
 .torretta .shade {
@@ -1488,6 +1652,15 @@ button {
 .torretta .eyes,
 .torretta .mouth {
     fill: var(--torretta-face);
+}
+
+.torretta .expression .line,
+.torretta .brows {
+    fill: none;
+    stroke: var(--torretta-face);
+    stroke-width: 3.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .torretta .eyes {
@@ -1509,8 +1682,14 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .torretta .eyes {
+    .torretta .eyes,
+    .torretta .expression.changed,
+    .torretta.mood-thoughtful .light {
         animation: none;
+    }
+
+    .torretta .light {
+        transition: none;
     }
 }
 
@@ -1918,12 +2097,213 @@ button {
     font-size: 12px;
 }
 
+/* A game in analysis (D-69): the AI's word on the whole game above the moves, and its note on the move shown in the talk, under the Torretta */
+.review {
+    display: grid;
+    gap: 4px;
+    font-size: 13.5px;
+    line-height: 1.45;
+}
+
+.review.waiting {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--soft);
+}
+
+.review ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+/* In analysis nothing in the talk gives way: on a short screen the talk scrolls whole */
+.talk.studied {
+    overflow-y: auto;
+}
+
+.talk.studied > section,
+.talk.studied > section > * {
+    flex: none;
+}
+
+.spinner {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spinner {
+        animation-duration: 3s;
+    }
+}
+
+/* The badges of a side's moves, in its card under the pieces taken */
+.badge-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    font-size: 13px;
+}
+
+.badge-counts li {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.review p,
+.ai-note p {
+    margin: 0;
+}
+
+.review .head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--soft);
+    font-size: 12px;
+}
+
+.ai-note {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.ai-note .who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--soft);
+    font-size: 13px;
+}
+
+/* Only the note's last bubble has a tail, pointing down at the Torretta beside the AI's name, the board turned round or not */
+.ai-note > .say::before,
+.ai-note > .say::after {
+    content: none;
+}
+
+.ai-note > .say:has(+ .who)::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    bottom: -9px;
+    border: 10px solid transparent;
+    border-bottom: 0;
+    border-top-color: var(--say);
+}
+
+.ai-note > .say + .who {
+    margin-top: 4px;
+}
+
+/* In analysis the board turned round changes which side's card is on top, never the order of the talk */
+.flipped .talk.studied,
+.flipped .talk.studied > section {
+    flex-direction: column;
+}
+
+.move-note .head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* The note is the bubble's content: in the bubble's own ink, not the soft one of a side note (Zoe, T-40) */
+.move-note .note {
+    display: block;
+    margin-top: 4px;
+    color: var(--say-ink);
+    font-size: 14.5px;
+}
+
+/* The words the AI put in bold, in the titles' colour; the squares and moves in its words in the accent too, to find on the board */
+.say b {
+    color: var(--ink);
+    font-weight: 700;
+}
+
+.say .on-board {
+    color: var(--accent);
+}
+
+/* What the colours drawn with the note mean, the ones it uses */
+.move-note .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+    margin-top: 6px;
+    color: var(--soft);
+    font-size: 12px;
+}
+
+.move-note .legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.move-note .legend i {
+    width: 14px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--ring);
+}
+
+.legend .green {
+    --ring: #15a34a;
+}
+
+.legend .red {
+    --ring: #dc2626;
+}
+
+.legend .yellow {
+    --ring: #eab308;
+}
+
+.legend .blue {
+    --ring: #2563eb;
+}
+
+/* The move's number, which the list far below gives on a phone */
+.move-note .move-number {
+    display: none;
+    margin-right: 2px;
+    color: var(--soft);
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.board-steps {
+    display: none;
+}
+
 .app.folded .side {
     visibility: hidden;
     transition: visibility 0s 200ms;
 }
 
+/* Positioned, so that the moves' hidden names scroll with the list instead of stretching the page */
 .moves {
+    position: relative;
     flex: 1;
     min-height: 90px;
     overflow: auto;
@@ -1955,6 +2335,9 @@ button {
 /* A move is a button that shows it on the board (T-88) */
 .moves .ply {
     justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     padding: 0 3px;
     margin-left: -3px;
     background: none;
@@ -2019,6 +2402,12 @@ button {
     vertical-align: -0.22em;
 }
 
+/* A capture's x is grey, so the squares of a move read first */
+.takes {
+    color: var(--soft);
+    font-weight: 400;
+}
+
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -2042,6 +2431,30 @@ button {
     max-width: 40em;
     margin: 24px auto;
     padding: 0 16px;
+}
+
+/* The page without its server, after /clear in Claude's app: a bar over the page, which waits under it, dimmed and still */
+.offline {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    z-index: 20;
+    width: min(560px, calc(100vw - 32px));
+    margin: 0;
+    padding: 12px 16px;
+    transform: translateX(-50%);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+    font-size: 14px;
+    text-align: center;
+}
+
+.offline + .app {
+    opacity: 0.45;
+    filter: grayscale(0.6);
 }
 
 /* The settings (D-56): a dialog over the page; each choice shows at once */
@@ -2347,6 +2760,127 @@ button {
     font-size: 16px;
 }
 
+.study textarea {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--page);
+    color: var(--ink);
+    font: 13px/1.4 ui-monospace, monospace;
+    resize: vertical;
+}
+
+.study .file input {
+    font: inherit;
+    font-size: 14px;
+    color: var(--soft);
+}
+
+/* The file button as our secondary buttons, in both themes */
+.study .file input::file-selector-button {
+    margin-right: 10px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+.study .note {
+    margin: 0 0 16px;
+}
+
+/* In analysis, the game's own commands in the right column (T-106): save its PGN with the review, open the other analyses */
+.analysis-actions {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+}
+
+.analysis-actions button {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.analysis-actions button:hover {
+    border-color: var(--accent);
+}
+
+/* The analyses to open again (T-106): a line each, who played and how it ended, then when, the opening and how long, and whether the AI has reviewed it */
+.study h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--soft);
+}
+
+.analyses ul {
+    display: grid;
+    gap: 6px;
+    max-height: 40vh;
+    overflow-y: auto;
+    margin: 0 0 18px;
+    padding: 0;
+    list-style: none;
+}
+
+.analyses button {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.analyses button:hover {
+    border-color: var(--accent);
+}
+
+.analyses b {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.analyses .note {
+    margin: 0;
+    font-size: 12px;
+}
+
+.analyses .state {
+    color: var(--soft);
+    font-size: 12px;
+    text-align: right;
+}
+
+.analyses .state.reviewed {
+    color: var(--accent);
+}
+
+.profile-form textarea:focus-visible,
 .profile-form input:focus-visible,
 .profile-form select:focus-visible {
     outline: 2px solid var(--accent);
@@ -3037,7 +3571,8 @@ button {
         width: 100%;
     }
 
-    .says {
+    .says,
+    .sent {
         max-height: 30vh;
     }
 
@@ -3061,5 +3596,37 @@ button {
 
     .moves li {
         break-inside: avoid;
+    }
+
+    /* A game in analysis, turned round or not: the card on top, the board, its steps under the thumb, the Torretta's note, the card below, the moves (Zoe, T-40) */
+    .app:has(.talk.studied),
+    .app.flipped:has(.talk.studied) {
+        grid-template-areas: "head" "ai" "board" "steps" "note" "you" "side";
+    }
+
+    .talk.studied > .ai-block {
+        display: contents;
+    }
+
+    .talk.studied > .ai-block > :not(.ai-note) {
+        grid-area: ai;
+    }
+
+    .talk.studied .ai-note {
+        grid-area: note;
+        margin-top: 0;
+    }
+
+    .board-steps {
+        display: block;
+        grid-area: steps;
+    }
+
+    .app:has(.talk.studied) .side .steps {
+        display: none;
+    }
+
+    .move-note .move-number {
+        display: inline;
     }
 }

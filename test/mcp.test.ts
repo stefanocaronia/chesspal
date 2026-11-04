@@ -52,6 +52,24 @@ describe("the MCP server", () => {
         expect(status?._meta?.["anthropic/alwaysLoad"]).toBe(true);
     });
 
+    it("records what the chat has read after its own calls, not after an agent's, so that the doorbell still rings the player's move (D-72)", async () => {
+        const context = testContext(mkdtempSync(join(tmpdir(), "chesspal-")));
+        const agent = { ...play, name: "agent_play", byAgent: true };
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await createMcpServer(context, [play, agent]).connect(serverTransport);
+        client = new Client({ name: "test", version: "1.0.0" });
+        await client.connect(clientTransport);
+
+        await client.callTool({ name: "agent_play", arguments: { san: "e4" } });
+
+        expect(context.seen).toBeUndefined();
+
+        await client.callTool({ name: "play", arguments: { san: "e4" } });
+
+        expect(context.seen).toBeDefined();
+        rmSync(context.folder, { recursive: true, force: true });
+    });
+
     it("names the opponent on the page after the host: Claude, Codex, or no name", () => {
         expect(opponentOf("claude-code")).toBe("Claude");
         expect(opponentOf("codex-mcp-client")).toBe("Codex");

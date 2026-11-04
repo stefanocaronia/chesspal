@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { canMate, Game, type Side, timeLeft } from "../core/index.ts";
+import { canMate, endWithMood, Game, moods, type Side, timeLeft } from "../core/index.ts";
 import { archiveEnded, bothSidesMoved, type CurrentGame, drawOfferOf, saveGame } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { gameGoingOn, type GameSummary, nextStep, positionLines, summaryOf } from "./game-summary.ts";
@@ -17,10 +17,13 @@ export const endGame = defineCommand({
     name: "end_game",
     description: "Ends the game by a resignation or a draw agreed; checkmate, stalemate and the draws by rule end it by themselves. Call it to resign, when "
         + 'the player resigns in the chat, or to agree a draw while an offer stands: theirs, or yours they accept in the chat. Example: end_game {result: "player_resigns"}.',
-    input: z.object({ result: z.enum(["player_resigns", "ai_resigns", "draw_agreed"]).describe("how the game ends") }),
+    input: z.object({
+        result: z.enum(["player_resigns", "ai_resigns", "draw_agreed"]).describe("how the game ends"),
+        mood: z.enum(moods).optional().describe("how you feel as the game ends, which your face on the board page keeps"),
+    }),
     idempotent: true,
     positionals: ["result"],
-    run: ({ result }, context): Ended => {
+    run: ({ result, mood }, context): Ended => {
         const now = context.now();
         const folder = gameFolder(context.folder);
         const current = gameGoingOn(folder, now);
@@ -32,6 +35,11 @@ export const endGame = defineCommand({
         const ending = result === "draw_agreed" ? { Result: "1/2-1/2", Termination: "draw agreed" } : resignation(current, result === "player_resigns" ? player(current) : current.ai);
         const { record } = current.game;
         const game = new Game({ ...record, tags: { ...record.tags, ...ending } });
+
+        if (mood !== undefined) {
+            endWithMood(game, mood);
+        }
+
         // The clock stops at the end, with the time the side to move had spent.
         const ended: CurrentGame = current.clock === undefined
             ? { ...current, game }

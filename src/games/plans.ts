@@ -7,11 +7,17 @@ export function commentWithPlan(comment: string | undefined, plan: string): stri
     return comment === undefined ? `[%plan ${plan}]` : `${comment} [%plan ${plan}]`;
 }
 
+/** The plan a move's comment carries, if it carries one. */
+export function planOf(comment: string | undefined): string | undefined
+{
+    return planPattern.exec(comment ?? "")?.[1];
+}
+
 /** The plan the AI wrote last, if it wrote one. */
 export function currentPlan(record: GameRecord): string | undefined
 {
     for (let index = record.moves.length - 1; index >= 0; index--) {
-        const plan = planPattern.exec(record.moves[index]?.comment ?? "")?.[1];
+        const plan = planOf(record.moves[index]?.comment);
 
         if (plan !== undefined) {
             return plan;

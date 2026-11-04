@@ -1,5 +1,5 @@
 // The page's words in the player's language (D-32): Italian or English, from the browser's or as the settings say (D-56).
-import type { AiLevel, IllegalReason, PieceLetter, Side } from "../core/index.ts";
+import type { AiLevel, Badge, DrawColour, IllegalReason, PieceLetter, Side } from "../core/index.ts";
 import type { Step } from "./browse.ts";
 import type { HowEnded } from "./ending.ts";
 import type { AvatarId, Level, RatingSite } from "./profile.ts";
@@ -11,6 +11,8 @@ export interface Text
     readonly flip: string;
     readonly theme: string;
     readonly sounds: string;
+    /** The switch that reads the AI's words aloud. */
+    readonly voice: string;
     readonly newGame: string;
     /** The player's draws and resignation in a game going on (D-65). */
     readonly offerDraw: string;
@@ -43,6 +45,13 @@ export interface Text
     /** The buttons that step through the moves (T-88). */
     readonly steps: Readonly<Record<Step, string>>;
     readonly noGame: string;
+    /** A game the AI goes over with the player (D-69): what the header says, the badges it puts on the moves, and its word on the whole game. */
+    readonly analysing: string;
+    readonly badges: Readonly<Record<Badge, string>>;
+    reviewBy(name: string): string;
+    /** What the colours the AI draws with a note mean (D-69). */
+    readonly drawn: Readonly<Record<DrawColour, string>>;
+    reviewing(name: string): string;
     readonly you: string;
     readonly ai: string;
     readonly sides: Readonly<Record<Side, string>>;
@@ -62,6 +71,10 @@ export interface Text
     readonly outOfBook: string;
     readonly inBook: string;
     readonly clearChat: string;
+    /** The page lost its server, which lives in Claude's chat: where to write to bring it back. */
+    readonly offline: string;
+    /** A command such as /clear written in the page's talk, which is for Claude's app. */
+    readonly commandHere: string;
     /** The choice of the piece a pawn becomes on the last rank (T-11). */
     readonly promoteTo: string;
     /** A square the piece picked may go to, for a screen reader (T-11). */
@@ -90,6 +103,29 @@ export interface Text
     readonly profile: ProfileText;
     /** The new game's dialog (D-48, T-58). */
     readonly start: StartText;
+    /** The dialog that brings a game played elsewhere to analyse (T-92). */
+    readonly study: StudyText;
+}
+
+/** The words of the dialog that brings a game to analyse. */
+export interface StudyText
+{
+    /** The header's button and the dialog's title. */
+    readonly title: string;
+    readonly paste: string;
+    readonly file: string;
+    readonly note: string;
+    readonly start: string;
+    /** The list of the analyses, and the part that brings a new game. */
+    readonly yours: string;
+    readonly bring: string;
+    readonly reviewed: string;
+    readonly unreviewed: string;
+    moves(count: number): string;
+    /** The column's button that saves the game in analysis with its review. */
+    readonly download: string;
+    /** The column's button under a game just over, which opens it in analysis. */
+    readonly analyseIt: string;
 }
 
 /** The words of the new game's dialog. */
@@ -157,7 +193,9 @@ export type ServerRefusal =
     | "draw-offered"
     | "draw-none"
     | "draw-early"
-    | "profile-game";
+    | "profile-game"
+    | "game-going"
+    | "pgn-unreadable";
 
 /**
  * A move the board refused (T-11), as the page names it: why, the piece moved, the square it went to and whether a piece stood there, the piece that forbids
@@ -188,6 +226,7 @@ const english: Text = {
     flip: "Flip",
     theme: "Light or dark theme",
     sounds: "Sounds",
+    voice: "Read the AI's words aloud",
     newGame: "New game",
     offerDraw: "Offer a draw",
     offerDrawWhen: "Offer a draw: on your turn, once each side has moved",
@@ -236,6 +275,22 @@ const english: Text = {
     moves: "Moves",
     steps: { first: "Start", back: "Previous move", forward: "Next move", last: "Back to the game" },
     noGame: "No game yet: press + to start one, or ask for one in the chat.",
+    analysing: "Analysis in progress",
+    badges: {
+        brilliant: "Brilliant",
+        great: "Great move",
+        best: "Best move",
+        excellent: "Excellent",
+        good: "Good",
+        book: "Book",
+        inaccuracy: "Inaccuracy",
+        mistake: "Mistake",
+        miss: "Miss",
+        blunder: "Blunder",
+    },
+    reviewBy: (name) => `${name}'s review`,
+    drawn: { green: "better", red: "threat", yellow: "another way", blue: "plan" },
+    reviewing: (name) => `${name} is going over the game…`,
     you: "You",
     ai: "AI",
     sides: { white: "White", black: "Black" },
@@ -264,7 +319,9 @@ const english: Text = {
     promoteTo: "Promote to",
     canGo: "a legal move",
     boardLabel: (turn, lastMove) => `Chessboard, ${english.toMove(turn)}${lastMove === undefined ? "" : `, last move ${lastMove}`}`,
-    clearChat: "Before a new game, clear the chat: write /clear there, or open a new chat. A clean chat plays faster.",
+    clearChat: 'Before a new game, clear your chat with Claude: in Claude\'s app, not here, write /clear, then a message such as "new game". A clean chat plays faster.',
+    offline: "Claude is not connected. Write it a message in Claude's app, not in this page's chat: the page connects again by itself.",
+    commandHere: "/clear and the other commands go in Claude's app, not here.",
     refused: {
         "no-game": () => "There is no game going on: press + to start one, or ask for one in the chat.",
         "ai-to-move": () => "Wait for the AI's move.",
@@ -278,6 +335,8 @@ const english: Text = {
         "draw-none": () => "There is no draw offer to answer.",
         "draw-early": () => "You can offer a draw once each side has made a move.",
         "profile-game": () => english.profile.whilePlaying,
+        "game-going": () => "A game is going on: finish it before you bring another to analyse.",
+        "pgn-unreadable": () => "Chesspal cannot read this PGN: check you copied the whole game, its tags and its moves.",
     },
     piece: (letter, side) => `${side} ${englishNames[letter]}`,
     taken: (pieces, ahead) => `Pieces taken: ${pieces.length === 0 ? "none" : pieces.join(", ")}${ahead > 0 ? `; ahead by ${ahead}` : ""}`,
@@ -348,6 +407,20 @@ const english: Text = {
         abandons: "The game going on goes to the archive unfinished.",
         start: "Start",
     },
+    study: {
+        title: "Analyses",
+        paste: "Paste the game's PGN",
+        file: "or choose a .pgn file",
+        note: "The game is kept to study; the AI goes over it with you in the chat.",
+        start: "Analyse",
+        yours: "Your analyses",
+        bring: "Bring a game",
+        reviewed: "reviewed",
+        unreviewed: "to review",
+        moves: (count) => `${count} ${count === 1 ? "move" : "moves"}`,
+        download: "Save PGN",
+        analyseIt: "Analyse the game",
+    },
 };
 
 const italian: Text = {
@@ -355,6 +428,7 @@ const italian: Text = {
     flip: "Gira",
     theme: "Tema chiaro o scuro",
     sounds: "Suoni",
+    voice: "Leggi ad alta voce le parole dell'AI",
     newGame: "Nuova partita",
     offerDraw: "Proponi patta",
     offerDrawWhen: "Proponi patta: nel tuo turno, dopo una mossa a testa",
@@ -403,6 +477,22 @@ const italian: Text = {
     moves: "Mosse",
     steps: { first: "Inizio", back: "Mossa precedente", forward: "Mossa successiva", last: "Torna alla partita" },
     noGame: "Nessuna partita: premi + per iniziarne una, o chiedila nella chat.",
+    analysing: "Analisi in corso",
+    badges: {
+        brilliant: "Geniale",
+        great: "Ottima mossa",
+        best: "Mossa migliore",
+        excellent: "Eccellente",
+        good: "Buona",
+        book: "Teoria",
+        inaccuracy: "Imprecisione",
+        mistake: "Errore",
+        miss: "Occasione persa",
+        blunder: "Errore grave",
+    },
+    reviewBy: (name) => `Il giudizio di ${name}`,
+    drawn: { green: "meglio", red: "minaccia", yellow: "altra via", blue: "piano" },
+    reviewing: (name) => `${name} sta analizzando la partita…`,
     you: "Tu",
     ai: "AI",
     sides: { white: "Bianco", black: "Nero" },
@@ -431,7 +521,9 @@ const italian: Text = {
     promoteTo: "Promuovi a",
     canGo: "mossa possibile",
     boardLabel: (turn, lastMove) => `Scacchiera, ${italian.toMove(turn)}${lastMove === undefined ? "" : `, ultima mossa ${lastMove}`}`,
-    clearChat: "Prima di una nuova partita azzera la chat: scrivi /clear, o aprine una nuova. Con la chat pulita l'AI gioca più veloce.",
+    clearChat: "Prima di una nuova partita azzera la conversazione con Claude: nell'app di Claude, non qui, scrivi /clear e poi un messaggio, per esempio \"nuova partita\". Con la chat pulita l'AI gioca più veloce.",
+    offline: "Claude è scollegato. Scrivigli un messaggio nell'app di Claude, non nella chat di questa pagina: la pagina si ricollega da sola.",
+    commandHere: "/clear e gli altri comandi vanno scritti nell'app di Claude, non qui.",
     refused: {
         "no-game": () => "Nessuna partita in corso: premi + per iniziarne una, o chiedila nella chat.",
         "ai-to-move": () => "Aspetta la mossa dell'AI.",
@@ -445,6 +537,8 @@ const italian: Text = {
         "draw-none": () => "Non c'è una proposta di patta a cui rispondere.",
         "draw-early": () => "Puoi proporre patta dopo una mossa a testa.",
         "profile-game": () => italian.profile.whilePlaying,
+        "game-going": () => "C'è una partita in corso: finiscila prima di portarne un'altra da analizzare.",
+        "pgn-unreadable": () => "Chesspal non riesce a leggere questo PGN: controlla di aver copiato la partita intera, intestazioni e mosse.",
     },
     // Queen and rook are feminine in Italian.
     piece: (letter, side) => `${italianNames[letter]} ${side === "white" ? (letter === "Q" || letter === "R" ? "bianca" : "bianco") : (letter === "Q" || letter === "R" ? "nera" : "nero")}`,
@@ -515,6 +609,20 @@ const italian: Text = {
         noClock: "Senza",
         abandons: "La partita in corso va nell'archivio, non finita.",
         start: "Inizia",
+    },
+    study: {
+        title: "Analisi",
+        paste: "Incolla il PGN della partita",
+        file: "oppure scegli un file .pgn",
+        note: "La partita resta tra quelle da studiare; l'AI la commenta con te nella chat.",
+        start: "Analizza",
+        yours: "Le tue analisi",
+        bring: "Porta una partita",
+        reviewed: "commentata",
+        unreviewed: "da commentare",
+        moves: (count) => `${count} ${count === 1 ? "mossa" : "mosse"}`,
+        download: "Scarica PGN",
+        analyseIt: "Analizza la partita",
     },
 };
 

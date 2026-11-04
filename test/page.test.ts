@@ -6,7 +6,8 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
-import { Bell, waitForBell } from "../src/server/bell.ts";
+import { status } from "../src/commands/status.ts";
+import { Bell, bellLine, codexBellAnswer, waitForBell } from "../src/server/bell.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page.ts";
 import { testContext } from "./commands.ts";
 
@@ -66,6 +67,85 @@ describe("the page's server", () => {
         expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, profiles: [] });
         host = "Claude";
         expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, opponent: "Claude", profiles: [] });
+    });
+
+    it("gives the game in analysis, with the AI's review, once no game goes on (D-69)", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const served = async (): Promise<{ game: object | null; analysis?: { name: string; pgn: string; }; }> => JSON.parse((await get(page, "/api/game")).body);
+
+        await run(folder, "analyse_game", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' });
+        await run(folder, "annotate_game", { notes: [{ move: "2.", badge: "inaccuracy", note: "early queen" }], summary: "A quiet start." });
+        expect(await served()).toMatchObject({ game: null, analysis: { name: "study/2026-11-02-153012.pgn", book: 4 } });
+        expect((await served()).analysis?.pgn.replace(/\s+/g, " ")).toContain("{[%review A quiet start.]} 1. e4 {[%badge book]} 1... e5 {[%badge book]} 2. Qh5?! {[%badge inaccuracy] [%review early queen]} 2... Nc6 {[%badge book]}");
+
+        await run(folder, "new_game", { ai_colour: "black" });
+        expect((await served()).analysis).toBeUndefined();
+    });
+
+    it("keeps a game the player brings to analyse and puts it in analysis, refusing a PGN it cannot read or a game going on (T-92)", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const kept = "study/2026-11-02-153012.pgn";
+
+        expect(await post(page, "/api/study", { pgn: "1. e4 e5 2. Ke3 Ke6 3. Kxe5 *" })).toMatchObject({ status: 400, body: expect.stringContaining('"refusal":"pgn-unreadable"') });
+        expect(await post(page, "/api/study", { pgn: " " })).toMatchObject({ status: 400 });
+        expect(await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ game: null, analysis: { name: kept } });
+        expect(await statusOf(folder)).toMatch(new RegExp(`\\nNo game\\.\\nThe player brought ${kept} on the board page to analyse it\\. Next: call analyse_game \\{"game": "${kept}"\\}`));
+
+        // The same game brought again is news again; once the AI goes over it, it is only the game in analysis.
+        await run(folder, "analyse_game", { game: kept });
+        expect(await statusOf(folder)).toContain(`\nIn analysis on the board page: ${kept}; analyse_game {"game": "${kept}"} goes over it with the player.`);
+        await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' });
+        expect(await statusOf(folder)).toContain(`The player brought ${kept} on the board page`);
+
+        await run(folder, "new_game", { ai_colour: "black" });
+        expect(await post(page, "/api/study", { pgn: "1. e4 *" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"game-going"') });
+        expect(await statusOf(folder)).not.toContain("In analysis");
+    });
+
+    it("lists the analyses, opens one again by its name, and takes back a review exported from the page ready, without waking the chat (T-106)", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const kept = "study/2026-11-02-153012.pgn";
+        const pgn = '[White "Ann"]\n[Black "Bob"]\n[Date "2026.10.01"]\n\n1. e4 e5 2. Qh5 Nc6 *';
+
+        await post(page, "/api/study", { pgn });
+        expect(JSON.parse((await get(page, "/api/analyses")).body)).toEqual([{ name: kept, white: "Ann", black: "Bob", date: "2026.10.01", result: "*", opening: expect.any(String), moves: 2, reviewed: false }]);
+
+        await run(folder, "annotate_game", { notes: [{ move: "2.", badge: "inaccuracy", note: "early queen", arrows: ["Rh5f7"] }], summary: "A quiet start." });
+        expect(JSON.parse((await get(page, "/api/analyses")).body)).toMatchObject([{ name: kept, reviewed: true }]);
+        const exported = JSON.parse((await get(page, "/api/game")).body).analysis.pgn as string;
+
+        // In another folder, the exported game comes in with its review, ready: the chat is not asked to go over it.
+        const other = playerFolder();
+        const elsewhere = await open(other);
+        expect(await post(elsewhere, "/api/study", { pgn: exported })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":true}' });
+        const ready = JSON.parse((await get(elsewhere, "/api/game")).body).analysis.pgn as string;
+        expect(ready.replace(/\s+/g, " ")).toContain("{[%review A quiet start.]}");
+        expect(ready.replace(/\s+/g, " ")).toContain("2. Qh5?! {[%badge inaccuracy] [%review early queen] [%cal Rh5f7]}");
+        expect(await statusOf(other)).toContain("In analysis on the board page");
+        expect(await statusOf(other)).not.toContain("brought");
+
+        // Opened again by its name, a reviewed game stays quiet too; a name that is not there is refused.
+        expect(await post(page, "/api/study", { game: kept })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":true}' });
+        expect(await post(page, "/api/study", { game: "study/2026-01-01-000000.pgn" })).toMatchObject({ status: 400 });
+    });
+
+    it("lists the games played, reviewed or not, and opens the one just over for the chat to go over", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        await run(folder, "new_game", { ai_colour: "black" });
+        await post(page, "/api/move", { move: "e4" });
+        await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." });
+
+        expect(await post(page, "/api/study", { last: true })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"game-going"') });
+        await post(page, "/api/resign", {});
+        expect(JSON.parse((await get(page, "/api/analyses")).body)).toMatchObject([{ white: "Player", moves: 1, reviewed: false }]);
+
+        expect(await post(page, "/api/study", { last: true })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
+        expect(await statusOf(folder)).toContain("call analyse_game");
     });
 
     it("answers only at its own address, and changes nothing but by a move", async () => {
@@ -450,6 +530,10 @@ describe("the doorbell of the chat", () => {
 
         expect(await waitForBell(JSON.stringify({ cwd: playerFolder() }), [Number(new URL(page.url).port)])).toBe(false);
     });
+
+    it("wakes Codex with a Stop hook's block and the same fixed line, never the move", () => {
+        expect(JSON.parse(codexBellAnswer)).toEqual({ decision: "block", reason: bellLine });
+    });
 });
 
 async function open(folder: string, opponent?: () => string | undefined, context: Context = testContext(folder)): Promise<Page>
@@ -464,6 +548,11 @@ function playerFolder(): string
     const folder = mkdtempSync(join(tmpdir(), "chesspal-page-"));
     folders.push(folder);
     return folder;
+}
+
+async function statusOf(folder: string): Promise<string>
+{
+    return status.format(await status.run({}, testContext(folder)));
 }
 
 async function run(folder: string, name: string, input: Record<string, unknown>, context: Context = testContext(folder)): Promise<void>

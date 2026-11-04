@@ -6,17 +6,22 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { createRequire } from "node:module";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { analyseGame } from "../commands/analyse-game.ts";
 import { gameAt } from "../commands/clock.ts";
 import type { Context } from "../commands/context.ts";
 import { answerDraw, DrawRefused, offerDraw } from "../commands/draw-offer.ts";
 import { endGame } from "../commands/end-game.ts";
 import { ChatNotClear, newGame } from "../commands/new-game.ts";
+import { bookPlies } from "../commands/opening-book.ts";
 import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
-import { type CurrentGame, drawOfferOf, endOf, gameStamp, heardLines, loadGame, playerLinesThisMove, playerPgn, talkLimits, WordsRefused } from "../games/index.ts";
+import { gameToStudy, namedGame } from "../commands/study.ts";
+import { type GameRecord, writePgn } from "../core/index.ts";
+import { type CurrentGame, drawOfferOf, endOf, gameInAnalysis, gameStamp, heardLines, loadGame, playerLinesThisMove, playerPgn, startAnalysis, talkLimits, WordsRefused } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
+import { analysesOf, isReviewed } from "./analyses.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
-import { bodyOf, isJson, json, jsonOf, send, textOf } from "./http.ts";
+import { bodyOf, bytesOf, isJson, json, jsonOf, send, textOf } from "./http.ts";
 import { answerProfiles, profilesShown } from "./profile-routes.ts";
 
 /** The page of a player's folder, served: its address, how to tell it the AI was given words, which change no file, and how to stop it. */
@@ -136,6 +141,11 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         return;
     }
 
+    if (request.method === "POST" && path === "/api/study") {
+        void studyFromPage(request, response, served);
+        return;
+    }
+
     // The API answers GET alone: a HEAD at the doorbell would wait there as a hook does.
     if (request.method !== "GET" && (request.method !== "HEAD" || path.startsWith("/api/"))) {
         send(
@@ -143,7 +153,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
             405,
             "text/plain; charset=utf-8",
             "The page only reads, moves with POST /api/move, writes with POST /api/message, starts a game with POST /api/new, "
-                + "offers or answers a draw with POST /api/draw, resigns with POST /api/resign, and keeps the profiles with POST /api/profile/… and /api/settings.",
+                + "offers or answers a draw with POST /api/draw, resigns with POST /api/resign, brings a game to analyse or opens one again with POST /api/study, and keeps the profiles with POST /api/profile/… and /api/settings.",
         );
         return;
     }
@@ -152,6 +162,8 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         send(response, 200, "text/html; charset=utf-8", html, { "Content-Security-Policy": policy });
     } else if (path === "/api/game") {
         sendGame(response, served);
+    } else if (path === "/api/analyses") {
+        send(response, 200, json, JSON.stringify(analysesOf(served.folder)));
     } else if (path === "/api/events") {
         keepPosted(request, response, served);
     } else if (path === "/api/bell") {
@@ -336,13 +348,84 @@ function resignFromPage(request: IncomingMessage, response: ServerResponse, serv
 }
 
 /**
+ * A game the player brings from elsewhere to analyse (T-92): kept to study and put in analysis as analyse_game does with a PGN, the page showing it at once,
+ * and the doorbell rung for the chat to go over it. Never while a game goes on.
+ */
+async function studyFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
+{
+    const asked = 'Send the game as JSON: {"pgn": "[White \\"…\\"] … 1. e4 e5 …"}, one to open again by its name: {"game": "study/2026-11-04-153012.pgn"}, '
+        + 'or the game just over: {"last": true}.';
+
+    if (!isJson(request)) {
+        send(response, 415, json, JSON.stringify({ error: asked }));
+        return;
+    }
+
+    const body = jsonOf((await bytesOf(request, pgnLimit))?.toString("utf8"));
+    const pgn = textOf(body?.pgn);
+    const game = textOf(body?.game);
+    const last = body?.last === true;
+
+    if (pgn === undefined && game === undefined && !last) {
+        send(response, 400, json, JSON.stringify({ error: asked, refusal: "pgn-unreadable" }));
+        return;
+    }
+
+    if (refusalOf(served)?.refusal !== "no-game") {
+        send(response, 409, json, JSON.stringify({ error: "A game is going on: finish it before you bring another to analyse.", refusal: "game-going" }));
+        return;
+    }
+
+    let reviewed: boolean;
+
+    try {
+        // Without what the chat was told: the analyst's instructions stay for the AI's own analyse_game.
+        const opened = last ? lastPlayed(served.context) : game === undefined ? kept(served, pgn!) : namedGame(served.context, game);
+        reviewed = isReviewed(opened.record);
+        // A game not yet reviewed is marked as brought, for status to ask the AI to go over it (T-92); one reviewed is ready, and the chat sleeps on (T-106).
+        startAnalysis(gameFolder(served.folder), opened.name, served.context.now(), !reviewed);
+    } catch (error) {
+        send(response, 400, json, JSON.stringify({ error: (error as Error).message, refusal: "pgn-unreadable" }));
+        return;
+    }
+
+    if (!reviewed) {
+        served.bell.ring();
+    }
+
+    send(response, 200, json, JSON.stringify({ kept: true, reviewed }));
+}
+
+/** The game just over, or else the last one played, as analyse_game takes it without a name: always one of the archive. */
+function lastPlayed(context: Context): { name: string; record: GameRecord; }
+{
+    const { name, record } = gameToStudy(context);
+
+    if (name === undefined) {
+        throw new Error("The game just over is not in the archive yet: try again in a moment.");
+    }
+
+    return { name, record };
+}
+
+/** A game brought as a PGN, kept to study as analyse_game keeps it: the one already kept when it is the same game, with its review. */
+function kept(served: Served, pgn: string): { name: string; record: GameRecord; }
+{
+    analyseGame.run({ pgn }, { ...served.context, told: undefined });
+    return namedGame(served.context, gameInAnalysis(gameFolder(served.folder))!.game);
+}
+
+/** The longest PGN the page brings: a long game with its clocks, and the comments a site adds, which go. */
+const pgnLimit = 256 * 1024;
+
+/**
  * A request refused, as the page reads it: the server's words, and the code of a refusal the page says in the player's language (T-11), with the characters
  * left for words too long; without a code, the page shows the words.
  */
 export interface Refused
 {
     readonly error: string;
-    readonly refusal?: "no-game" | "ai-to-move" | "illegal" | "clear-chat" | `words-${WordsRefused["reason"]}` | `draw-${DrawRefused["reason"]}` | "profile-game";
+    readonly refusal?: "no-game" | "ai-to-move" | "illegal" | "clear-chat" | `words-${WordsRefused["reason"]}` | `draw-${DrawRefused["reason"]}` | "profile-game" | "game-going" | "pgn-unreadable";
     readonly most?: number;
 }
 
@@ -483,8 +566,9 @@ function watchFolder(folder: string, heard: (name: string | null) => void): FSWa
     }
 }
 
-// The current game, the profile in use, and what a profile keeps (who plays, their picture, their settings); a folder's name, for a profile made or gone.
-const watched = /^(?:game\.json|active\.json|profile\.md|settings\.json|avatar\.\w+|[a-z0-9-]+)$/;
+// The current game, the game in analysis, the profile in use, and what a profile keeps (who plays, their picture, their settings); a folder's name, for a
+// profile made or gone.
+const watched = /^(?:game\.json|analysis\.json|active\.json|profile\.md|settings\.json|avatar\.\w+|[a-z0-9-]+)$/;
 
 /**
  * The game in progress or just ended, as the player may see it: its PGN without the AI's plans while it goes on, the AI's side, when it started, and the
@@ -505,10 +589,30 @@ function sendGame(response: ServerResponse, served: Served): void
             ...(current.clock === undefined ? {} : { clock: current.clock }),
             ...(offer === undefined ? {} : { drawOffer: offer }),
         };
-        const body = { game, opponent: served.opponent(), ...profilesShown(served.folder) };
+        const analysis = current === undefined || endOf(current.game) !== undefined ? analysisShown(served) : undefined;
+        const body = { game, ...(analysis === undefined ? {} : { analysis }), opponent: served.opponent(), ...profilesShown(served.folder) };
         send(response, 200, json, JSON.stringify(body));
     } catch (error) {
         send(response, 500, json, JSON.stringify({ error: (error as Error).message }));
+    }
+}
+
+/** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review; none without one, or when it cannot be read. */
+function analysisShown(served: Served): { name: string; pgn: string; book: number; } | undefined
+{
+    const analysis = gameInAnalysis(gameFolder(served.folder));
+
+    if (analysis === undefined) {
+        return undefined;
+    }
+
+    try {
+        const { name, record } = namedGame(served.context, analysis.game);
+        // How far the book goes, which the page cannot tell without the book's moves: its card names the opening on those moves.
+        return { name, pgn: writePgn(record), book: bookPlies(record) };
+    } catch {
+        // A game gone from the archive is no longer shown.
+        return undefined;
     }
 }
 

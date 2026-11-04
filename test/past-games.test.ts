@@ -23,7 +23,7 @@ describe("the games played (D-57)", async () => {
         await endGame.run(endGame.input.parse({ result: "player_resigns" }), context);
 
         const started = newGame.format(await newGame.run(newGame.input.parse({ ai_colour: "white" }), { ...context, now: () => new Date(2026, 10, 2, 16, 0, 0) }));
-        const line = "2026-11-02 15:30, you played Black: you won 0-1 (White resigns), B50 Sicilian Defense: Modern Variations, 2 moves. games/2026-11-02-153012.pgn";
+        const line = "2026-11-02 15:30, you (AI) played Black and won 0-1 (White resigns), B50 Sicilian Defense: Modern Variations, 2 moves. games/2026-11-02-153012.pgn";
         expect(started).toContain(`Last games with this player (past_games gives more, and their moves):\n${line}`);
 
         expect(pastGames.format(await pastGames.run(pastGames.input.parse({}), context))).toBe(line);

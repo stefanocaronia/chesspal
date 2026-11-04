@@ -17,6 +17,8 @@ export const serverInstructions = "Chesspal keeps the chess for you: the rules, 
 export function createMcpServer(context: Context = defaultContext(), list: AnyCommand[] = commands): McpServer
 {
     const server = new McpServer({ name: "chesspal", version }, { instructions: serverInstructions });
+    // The server keeps what it told the chat, the instructions a tool gives once.
+    context.told ??= new Set();
 
     for (const command of list.filter((each) => each.cliOnly !== true)) {
         server.registerTool(command.name, toolConfig(command), (input: unknown) => track(runTool(command, input, context)));
@@ -100,8 +102,10 @@ async function runTool(command: AnyCommand, input: unknown, context: Context): P
     } catch (error) {
         return { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], isError: true };
     } finally {
-        // What the tool read or wrote, the chat has seen: the doorbell rings it only for what changes after.
-        chatHasRead(context);
+        // What the tool read or wrote, the chat has seen: the doorbell rings it only for what changes after. An agent's call is not the chat's.
+        if (command.byAgent !== true) {
+            chatHasRead(context);
+        }
     }
 }
 

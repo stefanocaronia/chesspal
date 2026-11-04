@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { archivedName } from "../games/index.ts";
+import { archivedName, gameInAnalysis } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { gameAt } from "./clock.ts";
-import { closingLines, type GameSummary, nextStep, positionLines, sidesLine, summaryOf } from "./game-summary.ts";
+import { closingLines, type GameSummary, nextStep, positionLines, sidesLine, summaryOf, withThought, wordLines } from "./game-summary.ts";
 import { levelText } from "./levels.ts";
 import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
@@ -22,6 +22,8 @@ interface Status
     problem?: string;
     /** What the player wrote on the board page that the AI has not answered yet, all of it (T-65). */
     words?: string[];
+    /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there (T-92). */
+    analysis?: { game: string; brought?: true; };
 }
 
 /** What Chesspal sees now, the first call of a chat: a dashboard under 150 tokens while the player is to move, with the next step. */
@@ -52,8 +54,14 @@ export const status = defineCommand({
             const current = gameAt(folder, context.now());
 
             if (current !== undefined) {
-                status.game = summaryOf(current, context.now(), archivedName(folder, current));
+                status.game = withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current);
                 status.words = unansweredWords(context);
+            }
+
+            const analysis = current === undefined || status.game?.end !== undefined ? gameInAnalysis(folder) : undefined;
+
+            if (analysis !== undefined) {
+                status.analysis = { game: analysis.game, ...(analysis.brought === true ? { brought: true } : {}) };
             }
         } catch (error) {
             status.problem = (error as Error).message;
@@ -61,21 +69,31 @@ export const status = defineCommand({
 
         return status;
     },
-    format: ({ version, folder, page, player, game, problem, words = [] }) =>
+    format: ({ version, folder, page, player, game, problem, words = [], analysis }) =>
         [
             `Chesspal ${version}. Folder: ${folder}`,
             ...(page === undefined ? [] : [`Board page: ${page}`]),
             ...(player === undefined ? [] : [player]),
-            ...(problem === undefined ? gameLines(game, words) : [problem]),
+            ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true)),
+            ...(analysis === undefined ? [] : [analysisLine(analysis)]),
         ].join("\n"),
 });
 
-function gameLines(game: GameSummary | undefined, words: readonly string[]): string[]
+/** The game in analysis; the next step when the player has just brought it on the board page (T-92). */
+function analysisLine({ game, brought }: NonNullable<Status["analysis"]>): string
+{
+    return brought === true
+        ? `The player brought ${game} on the board page to analyse it. Next: call analyse_game {"game": "${game}"}, then keep your review on that page with annotate_game, and go over it with them.`
+        : `In analysis on the board page: ${game}; analyse_game {"game": "${game}"} goes over it with the player.`;
+}
+
+/** The game's lines; a game the player brought to analyse takes the place of the next step (T-92). */
+function gameLines(game: GameSummary | undefined, words: readonly string[], brought: boolean): string[]
 {
     if (game === undefined) {
-        return ["No game.", nextStep(game)];
+        return brought ? ["No game."] : ["No game.", nextStep(game)];
     }
 
     const moves = game.lastMoves === "" ? [] : [`Moves: ${game.lastMoves}`];
-    return [`Game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`, ...moves, ...positionLines(game), ...closingLines(game, words)];
+    return [`Game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`, ...moves, ...positionLines(game), ...(brought ? wordLines(words) : closingLines(game, words))];
 }

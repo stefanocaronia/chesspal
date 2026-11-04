@@ -11,6 +11,14 @@ const folders: string[] = [];
 // The doorbell of the moves on the page (D-47), as init writes it into Claude Code's settings.
 const bellHook = { type: "command", command: "chesspal listen", asyncRewake: true, timeout: 86_400 };
 const chatHook = { type: "command", command: "chesspal chat" };
+// The doorbell as init writes it into Codex's hooks (T-62).
+const codexBellHook = {
+    type: "command",
+    command: "chesspal listen --codex",
+    commandWindows: "chesspal.cmd listen --codex",
+    timeout: 86_400,
+    statusMessage: "Waiting for your move on the board page",
+};
 
 afterEach(() => {
     for (const folder of folders.splice(0)) {
@@ -26,7 +34,8 @@ describe("chesspal init", () => {
 
         expect(exitCode).toBe(0);
         expect(output).toBe(
-            `Set up ${chess}: .mcp.json, AGENTS.md, CLAUDE.md, ${join(".claude", "settings.json")}, ${join(".codex", "config.toml")}.\n`
+            `Set up ${chess}: .mcp.json, AGENTS.md, CLAUDE.md, ${join(".claude", "settings.json")}, ${join(".claude", "agents", "chesspal-ponder-quick.md")}, `
+                + `${join(".claude", "agents", "chesspal-ponder.md")}, ${join(".codex", "config.toml")}, ${join(".codex", "hooks.json")}.\n`
                 + "To play, open Claude Code or Codex in this folder and say hello; the first time, they ask whether to trust the folder: say yes, or Chesspal cannot start.\n"
                 + "Chesspal must stay installed: npm install -g chesspal.",
         );
@@ -35,7 +44,12 @@ describe("chesspal init", () => {
         expect(text(chess, "CLAUDE.md")).toBe("@AGENTS.md\n");
         expect(json(chess, ".claude/settings.json")).toEqual({ enabledMcpjsonServers: ["chesspal"], permissions: { allow: ["mcp__chesspal"] }, hooks: { Stop: [{ hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] } });
         expect(text(chess, ".codex/config.toml")).toBe('[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
+        expect(json(chess, ".codex/hooks.json")).toEqual({ hooks: { Stop: [{ hooks: [codexBellHook] }] } });
         expect(opponentInstructions()).toContain("call `status`");
+        expect(text(chess, ".claude/agents/chesspal-ponder-quick.md")).toMatch(
+            /^---\nname: chesspal-ponder-quick\n.*\ntools: mcp__chesspal__ponder, ToolSearch\nmodel: haiku\n---\n\nYou are the player's chess opponent/s,
+        );
+        expect(text(chess, ".claude/agents/chesspal-ponder.md")).toContain("\nmodel: inherit\n");
     });
 
     it("starts the server through cmd on Windows", async () => {
@@ -55,6 +69,7 @@ describe("chesspal init", () => {
         writeFileSync(join(folder, "CLAUDE.md"), "My notes.\n");
         const ownStop = { hooks: [{ type: "command", command: "say done" }] };
         writeFileSync(join(folder, ".claude", "settings.json"), "﻿" + JSON.stringify({ model: "opus", permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [ownStop] } }));
+        writeFileSync(join(folder, ".codex", "hooks.json"), JSON.stringify({ hooks: { Stop: [ownStop] } }));
         writeFileSync(join(folder, ".codex", "config.toml"), 'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n');
         await runCommandLine(["init"], testContext(folder));
 
@@ -69,6 +84,7 @@ describe("chesspal init", () => {
             hooks: { Stop: [ownStop, { hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] },
         });
         expect(text(folder, ".codex/config.toml")).toBe('model = "gpt-5"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n\n[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
+        expect(json(folder, ".codex/hooks.json")).toEqual({ hooks: { Stop: [ownStop, { hooks: [codexBellHook] }] } });
         expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/is set up already: nothing to change\.\n/);
     });
 

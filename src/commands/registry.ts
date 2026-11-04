@@ -16,6 +16,8 @@ export interface Command<Schema extends z.ZodObject = z.ZodObject, Result = unkn
     idempotent?: boolean;
     /** Hosts load the tool at once instead of on demand: for the ones the AI calls at the start of every chat. */
     alwaysLoad?: boolean;
+    /** An agent calls it apart from the chat, as ponder (D-72): the doorbell's record of what the chat has read stays as it was. */
+    byAgent?: boolean;
     /** Only the command line has it, as init: the MCP server leaves it out, and its description costs the AI no tokens. */
     cliOnly?: boolean;
     /** Fields the command line takes as positional arguments, in order. */

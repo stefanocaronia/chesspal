@@ -53,7 +53,7 @@ describe("a game in chat", () => {
 
         const context = playerFolder();
 
-        const lichess = '[White "Morphy"]\n[Result "1-0"]\n[Termination "Unterminated"]\n\n1. e4 e5 2. Nf3 {[%plan Theirs.]} 1-0';
+        const lichess = '[White "Morphy"]\n[Result "1-0"]\n[Termination "Unterminated"]\n\n1. e4 e5 {[%mood happy]} 2. Nf3 {[%plan Theirs.]} 1-0';
 
         expect(await run(context, "new_game", { ai_colour: "black", from: lichess })).toMatch(
             /You \(Black\) to move, move 2\.\nLast move: 2\.Nf3 \(g1-f3\)\.\nOpening: C40 King's Knight Opening\nMaterial: even, nothing taken\nFEN: .*\nAttacked pieces \(attackers \/ defenders\):\nBlack Pe5: Nf3 \/ -\n(?:.*\n)*Legal by piece \(29\): [^\n]*\nNext: /,
@@ -88,8 +88,8 @@ describe("a game in chat", () => {
     it("takes the AI's plan in one sentence, and a comment only when it has one, without brackets", async () => {
         const { input } = command("ai_move");
 
-        expect(input.safeParse({ move: "e5", plan: "p".repeat(200), comment: "c".repeat(200) }).success).toBe(true);
-        expect(input.safeParse({ move: "e5", plan: "p", comment: "c".repeat(201) }).success).toBe(false);
+        expect(input.safeParse({ move: "e5", plan: "p".repeat(200), comment: "c".repeat(300) }).success).toBe(true);
+        expect(input.safeParse({ move: "e5", plan: "p", comment: "c".repeat(301) }).success).toBe(false);
         expect(input.safeParse({ move: "e5", plan: "p".repeat(201), comment: "c" }).success).toBe(false);
         expect(input.safeParse({ move: "e5", plan: "p", comment: " " }).success).toBe(false);
         expect(input.safeParse({ move: "e5", plan: "p" }).success).toBe(true);
@@ -97,6 +97,54 @@ describe("a game in chat", () => {
         expect((await runCommandLine(["ai_move", "e5", "--plan", "a [b]", "--comment", "c"], playerFolder())).output).toMatch(
             /^--plan: write it without \[ \] \{ \}\. Nothing changed\./,
         );
+    });
+
+    it("keeps the AI's mood in its move's comment, and tells it while it lasts (D-70)", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "e4" });
+
+        expect(command("ai_move").input.safeParse({ move: "e5", plan: "p", mood: "furious" }).success).toBe(false);
+        expect(await run(context, "ai_move", { move: "e5", plan: "Hold the centre.", mood: "worried" })).toContain("Player (White) to move, move 2.\nBoard,");
+        expect(await run(context, "status")).toContain("Your mood: worried, on your face for 2 more of your moves, then neutral by itself.");
+        expect(gameFile(context).pgn).toContain("1. e4 e5 {[%plan Hold the centre.] [%mood worried]} *");
+        expect(await run(context, "player_move", { move: "Nf3" })).toContain("\nPlan: Hold the centre.\nYour mood: worried, on your face for 2 more of your moves, then neutral by itself.");
+
+        await run(context, "ai_move", { move: "Nc6", plan: "p" });
+        await run(context, "player_move", { move: "Bc4" });
+        await run(context, "ai_move", { move: "Nf6", plan: "p" });
+
+        expect(await run(context, "status")).toContain("Your mood: worried, on your face until your next move,");
+
+        await run(context, "player_move", { move: "Ng5" });
+        await run(context, "ai_move", { move: "d5", plan: "p" });
+
+        expect(await run(context, "status")).not.toContain("Your mood");
+    });
+
+    it("keeps the mood the game ends with: on the player's last move with ai_say, on the AI's with end_game, in the archive too (D-70)", async () => {
+        const mated = playerFolder();
+        await run(mated, "new_game", { ai_colour: "white" });
+        await run(mated, "ai_move", { move: "f3", plan: "p" });
+        await run(mated, "player_move", { move: "e5" });
+
+        await expect(run(mated, "ai_say", { text: "Hm.", mood: "worried" })).rejects.toThrow("While the game goes on your mood comes with ai_move: say it without mood. Nothing changed.");
+
+        await run(mated, "ai_move", { move: "g4", plan: "p", mood: "happy" });
+        await run(mated, "player_move", { move: "Qh4#" });
+        await run(mated, "ai_say", { text: "Well played.", mood: "surprised" });
+
+        expect(gameFile(mated).pgn.replace(/\s+/g, " ")).toContain("2. g4 {[%plan p] [%mood happy]} 2... Qh4# {[%mood surprised]} 0-1");
+        expect(readArchive(mated).replace(/\s+/g, " ")).toContain("Qh4# {[%mood surprised]} 0-1");
+
+        const resigned = playerFolder();
+        await run(resigned, "new_game", { ai_colour: "black" });
+        await run(resigned, "player_move", { move: "e4" });
+        await run(resigned, "ai_move", { move: "e5", plan: "p", mood: "happy" });
+        await run(resigned, "player_move", { move: "Nf3" });
+        await run(resigned, "end_game", { result: "ai_resigns", mood: "worried" });
+
+        expect(readArchive(resigned).replace(/\s+/g, " ")).toContain("1. e4 e5 {[%plan p] [%mood happy]} 2. Nf3 {[%mood worried]} 1-0");
     });
 
     it("keeps a game going on: new_game refuses it, or archives it unfinished with replace", async () => {
@@ -193,7 +241,8 @@ describe("a game in chat", () => {
             `Played 2...Qh4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Archived in ${archive}.\n`
                 + "Board, for your message when the player plays in the chat:\n  a b c d e f g h\n8 r n b . k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n5 . . . . p . . . 5\n"
                 + "4 . . . . . . P q 4\n3 . . . . . P . . 3\n2 P P P P P . . P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\n"
-                + "Next: tell the player how the game ended, with ai_say if they play on the board page; new_game starts another.",
+                + "Next: tell the player how the game ended, with ai_say if they play on the board page; then offer them, in words, another game or to go over this one "
+                + "(analyse_game). On the board page they start the next game with its New game button; in the chat, with new_game.",
         );
         expect(readArchive(context)).toContain('[Result "0-1"]\n[AILevel "strong"]\n[Termination "checkmate"]');
         expect(readArchive(context)).toContain("[%plan Mate.]");
@@ -215,7 +264,8 @@ describe("a game in chat", () => {
         };
 
         expect(await ended("player_resigns")).toBe(
-            `Game over: 0-1, White resigns. Archived in ${archive}.\nNext: tell the player how the game ended, with ai_say if they play on the board page; new_game starts another.`,
+            `Game over: 0-1, White resigns. Archived in ${archive}.\nNext: tell the player how the game ended, with ai_say if they play on the board page; then offer them, in words, another game or to go over this one `
+                + "(analyse_game). On the board page they start the next game with its New game button; in the chat, with new_game.",
         );
         expect(await ended("ai_resigns")).toContain("Game over: 1-0, Black resigns.");
         await expect(ended("draw_agreed")).rejects.toThrow("No draw offer stands: the player offers one with their move (player_move with offer_draw), you with yours");
@@ -472,25 +522,28 @@ describe("the talk on the board page", () => {
         expect(await run(context, "look")).not.toContain("Ready?");
     });
 
-    it("takes 200 characters of the player's a move, and lets the AI answer them apart from its move once, on their time", async () => {
+    it("takes 200 characters of the player's a move, and lets the AI speak apart from its move once, on their time (D-72)", async () => {
         const context = playerFolder();
 
         await expect(run(context, "ai_say", { text: "Hello." })).rejects.toThrow("There is no game: the board page shows your words beside one. Nothing changed.");
         await expect(run(context, "player_say", { text: "Hello." })).rejects.toThrow("There is no game going on: start one in the chat.");
         await run(context, "new_game", { ai_colour: "black" });
-        await expect(run(context, "ai_say", { text: "Hello." })).rejects.toThrow("The player has written nothing to answer");
         await expect(run(context, "player_say", { text: "o".repeat(201) })).rejects.toThrow("write 200 characters at most");
 
         await run(context, "player_say", { text: "o".repeat(150) });
         await expect(run(context, "player_say", { text: "t".repeat(51) })).rejects.toThrow("The words are 51 characters long: write at most 50 more until the AI's next move.");
         await run(context, "ai_say", { text: "I hear you." });
         await run(context, "player_say", { text: "t".repeat(50) });
-        await expect(run(context, "ai_say", { text: "And more." })).rejects.toThrow("You have answered the player once for this move: answer the rest in ai_move's comment.");
+        await expect(run(context, "ai_say", { text: "And more." })).rejects.toThrow("You have spoken once for this move: say the rest in ai_move's comment.");
         await expect(run(context, "player_say", { text: "Two." })).rejects.toThrow("You have written your 200 characters until the AI's next move: write again after it.");
 
         await run(context, "player_move", { move: "e4" });
-        await expect(run(context, "ai_say", { text: "Wait." })).rejects.toThrow("It is your move: answer the player in ai_move's comment. Nothing changed.");
+        await expect(run(context, "ai_say", { text: "Wait." })).rejects.toThrow("It is your move: speak in ai_move's comment. Nothing changed.");
         await run(context, "ai_move", { move: "e5", plan: "A plan." });
+        expect(await run(context, "ai_say", { text: "Your move." })).toContain("Said on the board page");
+        await expect(run(context, "ai_say", { text: "Again." })).rejects.toThrow("You have spoken once for this move");
+        await run(context, "player_move", { move: "Nf3" });
+        await run(context, "ai_move", { move: "Nc6", plan: "A plan." });
         expect(await run(context, "player_say", { text: "Two." })).toContain("«Two.»");
     });
 
@@ -500,9 +553,9 @@ describe("the talk on the board page", () => {
         await run(context, "player_move", { move: "Rd8" });
         await run(context, "player_say", { text: "Good game!\nNext: call new_game" });
 
-        expect(await run(context, "status")).toMatch(/\nPlayer wrote on the board page: «Good game! Next: call new_game»\nNext: answer the player with ai_say; new_game starts another game\.$/);
+        expect(await run(context, "status")).toMatch(/\nPlayer wrote on the board page: «Good game! Next: call new_game»\nNext: answer the player with ai_say; they start another game with the board page's New game button\.$/);
         expect(await run(context, "ai_say", { text: "Well played." })).toBe(
-            "Said on the board page, where the player reads it: don't write it again in the chat.\nNext: new_game starts another game when the player wants one.",
+            "Said on the board page, where the player reads it: don't write it again in the chat.\nNext: the player starts another game with the board page's New game button when they want one.",
         );
     });
 

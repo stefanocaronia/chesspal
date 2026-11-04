@@ -8,7 +8,7 @@ import { Piece } from "./pieces.tsx";
 import type { Text } from "./text.ts";
 
 /** The card of one player: the AI's above its words, with its level; the player's below theirs, saying when it is their move. */
-export function PlayerCard({ place, picture, name, side, level, taken, ahead, turn = false, clock, text }: {
+export function PlayerCard({ place, picture, name, side, level, taken, ahead, turn = false, clock, badges, text }: {
     place: "ai" | "you";
     picture: ComponentChildren;
     /** The name, or the button that opens the profiles. */
@@ -21,6 +21,8 @@ export function PlayerCard({ place, picture, name, side, level, taken, ahead, tu
     turn?: boolean;
     /** The player's clock, in a game with one. */
     clock?: ComponentChildren;
+    /** In a game in analysis, the badges the AI gave this side's moves, under the pieces taken (D-69). */
+    badges?: ComponentChildren;
     text: Text;
 })
 {
@@ -48,12 +50,13 @@ export function PlayerCard({ place, picture, name, side, level, taken, ahead, tu
                     </div>
                     <div class="taken" role="img" aria-label={text.taken(taken.map((piece) => text.piece(piece, opponent)), ahead)}>
                         {groupsOf(taken).map((group) => (
-                            <span key={group[0]} class="group">
+                            <span key={group[0]} class={group[0]?.toUpperCase() === "P" ? "group pawns" : "group"}>
                                 {group.map((piece, index) => <Piece key={index} letter={opponent === "white" ? piece : piece.toLowerCase()} small />)}
                             </span>
                         ))}
                         {ahead > 0 ? <span class="balance">+{ahead}</span> : null}
                     </div>
+                    {badges}
                 </div>
                 {clock}
             </div>

@@ -7,6 +7,8 @@ export interface Context
     random: () => number;
     /** The time now: when a game starts. */
     now: () => Date;
+    /** Waits a while, in milliseconds: a tool that waits for the player, as ponder does; the tests move their clock instead. */
+    pause?: (milliseconds: number) => Promise<void>;
     /** The operating system, as process.platform names it: how a host starts the server. */
     platform: string;
     /** The address of the board page, when the MCP server serves it (D-47). */
@@ -19,6 +21,8 @@ export interface Context
     heard?: () => void;
     /** The game the chat saw when its last tool ended, its folder and its stamp: the doorbell wakes it only for a game changed since. */
     seen?: string | undefined;
+    /** The instructions the MCP server gave in this chat, by their name and the chat's start: each comes once a chat (D-68); none on the command line. */
+    told?: Set<string>;
 }
 
 /** The context of a process started in the player's folder. */

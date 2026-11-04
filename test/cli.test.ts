@@ -46,11 +46,12 @@ describe("the command line", () => {
         expect(option).toEqual({ output: "status has no parameter --colour. Nothing changed.\nUsage: chesspal status [options]\nRun `chesspal status --help` for its options.", exitCode: 1 });
     });
 
-    it("refuses options after mcp and listen, which a host starts as they are", async () => {
+    it("refuses options after mcp, and after listen all but --codex, which a host starts as they are", async () => {
         expect((await runCommandLine(["mcp", "--stdio"], context)).exitCode).toBe(1);
         expect((await runCommandLine(["mcp", "--help"], context)).exitCode).toBe(0);
         expect((await runCommandLine(["listen", "--port", "5870"], context)).exitCode).toBe(1);
         expect((await runCommandLine(["listen", "--help"], context)).exitCode).toBe(0);
+        expect((await runCommandLine(["listen", "--codex", "--help"], context)).exitCode).toBe(0);
     });
 });
 

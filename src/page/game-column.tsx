@@ -7,8 +7,11 @@ import { Piece } from "./pieces.tsx";
 import type { Ply } from "./plies.ts";
 import type { Text } from "./text.ts";
 
-/** The column, which the player folds with its tab (T-84); under the board, where three columns would leave the board small, always open. */
-export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, shownPlies, onShow, onStep, text }: {
+/**
+ * The column, which the player folds with its tab (T-84); under the board, where three columns would leave the board small, always open. A game in analysis
+ * (D-69) says above the moves that the AI is going over it, until its word on the whole game comes, which the talk shows.
+ */
+export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, analysis, shownPlies, onShow, onStep, onDownload, onAnalyse, text }: {
     plies: readonly Ply[];
     result?: string;
     how?: HowEnded;
@@ -18,18 +21,50 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     move: number;
     toMove: Side;
     opening?: Opening;
+    /** The game in analysis: who reviews it, and their word on the whole game, once written. */
+    analysis?: { by: string; summary?: string; };
     shownPlies: number;
     onShow: (plies: number) => void;
     onStep: (step: Step) => void;
+    /** In analysis (T-106): saves the game with its review as a PGN. */
+    onDownload?: () => void;
+    /** Once the game is over: opens it in analysis. */
+    onAnalyse?: () => void;
     text: Text;
 })
 {
     return (
         <aside class="side" id="game" aria-label={text.game}>
-            {started === undefined ? <p class="card empty">{text.noGame}</p> : (
+            {started === undefined && analysis === undefined ? <p class="card empty">{text.noGame}</p> : (
                 <>
                     <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} text={text} />
                     {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
+                    {onDownload === undefined ? null : (
+                        <div class="card analysis-actions">
+                            <button type="button" onClick={onDownload}>
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 4V15M7 10L12 15L17 10M5 19H19" />
+                                </svg>
+                                {text.study.download}
+                            </button>
+                        </div>
+                    )}
+                    {onAnalyse === undefined ? null : (
+                        <div class="card analysis-actions">
+                            <button type="button" onClick={onAnalyse}>
+                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 4V20M8 20H16M5 7H19M5 7L2.5 13A2.5 2 0 0 0 7.5 13ZM19 7L16.5 13A2.5 2 0 0 0 21.5 13Z" />
+                                </svg>
+                                {text.study.analyseIt}
+                            </button>
+                        </div>
+                    )}
+                    {analysis === undefined || analysis.summary !== undefined ? null : (
+                        <p class="card review waiting" role="status">
+                            <span class="spinner" aria-hidden="true" />
+                            {text.reviewing(analysis.by)}
+                        </p>
+                    )}
                     <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} text={text} />
                     <Steps shown={shownPlies} total={plies.length} onStep={onStep} text={text} />
                 </>
@@ -48,13 +83,14 @@ function GameCard({ plies, result, how, lit, started, move, toMove, text }: {
     result?: string;
     how?: HowEnded;
     lit: boolean;
-    started: string;
+    /** When the game started; not known for a game in analysis played elsewhere. */
+    started?: string;
     move: number;
     toMove: Side;
     text: Text;
 })
 {
-    const when = new Date(started).toLocaleString(text.language, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    const when = started === undefined ? undefined : new Date(started).toLocaleString(text.language, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
     if (result === undefined) {
         return (
@@ -67,7 +103,7 @@ function GameCard({ plies, result, how, lit, started, move, toMove, text }: {
                         {text.move} <b class="big">{move}</b>
                         <span class="visually-hidden">, {text.toMove(toMove)}</span>
                     </p>
-                    <p class="when">{text.started(when)}</p>
+                    {when === undefined ? null : <p class="when">{text.started(when)}</p>}
                 </div>
             </section>
         );

@@ -4,19 +4,30 @@ import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import { refuseUnseen } from "./levels.ts";
 import { defineCommand } from "./registry.ts";
+import { gameToStudy, positionAfter, positionLine, studyInput } from "./study.ts";
 import { colourName, materialText } from "./view.ts";
 
-/** The positional profile of the game in progress (D-19, T-12): separate facts, never a score. */
+/** The positional profile of a position: of a game studied, with where it stands. */
+type Described = Profile & { where?: string; };
+
+/** The positional profile of the game in progress (D-19, T-12), or of any position of a game over (D-68): separate facts, never a score. */
 export const position = defineCommand({
     name: "position",
     description: "Shows the positional facts of the position, from the strong level up: material, pawns (isolated, doubled, backward, passed, islands), open files, rooks and queens on the seventh, bishops, "
         + "outposts, centre, space, control, mobility, development and castling, king safety, the phase, the draw rules and, with only kings and pawns, "
         + "the rule of the square and the opposition. Facts only, never a score: weigh them yourself. Call it when you set or change your plan: out of "
-        + "the opening, after a big exchange, in the endgame; not at every move. Example: position {}.",
-    input: z.object({}),
+        + "the opening, after a big exchange, in the endgame; not at every move. With move, and game for a game of the archive, the facts of any position of a "
+        + 'game over, to analyse it. Example: position {}, position {move: "24."}.',
+    input: z.object(studyInput),
     readOnly: true,
     idempotent: true,
-    run: (_input, context): Profile => {
+    run: ({ game, move }, context): Described => {
+        if (game !== undefined || move !== undefined) {
+            const studied = gameToStudy(context, game);
+            const at = positionAfter(studied.record, move);
+            return { ...at.game.profile, where: positionLine(at, studied.name) };
+        }
+
         const current = gameAt(gameFolder(context.folder), context.now());
 
         if (current === undefined) {
@@ -26,7 +37,7 @@ export const position = defineCommand({
         refuseUnseen(current, "strategy", "position");
         return current.game.profile;
     },
-    format: (profile) => profileLines(profile).join("\n"),
+    format: (described) => [...(described.where === undefined ? [] : [described.where]), ...profileLines(described)].join("\n"),
 });
 
 /** The profile as lines for the AI, White's facts before Black's; a line with nothing to say is left out. */
