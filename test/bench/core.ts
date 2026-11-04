@@ -21,6 +21,7 @@ report([
     { name: "a move as the server plays it, in a new position", budget: 2.5, run: () => onNewPositions(serverMove) },
     { name: "legal moves of a position not seen yet", budget: 1.5, run: () => looksAtNewPositions((game) => game.legalMoves()) },
     { name: "facts of a position not seen yet, its legal moves known", budget: 0.5, run: factsOfNewPositions },
+    { name: "profile of a position not seen yet, its legal moves known", budget: 0.5, run: profileOfNewPositions },
     { name: "legal moves of a position seen", budget: 0.005, run: () => timed(1_000, () => repeat(1_000, () => kept.legalMoves())) },
     { name: "position and outcome of a new position", budget: 0.1, run: () => looksAtNewPositions((game) => [game.position, game.outcome]) },
     { name: `write the PGN of ${plies} plies`, budget: 1, run: () => timed(1, () => writePgn(record)) },
@@ -38,6 +39,22 @@ function looksAtNewPositions(look: (game: Game) => unknown): number
     for (const move of moves) {
         game.play(move);
         time += timed(1, () => look(game));
+    }
+
+    return time / moves.length;
+}
+
+/** The time of the profile of positions not seen yet, their legal moves computed before: what the profile adds to them. */
+function profileOfNewPositions(): number
+{
+    const moves = randomGame(seed++, 40);
+    const game = new Game();
+    let time = 0;
+
+    for (const move of moves) {
+        game.play(move);
+        game.legalMoves();
+        time += timed(1, () => game.profile);
     }
 
     return time / moves.length;

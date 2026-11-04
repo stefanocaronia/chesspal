@@ -1,5 +1,5 @@
 // The page's words in the player's language (D-32): Italian or English, from the browser's, until the profiles say which (T-19).
-import type { PieceLetter, Side } from "../core/index.ts";
+import type { IllegalReason, PieceLetter, Side } from "../core/index.ts";
 import type { Step } from "./browse.ts";
 import type { HowEnded } from "./ending.ts";
 
@@ -23,11 +23,11 @@ export interface Text
     readonly marksColour: string;
     readonly play: string;
     readonly dots: string;
+    readonly explain: string;
     readonly languageChoice: string;
     readonly languages: Readonly<Record<"auto" | "it" | "en", string>>;
     /** The names of the settings' choices by their ids: the piece sets, the boards' skins, the pieces' colours, the marks' colours. */
     readonly names: Readonly<Record<string, string>>;
-    readonly board: string;
     readonly game: string;
     readonly moves: string;
     /** The buttons that step through the moves (T-88). */
@@ -37,6 +37,8 @@ export interface Text
     readonly ai: string;
     readonly sides: Readonly<Record<Side, string>>;
     readonly yourTurn: string;
+    /** A player's clock, for a screen reader (T-37). */
+    readonly clock: (time: string, running: boolean) => string;
     readonly send: string;
     readonly sent: string;
     readonly withMove: string;
@@ -50,6 +52,14 @@ export interface Text
     readonly outOfBook: string;
     readonly inBook: string;
     readonly clearChat: string;
+    /** The choice of the piece a pawn becomes on the last rank (T-11). */
+    readonly promoteTo: string;
+    /** A square the piece picked may go to, for a screen reader (T-11). */
+    readonly canGo: string;
+    /** The board for a screen reader (T-11): who moves, and the last move. */
+    boardLabel(turn: Side, lastMove: string | undefined): string;
+    /** A request the server refused, by its code (T-11), with the characters left for words too long. */
+    readonly refused: Readonly<Record<ServerRefusal, (most: number) => string>>;
     piece(letter: PieceLetter, side: Side): string;
     taken(pieces: readonly string[], ahead: number): string;
     writeTo(name: string): string;
@@ -61,6 +71,25 @@ export interface Text
     toMove(side: Side): string;
     /** The header's word on a game over (T-77): how it ended and who won. */
     verdict(how: HowEnded | undefined, winner: Side | undefined): string;
+    /** Why the board refuses a move (T-11, D-18): the piece moved, the square it went to, the piece that forbids it. */
+    illegal(move: RefusedMove): string;
+}
+
+/** The refusals the page server gives a code to, for the page to say them in the player's language. */
+export type ServerRefusal = "no-game" | "ai-to-move" | "illegal" | "clear-chat" | "words-empty" | "words-spent" | "words-long" | "words-longer-than-left";
+
+/**
+ * A move the board refused (T-11), as the page names it: why, the piece moved, the square it went to and whether a piece stood there, the piece that forbids
+ * it, and the square the reason concerns besides (the rook's corner, the square castling crosses).
+ */
+export interface RefusedMove
+{
+    readonly reason: IllegalReason;
+    readonly piece: PieceLetter;
+    readonly to: string;
+    readonly takes: boolean;
+    readonly by?: { readonly letter: PieceLetter; readonly side: Side; readonly square: string; };
+    readonly at?: string;
 }
 
 /** The words for the first of the browser's languages the page speaks, else English. */
@@ -91,6 +120,7 @@ const english: Text = {
     marksColour: "Arrows and marked squares",
     play: "Play",
     dots: "Dots on the legal moves",
+    explain: "Explain the moves refused",
     languageChoice: "Language",
     languages: { auto: "As the browser", it: "Italiano", en: "English" },
     names: {
@@ -114,7 +144,6 @@ const english: Text = {
         rosso: "Red",
         blu: "Blue",
     },
-    board: "Chessboard",
     game: "The game",
     moves: "Moves",
     steps: { first: "Start", back: "Previous move", forward: "Next move", last: "Back to the game" },
@@ -123,6 +152,7 @@ const english: Text = {
     ai: "AI",
     sides: { white: "White", black: "Black" },
     yourTurn: "your move",
+    clock: (time, running) => `Clock: ${time}${running ? ", running" : ""}`,
     send: "Send",
     sent: "Sent",
     withMove: "Or move: your words go with it",
@@ -138,11 +168,25 @@ const english: Text = {
         "fifty moves": "fifty-move rule",
         resignation: "resignation",
         agreement: "agreed",
+        time: "on time",
     },
     opening: "Opening",
     outOfBook: "Out of book since move",
     inBook: "In book",
+    promoteTo: "Promote to",
+    canGo: "a legal move",
+    boardLabel: (turn, lastMove) => `Chessboard, ${english.toMove(turn)}${lastMove === undefined ? "" : `, last move ${lastMove}`}`,
     clearChat: "Before a new game, clear the chat: write /clear there, or open a new chat. A clean chat plays faster.",
+    refused: {
+        "no-game": () => "There is no game going on: start one in the chat.",
+        "ai-to-move": () => "Wait for the AI's move.",
+        illegal: () => "That move is not legal here.",
+        "clear-chat": () => english.clearChat,
+        "words-empty": () => "Write something first.",
+        "words-spent": () => "You have used up your words for this move: write again after the AI's move.",
+        "words-long": (most) => `Write at most ${most} characters.`,
+        "words-longer-than-left": (most) => `You have ${most} characters left until the AI's move.`,
+    },
     piece: (letter, side) => `${side} ${englishNames[letter]}`,
     taken: (pieces, ahead) => `Pieces taken: ${pieces.length === 0 ? "none" : pieces.join(", ")}${ahead > 0 ? `; ahead by ${ahead}` : ""}`,
     writeTo: (name) => `Write to ${name}…`,
@@ -159,6 +203,7 @@ const english: Text = {
 
         return how === "agreement" ? "Draw agreed" : how === undefined ? "Draw" : `Draw · ${english.ended[how]}`;
     },
+    illegal: (move) => move.reason === "shape" ? englishMoves[move.piece] : englishIllegal[move.reason]({ ...move, by: englishCulprit(move.by) }),
 };
 
 const italian: Text = {
@@ -179,6 +224,7 @@ const italian: Text = {
     marksColour: "Frecce e case segnate",
     play: "Gioco",
     dots: "Pallini sulle mosse legali",
+    explain: "Spiega le mosse vietate",
     languageChoice: "Lingua",
     languages: { auto: "Come il browser", it: "Italiano", en: "English" },
     names: {
@@ -202,7 +248,6 @@ const italian: Text = {
         rosso: "Rosso",
         blu: "Blu",
     },
-    board: "Scacchiera",
     game: "La partita",
     moves: "Mosse",
     steps: { first: "Inizio", back: "Mossa precedente", forward: "Mossa successiva", last: "Torna alla partita" },
@@ -211,6 +256,7 @@ const italian: Text = {
     ai: "AI",
     sides: { white: "Bianco", black: "Nero" },
     yourTurn: "tocca a te",
+    clock: (time, running) => `Orologio: ${time}${running ? ", in corsa" : ""}`,
     send: "Manda",
     sent: "Mandato",
     withMove: "Oppure muovi: parte con la mossa",
@@ -226,11 +272,25 @@ const italian: Text = {
         "fifty moves": "regola delle 50 mosse",
         resignation: "abbandono",
         agreement: "d'accordo",
+        time: "per tempo",
     },
     opening: "Apertura",
     outOfBook: "Fuori teoria dalla mossa",
     inBook: "In teoria",
+    promoteTo: "Promuovi a",
+    canGo: "mossa possibile",
+    boardLabel: (turn, lastMove) => `Scacchiera, ${italian.toMove(turn)}${lastMove === undefined ? "" : `, ultima mossa ${lastMove}`}`,
     clearChat: "Prima di una nuova partita azzera la chat: scrivi /clear, o aprine una nuova. Con la chat pulita l'AI gioca più veloce.",
+    refused: {
+        "no-game": () => "Nessuna partita in corso: iniziane una nella chat.",
+        "ai-to-move": () => "Aspetta la mossa dell'AI.",
+        illegal: () => "Questa mossa qui non è legale.",
+        "clear-chat": () => italian.clearChat,
+        "words-empty": () => "Scrivi prima qualcosa.",
+        "words-spent": () => "Hai finito le parole per questa mossa: scrivi di nuovo dopo quella dell'AI.",
+        "words-long": (most) => `Scrivi al massimo ${most} caratteri.`,
+        "words-longer-than-left": (most) => `Ti restano ${most} caratteri fino alla mossa dell'AI.`,
+    },
     // Queen and rook are feminine in Italian.
     piece: (letter, side) => `${italianNames[letter]} ${side === "white" ? (letter === "Q" || letter === "R" ? "bianca" : "bianco") : (letter === "Q" || letter === "R" ? "nera" : "nero")}`,
     taken: (pieces, ahead) => `Pezzi presi: ${pieces.length === 0 ? "nessuno" : pieces.join(", ")}${ahead > 0 ? `; avanti di ${ahead}` : ""}`,
@@ -248,7 +308,77 @@ const italian: Text = {
 
         return how === "agreement" ? "Patta d'accordo" : how === undefined ? "Patta" : `Patta · ${italian.ended[how]}`;
     },
+    illegal: (move) => move.reason === "shape" ? italianMoves[move.piece] : italianIllegal[move.reason]({ ...move, by: italianCulprit(move.by) }),
 };
+
+// Why a move is refused, from the piece moved, the square it went to and the piece that forbids it, each named with its article.
+type Reason = (move: Omit<RefusedMove, "by"> & { readonly by: string; }) => string;
+
+// How each piece moves, said when it was taken where it cannot go (Anatolij's words).
+const englishMoves: Readonly<Record<PieceLetter, string>> = {
+    K: "The king moves one square; two only to castle.",
+    Q: "The queen moves in a straight line or diagonally.",
+    R: "The rook moves only along ranks and files.",
+    B: "The bishop moves only diagonally.",
+    N: "The knight jumps in an L: two squares one way and one to the side.",
+    P: "A pawn moves straight ahead one square, two from its starting square, and captures one square diagonally forward.",
+};
+
+const englishIllegal: Readonly<Record<Exclude<IllegalReason, "shape">, Reason>> = {
+    own: ({ to }) => `One of your pieces already stands on ${to}.`,
+    blocked: ({ by }) => `${capital(by)} is in the way.`,
+    "pawn-straight": () => "A pawn takes only diagonally: straight ahead it needs an empty square.",
+    "pawn-double": () => "A pawn goes two squares only from its starting square.",
+    "pawn-diagonal": () => "A pawn goes diagonally only to take a piece.",
+    "en-passant-late": ({ by }) => `${capital(by)} can be taken en passant only right after its two-square move.`,
+    check: ({ by }) => `You are in check from ${by}, and this move does not get you out of it.`,
+    pinned: ({ piece, by }) => `The ${englishNames[piece]} is pinned: if you move it, ${by} gives check to your king.`,
+    attacked: ({ to, takes, by }) => takes ? `The king cannot take on ${to}: ${by} defends that square.` : `The king cannot go to ${to}: ${by} attacks that square.`,
+    "castle-lost": () => "You can no longer castle on that side: the king or that rook has already moved.",
+    "castle-rook-gone": ({ at }) => `Your rook on ${at} is gone: you cannot castle on that side.`,
+    "castle-blocked": ({ by }) => `To castle, no piece may stand between the king and the rook: ${by} does.`,
+    "castle-check": ({ by }) => `You cannot castle out of check: ${by} gives it.`,
+    "castle-through": ({ at, by }) => `The king cannot castle through or onto ${at}: ${by} attacks that square.`,
+};
+
+const italianThe: Readonly<Record<PieceLetter, string>> = { K: "il re", Q: "la donna", R: "la torre", B: "l'alfiere", N: "il cavallo", P: "il pedone" };
+
+const italianMoves: Readonly<Record<PieceLetter, string>> = {
+    K: "Il re si muove di una casa; di due solo per arroccare.",
+    Q: "La donna si muove in linea retta o in diagonale.",
+    R: "La torre si muove solo per righe e colonne.",
+    B: "L'alfiere si muove solo in diagonale.",
+    N: "Il cavallo salta a L: due case in una direzione e una di lato.",
+    P: "Il pedone avanza dritto di una casa, di due dalla casa di partenza, e cattura di una casa in diagonale.",
+};
+
+const italianIllegal: Readonly<Record<Exclude<IllegalReason, "shape">, Reason>> = {
+    own: ({ to }) => `In ${to} c'è già un tuo pezzo.`,
+    blocked: ({ by }) => `${capital(by)} sbarra la strada.`,
+    "pawn-straight": () => "Il pedone cattura solo in diagonale: in avanti gli serve una casa libera.",
+    "pawn-double": () => "Il pedone avanza di due case solo dalla sua casa di partenza.",
+    "pawn-diagonal": () => "Il pedone va in diagonale solo per catturare.",
+    "en-passant-late": ({ by }) => `${capital(by)} si prende en passant solo subito dopo il suo passo doppio.`,
+    check: ({ by }) => `Sei sotto scacco e questa mossa non lo para: lo dà ${by}.`,
+    pinned: ({ by }) => `Questo pezzo è inchiodato: se lo sposti, ${by} dà scacco al tuo re.`,
+    attacked: ({ to, takes, by }) => takes ? `Il re non può prendere in ${to}: ${by} difende quella casa.` : `Il re non può andare in ${to}: ${by} controlla quella casa.`,
+    "castle-lost": () => "Da quel lato non puoi più arroccare: il re o quella torre si sono già mossi.",
+    "castle-rook-gone": ({ at }) => `Non c'è più la tua torre in ${at}: da quel lato non si arrocca.`,
+    "castle-blocked": ({ by }) => `Per arroccare non ci devono essere pezzi fra il re e la torre: c'è ${by}.`,
+    "castle-check": ({ by }) => `Sotto scacco non si arrocca: lo dà ${by}.`,
+    "castle-through": ({ at, by }) => `Arroccando il re passerebbe per ${at}, e ${by} controlla quella casa.`,
+};
+
+/** The piece that forbids a move, with its article and square; a king with its colour, beside the player's own. */
+function englishCulprit(by: RefusedMove["by"]): string
+{
+    return by === undefined ? "" : `the ${by.letter === "K" ? `${by.side} ` : ""}${englishNames[by.letter]} on ${by.square}`;
+}
+
+function italianCulprit(by: RefusedMove["by"]): string
+{
+    return by === undefined ? "" : `${italianThe[by.letter]}${by.letter === "K" ? (by.side === "white" ? " bianco" : " nero") : ""} in ${by.square}`;
+}
 
 /** The words with their first letter capital, to open a sentence. */
 function capital(words: string): string

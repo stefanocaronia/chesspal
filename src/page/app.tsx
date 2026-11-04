@@ -1,23 +1,25 @@
 // The page: the game of the player's folder, replayed with the chess core from its PGN (D-17), kept up to date as it changes, the player's moves (D-47) and
 // words (T-65), in Zoe's three columns (D-53): the talk, the board, the game, the side ones folded as the player likes (T-84).
+import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { Game, materialOf, openingOf, readPgn, type Side, type Square } from "../core/index.ts";
-import { Board, piecesOf } from "./board.tsx";
+import { type Clock, Game, materialOf, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square } from "../core/index.ts";
+import { Board, type Notice, piecesOf } from "./board.tsx";
 import { flipKeys, type Step, stepKeys, stepped } from "./browse.ts";
 import { howEnded, useJustEnded } from "./ending.ts";
+import { explain } from "./explain.ts";
 import { FoldTab } from "./fold-tab.tsx";
 import { type Column, foldKeys, gameUnderBoard, nextFold, oneColumn, rememberFold, startFolds } from "./folds.ts";
 import { GameColumn } from "./game-column.tsx";
 import { Header } from "./header.tsx";
 import { useOpeningBook } from "./opening-book.ts";
 import { ChosenSet } from "./pieces.tsx";
-import { Avatar, PlayerCard } from "./player-card.tsx";
+import { Avatar, ClockFace, PlayerCard } from "./player-card.tsx";
 import { aiSpoke, aiWords, playerSpent, playerWords, pliesOf, type TalkLine } from "./plies.ts";
 import { SettingsPanel } from "./settings-panel.tsx";
 import { languagesOf, saveSettings, type Settings, showSettings } from "./settings.ts";
 import { playSound, soundOf, wakeSounds } from "./sounds.ts";
 import { AiWords, Compose, TalkFaces } from "./talk.tsx";
-import { textFor } from "./text.ts";
+import { type ServerRefusal, type Text, textFor } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
 
 /**
@@ -41,11 +43,15 @@ export function App({ start }: { start: Settings; })
     const [served, setServed] = useState<Served | undefined>(undefined);
     const [problem, setProblem] = useState<string | undefined>(undefined);
     const [selected, setSelected] = useState<string | undefined>(undefined);
-    const [refusal, setRefusal] = useState<string | undefined>(undefined);
+    const [refusal, setRefusal] = useState<Notice | undefined>(undefined);
+    // A pawn taken to the last rank waits for the player to choose what it becomes (T-11).
+    const [promoting, setPromoting] = useState<{ from: string; to: string; } | undefined>(undefined);
     const [flipped, setFlipped] = useState(false);
     const [folds, setFolds] = useState(startFolds);
     const [draft, setDraft] = useState("");
     const [unsent, setUnsent] = useState<string | undefined>(undefined);
+    // Reads the game again: when the server says it changed, and when a clock runs out on the page (T-37).
+    const reload = useRef(() => {});
 
     useEffect(() => {
         let latest = 0;
@@ -70,6 +76,7 @@ export function App({ start }: { start: Settings; })
         };
 
         // The server says when the game changes, whoever changed it: the page reads it again, and as it connects, the first time or to a new chat's server.
+        reload.current = load;
         const events = new EventSource("/api/events");
         events.onopen = load;
         events.onmessage = load;
@@ -91,9 +98,11 @@ export function App({ start }: { start: Settings; })
     const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
     const next = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove, [live, viewing]);
     const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
+    // A game read again ends what the player was doing on the one before: the move sent, the look back, the choice of a promotion.
     useEffect(() => {
         setPending(undefined);
         setViewing(undefined);
+        setPromoting(undefined);
     }, [game]);
     useMoveSounds(game, live, sound);
     const unread = useUnread(game === undefined || game === null ? undefined : aiSpoke(plies, game.ai, game.talk), folds.talk !== "open");
@@ -140,7 +149,7 @@ export function App({ start }: { start: Settings; })
         }
 
         setSelected(undefined);
-        void post("/api/new", {}, text.clearChat).then(setRefusal);
+        void post("/api/new", {}, text).then((refused) => setRefusal(refused === undefined ? undefined : { text: refused.text }));
     };
 
     const result = live.outcome.over ? live.outcome.result : live.record.tags.Result;
@@ -185,6 +194,18 @@ export function App({ start }: { start: Settings; })
     const name = served.opponent ?? text.ai;
     const talk = game?.talk ?? [];
     const said = playerWords(plies, ai, talk);
+    const clock = game?.clock;
+    const clockOf = (side: Side): ComponentChildren =>
+        clock === undefined ? undefined : (
+            <ClockFace
+                clock={clock}
+                side={side}
+                toMove={!ended && live.position.turn === side}
+                held={pending !== undefined}
+                onFlag={() => reload.current()}
+                text={text}
+            />
+        );
 
     // Words sent leave the box; what the player wrote on while they went stays.
     const clearSent = (refused: string | undefined, words: string): void => {
@@ -198,16 +219,24 @@ export function App({ start }: { start: Settings; })
         setSelected(square);
     };
 
-    const play = (from: string, to: string): void => {
-        // The words written and not sent go with the move (D-53): the box holds no more than the move has left (D-54).
-        const words = draft;
-        const move = `${from}${to}${promotion(pieces.get(from), to)}`;
+    const play = (from: string, to: string, piece?: Promotion): void => {
         setSelected(undefined);
         setRefusal(undefined);
+
+        if (piece === undefined && promotes(pieces.get(from), to)) {
+            setPromoting({ from, to });
+            return;
+        }
+
+        // The words written and not sent go with the move (D-53): the box holds no more than the move has left (D-54).
+        const words = draft;
+        const move = `${from}${to}${piece ?? ""}`;
+        setPromoting(undefined);
         setPending(move);
-        void sendMove(move, words).then((refused) => {
-            setRefusal(refused);
-            clearSent(refused, words);
+        void sendMove(move, words, text).then((refused) => {
+            setRefusal(refused === undefined || refused.words ? undefined : { text: refused.text, square: from });
+            setUnsent(refused?.words === true ? refused.text : undefined);
+            clearSent(refused?.text, words);
 
             if (refused !== undefined) {
                 setPending(undefined);
@@ -215,12 +244,26 @@ export function App({ start }: { start: Settings; })
         });
     };
 
+    // A move the board refuses says why, without the AI (D-18), unless the player turned it off: the piece goes back, the reason over it.
+    const refuse = (from: string, to: string): void => {
+        const illegal = settings.explain ? live.whyNot(from as Square, to as Square) : undefined;
+
+        if (illegal !== undefined) {
+            const letterOn = (square: string): PieceLetter => pieces.get(square)!.toUpperCase() as PieceLetter;
+            const sideOn = (square: string): Side => pieces.get(square) === letterOn(square) ? "white" : "black";
+            const by = illegal.by === undefined ? undefined : { letter: letterOn(illegal.by), side: sideOn(illegal.by), square: illegal.by };
+            const words = text.illegal({ reason: illegal.reason, piece: letterOn(from), to, takes: pieces.has(to), by, ...(illegal.at === undefined ? {} : { at: illegal.at }) });
+            const king = [...pieces].find(([, letter]) => letter === (sideOn(from) === "white" ? "K" : "k"))?.[0];
+            setRefusal({ text: words, square: from, piece: pieces.get(from)!, explanation: explain(illegal, to, king) });
+        }
+    };
+
     const sendWords = (): void => {
         const words = draft;
         setUnsent(undefined);
-        void sendMessage(words).then((refused) => {
-            setUnsent(refused);
-            clearSent(refused, words);
+        void sendMessage(words, text).then((refused) => {
+            setUnsent(refused?.text);
+            clearSent(refused?.text, words);
         });
     };
 
@@ -235,7 +278,7 @@ export function App({ start }: { start: Settings; })
                 <span class="visually-hidden" aria-live="polite">{unread ? text.wrote(name) : ""}</span>
                 <div class="talk" id="talk">
                     <section class="ai-block" aria-label={name}>
-                        <PlayerCard place="ai" picture={<Torretta size={48} />} name={name} side={ai} taken={material.taken[ai]} ahead={ahead(ai)} text={text} />
+                        <PlayerCard place="ai" picture={<Torretta size={48} />} name={name} side={ai} taken={material.taken[ai]} ahead={ahead(ai)} clock={clockOf(ai)} text={text} />
                         <AiWords words={aiWords(plies, ai, talk)} />
                     </section>
                     <section class="you-block" aria-label={text.you}>
@@ -263,6 +306,7 @@ export function App({ start }: { start: Settings; })
                             taken={material.taken[player]}
                             ahead={ahead(player)}
                             turn={playerToMove}
+                            clock={clockOf(player)}
                             text={text}
                         />
                     </section>
@@ -285,11 +329,14 @@ export function App({ start }: { start: Settings; })
                         selected={selected}
                         targets={selected === undefined || viewing !== undefined ? [] : live.legalMoves(selected as Square)}
                         dots={settings.dots}
+                        notice={viewing === undefined ? refusal : undefined}
+                        promotion={promoting === undefined || viewing !== undefined || !playerToMove ? undefined : { ...promoting, side: player }}
+                        onPromote={(piece) => piece === undefined ? setPromoting(undefined) : play(promoting!.from, promoting!.to, piece)}
                         onSelect={select}
                         onMove={play}
+                        onRefuse={refuse}
                         text={text}
                     />
-                    {refusal === undefined ? null : <p class="toast" role="alert">{refusal}</p>}
                 </div>
                 <GameColumn
                     plies={plies}
@@ -311,12 +358,12 @@ export function App({ start }: { start: Settings; })
 }
 
 /**
- * What the server sends: the game, its PGN for the player, the AI's side, when it started and the talk on the page, each line with the moves the game had
- * then, null before the first game; and the AI's name, when the host gave it.
+ * What the server sends: the game, its PGN for the player, the AI's side, when it started, the talk on the page, each line with the moves the game had
+ * then, and its clock in a game with one, null before the first game; and the AI's name, when the host gave it.
  */
 interface Served
 {
-    readonly game: { readonly pgn: string; readonly ai: Side; readonly started: string; readonly talk: readonly TalkLine[]; } | null;
+    readonly game: { readonly pgn: string; readonly ai: Side; readonly started: string; readonly talk: readonly TalkLine[]; readonly clock?: Clock; } | null;
     readonly opponent?: string;
 }
 
@@ -440,20 +487,27 @@ function forThePage(event: KeyboardEvent): boolean
 }
 
 /** Sends the player's move to the server, which plays it as the chat would, with the words written for the AI: the reason it was refused, or undefined. */
-function sendMove(move: string, words: string): Promise<string | undefined>
+function sendMove(move: string, words: string, text: Text): Promise<Refused | undefined>
 {
     const message = words.trim();
-    return post("/api/move", message === "" ? { move } : { move, message });
+    return post("/api/move", message === "" ? { move } : { move, message }, text);
 }
 
 /** Sends the player's words alone: the reason they were refused, or undefined. */
-function sendMessage(words: string): Promise<string | undefined>
+function sendMessage(words: string, text: Text): Promise<Refused | undefined>
 {
-    return post("/api/message", { text: words.trim() });
+    return post("/api/message", { text: words.trim() }, text);
 }
 
-/** Sends a request to the server: the reason it was refused, in the player's language when the chat must be cleared first (D-57), or undefined. */
-async function post(path: string, body: object, clearChat?: string): Promise<string | undefined>
+/** A request the server refused: why, and whether the player's words were the cause, which the talk says rather than the board (T-11). */
+interface Refused
+{
+    readonly text: string;
+    readonly words: boolean;
+}
+
+/** Sends a request to the server: the reason it was refused, in the player's language when the page knows the refusal (T-11, D-57), or undefined. */
+async function post(path: string, body: object, text: Text): Promise<Refused | undefined>
 {
     try {
         const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -462,10 +516,11 @@ async function post(path: string, body: object, clearChat?: string): Promise<str
             return undefined;
         }
 
-        const refusal = (await response.json()) as { error?: string; clearChat?: boolean; };
-        return refusal.clearChat === true && clearChat !== undefined ? clearChat : refusal.error ?? response.statusText;
+        const refused = (await response.json()) as { error?: string; refusal?: string; most?: number; };
+        const known = refused.refusal === undefined ? undefined : text.refused[refused.refusal as ServerRefusal] as ((most: number) => string) | undefined;
+        return { text: known?.(refused.most ?? 0) ?? refused.error ?? response.statusText, words: refused.refusal?.startsWith("words-") === true };
     } catch (error) {
-        return String(error);
+        return { text: String(error), words: false };
     }
 }
 
@@ -476,8 +531,8 @@ function withMove(game: Game, move: string): Game
     return copy.play(move).played ? copy : game;
 }
 
-/** A pawn that reaches the last rank becomes a queen, until the page lets the player choose (T-11). */
-function promotion(piece: string | undefined, to: string): string
+/** Whether a pawn's move takes it to the last rank, where the player chooses what it becomes (T-11). */
+function promotes(piece: string | undefined, to: string): boolean
 {
-    return (piece === "P" && to.endsWith("8")) || (piece === "p" && to.endsWith("1")) ? "q" : "";
+    return (piece === "P" && to.endsWith("8")) || (piece === "p" && to.endsWith("1"));
 }

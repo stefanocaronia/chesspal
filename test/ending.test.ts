@@ -9,11 +9,13 @@ describe("how a game ended", () => {
         expect(howEnded(mated.outcome, undefined)).toBe("checkmate");
     });
 
-    it("is a resignation or an agreement by the record's Termination", () => {
+    it("is a resignation, an agreement or a flag that fell by the record's Termination", () => {
         const going = new Game().outcome;
 
         expect(howEnded(going, "White resigns")).toBe("resignation");
         expect(howEnded(going, "draw agreed")).toBe("agreement");
+        expect(howEnded(going, "Black lost on time")).toBe("time");
+        expect(howEnded(going, "Black ran out of time and White cannot mate")).toBe("time");
     });
 
     it("is unknown while the game goes on or the record does not say", () => {

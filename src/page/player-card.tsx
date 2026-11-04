@@ -1,11 +1,14 @@
-// A player's card beside the board: their picture, name and side, whose move it is, the pieces they took and how far ahead they are (D-20).
+// A player's card beside the board: their picture, name and side, whose move it is, the pieces they took and how far ahead they are (D-20), and their
+// clock (T-37).
 import type { ComponentChildren } from "preact";
-import type { PieceLetter, Side } from "../core/index.ts";
+import { useEffect, useState } from "preact/hooks";
+import { type Clock, type PieceLetter, type Side, timeLeft } from "../core/index.ts";
+import { lowTime, timeShown } from "./clock-time.ts";
 import { Piece } from "./pieces.tsx";
 import type { Text } from "./text.ts";
 
 /** The card of one player: the AI's above its words, the player's below theirs; the player's says when it is their move. */
-export function PlayerCard({ place, picture, name, side, taken, ahead, turn = false, text }: {
+export function PlayerCard({ place, picture, name, side, taken, ahead, turn = false, clock, text }: {
     place: "ai" | "you";
     picture: ComponentChildren;
     name: string;
@@ -13,6 +16,8 @@ export function PlayerCard({ place, picture, name, side, taken, ahead, turn = fa
     taken: readonly PieceLetter[];
     ahead: number;
     turn?: boolean;
+    /** The player's clock, in a game with one. */
+    clock?: ComponentChildren;
     text: Text;
 })
 {
@@ -38,15 +43,49 @@ export function PlayerCard({ place, picture, name, side, taken, ahead, turn = fa
                     <div class="taken" role="img" aria-label={text.taken(taken.map((piece) => text.piece(piece, opponent)), ahead)}>
                         {groupsOf(taken).map((group) => (
                             <span key={group[0]} class="group">
-                                {group.map((piece, index) => <Piece key={index} letter={opponent === "white" ? piece : piece.toLowerCase()} />)}
+                                {group.map((piece, index) => <Piece key={index} letter={opponent === "white" ? piece : piece.toLowerCase()} small />)}
                             </span>
                         ))}
                         {ahead > 0 ? <span class="balance">+{ahead}</span> : null}
                     </div>
                 </div>
+                {clock}
             </div>
         </section>
     );
+}
+
+/**
+ * A side's time on the game's clock, as the server keeps it: it runs while the side is to move and the game goes on, unless `held` (a move on its way);
+ * at nothing it calls `onFlag` once, for the server to say how the game ended.
+ */
+export function ClockFace({ clock, side, toMove, held, onFlag, text }: { clock: Clock; side: Side; toMove: boolean; held: boolean; onFlag: () => void; text: Text; })
+{
+    const [now, setNow] = useState(() => Date.now());
+    const running = toMove && !held;
+
+    useEffect(() => {
+        if (!running) {
+            return;
+        }
+
+        setNow(Date.now());
+        const ticks = setInterval(() => setNow(Date.now()), 100);
+        return () => clearInterval(ticks);
+    }, [running, clock]);
+
+    const left = toMove ? timeLeft(clock, side, new Date(now))[side] : clock.left[side];
+    const fallen = running && left === 0;
+
+    useEffect(() => {
+        if (fallen) {
+            onFlag();
+        }
+    }, [fallen]);
+
+    const shown = timeShown(left);
+    const classes = ["clock", running ? "running" : "", left < lowTime ? "low" : ""].filter((name) => name !== "").join(" ");
+    return <span class={classes} role="timer" aria-label={text.clock(shown, running)}>{shown}</span>;
 }
 
 /** The player's picture until the profiles bring theirs (T-19): a simple face, in a circle. */

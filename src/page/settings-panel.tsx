@@ -58,6 +58,7 @@ export function SettingsPanel({ open, settings, onChange, onClose, text }: {
             <Swatches look="marks" label={text.marksColour} settings={settings} onPick={(id) => set("marks", id)} text={text} />
             <h3>{text.play}</h3>
             <Toggle on={settings.dots} onSwitch={(on) => set("dots", on)}>{text.dots}</Toggle>
+            <Toggle on={settings.explain} onSwitch={(on) => set("explain", on)}>{text.explain}</Toggle>
             <Toggle on={settings.sound} onSwitch={(on) => set("sound", on)}>{text.sounds}</Toggle>
             <h3>{text.languageChoice}</h3>
             <Choices label={text.languageChoice}>

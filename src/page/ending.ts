@@ -1,9 +1,9 @@
 // How a game ended, as the page names it (T-77): by the board, or by a resignation or a draw agreed, which only the record's Termination tag says (D-37).
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { Ending, Outcome } from "../core/index.ts";
 
 /** The ways a game ends. */
-export type HowEnded = Ending | "resignation" | "agreement";
+export type HowEnded = Ending | "resignation" | "agreement" | "time";
 
 /** How the game ended, from the board or the record's Termination tag; undefined while it goes on, or when the record does not say. */
 export function howEnded(outcome: Outcome, termination: string | undefined): HowEnded | undefined
@@ -14,6 +14,11 @@ export function howEnded(outcome: Outcome, termination: string | undefined): How
 
     if (termination === "draw agreed") {
         return "agreement";
+    }
+
+    // A flag that fell (T-37): "Black lost on time", "Black ran out of time and White cannot mate".
+    if (/ (lost on|ran out of) time\b/.test(termination ?? "")) {
+        return "time";
     }
 
     return termination?.endsWith(" resigns") === true ? "resignation" : undefined;
@@ -28,7 +33,8 @@ export function useJustEnded(state: "going" | "over" | undefined): boolean
     const before = useRef(state);
     const [just, setJust] = useState(false);
 
-    useEffect(() => {
+    // Before the page paints: a frame of the end at rest would show before its effects.
+    useLayoutEffect(() => {
         const ended = before.current === "going" && state === "over";
         before.current = state;
 

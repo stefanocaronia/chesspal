@@ -1,6 +1,8 @@
 // A live game on chess.js: the rules, the record, and the legal moves computed once per position.
 import { Chess, type Move as ChessMove, type Square, validateFen } from "chess.js";
 import { type Facts, factsOf } from "./facts.ts";
+import { type Illegal, whyIllegal } from "./illegal.ts";
+import { type Profile, profileOf } from "./profile.ts";
 import { type Annotation, cleanComment, type GameRecord, type RecordedMove, recordedMove } from "./record.ts";
 
 export type { Square } from "chess.js";
@@ -55,6 +57,9 @@ export class Game
     private readonly comment: string | undefined;
     private readonly moves: RecordedMove[] = [];
     private last: Move | undefined;
+    // The key of every position the game has stood in, the first included, and how each side castled: for the profile's repetitions and castling.
+    private readonly keys: string[];
+    private readonly castled: Partial<Record<Side, "O-O" | "O-O-O">> = {};
     private keptPosition: Position | undefined;
     private keptOutcome: Outcome | undefined;
     private keptRecord: GameRecord | undefined;
@@ -63,6 +68,8 @@ export class Game
     constructor(record: GameRecord = { tags: {}, moves: [] })
     {
         this.chess = startingBoard(record.tags.FEN);
+        // The first key without an en passant square no pawn can use, which the FEN may give: the position then repeats as the rules count it.
+        this.keys = [new Chess(this.chess.fen()).hash()];
         this.tags = { ...record.tags };
         this.comment = cleanComment(record.comment ?? "") || undefined;
 
@@ -118,11 +125,24 @@ export class Game
         return factsOf(this.chess, legalMovesOf(this.chess));
     }
 
+    /** The positional profile (D-19, T-12): pawns, files, outposts, space, mobility, development, king safety, control, phase, draws; computed once for each position. */
+    get profile(): Profile
+    {
+        const key = this.chess.hash();
+        return profileOf(this.chess, { repetitions: this.keys.filter((seen) => seen === key).length, castled: this.castled, fromFen: this.tags.FEN !== undefined }, legalMovesOf(this.chess));
+    }
+
     /** The legal moves, or those of the piece on a square. */
     legalMoves(square?: Square): readonly Move[]
     {
         const moves = legalMovesOf(this.chess);
         return square === undefined ? moves : moves.filter((move) => move.from === square);
+    }
+
+    /** Why the piece of the side to move on a square cannot go to another (D-18); undefined when it can, or when no rule says why. */
+    whyNot(from: Square, to: Square): Illegal | undefined
+    {
+        return this.legalMoves(from).some((move) => move.to === to) ? undefined : whyIllegal(this.chess, from, to);
     }
 
     /** Plays a move written in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q); a refused move changes nothing. */
@@ -173,6 +193,7 @@ export class Game
             return unreadable(input);
         }
 
+        const mover = sideToMove(this.chess);
         // Proper SAN is the fast way; anything else is matched by hand, because chess.js guesses where we must ask.
         const exact = attempt(() => this.chess.move(input, { strict: true }));
         const move = exact === undefined ? this.resolve(input) : toMove(exact);
@@ -186,6 +207,12 @@ export class Game
         }
 
         this.last = move;
+        this.keys.push(this.chess.hash());
+
+        if (move.san.startsWith("O-O")) {
+            this.castled[mover] = move.san.startsWith("O-O-O") ? "O-O-O" : "O-O";
+        }
+
         this.keptPosition = undefined;
         this.keptOutcome = undefined;
         this.keptRecord = undefined;
@@ -211,15 +238,15 @@ export class Game
         const parts = loosePattern.exec(bare);
 
         if (parts === null) {
-            return unreadable(input);
+            return foreignLetter(input, bare) ?? unreadable(input);
         }
 
         const [, piece, file, rank, separator, target = "", promotion] = parts;
         const capture = separator === "x" || separator === ":";
 
-        // "bc4" is a bishop without its capital, or a pawn's capture without its x: never guessed.
-        if (piece === undefined && file !== undefined && rank === undefined && !capture && file !== target[0]) {
-            return unreadable(input);
+        // "bc4" is a bishop without its capital, or a pawn's capture without its x, as "bb4" is a bishop or a pawn: never guessed (T-11).
+        if (piece === undefined && file !== undefined && rank === undefined && !capture && (file !== target[0] || file === "b")) {
+            return smallLetter(input, file, target);
         }
 
         // Without a letter, a move is a pawn's, unless it gives its whole starting square.
@@ -239,6 +266,15 @@ export class Game
 
         if (candidates.length > 1) {
             return { refusal: "ambiguous", message: `${input} could be ${candidates.map((move) => move.san).sort().join(" or ")}: say which.` };
+        }
+
+        if (candidates.length === 0 && capture && this.chess.get(target as Square) === undefined && !legal.some((move) => move.to === target && move.san.includes("x"))) {
+            return { refusal: "illegal", message: `${input} takes, but there is nothing to take on ${target}.` };
+        }
+
+        // An Italian, French or Spanish R is the king: said when the king could go there and no rook can.
+        if (candidates.length === 0 && piece === "R" && legal.some((move) => move.to === target && this.chess.get(move.from)?.type === "k")) {
+            return { refusal: "illegal", message: `${input} is not legal here: R is the rook in SAN, and the king is K: K${target}.` };
         }
 
         return candidates[0] ?? this.illegal(input);
@@ -283,6 +319,17 @@ const asciiOf: Readonly<Record<string, string>> = {
     "♞": "N",
     "♙": "",
     "♟": "",
+};
+
+// The pieces' letters of other languages that name one piece only: the Italian, French, Spanish and German ones; R is the rook in SAN.
+const foreignPieces: Readonly<Record<string, readonly [string, string]>> = {
+    C: ["knight", "N"],
+    S: ["knight", "N"],
+    A: ["bishop", "B"],
+    F: ["bishop", "B"],
+    L: ["bishop", "B"],
+    T: ["rook", "R"],
+    D: ["queen", "Q"],
 };
 
 // The legal moves of the positions seen last, by their key: about 4 KB each.
@@ -382,6 +429,44 @@ function kingInCheckOffTurn(chess: Chess): boolean
 function gameOver({ ending, result }: Extract<Outcome, { over: true; }>): Refused
 {
     return { refusal: "over", message: `The game is over by ${ending} (${result}): no move can follow.` };
+}
+
+/** A move written with a piece's letter of another language (T-11): Cf3 for an Italian or French knight, Dd1 for a queen; none for another mistake. */
+function foreignLetter(input: string, bare: string): Refused | undefined
+{
+    const [, move = "", becomes = ""] = /^(.*[18])=?([A-Z])$/.exec(bare) ?? [];
+
+    if (becomes !== "" && !"QRBN".includes(becomes)) {
+        const piece = foreignPieces[becomes];
+        const instead = piece === undefined ? "" : ` For a ${piece[0]}, ${move}=${piece[1]}.`;
+        return { refusal: "unreadable", message: `"${input}" is not a move: a pawn becomes Q, R, B or N, never ${becomes}.${instead}` };
+    }
+
+    const letter = /^([A-Z])[a-h1-8]?[-x:]?[a-h][1-8]/.exec(bare)?.[1];
+
+    if (letter === undefined || "KQRBNP".includes(letter)) {
+        return undefined;
+    }
+
+    const piece = foreignPieces[letter];
+    const instead = piece === undefined ? "" : ` For a ${piece[0]}, ${piece[1]}${bare.slice(1)}.`;
+    // T is the Italian, French and Spanish rook, whose R is their king.
+    const king = letter === "T" ? " In SAN R is the rook, and K the king." : "";
+    return { refusal: "unreadable", message: `"${input}" is not a move: SAN writes the pieces K, Q, R, B and N, and a pawn with none, never ${letter}.${instead}${king}` };
+}
+
+/** A move that opens with a small letter and a square of another file, or "bb4": a pawn's capture without its x, a piece without its capital. */
+function smallLetter(input: string, file: string, target: string): Refused
+{
+    const files = Math.abs(file.charCodeAt(0) - target.charCodeAt(0));
+    const piece = file === "b" ? (["bishop", "B"] as const) : foreignPieces[file.toUpperCase()];
+    const hints = [
+        files === 0 ? `The pawn's move is ${target}.` : "",
+        files === 1 ? `A pawn takes with an x: ${file}x${target}.` : "",
+        piece === undefined ? "" : `For a ${piece[0]}, ${piece[1]}${target}.`,
+    ].filter((hint) => hint !== "");
+    const said = hints.length > 0 ? hints : ["A piece is a capital letter: K, Q, R, B or N."];
+    return { refusal: "unreadable", message: `"${input}" is not a move: ${file} is a file. ${said.join(" ")}` };
 }
 
 function unreadable(input: string): Refused

@@ -85,14 +85,14 @@ describe("the player's moves on the page", () => {
         const folder = playerFolder();
         const page = await open(folder);
 
-        expect(await post(page, "/api/move", { move: "e2e4" })).toMatchObject({ status: 409, body: '{"error":"There is no game going on: start one in the chat."}' });
+        expect(await post(page, "/api/move", { move: "e2e4" })).toMatchObject({ status: 409, body: '{"error":"There is no game going on: start one in the chat.","refusal":"no-game"}' });
         await run(folder, "new_game", { ai_colour: "black" });
 
         expect(await post(page, "/api/move", { move: "e2e4" })).toMatchObject({ status: 200, body: '{"played":true}' });
-        expect(await post(page, "/api/move", { move: "d2d4" })).toMatchObject({ status: 409, body: '{"error":"Wait for the AI\'s move."}' });
+        expect(await post(page, "/api/move", { move: "d2d4" })).toMatchObject({ status: 409, body: '{"error":"Wait for the AI\'s move.","refusal":"ai-to-move"}' });
         await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." });
 
-        expect((await post(page, "/api/move", { move: "e4e5" })).status).toBe(409);
+        expect(await post(page, "/api/move", { move: "e4e5" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"illegal"') });
         expect((await post(page, "/api/move", { move: "Nf3" }, { "content-type": "text/plain" })).status).toBe(415);
         expect((await post(page, "/api/move", { san: "Nf3" })).status).toBe(400);
         expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain("1. e4 e5 {Symmetry.} *");
@@ -118,14 +118,14 @@ describe("the player's moves on the page", () => {
         const folder = playerFolder();
         const page = await open(folder);
 
-        expect(await post(page, "/api/message", { text: "Hi" })).toMatchObject({ status: 409, body: '{"error":"There is no game going on: start one in the chat."}' });
+        expect(await post(page, "/api/message", { text: "Hi" })).toMatchObject({ status: 409, body: '{"error":"There is no game going on: start one in the chat.","refusal":"no-game"}' });
         await run(folder, "new_game", { ai_colour: "black" });
 
         expect(await post(page, "/api/message", { text: "  Hi!  " })).toMatchObject({ status: 200, body: '{"said":true}' });
         // 200 characters a move: the words sent alone count with those sent with the move.
         expect(await post(page, "/api/move", { move: "e4", message: "y".repeat(198) })).toMatchObject({
             status: 409,
-            body: '{"error":"The words are 198 characters long: write at most 197 more until the AI\'s next move."}',
+            body: '{"error":"The words are 198 characters long: write at most 197 more until the AI\'s next move.","refusal":"words-longer-than-left","most":197}',
         });
         expect(await post(page, "/api/move", { move: "e4", message: "Your turn." })).toMatchObject({ status: 200, body: '{"played":true}' });
         expect(JSON.parse((await get(page, "/api/game")).body).game.talk).toEqual([
@@ -137,10 +137,10 @@ describe("the player's moves on the page", () => {
         // The words written while the AI thinks count with those of the move, until the AI moves.
         expect(await post(page, "/api/message", { text: "x".repeat(201) })).toMatchObject({
             status: 409,
-            body: '{"error":"The words are 201 characters long: write at most 187 more until the AI\'s next move."}',
+            body: '{"error":"The words are 201 characters long: write at most 187 more until the AI\'s next move.","refusal":"words-longer-than-left","most":187}',
         });
         expect((await post(page, "/api/message", { text: "x".repeat(187) })).status).toBe(200);
-        expect((await post(page, "/api/message", { text: "Hello?" })).status).toBe(409);
+        expect(await post(page, "/api/message", { text: "Hello?" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"words-spent"') });
         await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." });
         expect(await post(page, "/api/move", { move: "Nf3", message: "And a move." })).toMatchObject({ status: 200, body: '{"played":true}' });
         expect((await post(page, "/api/message", { text: "Hi" }, { "content-type": "text/plain" })).status).toBe(415);
@@ -150,7 +150,7 @@ describe("the player's moves on the page", () => {
 
         await run(folder, "ai_move", { move: "Nc6", plan: "A plan.", comment: "Development." });
         expect((await post(page, "/api/move", { move: "Bb5", message: 7 })).status).toBe(400);
-        expect(await post(page, "/api/move", { move: "Bb5", message: "x".repeat(201) })).toMatchObject({ status: 409, body: '{"error":"The words are 201 characters long: write at most 200."}' });
+        expect(await post(page, "/api/move", { move: "Bb5", message: "x".repeat(201) })).toMatchObject({ status: 409, body: '{"error":"The words are 201 characters long: write at most 200.","refusal":"words-long","most":200}' });
         expect(await post(page, "/api/move", { move: "Bb5", message: "Pin." })).toMatchObject({ status: 200, body: '{"played":true}' });
         expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain("1. e4 e5 {Symmetry.} 2. Nf3 Nc6 {Development.} 3. Bb5 *");
     });
@@ -270,6 +270,22 @@ describe("the doorbell of the chat", () => {
         // The watcher hears of the mate before the hook comes.
         await new Promise((done) => setTimeout(done, 200));
 
+        expect(await waitForBell(JSON.stringify({ cwd: folder }), [Number(new URL(page.url).port)])).toBe(true);
+    });
+
+    it("gives the page the clock, and rings the chat when a flag falls as the page reads the game (T-37)", async () => {
+        const folder = playerFolder();
+        const base = testContext(folder);
+        const start = base.now().getTime();
+        let seconds = 0;
+        const chat: Context = { ...base, now: () => new Date(start + seconds * 1000) };
+        const page = await open(folder, undefined, chat);
+        await run(folder, "new_game", { ai_colour: "black", clock: "1+0" }, chat);
+        const game = async (): Promise<{ pgn: string; clock: Record<string, unknown>; }> => JSON.parse((await get(page, "/api/game")).body).game;
+
+        expect((await game()).clock).toMatchObject({ left: { white: 60_000, black: 60_000 } });
+        seconds = 61;
+        expect((await game()).pgn).toContain('[Result "0-1"]');
         expect(await waitForBell(JSON.stringify({ cwd: folder }), [Number(new URL(page.url).port)])).toBe(true);
     });
 

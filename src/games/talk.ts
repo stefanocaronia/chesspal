@@ -14,15 +14,16 @@ export function talkLine(current: CurrentGame, who: Speaker, text: string, at: D
     const most = who === "player" ? wordsLeft(current) : talkLimits.ai;
 
     if (words === "") {
-        throw new Error("There is nothing to say: write the words first.");
+        throw new WordsRefused("There is nothing to say: write the words first.", "empty");
     }
 
     if (who === "player" && most === 0) {
-        throw new Error(`You have written your ${talkLimits.player} characters until the AI's next move: write again after it.`);
+        throw new WordsRefused(`You have written your ${talkLimits.player} characters until the AI's next move: write again after it.`, "spent");
     }
 
     if (words.length > most) {
-        throw new Error(`The words are ${words.length} characters long: write at most ${most}${who === "player" && most < talkLimits.player ? " more until the AI's next move" : ""}.`);
+        const more = who === "player" && most < talkLimits.player;
+        throw new WordsRefused(`The words are ${words.length} characters long: write at most ${most}${more ? " more until the AI's next move" : ""}.`, more ? "longer-than-left" : "long", most);
     }
 
     if (who === "ai") {
@@ -30,6 +31,20 @@ export function talkLine(current: CurrentGame, who: Speaker, text: string, at: D
     }
 
     return { who, text: words, ply, at: at.toISOString() };
+}
+
+/** Words refused, and why, for the page to say it in the player's language (T-11): none, the move's characters spent, more than a line or what is left holds. */
+export class WordsRefused extends Error
+{
+    readonly reason: "empty" | "spent" | "long" | "longer-than-left";
+    readonly most: number;
+
+    constructor(message: string, reason: WordsRefused["reason"], most = 0)
+    {
+        super(message);
+        this.reason = reason;
+        this.most = most;
+    }
 }
 
 /** The lines the player wrote since the AI's last move: those it answers with its next move, and the 200 characters of this move are counted on them. */

@@ -9,9 +9,9 @@ import { give, waitingWords } from "./say.ts";
 /** The AI's move, with its plan, kept hidden (D-29), and its comment for the player when it has something to say (D-12, D-54). */
 export const aiMove = defineCommand({
     name: "ai_move",
-    description: "Plays your move, with your plan, hidden from the player, and a comment for them only when there is something to say: a threat, a capture, a "
-        + "change of plan, a move of theirs worth a word, words of theirs to answer. It answers with the board, for your message when the player plays in the chat. "
-        + 'Example: ai_move {move: "d5", plan: "After exd5 Na5, chase the bishop on c4.", comment: "d5 shuts the bishop out of f7."}.',
+    description: "Plays your move, with your plan, hidden from the player, and a comment for them only when there is something to say: a capture, a move of theirs "
+        + "worth a word, words of theirs to answer; as a player at a tournament, never revealing your plans or threats. It answers with the board, for your message "
+        + 'when the player plays in the chat. Example: ai_move {move: "d5", plan: "After exd5 Na5, chase the bishop on c4.", comment: "An old favourite of mine."}.',
     input: z.object({
         move: z.string().min(1).describe("your move, in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q)"),
         plan: sentence(200).describe("your plan, in one sentence: kept for you, hidden from the player"),

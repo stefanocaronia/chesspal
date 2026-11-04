@@ -125,19 +125,31 @@ function computed(chess: Chess, legal: readonly Move[]): Facts
 }
 
 /** Which pieces attack a square: chess.js's direct attacks, a piece pinned to its king only along the pin's line, and the pawns that take en passant. */
-type Reach = (square: Square, color: Color) => Square[];
+export type Reach = (square: Square, color: Color) => Square[];
+
+/** Which pieces attack a square as the facts count them: a piece pinned to its king only along the pin's line, though it still gives check; no en passant. */
+export function attacksOf(chess: Chess): Reach
+{
+    return alongPins(chess, piecesOf(chess).filter((piece) => piece.type === "k").flatMap((king) => pinsTo(chess, king)));
+}
 
 function reachOf(chess: Chess, kingPins: readonly Pin[], legal: readonly Move[]): Reach
 {
-    const pinLines = new Map(kingPins.map((pin) => [pin.square, new Set(squaresBetween(pin.to, pin.by).concat(pin.by))]));
+    const direct = alongPins(chess, kingPins);
     const enPassant = enPassantVictim(chess);
     const takers = enPassant === undefined ? [] : legal.filter((move) => move.to === enPassant.to && chess.get(move.from)?.type === "p").map((move) => move.from);
+
+    return (square, color) => (square === enPassant?.square && color === chess.turn() ? [...direct(square, color), ...takers].sort(compare) : direct(square, color));
+}
+
+function alongPins(chess: Chess, kingPins: readonly Pin[]): Reach
+{
+    const pinLines = new Map(kingPins.map((pin) => [pin.square, new Set(squaresBetween(pin.to, pin.by).concat(pin.by))]));
 
     return (square, color) => {
         // A pinned piece still gives check: the king is never taken.
         const isKing = chess.get(square)?.type === "k";
-        const direct = chess.attackers(square, color).filter((from) => isKing || (pinLines.get(from)?.has(square) ?? true));
-        return square === enPassant?.square && color === chess.turn() ? [...direct, ...takers].sort(compare) : direct.sort(compare);
+        return chess.attackers(square, color).filter((from) => isKing || (pinLines.get(from)?.has(square) ?? true)).sort(compare);
     };
 }
 
@@ -256,18 +268,18 @@ function rayFrom(from: Square, fileStep: number, rankStep: number): Square[]
 }
 
 /** The squares strictly between two squares on one line. */
-function squaresBetween(from: Square, to: Square): Square[]
+export function squaresBetween(from: Square, to: Square): Square[]
 {
     const ray = rayFrom(from, Math.sign(fileOf(to) - fileOf(from)), Math.sign(rankOf(to) - rankOf(from)));
     return ray.slice(0, ray.indexOf(to));
 }
 
-function fileOf(square: Square): number
+export function fileOf(square: Square): number
 {
     return files.indexOf(square[0]!);
 }
 
-function rankOf(square: Square): number
+export function rankOf(square: Square): number
 {
     return Number(square[1]);
 }

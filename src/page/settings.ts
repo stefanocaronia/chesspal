@@ -22,6 +22,8 @@ export interface Settings
     readonly pieces: string;
     readonly marks: string;
     readonly dots: boolean;
+    /** Whether the board says why a move is refused (T-11, D-18). */
+    readonly explain: boolean;
     readonly sound: boolean;
     readonly language: "auto" | "it" | "en";
 }
@@ -39,6 +41,7 @@ export function loadSettings(): Settings
         pieces: oneOf(stored.pieces, looks.pieces, looks.pieces[0]),
         marks: oneOf(stored.marks, looks.marks, looks.marks[0]),
         dots: typeof stored.dots === "boolean" ? stored.dots : true,
+        explain: typeof stored.explain === "boolean" ? stored.explain : true,
         sound: typeof stored.sound === "boolean" ? stored.sound : read("chesspal-sound") !== "off",
         language: oneOf(stored.language, ["auto", "it", "en"], "auto"),
     };

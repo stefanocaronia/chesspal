@@ -1,5 +1,5 @@
 // The view of a position the AI reads (D-26): the facts the core computes, in the format the T-27 bench chose; never the grid, which is the player's.
-import type { Facts, PieceFacts, Side, Square } from "../core/index.ts";
+import type { Facts, Material, PieceFacts, PieceLetter, Side, Square } from "../core/index.ts";
 
 /** The view after the player's move: the check, the pieces attacked, then what is at risk, the pins, the checks and the moves of each piece. */
 export function compactView(facts: Facts, turn: Side): string[]
@@ -26,6 +26,28 @@ export function fullView(facts: Facts, turn: Side): string[]
 export function colourName(side: Side): string
 {
     return side === "white" ? "White" : "Black";
+}
+
+/** The material as the player sees it beside the board (D-59): who is ahead and by how much, and the pieces each side took. */
+export function materialText(material: Material): string
+{
+    const ahead = material.balance === 0 ? "even" : `${material.balance > 0 ? "White" : "Black"} +${Math.abs(material.balance)}`;
+
+    if (material.taken.white.length === 0 && material.taken.black.length === 0) {
+        return `${ahead}, nothing taken`;
+    }
+
+    return `${ahead} (White took ${takenText(material.taken.white)}, Black took ${takenText(material.taken.black)})`;
+}
+
+/** The pieces taken, counted by kind: Q 2R 7P. */
+function takenText(taken: readonly PieceLetter[]): string
+{
+    const kinds = [...new Set(taken)];
+    return kinds.map((piece) => {
+        const count = taken.filter((other) => other === piece).length;
+        return count === 1 ? piece : `${count}${piece}`;
+    }).join(" ") || "nothing";
 }
 
 const sidesInOrder: readonly Side[] = ["white", "black"];

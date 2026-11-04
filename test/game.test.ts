@@ -67,6 +67,30 @@ describe("a game", () => {
         expect(from("4k3/8/8/8/8/5N2/8/1N2K3 w - - 0 1").play("Nxd2")).toMatchObject({ refusal: "illegal" });
     });
 
+    it("says what is wrong in the notation: a file for a bishop, a pawn's capture without its x, another language's letter, nothing to take", () => {
+        const game = new Game();
+
+        expect(game.play("bc4")).toMatchObject({ refusal: "unreadable", message: '"bc4" is not a move: b is a file. A pawn takes with an x: bxc4. For a bishop, Bc4.' });
+        expect(game.play("ed5")).toMatchObject({ refusal: "unreadable", message: '"ed5" is not a move: e is a file. A pawn takes with an x: exd5.' });
+        expect(game.play("bf4")).toMatchObject({ message: '"bf4" is not a move: b is a file. For a bishop, Bf4.' });
+        expect(game.play("bb4")).toMatchObject({ message: '"bb4" is not a move: b is a file. The pawn\'s move is b4. For a bishop, Bb4.' });
+        expect(game.play("cf3")).toMatchObject({ message: '"cf3" is not a move: c is a file. For a knight, Nf3.' });
+        expect(game.play("hd4")).toMatchObject({ message: '"hd4" is not a move: h is a file. A piece is a capital letter: K, Q, R, B or N.' });
+        expect(game.play("Tf3")).toMatchObject({ message: expect.stringMatching(/For a rook, Rf3\. In SAN R is the rook, and K the king\.$/) });
+        expect(from("4k3/1P6/8/8/8/8/8/4K3 w - - 0 1").play("b8=D")).toMatchObject({
+            refusal: "unreadable",
+            message: '"b8=D" is not a move: a pawn becomes Q, R, B or N, never D. For a queen, b8=Q.',
+        });
+        expect(played(standard, "e4", "e5").play("Re2")).toMatchObject({ refusal: "illegal", message: "Re2 is not legal here: R is the rook in SAN, and the king is K: Ke2." });
+        expect(game.play("Cf3")).toMatchObject({
+            refusal: "unreadable",
+            message: '"Cf3" is not a move: SAN writes the pieces K, Q, R, B and N, and a pawn with none, never C. For a knight, Nf3.',
+        });
+        expect(game.play("Xf3")).toMatchObject({ refusal: "unreadable", message: expect.stringMatching(/never X\.$/) });
+        expect(game.play("exd5")).toMatchObject({ refusal: "illegal", message: "exd5 takes, but there is nothing to take on d5." });
+        expect(game.record.moves).toEqual([]);
+    });
+
     it("reads the notation of books, phones and word processors", () => {
         const game = played(standard, "e2–e4", "e7—e5", "♘f3", "nc6", "♗b5", "a7−a6", "B×c6", "♟dxc6", "0–0");
         const numbered = played(standard, "1. e4", "1...e5", "2.Nf3", "2… Nc6", "3 . Bb5", "3. ... a6");

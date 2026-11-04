@@ -11,7 +11,7 @@ import type { Context } from "../commands/context.ts";
 import { ChatNotClear, newGame } from "../commands/new-game.ts";
 import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
-import { endOf, heardLines, loadGame, playerLinesThisMove, playerPgn, talkLimits, unheardWords } from "../games/index.ts";
+import { type CurrentGame, endOf, heardLines, loadGame, playerLinesThisMove, playerPgn, talkLimits, unheardWords, WordsRefused } from "../games/index.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
 
 /** The page of a player's folder, served: its address, how to tell it the AI was given words, which change no file, and how to stop it. */
@@ -160,20 +160,28 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
         return;
     }
 
-    const refused = refusalOf(served.folder, served.context.now());
+    const refused = refusalOf(served);
 
     if (refused !== undefined) {
-        send(response, 409, json, JSON.stringify({ error: refused }));
+        send(response, 409, json, JSON.stringify(refused));
         return;
     }
 
     const message = textOf(body?.message);
+    let illegal = false;
 
     try {
         const now = served.context.now();
-        playMove(served.folder, now, "player", move, (problem) => problem, message === undefined ? {} : { said: { text: message, at: now } });
+
+        const refuse = (problem: string): string => {
+            illegal = true;
+            return problem;
+        };
+
+        playMove(served.folder, now, "player", move, refuse, message === undefined ? {} : { said: { text: message, at: now } });
     } catch (error) {
-        send(response, 409, json, JSON.stringify({ error: (error as Error).message, ...(error instanceof ChatNotClear ? { clearChat: true } : {}) }));
+        // The game may have changed since the page read it: the move refused, the AI's turn, a flag fallen.
+        send(response, 409, json, JSON.stringify(refusalFrom(error, illegal ? "illegal" : refusalOf(served)?.refusal)));
         return;
     }
 
@@ -202,7 +210,8 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
     try {
         current = say(served.folder, "player", text, served.context.now());
     } catch (error) {
-        send(response, 409, json, JSON.stringify({ error: (error as Error).message }));
+        const noGame = refusalOf(served)?.refusal === "no-game";
+        send(response, 409, json, JSON.stringify(refusalFrom(error, noGame ? "no-game" : undefined)));
         return;
     }
 
@@ -226,7 +235,7 @@ function newGameFromPage(request: IncomingMessage, response: ServerResponse, ser
         const before = loadGame(served.folder);
         newGame.run({ ai_colour: before?.ai ?? "black", replace: true }, served.context);
     } catch (error) {
-        send(response, 409, json, JSON.stringify({ error: (error as Error).message }));
+        send(response, 409, json, JSON.stringify(refusalFrom(error)));
         return;
     }
 
@@ -236,31 +245,72 @@ function newGameFromPage(request: IncomingMessage, response: ServerResponse, ser
 
 const json = "application/json; charset=utf-8";
 
-/** Why the player cannot move now, in their words; undefined when they can. */
-function refusalOf(folder: string, now: Date): string | undefined
+/**
+ * A request refused, as the page reads it: the server's words, and the code of a refusal the page says in the player's language (T-11), with the characters
+ * left for words too long; without a code, the page shows the words.
+ */
+export interface Refused
+{
+    readonly error: string;
+    readonly refusal?: "no-game" | "ai-to-move" | "illegal" | "clear-chat" | `words-${WordsRefused["reason"]}`;
+    readonly most?: number;
+}
+
+/** Why the player cannot move now; undefined when they can. */
+function refusalOf(served: Served): Refused | undefined
 {
     try {
-        const current = gameAt(folder, now);
+        const current = gameNow(served);
 
         if (current === undefined || endOf(current.game) !== undefined) {
-            return "There is no game going on: start one in the chat.";
+            return { error: "There is no game going on: start one in the chat.", refusal: "no-game" };
         }
 
-        return current.game.position.turn === current.ai ? "Wait for the AI's move." : undefined;
+        return current.game.position.turn === current.ai ? { error: "Wait for the AI's move.", refusal: "ai-to-move" } : undefined;
     } catch (error) {
-        return (error as Error).message;
+        return { error: (error as Error).message };
     }
 }
 
+/** The refusal of an error thrown by a command, with its code when the error or the caller knows it. */
+function refusalFrom(error: unknown, refusal?: Refused["refusal"]): Refused
+{
+    const message = (error as Error).message;
+
+    if (error instanceof ChatNotClear) {
+        return { error: message, refusal: "clear-chat" };
+    }
+
+    if (error instanceof WordsRefused) {
+        return { error: message, refusal: `words-${error.reason}`, most: error.most };
+    }
+
+    return refusal === undefined ? { error: message } : { error: message, refusal };
+}
+
+/** The game as the page reads it now: a flag that has fallen ends it (D-13), and the doorbell tells the chat, which hears how from status (T-37). */
+function gameNow(served: Served): CurrentGame | undefined
+{
+    const before = loadGame(served.folder);
+    const current = gameAt(served.folder, served.context.now());
+
+    if (before !== undefined && endOf(before.game) === undefined && current !== undefined && endOf(current.game) !== undefined) {
+        served.bell.ring();
+    }
+
+    return current;
+}
+
 /**
- * Whether the chat has news from the page: a move of the player's the AI has not answered, a game the player ended there, or words of theirs it has not
- * been given. A game that cannot be read is news too: status says what is wrong.
+ * Whether the chat has news from the page: a move of the player's the AI has not answered, a game the player ended there or lost on time, or words of
+ * theirs it has not been given. A game that cannot be read is news too: status says what is wrong.
  */
 function hasNews(context: Context): boolean
 {
     try {
         const current = loadGame(context.folder);
-        return current !== undefined && (current.game.position.turn === current.ai || unheardWords(current, context.given).length > 0);
+        const onTime = /\btime\b/.test(current?.game.record.tags.Termination ?? "");
+        return current !== undefined && (current.game.position.turn === current.ai || onTime || unheardWords(current, context.given).length > 0);
     } catch {
         return true;
     }
@@ -358,8 +408,7 @@ function watchGame(served: Served): () => void
 function sendGame(response: ServerResponse, served: Served): void
 {
     try {
-        // A flag that has fallen ends the game as the page reads it (D-13).
-        const current = gameAt(served.folder, served.context.now());
+        const current = gameNow(served);
         const heard = current === undefined ? [] : heardLines(current, served.context.given);
         const talk = current?.talk.map(({ who, text, ply }, index) => heard[index] === undefined ? { who, text, ply } : { who, text, ply, heard: heard[index] });
         const body = { game: current === undefined ? null : { pgn: playerPgn(current), ai: current.ai, started: current.started, talk, ...(current.clock === undefined ? {} : { clock: current.clock }) }, opponent: served.opponent() };

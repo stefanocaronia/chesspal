@@ -1,9 +1,9 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
-import type { Facts, GameRecord, Side, Square } from "../core/index.ts";
+import { type Facts, type GameRecord, materialOf, type Side, type Square } from "../core/index.ts";
 import { type CurrentGame, currentPlan, endOf } from "../games/index.ts";
 import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
 import { openingLine } from "./opening-book.ts";
-import { colourName, compactView } from "./view.ts";
+import { colourName, compactView, materialText } from "./view.ts";
 
 /** The current game, as the commands give it. */
 export interface GameSummary
@@ -119,13 +119,14 @@ export function positionLines(game: GameSummary, withLastMove = true): string[]
     ];
 }
 
-/** The head of a view: where the game stands, the last move unless the lines before named it, the opening, and the FEN. */
+/** The head of a view: where the game stands, the last move unless the lines before named it, the opening, the material as the player sees it, and the FEN. */
 export function headLines(game: GameSummary, withLastMove = true): string[]
 {
     return [
         whereLine(game),
         ...(withLastMove && game.lastMove !== undefined ? [`Last move: ${lastMoveText(game.lastMove)}.`] : []),
         ...(game.opening === undefined ? [] : [`Opening: ${game.opening}`]),
+        `Material: ${materialText(materialOf(game.fen))}`,
         ...clockLines(game),
         `FEN: ${game.fen}`,
     ];

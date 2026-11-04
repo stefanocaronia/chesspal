@@ -1,8 +1,9 @@
 // The board: eight ranks of squares from a FEN, one side at the bottom, Zoe's pieces (T-9), the ranks and files on the edge squares. The player moves
 // with two clicks or by dragging a piece, which lifts off the board, in Zoe's design (T-70).
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { Move, PieceLetter, Side } from "../core/index.ts";
+import type { Move, PieceLetter, Promotion, Side } from "../core/index.ts";
 import type { HowEnded } from "./ending.ts";
+import { type BubblePlace, bubblePlace, type ExplainKind, type Explanation, keptSquares } from "./explain.ts";
 import { Piece } from "./pieces.tsx";
 import type { Text } from "./text.ts";
 
@@ -11,7 +12,7 @@ import type { Text } from "./text.ts";
  * picks one, and the legal moves of the piece picked show as dots, rings on captures; a second press on one of them, or a drag there, plays it. At any time
  * the right button lights a square, or draws an arrow when dragged, until a left click.
  */
-export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, player, selected, targets, dots, onSelect, onMove, text }: {
+export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, player, selected, targets, dots, notice, promotion, onSelect, onMove, onRefuse, onPromote, text }: {
     fen: string;
     bottom: Side;
     lastMove?: Move;
@@ -26,8 +27,15 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
     selected?: string;
     targets: readonly Move[];
     dots: boolean;
+    /** Why a move was refused (T-11): a bubble over the square it went to, and a ring on the piece that forbids it. */
+    notice?: Notice;
+    /** A pawn on its way to the last rank (T-11): the four pieces it may become, over the square, until the player picks one or none. */
+    promotion?: { from: string; to: string; side: Side; };
     onSelect: (square: string | undefined) => void;
     onMove: (from: string, to: string) => void;
+    /** A piece picked and taken to a square its legal moves do not reach. */
+    onRefuse: (from: string, to: string) => void;
+    onPromote: (piece: Promotion | undefined) => void;
     text: Text;
 })
 {
@@ -36,6 +44,8 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
     const signs = end === undefined ? noSigns : kingSigns(pieces, fen.split(" ")[1] === "b" ? "black" : "white", end);
     const ranks = bottom === "white" ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8];
     const columns = bottom === "white" ? [...files] : [...files].reverse();
+    const seen = (square: string): [number, number] => [columns.indexOf(square[0]!), ranks.indexOf(Number(square[1]))];
+    const centreOf = (square: string): [number, number] => [columns.indexOf(square[0]!) + 0.5, ranks.indexOf(Number(square[1])) + 0.5];
     const board = useRef<HTMLDivElement>(null);
     const press = useRef<Press | undefined>(undefined);
     const [drag, setDrag] = useState<Drag | undefined>(undefined);
@@ -69,7 +79,64 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
         return player !== undefined && piece !== undefined && (piece === piece.toUpperCase()) === (player === "white");
     };
 
-    const isTarget = (square: string): boolean => targets.some((move) => move.to === square);
+    // Where a move to a square lands: there, or castling's square for a king taken onto its own rook, as on Lichess; none for a square it cannot go to.
+    const landing = (square: string): string | undefined => targets.find((move) => move.to === square || rookOf(move) === square)?.to;
+    const isTarget = (square: string): boolean => landing(square) !== undefined;
+
+    // A press on a square that is not the player's, and none of the piece picked's moves, puts the piece down, saying why it cannot go there.
+    const putDown = (square: string): void => {
+        onSelect(undefined);
+
+        if (selected !== undefined) {
+            onRefuse(selected, square);
+        }
+    };
+
+    // The keyboard (T-11): the arrows move between the squares as the board is turned, Enter and Space press one as a click does, Esc puts the piece down.
+    const [cursor, setCursor] = useState<string | undefined>(undefined);
+    const focused = cursor ?? selected ?? `${columns[0]}${ranks[7]}`;
+
+    const key = (event: KeyboardEvent, square: string): void => {
+        const step = arrowSteps[event.key];
+
+        if (step !== undefined) {
+            const column = Math.min(7, Math.max(0, columns.indexOf(square[0]!) + step[0]));
+            const row = Math.min(7, Math.max(0, ranks.indexOf(Number(square[1])) + step[1]));
+            const next = `${columns[column]}${ranks[row]}`;
+            event.preventDefault();
+            setCursor(next);
+            board.current!.querySelector<HTMLElement>(`[data-square="${next}"]`)!.focus();
+        } else if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            pressKey(square);
+        } else if (event.key === "Escape" && selected !== undefined) {
+            onSelect(undefined);
+        }
+    };
+
+    // The focus goes back to the board after the choice of a promotion: to the pawn's square when it was cancelled, else to where it went.
+    const promote = (piece: Promotion | undefined): void => {
+        const back = piece === undefined ? promotion!.from : promotion!.to;
+        onPromote(piece);
+        setCursor(back);
+        requestAnimationFrame(() => board.current?.querySelector<HTMLElement>(`[data-square="${back}"]`)?.focus());
+    };
+
+    const pressKey = (square: string): void => {
+        setMarks(noMarks);
+
+        if (player === undefined) {
+            return;
+        }
+
+        if (selected !== undefined && isTarget(square)) {
+            onMove(selected, landing(square)!);
+        } else if (own(square)) {
+            onSelect(selected === square ? undefined : square);
+        } else {
+            putDown(square);
+        }
+    };
 
     // The square under a point, as the board is turned; none off the board.
     const squareAt = (x: number, y: number): string | undefined => {
@@ -113,6 +180,22 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
         };
     }, [drag?.back, drag === undefined]);
 
+    // A piece dragged out of the window gives it no scrollbar; the page keeps those it had, so nothing moves under the piece.
+    useEffect(() => {
+        if (drag === undefined) {
+            return;
+        }
+
+        const root = document.documentElement;
+        root.style.overflowX = root.scrollWidth > root.clientWidth ? "" : "hidden";
+        root.style.overflowY = root.scrollHeight > root.clientHeight ? "" : "hidden";
+
+        return () => {
+            root.style.overflowX = "";
+            root.style.overflowY = "";
+        };
+    }, [drag === undefined]);
+
     const down = (event: PointerEvent): void => {
         const square = squareAt(event.clientX, event.clientY);
 
@@ -140,16 +223,16 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
         if (selected !== undefined && isTarget(square)) {
             // A finger plays when it lifts, so a page scrolled from a dot plays nothing.
             if (event.pointerType === "touch") {
-                press.current = { from: selected, to: square, x: event.clientX, y: event.clientY, was: false, touch: true, id: event.pointerId, moved: false };
+                press.current = { from: selected, to: landing(square)!, x: event.clientX, y: event.clientY, was: false, touch: true, id: event.pointerId, moved: false };
             } else {
-                onMove(selected, square);
+                onMove(selected, landing(square)!);
             }
 
             return;
         }
 
         if (!own(square)) {
-            onSelect(undefined);
+            putDown(square);
             return;
         }
 
@@ -239,14 +322,21 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
 
         const to = drag.over;
 
-        if (!cancelled && to !== undefined && to !== drag.from && isTarget(to)) {
+        const landed = to === undefined || to === drag.from ? undefined : landing(to);
+
+        if (!cancelled && landed !== undefined) {
             setDrag(undefined);
-            dragged.current = `${drag.from}${to}`;
-            onMove(drag.from, to);
+            dragged.current = `${drag.from}${landed}`;
+            onMove(drag.from, landed);
         } else if (!cancelled && to === drag.from) {
             setDrag(undefined);
         } else {
             goBack();
+
+            // A game that changed under the drag may have given the turn away: no reason for a piece that may not move.
+            if (!cancelled && to !== undefined && to !== drag.from && player !== undefined) {
+                onRefuse(drag.from, to);
+            }
         }
     };
 
@@ -255,8 +345,8 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
             <div
                 ref={board}
                 class={["board", player === undefined ? "" : "playable", end === undefined ? "" : endClasses(end)].filter((name) => name !== "").join(" ")}
-                role="grid"
-                aria-label={text.board}
+                role="group"
+                aria-label={text.boardLabel(fen.split(" ")[1] === "b" ? "black" : "white", lastMove?.san)}
                 onPointerDown={down}
                 onPointerMove={moveTo}
                 onPointerUp={(event) => release(event, false)}
@@ -279,6 +369,7 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
                             sign?.classes ?? "",
                             selected === square ? "selected" : "",
                             marks.squares.includes(square) ? "marked" : "",
+                            notice?.explanation?.ring === square ? "culprit" : "",
                             own(square) ? "own" : "",
                             target === undefined ? "" : !dots ? "target" : target.san.includes("x") ? "hint capture" : "hint",
                             drag?.over === square && drag.over !== drag.from ? "over" : "",
@@ -288,7 +379,7 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
                             motion.appear?.has(square) === true ? "appear" : "",
                         ].filter((name) => name !== "").join(" ");
                         const named = piece === undefined ? square : `${square}, ${text.piece(piece.toUpperCase() as PieceLetter, piece === piece.toUpperCase() ? "white" : "black")}`;
-                        const label = mated === square ? `${named}, ${text.checkmate}` : named;
+                        const label = [named, mated === square ? text.checkmate : "", isTarget(square) ? text.canGo : ""].filter((part) => part !== "").join(", ");
                         const from = motion.slides.get(square);
                         const moving = from !== undefined || motion.shake === square || motion.appear?.has(square) === true;
                         // How far the sliding piece comes from, in squares as the board is turned.
@@ -297,7 +388,20 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
                             "--dy": ranks.indexOf(Number(from[1])) - row,
                         };
                         return (
-                            <div key={square} class={classes} role="gridcell" aria-label={label} style={away}>
+                            <div
+                                key={square}
+                                class={classes}
+                                role="button"
+                                aria-label={label}
+                                aria-pressed={own(square) ? selected === square : undefined}
+                                tabIndex={square === focused ? 0 : -1}
+                                data-square={square}
+                                onKeyDown={(event) => key(event, square)}
+                                onFocus={() => setCursor(square)}
+                                // A click with no pointer behind it, as a screen reader's in browse mode, presses the square as Enter does.
+                                onClick={(event) => event.detail === 0 && pressKey(square)}
+                                style={away}
+                            >
                                 {column === 0 ? <span class="coordinate rank">{rank}</span> : null}
                                 {row === 7 ? <span class="coordinate file">{file}</span> : null}
                                 {motion.taken?.square === square
@@ -319,10 +423,35 @@ export function Board({ fen, bottom, lastMove, nextMove, jumped, check, end, pla
                     })
                 )}
             </div>
-            <Arrows arrows={drawing === undefined ? marks.arrows : [...marks.arrows, drawing]} at={(square) => [columns.indexOf(square[0]!) + 0.5, ranks.indexOf(Number(square[1])) + 0.5]} />
+            <Arrows arrows={drawing === undefined ? marks.arrows : [...marks.arrows, drawing]} at={centreOf} />
+            {notice?.explanation?.arrow === undefined ? null : <Arrows arrows={[notice.explanation.arrow]} at={centreOf} explain={{ occupied: pieces.has(notice.explanation.arrow.to) }} />}
             {drag === undefined || !pieces.has(drag.from) ? null : <Lifted drag={drag} letter={pieces.get(drag.from)!} />}
+            {promotion === undefined
+                ? null
+                : <PromotionChoice side={promotion.side} column={columns.indexOf(promotion.to[0]!)} down={ranks[0] === Number(promotion.to[1])} onPick={promote} text={text} />}
+            {notice === undefined ? null : (
+                <Bubble
+                    notice={notice}
+                    place={notice.square === undefined ? undefined : seen(notice.square)}
+                    where={notice.square === undefined
+                        ? "above"
+                        : bubblePlace(seen(notice.square), keptSquares(notice.explanation).map(seen), (board.current?.clientWidth ?? 0) < narrowBoard)}
+                />
+            )}
         </>
     );
+}
+
+/**
+ * What the board says of a refused move, over the piece moved, or in its middle for a request refused; with the piece's letter, for the bubble's icon, and
+ * what explains the move (T-91).
+ */
+export interface Notice
+{
+    readonly text: string;
+    readonly square?: string;
+    readonly piece?: string;
+    readonly explanation?: Explanation;
 }
 
 /** A game over as the board shows it (T-77): how it ended, who won, the player's side, and whether it ended a moment ago, which plays its effects. */
@@ -581,20 +710,29 @@ function toggled(marks: Marks, from: string, to: string): Marks
     return { ...marks, arrows: there ? marks.arrows.filter((arrow) => arrow.from !== from || arrow.to !== to) : [...marks.arrows, { from, to }] };
 }
 
-/** The arrows over the board, in squares from its top left corner: a knight's turns once, the long leg first. */
-function Arrows({ arrows, at }: { arrows: readonly Arrow[]; at: (square: string) => [number, number]; })
+/**
+ * The arrows over the board, in squares from its top left corner: a knight's turns once, the long leg first. In ink when they explain a refused move, and
+ * cut short (T-91, Zoe): off the culprit's piece, and before the piece they point at, so both stay in sight.
+ */
+function Arrows({ arrows, at, explain }: { arrows: readonly Arrow[]; at: (square: string) => [number, number]; explain?: { readonly occupied: boolean; }; })
 {
     if (arrows.length === 0) {
         return null;
     }
 
     return (
-        <svg class="arrows" viewBox="0 0 8 8" aria-hidden="true">
+        <svg class={explain === undefined ? "arrows" : "arrows explain"} viewBox="0 0 8 8" aria-hidden="true">
             {arrows.map(({ from, to }) => {
-                const [x0, y0] = at(from);
-                const [x1, y1] = at(to);
-                const knight = Math.abs(x1 - x0) * Math.abs(y1 - y0) === 2;
-                const corner: [number, number] | undefined = !knight ? undefined : Math.abs(y1 - y0) > Math.abs(x1 - x0) ? [x0, y1] : [x1, y0];
+                const [startX, startY] = at(from);
+                const [pointX, pointY] = at(to);
+                const knight = Math.abs(pointX - startX) * Math.abs(pointY - startY) === 2;
+                const corner: [number, number] | undefined = !knight
+                    ? undefined
+                    : Math.abs(pointY - startY) > Math.abs(pointX - startX)
+                    ? [startX, pointY]
+                    : [pointX, startY];
+                const [x0, y0] = explain === undefined ? [startX, startY] : towards([startX, startY], corner ?? [pointX, pointY], explainTrim.start);
+                const [x1, y1] = explain?.occupied === true ? towards([pointX, pointY], corner ?? [startX, startY], explainTrim.end) : [pointX, pointY];
                 const [fromX, fromY] = corner ?? [x0, y0];
                 const length = Math.hypot(x1 - fromX, y1 - fromY);
                 const [dx, dy] = [(x1 - fromX) / length, (y1 - fromY) / length];
@@ -610,6 +748,113 @@ function Arrows({ arrows, at }: { arrows: readonly Arrow[]; at: (square: string)
         </svg>
     );
 }
+
+/** A point `distance` squares from `point` toward `target`. */
+function towards(point: readonly [number, number], target: readonly [number, number], distance: number): [number, number]
+{
+    const length = Math.hypot(target[0] - point[0], target[1] - point[1]);
+    return [point[0] + (target[0] - point[0]) / length * distance, point[1] + (target[1] - point[1]) / length * distance];
+}
+
+/**
+ * A bubble by the piece of a refused move, where it hides neither the culprit nor the arrow's point (`where`, T-91), kept on the board at its edges; in the
+ * board's middle without a piece.
+ */
+function Bubble({ notice, place, where }: { notice: Notice; place?: [number, number]; where: BubblePlace; })
+{
+    if (place === undefined) {
+        return <p key={notice.text} class="notice centre" role="alert">{notice.text}</p>;
+    }
+
+    const [column, row] = place;
+    const align = column <= 1 ? "start" : column >= 6 ? "end" : "middle";
+    const kind = notice.explanation?.kind;
+    return (
+        <p key={`${notice.square} ${notice.text}`} class={`notice ${align} ${where}`} role="alert" style={{ "--column": column, "--row": row }}>
+            {kind === undefined || notice.piece === undefined ? null : <ExplainIcon kind={kind} piece={notice.piece} />}
+            <span>{notice.text}</span>
+        </p>
+    );
+}
+
+/** The bubble's icon for a kind of reason (T-91): the piece moved, a pin, the player's king on red, a bar, the two ways of castling. */
+function ExplainIcon({ kind, piece }: { kind: ExplainKind; piece: string; })
+{
+    const white = piece === piece.toUpperCase();
+    return (
+        <span class={`explain-icon ${kind}`} aria-hidden="true">
+            {kind === "piece" ? <Piece letter={piece} /> : kind === "king" ? <Piece letter={white ? "K" : "k"} /> : (
+                <svg viewBox="0 0 24 24">
+                    {kind === "pin"
+                        ? <path d="M9 3h6M10 3v6l-3 4h10l-3-4V3M12 13v8" />
+                        : kind === "blocked"
+                        ? (
+                            <>
+                                <circle cx="12" cy="12" r="8.5" />
+                                <path class="bar" d="M7.5 12h9" />
+                            </>
+                        )
+                        : <path d="M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4" />}
+                </svg>
+            )}
+        </span>
+    );
+}
+
+/** The pieces a pawn may become, in a column from its square toward the middle of the board, over a shade that cancels the move; Esc cancels it too. */
+function PromotionChoice({ side, column, down, onPick, text }: { side: Side; column: number; down: boolean; onPick: (piece: Promotion | undefined) => void; text: Text; })
+{
+    const first = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        first.current?.focus();
+
+        const escape = (event: KeyboardEvent): void => {
+            if (event.key === "Escape") {
+                onPick(undefined);
+            }
+        };
+
+        addEventListener("keydown", escape);
+        return () => removeEventListener("keydown", escape);
+    }, []);
+
+    return (
+        <div class="promotion" role="group" aria-label={text.promoteTo}>
+            <div class="promotion-shade" onPointerDown={() => onPick(undefined)} />
+            {promotionPieces.map((piece, index) => (
+                <button
+                    key={piece}
+                    ref={index === 0 ? first : undefined}
+                    type="button"
+                    class="promotion-piece"
+                    style={{ "--column": column, "--row": down ? index : 7 - index }}
+                    aria-label={text.piece(piece.toUpperCase() as PieceLetter, side)}
+                    onClick={() => onPick(piece)}
+                >
+                    <Piece letter={side === "white" ? piece.toUpperCase() : piece} />
+                </button>
+            ))}
+        </div>
+    );
+}
+
+const promotionPieces: readonly Promotion[] = ["q", "n", "r", "b"];
+
+/** The corner of the rook a castling moves; none for another move. */
+function rookOf(move: Move): string | undefined
+{
+    return move.san.startsWith("O-O-O") ? `a${move.from[1]}` : move.san.startsWith("O-O") ? `h${move.from[1]}` : undefined;
+}
+
+// How each arrow moves the keyboard's square, in columns and rows as the board is seen.
+const arrowSteps: Readonly<Record<string, readonly [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+
+// How much an arrow that explains is cut, in squares: off the culprit at its start, and before an occupied square at its point.
+const explainTrim = { start: 0.36, end: 0.4 };
+
+// A board narrower than this, in pixels, is a phone's: its bubble takes the board's width, and goes under the board when it has no room on it.
+const narrowBoard = 520;
 
 // An arrow's head, in squares: how long, and how far each side of its line.
 const arrowHead = { length: 0.42, width: 0.3 };

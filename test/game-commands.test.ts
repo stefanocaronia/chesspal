@@ -25,7 +25,7 @@ describe("a game in chat", () => {
             "New game: you play Black, the player White.\nPlayer (White) to move, move 1.\nNext: wait for the player's move, then call player_move with it.",
         );
         expect(await run(context, "player_move", { move: "e4" })).toMatch(
-            /^Player: 1\.e4 \(e2-e4\)\.\nYou \(Black\) to move, move 1\.\nOpening: B00 King's Pawn Game\nFEN: rnbqkbnr\/pppppppp\/8\/8\/4P3\/8\/PPPP1PPP\/RNBQKBNR b KQkq - 0 1\nAttacked pieces: none\n(?:.*\n){4}Legal by piece \(20\): Nb8 \(2\) Nc6 Na6; .* Ph7 \(2\) h6 h5; no moves: Ke8 Qd8 Ra8 Rh8 Bc8 Bf8\nNext: choose your move/,
+            /^Player: 1\.e4 \(e2-e4\)\.\nYou \(Black\) to move, move 1\.\nOpening: B00 King's Pawn Game\nMaterial: even, nothing taken\nFEN: rnbqkbnr\/pppppppp\/8\/8\/4P3\/8\/PPPP1PPP\/RNBQKBNR b KQkq - 0 1\nAttacked pieces: none\n(?:.*\n){4}Legal by piece \(20\): Nb8 \(2\) Nc6 Na6; .* Ph7 \(2\) h6 h5; no moves: Ke8 Qd8 Ra8 Rh8 Bc8 Bf8\nNext: choose your move/,
         );
         expect(await run(context, "ai_move", { move: "e5", plan: "Develop the knights, then castle.", comment: "The open game." })).toBe(
             "Played 1...e5.\nPlayer (White) to move, move 2.\nBoard, for your message when the player plays in the chat:\n  a b c d e f g h\n8 r n b q k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n"
@@ -45,7 +45,7 @@ describe("a game in chat", () => {
         expect(await run(playerFolder(0.2), "new_game", { ai_colour: "random" })).toContain("you play White");
         expect(await run(playerFolder(0.7), "new_game", { ai_colour: "random" })).toContain("you play Black");
         expect(await run(playerFolder(), "new_game", { ai_colour: "white", from: "4k3/8/8/8/8/8/4P3/4K3 w - - 0 40" })).toContain(
-            "You (White) to move, move 40.\nFEN: 4k3/8/8/8/8/8/4P3/4K3 w - - 0 40\nAttacked pieces: none\n",
+            "You (White) to move, move 40.\nMaterial: White +1 (White took Q 2R 2B 2N 8P, Black took Q 2R 2B 2N 7P)\nFEN: 4k3/8/8/8/8/8/4P3/4K3 w - - 0 40\nAttacked pieces: none\n",
         );
 
         const context = playerFolder();
@@ -53,7 +53,7 @@ describe("a game in chat", () => {
         const lichess = '[White "Morphy"]\n[Result "1-0"]\n[Termination "Unterminated"]\n\n1. e4 e5 2. Nf3 {[%plan Theirs.]} 1-0';
 
         expect(await run(context, "new_game", { ai_colour: "black", from: lichess })).toMatch(
-            /You \(Black\) to move, move 2\.\nLast move: 2\.Nf3 \(g1-f3\)\.\nOpening: C40 King's Knight Opening\nFEN: .*\nAttacked pieces \(attackers \/ defenders\):\nBlack Pe5: Nf3 \/ -\n(?:.*\n)*Legal by piece \(29\): [^\n]*\nNext: /,
+            /You \(Black\) to move, move 2\.\nLast move: 2\.Nf3 \(g1-f3\)\.\nOpening: C40 King's Knight Opening\nMaterial: even, nothing taken\nFEN: .*\nAttacked pieces \(attackers \/ defenders\):\nBlack Pe5: Nf3 \/ -\n(?:.*\n)*Legal by piece \(29\): [^\n]*\nNext: /,
         );
         expect(gameFile(context).pgn).toContain('[White "Player"]\n[Black "AI"]\n[Result "*"]\n\n1. e4 e5 2. Nf3 *');
     });
@@ -276,16 +276,36 @@ describe("a game in chat", () => {
         expect((await run(context, "status")).length).toBeLessThan(1_300);
     });
 
+    it("shows the positional profile, facts only, in few tokens", async () => {
+        const context = playerFolder();
+
+        await expect(run(context, "position")).rejects.toThrow("There is no game to describe: start one with new_game.");
+        await run(context, "new_game", { ai_colour: "black" });
+
+        for (const [player, ai] of [["e4", "d5"], ["exd5", "Qxd5"], ["Nc3", "Qa5"]] as const) {
+            await run(context, "player_move", { move: player });
+            await run(context, "ai_move", { move: ai, plan: "p", comment: "c" });
+        }
+
+        const profile = await run(context, "position");
+        expect(profile).toMatch(/^Phase: opening\nMaterial: even \(White took P, Black took P\)\nWhite pawns: islands a-d, f-h\nBlack pawns: islands a-c, e-h\n/);
+        expect(profile).toContain("\nFiles: half-open for White e; half-open for Black d\n");
+        expect(profile).toContain("\nDevelopment: White not castled, may castle O-O O-O-O, at home g1 c1 f1; ");
+        expect(profile).not.toContain("score");
+        // About 0.5 Claude tokens a character, as Priya measured it: within 450 tokens.
+        expect(profile.length).toBeLessThan(850);
+    });
+
     it("shows the whole view with look, or only the board for the player", async () => {
         const context = playerFolder();
 
         await expect(run(context, "look")).rejects.toThrow("There is no game to look at: start one with new_game.");
         await run(context, "new_game", { ai_colour: "black" });
-        expect(await run(context, "look")).toMatch(/^Player \(White\) to move, move 1\.\nFEN: .*\nWhite pieces \(attackers \/ defenders\):\nQd1: - \/ Ke1\n/);
+        expect(await run(context, "look")).toMatch(/^Player \(White\) to move, move 1\.\nMaterial: even, nothing taken\nFEN: .*\nWhite pieces \(attackers \/ defenders\):\nQd1: - \/ Ke1\n/);
         await run(context, "player_move", { move: "e4" });
         const view = await run(context, "look");
 
-        expect(view).toMatch(/^You \(Black\) to move, move 1\.\nLast move: 1\.e4 \(e2-e4\)\.\nOpening: B00 King's Pawn Game\nFEN: .*\nWhite pieces \(attackers \/ defenders\):\nQd1: - \/ Ke1\n/);
+        expect(view).toMatch(/^You \(Black\) to move, move 1\.\nLast move: 1\.e4 \(e2-e4\)\.\nOpening: B00 King's Pawn Game\nMaterial: even, nothing taken\nFEN: .*\nWhite pieces \(attackers \/ defenders\):\nQd1: - \/ Ke1\n/);
         expect(view).toContain("\nBf1: - / Ke1(+Qd1)\n");
         expect(view).toContain("\nBlack pieces (attackers / defenders):\nQd8: - / Ke8\n");
         expect(view).toContain("\nLegal by piece (20): Nb8 (2) Nc6 Na6; ");
@@ -315,7 +335,7 @@ describe("a game in chat", () => {
         await run(context, "ai_move", { move: "Qh4#", plan: "Mate.", comment: "Mate." });
         const view = await run(context, "look");
 
-        expect(view).toMatch(/^Game over: 0-1, .*\nLast move: 2\.\.\.Qh4# \(d8-h4\)\.\nOpening: A00 Barnes Opening: Fool's Mate\nFEN: .*\nWhite is in check from Qh4\.\nWhite pieces/);
+        expect(view).toMatch(/^Game over: 0-1, .*\nLast move: 2\.\.\.Qh4# \(d8-h4\)\.\nOpening: A00 Barnes Opening: Fool's Mate\nMaterial: even, nothing taken\nFEN: .*\nWhite is in check from Qh4\.\nWhite pieces/);
         expect(view).not.toContain("Legal by piece");
     });
 });
