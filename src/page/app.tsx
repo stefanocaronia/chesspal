@@ -21,7 +21,7 @@ import { NameButton, PictureButton, PictureDialog, ProfilesDialog, Wizard } from
 import { keepSettings, type Profile } from "./profile.ts";
 import { SettingsPanel } from "./settings-panel.tsx";
 import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "./settings.ts";
-import { playSound, soundOf, wakeSounds } from "./sounds.ts";
+import { endSoundOf, playSound, soundOf, wakeSounds } from "./sounds.ts";
 import { AiWords, Compose, TalkFaces } from "./talk.tsx";
 import { type ServerRefusal, type Text, textFor } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
@@ -132,7 +132,7 @@ export function App({ start }: { start: Settings; })
         setViewing(undefined);
         setPromoting(undefined);
     }, [game]);
-    useMoveSounds(game, live, sound);
+    useGameSounds(game, live, sound);
     const unread = useUnread(game === undefined || game === null ? undefined : aiSpoke(plies, game.ai, game.talk), folds.talk !== "open");
 
     const fold = (column: Column): void => {
@@ -174,8 +174,8 @@ export function App({ start }: { start: Settings; })
         void post(path, body, text).then((refused) => setRefusal(refused === undefined ? undefined : { text: refused.text }));
     };
 
-    const result = live.outcome.over ? live.outcome.result : live.record.tags.Result;
-    const ended = result !== undefined && result !== "*";
+    const result = resultOf(live);
+    const ended = isOver(result);
     const how = ended ? howEnded(live.outcome, live.record.tags.Termination) : undefined;
     const winner = result === "1-0" ? "white" : result === "0-1" ? "black" : undefined;
     const justEnded = useJustEnded(game === undefined || game === null ? undefined : ended ? "over" : "going");
@@ -456,10 +456,13 @@ interface Served
     readonly settings?: object;
 }
 
-/** Plays the sound of each move the game gains while the page watches it, the AI's and the player's: none for a game loaded or begun again (T-71). */
-function useMoveSounds(game: Served["game"] | undefined, live: Game, on: boolean): void
+/**
+ * Plays the sound of each move the game gains while the page watches it, the AI's and the player's, of its end without a move and of a draw offered:
+ * none for a game loaded or begun again (T-71, T-100).
+ */
+function useGameSounds(game: Served["game"] | undefined, live: Game, on: boolean): void
 {
-    const seen = useRef<{ started: string; moves: number; } | undefined>(undefined);
+    const seen = useRef<{ started: string; moves: number; over: boolean; offered: boolean; } | undefined>(undefined);
 
     useEffect(wakeSounds, []);
 
@@ -469,14 +472,37 @@ function useMoveSounds(game: Served["game"] | undefined, live: Game, on: boolean
         }
 
         const moves = live.record.moves.length;
+        const over = isOver(resultOf(live));
+        const offered = game.drawOffer !== undefined;
         const before = seen.current;
-        seen.current = { started: game.started, moves };
-        const sound = soundOf(live);
+        seen.current = { started: game.started, moves, over, offered };
 
-        if (on && before?.started === game.started && moves === before.moves + 1 && sound !== undefined) {
+        if (!on || before?.started !== game.started) {
+            return;
+        }
+
+        // A move sounds as the board stands after it; a game ended without one, by how it ended; a draw offered, with its move or on its own.
+        const sound = moves === before.moves + 1 ? soundOf(live) : over && !before.over ? endSoundOf(howEnded(live.outcome, live.record.tags.Termination)) : undefined;
+
+        if (sound !== undefined) {
             playSound(sound);
         }
+
+        if (offered && !before.offered) {
+            playSound("offer");
+        }
     }, [live]);
+}
+
+/** The game's result: the board's, else the record's, which a resignation, a draw agreed or a flag write. */
+function resultOf(live: Game): string | undefined
+{
+    return live.outcome.over ? live.outcome.result : live.record.tags.Result;
+}
+
+function isOver(result: string | undefined): boolean
+{
+    return result !== undefined && result !== "*";
 }
 
 /** Whether the AI spoke while the talk was folded, by how many times it has spoken (`spoke`, undefined before a game): until the player opens the talk. */

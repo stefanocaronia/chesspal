@@ -879,7 +879,7 @@ button {
 }
 
 .board.fresh.by-checkmate .square.fallen .piece {
-    animation: ring 320ms cubic-bezier(0.3, 0, 0.2, 1) 200ms, fall 550ms 800ms backwards;
+    animation: ring 320ms cubic-bezier(0.3, 0, 0.2, 1) 200ms, fall 450ms 800ms backwards;
 }
 
 /* A resignation: the king is laid down slowly, as a player lays theirs */
@@ -936,18 +936,33 @@ button {
     }
 }
 
-/* Falling, the king tips a little past lying and settles */
+/* Falling, the king drops fast, bounces once off the board and settles */
 @keyframes fall {
     from {
         rotate: 0deg;
         scale: 1;
-        animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+        animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
     }
 
-    75% {
-        rotate: -96deg;
+    45% {
+        rotate: -90deg;
         scale: 0.88;
-        animation-timing-function: ease-out;
+        animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
+    }
+
+    68% {
+        rotate: -74deg;
+        animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+    }
+
+    86% {
+        rotate: -90deg;
+        animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
+    }
+
+    94% {
+        rotate: -86deg;
+        animation-timing-function: ease-in;
     }
 }
 
