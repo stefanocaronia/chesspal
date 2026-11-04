@@ -30,7 +30,7 @@ export function PlayerCard({ place, picture, name, side, level, taken, ahead, tu
             <div class="player-line">
                 {picture}
                 <div class="who">
-                    <div class="name">{name}</div>
+                    <div class="name" title={typeof name === "string" ? name : undefined}>{name}</div>
                     <div class="note">
                         {text.sides[side]}
                         {level === undefined ? null : (
@@ -116,7 +116,7 @@ function LevelTip({ level }: { level: readonly [name: string, note: string, sees
 {
     return (
         <>
-            <button class="level-name" type="button" popovertarget="ai-level">{level[0]}</button>
+            <button class="level-name" type="button" popovertarget="ai-level" aria-describedby="ai-level">{level[0]}</button>
             <span id="ai-level" class="level-tip" popover="auto">{level[2]}</span>
         </>
     );

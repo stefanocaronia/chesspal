@@ -32,6 +32,7 @@ describe("the AI's levels (D-60)", () => {
         expect(Object.values(levelForPlayer)).toEqual(["beginner", "beginner", "club", "master"]);
         expect(suggestedLevel(undefined, "regular")).toBe("club");
         expect(suggestedLevel(undefined, undefined)).toBe("strong");
+        expect(suggestedLevel(undefined, "constructor")).toBe("strong");
         expect(suggestedLevel({ tags: { AILevel: "master" }, moves: [] }, "learning")).toBe("master");
     });
 
@@ -50,23 +51,27 @@ describe("the AI's levels (D-60)", () => {
         expect(bookMoves("rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1", book)).toEqual([]);
     });
 
-    it("mark the moves only named traps play, and leave out those under one line in fifty", () => {
-        const book = indexBook(["eco\tname\tpgn", "A00\tAmar Opening\t1. Nh3", "A00\tAmar Opening: Some Trap\t1. Nh3 d5 2. g3", ...Array(50).fill("C20\tKing's Pawn Game\t1. e4 e5"), "B00\tOdd\t1. e4 a6"].join("\n"));
+    it("name the trap of the moves only named traps play, and leave out those under one line in fifty", () => {
+        const book = indexBook(
+            ["eco\tname\tpgn", "A00\tAmar Opening\t1. Nh3", "A00\tAmar Opening: Gambit, Some Trap\t1. Nh3 d5 2. g3", ...Array(50).fill("C20\tKing's Pawn Game\t1. e4 e5"), "B00\tOdd\t1. e4 a6"].join("\n"),
+        );
         const afterNh3 = new Chess();
         afterNh3.move("Nh3");
         afterNh3.move("d5");
         const afterE4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
 
         expect(bookMoves(new Chess().fen(), book)).toEqual(["e4", "Nh3"]);
-        expect(bookMoves(afterNh3.fen(), book)).toEqual(["g3 (trap)"]);
+        expect(bookMoves(afterNh3.fen(), book)).toEqual(["g3 (Some Trap)"]);
         expect(bookMoves(afterE4, book)).toEqual(["e5"]);
     });
 
-    it("mark a trap of the real book", async () => {
+    it("name a trap of the real book, on the move that falls into it and on the one that punishes it", async () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "white", level: "master", from: "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Ne7" });
+        expect(await run(context, "status")).toContain("\nBook moves, most named lines first: Nxe5 (Mortimer Trap)\n");
 
-        expect(await run(context, "status")).toContain("\nBook moves, most named lines first: Nxe5 (trap)\n");
+        await run(context, "new_game", { ai_colour: "black", level: "master", from: "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Ne7 5. Nxe5", replace: true });
+        expect(await run(context, "status")).toContain("\nBook moves, most named lines first: c6 (Mortimer Trap)\n");
     });
 
     it("give the beginner the board and the legal moves: no tactical facts, no look, no position", async () => {

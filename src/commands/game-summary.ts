@@ -169,7 +169,8 @@ export function wordLines(words: readonly string[]): string[]
 export function nextStep(game: GameSummary | undefined, words: readonly string[] = []): string
 {
     if (game === undefined) {
-        return "Next: ask the player which colour they want, whether they want a clock and at which level you play, then call new_game.";
+        return "Next: ask the player which colour they want, whether they want a clock and at which level you play (if they leave it to you, leave level out: "
+            + "Chesspal picks the one that suits them), then call new_game.";
     }
 
     if (game.end !== undefined) {

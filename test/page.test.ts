@@ -124,8 +124,13 @@ describe("the player's moves on the page", () => {
         expect(game.pgn).toContain('[AILevel "club"]\n[TimeControl "600+5"]');
         expect(game.clock.control).toEqual({ base: 600_000, increment: 5_000 });
 
+        // What the player leaves out: the level of the game before, and no clock.
         expect(await post(page, "/api/new", {})).toMatchObject({ status: 200 });
-        expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain('[AILevel "club"]');
+        const next = JSON.parse((await get(page, "/api/game")).body).game;
+        expect(next.pgn).toContain('[AILevel "club"]');
+        expect(next.clock).toBeUndefined();
+        expect(await post(page, "/api/new", { clock: "none" })).toMatchObject({ status: 200 });
+        expect(JSON.parse((await get(page, "/api/game")).body).game.clock).toBeUndefined();
         expect(await post(page, "/api/new", { level: "grandmaster" })).toMatchObject({ status: 400, body: expect.stringContaining("Send the new game as JSON") });
         expect(await post(page, "/api/new", { clock: "forever" })).toMatchObject({ status: 409, body: expect.stringContaining("is not a time control") });
     });

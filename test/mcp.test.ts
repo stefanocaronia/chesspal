@@ -68,7 +68,8 @@ describe("the MCP server", () => {
 
     it("runs a tool and answers with its text", async () => {
         expect(await call("status", {})).toEqual({
-            text: `Chesspal ${version}. Folder: /the/player\nNo game.\nNext: ask the player which colour they want, whether they want a clock and at which level you play, then call new_game.`,
+            text:
+                `Chesspal ${version}. Folder: /the/player\nNo game.\nNext: ask the player which colour they want, whether they want a clock and at which level you play (if they leave it to you, leave level out: Chesspal picks the one that suits them), then call new_game.`,
             isError: false,
         });
     });

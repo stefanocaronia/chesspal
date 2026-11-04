@@ -21,7 +21,9 @@ describe("a game in chat", () => {
     it("plays the player's and the AI's moves, and saves them in game.json with the AI's comment and plan", async () => {
         const context = playerFolder();
 
-        expect(await run(context, "status")).toContain("No game.\nNext: ask the player which colour they want, whether they want a clock and at which level you play, then call new_game.");
+        expect(await run(context, "status")).toContain(
+            "No game.\nNext: ask the player which colour they want, whether they want a clock and at which level you play (if they leave it to you, leave level out: Chesspal picks the one that suits them), then call new_game.",
+        );
         expect(await run(context, "new_game", { ai_colour: "black" })).toBe(
             "New game: you play Black, the player White, at the strong level (board, tactical and positional facts).\nPlayer (White) to move, move 1.\nNext: wait for the player's move, then call player_move with it.",
         );

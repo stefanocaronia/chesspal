@@ -36,14 +36,14 @@ export function NewGameDialog({ open, choice, going, onStart, onClose, text }: {
 
 const colours = ["white", "black", "random"] as const;
 
-/** The colours by their king, from the chosen set; either colour by both kings. */
+/** The colours by their king, the chosen set's silhouette in fixed colours, which both themes show (T-94); either colour by both kings. */
 const colourIcons: Readonly<Record<(typeof colours)[number], ComponentChildren>> = {
-    white: <Piece letter="K" />,
-    black: <Piece letter="k" />,
+    white: <Piece letter="K" small />,
+    black: <Piece letter="k" small />,
     random: (
         <span class="kings">
-            <Piece letter="K" />
-            <Piece letter="k" />
+            <Piece letter="K" small />
+            <Piece letter="k" small />
         </span>
     ),
 };

@@ -1344,6 +1344,13 @@ button {
     font-weight: 400;
 }
 
+/* The AI's name, which the player may choose long, stays on one line: whole in its tooltip */
+.player.ai .name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
 .turn {
     color: var(--accent);
     font-weight: 600;
@@ -2562,13 +2569,14 @@ button {
 /* The new game (T-58): the colours and the clocks in a row, the levels two by two with what the AI sees under them */
 .new-game .row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
     gap: 8px;
 }
 
 .new-game .row .level > span {
     align-items: center;
     gap: 4px;
+    padding: 9px 4px;
 }
 
 /* Each colour by its king, either by both, and each clock by its minutes as a slice of the hour */
@@ -2608,8 +2616,10 @@ button {
 
 /* The AI's level on its card: a button that shows what it sees, under it where the browser anchors popovers, else in the middle */
 .level-name {
-    padding: 0;
+    margin: -4px -2px;
+    padding: 4px 2px;
     border: 0;
+    border-radius: 4px;
     background: none;
     color: inherit;
     font: inherit;
@@ -2617,6 +2627,11 @@ button {
     text-decoration: underline dotted;
     text-underline-offset: 3px;
     anchor-name: --ai-level;
+}
+
+.level-name:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 .level-tip {

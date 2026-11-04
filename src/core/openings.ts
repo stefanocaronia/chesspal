@@ -44,22 +44,22 @@ export function indexOpenings(tsv: string): Record<string, [string, string]>
 /**
  * The book of Lichess's TSV files: every position on their lines, keyed as the index keys them, to the moves the lines play from it, the move most lines go
  * through first: how much theory a move has, never how good it is. A move under one line in fifty from its position is left out; one whose lines are all named
- * traps is marked: Nxe5 (trap).
+ * traps carries the trap's name, as the files write it: Nxe5 (Mortimer Trap).
  */
 export function indexBook(tsv: string): Record<string, string[]>
 {
     const lines = new Map<string, Map<string, LineCount>>();
 
     for (const { name, moves } of linesOf(tsv)) {
-        const trap = /\bTrap\b/.test(name);
+        const trap = name.split(/[:,]/).map((part) => part.trim()).find((part) => /\bTrap\b/.test(part));
         const chess = new Chess();
 
         for (const move of moves) {
             const key = positionKey(chess.fen());
             const san = chess.move(move).san;
             const counts = lines.get(key) ?? new Map<string, LineCount>();
-            const count = counts.get(san) ?? { lines: 0, traps: 0 };
-            counts.set(san, { lines: count.lines + 1, traps: count.traps + (trap ? 1 : 0) });
+            const count = counts.get(san) ?? { lines: 0, traps: [] };
+            counts.set(san, { lines: count.lines + 1, traps: trap === undefined ? count.traps : [...count.traps, trap] });
             lines.set(key, counts);
         }
     }
@@ -110,14 +110,14 @@ export function outOfBookMove(opening: Opening): number
     return Math.floor(opening.ply / 2) + 1;
 }
 
-/** How many of the book's lines go through a move, and how many of them are named traps. */
+/** How many of the book's lines go through a move, and the trap each of them that is a named trap is named after. */
 interface LineCount
 {
     lines: number;
-    traps: number;
+    traps: readonly string[];
 }
 
-/** The moves from a position that at least one line in fifty plays, the most played first, marked when all their lines are traps. */
+/** The moves from a position that at least one line in fifty plays, the most played first, with the trap's name when all their lines are traps. */
 function bookOf(counts: ReadonlyMap<string, LineCount>): string[]
 {
     const total = [...counts.values()].reduce((sum, count) => sum + count.lines, 0);
@@ -125,7 +125,7 @@ function bookOf(counts: ReadonlyMap<string, LineCount>): string[]
     return [...counts]
         .filter(([, count]) => count.lines * 50 >= total)
         .sort(([, one], [, other]) => other.lines - one.lines)
-        .map(([san, count]) => count.traps === count.lines ? `${san} (trap)` : san);
+        .map(([san, count]) => count.traps.length === count.lines ? `${san} (${[...new Set(count.traps)].join(" / ")})` : san);
 }
 
 /** The lines of Lichess's TSV files, their moves in SAN; one past the book's depth throws. */

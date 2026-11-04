@@ -29,17 +29,17 @@ export const newGame = defineCommand({
     input: z.object({
         ai_colour: z.enum(["white", "black", "random"]).describe("the colour you play: random draws it"),
         from: z.string().optional().describe("a FEN or a PGN to go on from, instead of the standard position"),
-        clock: z.string().optional().describe("the time control, minutes each and seconds added after each move, such as 10+5 or 3+0; none for a game without a clock"),
+        clock: z.string().optional().describe("the time control, minutes each and seconds added after each move, such as 10+5 or 3+0; none, or left out, for a game without a clock"),
         level: z.enum(aiLevels).optional().describe(
-            "the facts you get: beginner the board and the legal moves, club also the tactical facts, strong also the positional ones, master also the opening "
-                + "book's moves; none keeps the last game's, or suits the player's profile for the first",
+            "the facts you, not the player, get: beginner the board and the legal moves, club also the tactical facts, strong also the positional ones, master "
+                + "also the opening book's moves; left out, the last game's, or for the first game the one that suits the player's profile",
         ),
         replace: z.boolean().default(false).describe("start even though a game is going on: it goes to the archive unfinished"),
     }),
     alwaysLoad: true,
     positionals: ["ai_colour"],
     run: ({ ai_colour: colour, from, clock, level: chosen, replace }, context): NewGame => {
-        const control = clock === undefined ? undefined : timeControlFrom(clock);
+        const control = clock === undefined || /^\s*none\s*$/i.test(clock) ? undefined : timeControlFrom(clock);
         const now = context.now();
         const folder = gameFolder(context.folder);
         const before = gameAt(folder, now);

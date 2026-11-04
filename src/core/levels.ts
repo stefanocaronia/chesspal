@@ -25,7 +25,7 @@ export function suggestedLevel(before: GameRecord | undefined, playerLevel: stri
         return levelOf(before);
     }
 
-    return (playerLevel === undefined ? undefined : levelForPlayer[playerLevel]) ?? formerLevel;
+    return playerLevel !== undefined && Object.hasOwn(levelForPlayer, playerLevel) ? levelForPlayer[playerLevel]! : formerLevel;
 }
 
 /** The layers a level sees, the board first. */
