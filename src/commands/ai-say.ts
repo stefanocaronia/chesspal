@@ -16,7 +16,7 @@ interface Said
 export const aiSay = defineCommand({
     name: "ai_say",
     description: "Says a word on the board page without a move, once while the player is to move: an answer to what they wrote or to their draw offer, or "
-        + "something you have to say; when you are to move, speak in ai_move's comment. Once the game is over, it says a word once, then only answers. "
+        + "something you have to say; when you are to move, speak in ai_move's comment. Between games it speaks freely: about the game just over, or to start another. "
         + 'Example: ai_say {text: "Sure, I\'ll play faster."}.',
     input: z.object({
         text: z.string().trim().min(1, "write what you say").max(talkLimits.ai, `write ${talkLimits.ai} characters at most`).describe(

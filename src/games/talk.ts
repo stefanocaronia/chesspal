@@ -88,23 +88,18 @@ export function heardLines(current: CurrentGame, given: ReadonlySet<string>): (H
 
 /**
  * The AI speaks apart from its move once a move of the player's, on their time, with something to say or to answer (D-72), and never while its move waits:
- * it speaks in the move's comment then. Once the game is over it may say a word once, with nothing to answer (D-64), then only answer.
+ * it speaks in the move's comment then. Between games it talks freely, about the game just over or to start another (D-74).
  */
 function refuseAiWords(current: CurrentGame): void
 {
     const { game, ai } = current;
     const since = sinceAiMoved(current);
-    const over = endOf(game) !== undefined;
 
-    if (over && !current.talk.some((line) => line.who === "ai" && line.ply >= game.record.moves.length)) {
+    if (endOf(game) !== undefined) {
         return;
     }
 
-    if (over && unanswered(current).length === 0) {
-        throw new Error("The player has written nothing to answer: you have said your word on the game's end. Nothing changed.");
-    }
-
-    if (game.position.turn === ai && endOf(game) === undefined) {
+    if (game.position.turn === ai) {
         throw new Error("It is your move: speak in ai_move's comment. Nothing changed.");
     }
 

@@ -559,13 +559,15 @@ describe("the talk on the board page", () => {
         );
     });
 
-    it("lets the AI say a word once when the game is over, with nothing to answer (D-64)", async () => {
+    it("lets the AI talk freely between games, with or without words to answer", async () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "black", from: "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1" });
         await run(context, "player_move", { move: "Rd8" });
 
         expect(await run(context, "ai_say", { text: "Well played, I didn't see it." })).toContain("Said on the board page");
-        await expect(run(context, "ai_say", { text: "Again." })).rejects.toThrow("The player has written nothing to answer");
+        expect(await run(context, "ai_say", { text: "Your rook came from far away." })).toContain("Said on the board page");
+        await run(context, "player_say", { text: "Shall we play another?" });
+        expect(await run(context, "ai_say", { text: "Gladly." })).toContain("Said on the board page");
     });
 });
 
