@@ -535,6 +535,32 @@ describe("the doorbell of the chat", () => {
         expect(await waiting).toBe(true);
     });
 
+    it("takes the player's words between games without the move's count, and rings for the first since the AI spoke (D-74)", async () => {
+        const folder = playerFolder();
+        const chat = testContext(folder);
+        const page = await open(folder, undefined, chat);
+        const port = Number(new URL(page.url).port);
+        const hook = JSON.stringify({ cwd: folder });
+        await run(folder, "new_game", { ai_colour: "black", from: "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1" }, chat);
+        await post(page, "/api/move", { move: "Rd8" });
+        await run(folder, "status", {}, chat);
+
+        const first = waitForBell(hook, [port]);
+        await new Promise((done) => setTimeout(done, 50));
+        expect((await post(page, "/api/message", { text: "x".repeat(190) })).status).toBe(200);
+        expect(await first).toBe(true);
+
+        // A line holds 200 characters, as in a game, but none counts against the next.
+        expect(await post(page, "/api/message", { text: "x".repeat(201) })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"words-long"') });
+        expect((await post(page, "/api/message", { text: "y".repeat(190) })).status).toBe(200);
+        await run(folder, "ai_say", { text: "Well played." }, chat);
+
+        const second = waitForBell(hook, [port]);
+        await new Promise((done) => setTimeout(done, 50));
+        expect((await post(page, "/api/message", { text: "Another?" })).status).toBe(200);
+        expect(await second).toBe(true);
+    });
+
     it("tells the hook whose page it is, the chat's folder first, and rings when the player moves there", async () => {
         const folder = playerFolder();
         const page = await open(folder);

@@ -54,10 +54,20 @@ export function playerLinesThisMove(current: CurrentGame): TalkLine[]
     return current.talk.filter((line) => line.who === "player" && line.ply >= since);
 }
 
-/** How many characters the player may still write for this move. */
+/** How many characters the player may still write for this move; between games a whole line each time, with no count (D-74). */
 export function wordsLeft(current: CurrentGame): number
 {
+    if (endOf(current.game) !== undefined) {
+        return talkLimits.player;
+    }
+
     return Math.max(talkLimits.player - playerLinesThisMove(current).reduce((sum, line) => sum + line.text.length, 0), 0);
+}
+
+/** Whether the player's last line wakes the chat: the first of a move, and between games the first since the AI last spoke (D-54, D-74). */
+export function wakesTheChat(current: CurrentGame): boolean
+{
+    return endOf(current.game) === undefined ? playerLinesThisMove(current).length === 1 : unanswered(current).length === 1;
 }
 
 /** Words of the player's, with the key that tells them apart across games. */

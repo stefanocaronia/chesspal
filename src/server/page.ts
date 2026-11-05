@@ -17,7 +17,7 @@ import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
 import { gameToStudy, namedGame } from "../commands/study.ts";
 import { clockStarted, type GameRecord, writePgn } from "../core/index.ts";
-import { type CurrentGame, drawOfferOf, endOf, gameInAnalysis, gameStamp, heardLines, loadGame, playerLinesThisMove, playerPgn, saveGame, startAnalysis, talkLimits, WordsRefused } from "../games/index.ts";
+import { type CurrentGame, drawOfferOf, endOf, gameInAnalysis, gameStamp, heardLines, loadGame, playerPgn, saveGame, startAnalysis, talkLimits, wakesTheChat, WordsRefused } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { analysesOf, isReviewed } from "./analyses.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
@@ -271,8 +271,8 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
         return;
     }
 
-    // The first words of a move wake the chat; the AI finds the rest at its next call (D-54).
-    if (playerLinesThisMove(current).length === 1) {
+    // The first words of a move wake the chat, and between games the first since the AI spoke; the AI finds the rest at its next call (D-54, D-74).
+    if (wakesTheChat(current)) {
         served.bell.ring();
     }
 

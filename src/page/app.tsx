@@ -542,7 +542,8 @@ export function App({ start }: { start: Settings; })
                                         <Compose
                                             lines={said}
                                             newestFirst={flipped}
-                                            spent={playerSpent(plies, ai, talk)}
+                                            // Between games the player writes freely, a line at a time, as the AI does (D-74).
+                                            spent={going ? playerSpent(plies, ai, talk) : 0}
                                             draft={draft}
                                             onDraft={(words) => {
                                                 setDraft(words);
