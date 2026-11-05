@@ -20,9 +20,9 @@ export const aiSay = defineCommand({
         + "something you have to say; when you are to move, speak in ai_move's comment. Between games, and before the first, it speaks freely: about the game just over, or to start another. "
         + 'Example: ai_say {text: "Sure, I\'ll play faster."}.',
     input: z.object({
-        text: z.string().trim().min(1, "write what you say").max(talkLimits.ai, `write ${talkLimits.ai} characters at most`).describe(
-            'your words for the player, one or two short sentences: pieces and moves in words ("your knight takes on f6"), never in notation (Nxf6+); never your '
-                + "plans or threats; **two asterisks** put a word or two in bold on the page",
+        text: z.string().trim().min(1, "write what you say").max(talkLimits.aiHelps, `write ${talkLimits.aiHelps} characters at most`).describe(
+            `your words for the player, one or two short sentences, ${talkLimits.ai} characters at most (${talkLimits.aiHelps} with the helps on): pieces and moves in `
+                + 'words ("your knight takes on f6"), never in notation (Nxf6+); your plans and threats only with the helps on; **two asterisks** put a word or two in bold on the page',
         ),
         mood: z.enum(moods).optional().describe("only after the game has ended: the face the board page keeps for its end"),
     }),

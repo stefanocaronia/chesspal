@@ -38,19 +38,19 @@ export interface MoveReview
     readonly squares?: readonly DrawnSquare[];
 }
 
-/** The review a move's comment carries; none without a badge or a note. */
+/** The review a move's comment carries: a badge, a note, or the drawings the AI made with its move (D-78); none without any. */
 export function reviewOf(comment: string | undefined): MoveReview | undefined
 {
     const found = badgePattern.exec(comment ?? "")?.[1];
     const badge = isBadge(found) ? found : undefined;
     const note = notePattern.exec(comment ?? "")?.[1]?.trim() || undefined;
+    const arrows = drawn(arrowPattern, comment, arrowOf);
+    const squares = drawn(squarePattern, comment, squareOf);
 
-    if (badge === undefined && note === undefined) {
+    if (badge === undefined && note === undefined && arrows.length === 0 && squares.length === 0) {
         return undefined;
     }
 
-    const arrows = drawn(arrowPattern, comment, arrowOf);
-    const squares = drawn(squarePattern, comment, squareOf);
     return { ...(badge === undefined ? {} : { badge }), ...(note === undefined ? {} : { note }), ...(arrows.length === 0 ? {} : { arrows }), ...(squares.length === 0 ? {} : { squares }) };
 }
 
@@ -86,17 +86,22 @@ export function reviewed(move: RecordedMove, review: MoveReview): RecordedMove
     const nag = review.badge === undefined ? undefined : nagOfBadge[review.badge];
     const nags = (move.nags ?? []).filter((one) => !judgmentNags.has(one));
     const note = review.note === undefined ? "" : noteText(review.note);
-    const arrows = (review.arrows ?? []).map(({ colour, from, to }) => `${letterOf(colour)}${from}${to}`).join(",");
-    const squares = (review.squares ?? []).map(({ colour, square }) => `${letterOf(colour)}${square}`).join(",");
 
     const comment = [
         withoutReview(move.comment),
         review.badge === undefined ? "" : `[%badge ${review.badge}]`,
         note === "" ? "" : `[%review ${note}]`,
-        arrows === "" ? "" : `[%cal ${arrows}]`,
-        squares === "" ? "" : `[%csl ${squares}]`,
+        drawingsText(review),
     ].filter((part) => part !== "").join(" ");
     return recordedMove(move.san, nag === undefined ? nags : [nag, ...nags], comment);
+}
+
+/** The arrows and squares as PGN's [%cal] and [%csl] write them, for a comment; empty without any. */
+export function drawingsText({ arrows = [], squares = [] }: Pick<MoveReview, "arrows" | "squares">): string
+{
+    const arrowList = arrows.map(({ colour, from, to }) => `${letterOf(colour)}${from}${to}`).join(",");
+    const squareList = squares.map(({ colour, square }) => `${letterOf(colour)}${square}`).join(",");
+    return [arrowList === "" ? "" : `[%cal ${arrowList}]`, squareList === "" ? "" : `[%csl ${squareList}]`].filter((part) => part !== "").join(" ");
 }
 
 /** The record with the AI's word on the whole game, or its last word on the ending, in place of the one it had: each only when given. */

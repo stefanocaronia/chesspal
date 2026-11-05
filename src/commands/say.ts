@@ -1,7 +1,7 @@
 // The talk on the board page (D-51, T-65): a line of the player's or the AI's, saved with the game, and the player's words the AI has not been given yet.
 import { endWithMood, type Mood } from "../core/index.ts";
-import { archiveEnded, endOf, loadGame, loadTableTalk, saveGame, saveTableTalk, type Sayer, type TableTalk, type Talk, talkLine, unheardWords, type Words } from "../games/index.ts";
-import { gameFolder } from "../profiles/index.ts";
+import { archiveEnded, endOf, loadGame, loadTableTalk, saveGame, saveTableTalk, type Sayer, type TableTalk, type Talk, talkLimits, talkLine, unheardWords, type Words } from "../games/index.ts";
+import { gameFolder, helpsIn } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 
@@ -21,7 +21,8 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
         throw new Error("While the game goes on your mood comes with ai_move: say it without mood. Nothing changed.");
     }
 
-    current.talk.push(talkLine(current, who, text, at));
+    // With the helps on the AI writes as long as the analyst (D-78).
+    current.talk.push(talkLine(current, who, text, at, undefined, aiMost(folder)));
 
     if (mood !== undefined) {
         endWithMood(current.game, mood);
@@ -34,6 +35,12 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
     }
 
     return current;
+}
+
+/** The most a line of the AI's may hold in the games of `folder`: an analyst's note with the helps on (D-78). */
+export function aiMost(folder: string): number
+{
+    return helpsIn(folder) ? talkLimits.aiHelps : talkLimits.ai;
 }
 
 /** What the player wrote on the board page that the AI has not been given in this chat, given now: each game tool gives it once. */

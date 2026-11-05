@@ -17,6 +17,16 @@ export function profileSettings(root: string, id: string): PageSettings | undefi
     }
 }
 
+/** Whether the player has turned the helps on (D-78), in the settings of the profile whose games are in `folder`: off without them. */
+export function helpsIn(folder: string): boolean
+{
+    try {
+        return settingsOf(JSON.parse(readFileSync(join(folder, fileName), "utf8")))?.helps === true;
+    } catch {
+        return false;
+    }
+}
+
 /** Saves a profile's settings, over the ones before. */
 export function saveProfileSettings(root: string, id: string, settings: PageSettings): void
 {

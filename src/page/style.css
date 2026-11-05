@@ -652,6 +652,11 @@ button {
     background-image: linear-gradient(var(--mark-square), var(--mark-square));
 }
 
+/* The square the player points at in the AI's words (T-111): a ring in the accent, over everything else on it */
+.square.pointed {
+    box-shadow: inset 0 0 0 4px var(--accent), inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 .arrows {
     position: absolute;
     left: 0;

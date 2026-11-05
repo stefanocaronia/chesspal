@@ -37,7 +37,14 @@ export function pliesOf(record: GameRecord): Ply[]
 /** The moves with the book's badge on the first `book` of them that have no review of the AI's. */
 export function withBook(plies: Ply[], book: number): Ply[]
 {
-    return book === 0 ? plies : plies.map((ply, index) => index < book && ply.review === undefined ? { ...ply, review: { badge: "book" } } : ply);
+    // A move the AI only drew on keeps its drawings beside the book's badge (D-78).
+    return book === 0 ? plies : plies.map((ply, index) => index < book && ply.review?.badge === undefined && ply.review?.note === undefined ? { ...ply, review: { ...ply.review, badge: "book" } } : ply);
+}
+
+/** The moves without the AI's review: during a game with the helps off the player sees neither its judgments nor its drawings (D-78). */
+export function withoutReviews(plies: Ply[]): Ply[]
+{
+    return plies.map(({ review, ...ply }) => ply);
 }
 
 /** How long a line of the player's may be: the server's limit (D-54), which a test keeps equal. */

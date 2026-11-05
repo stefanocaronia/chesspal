@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readPgn } from "../src/core/index.ts";
 import { talkLimits } from "../src/games/index.ts";
-import { aiSpoke, aiWords, playerWords, pliesOf, talkLimits as pageLimits, withBook } from "../src/page/plies.ts";
+import { aiSpoke, aiWords, playerWords, pliesOf, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/plies.ts";
 
 describe("the moves on the page", () => {
     it("number the moves of a game that starts with Black to move", () => {
@@ -20,6 +20,14 @@ describe("the moves on the page", () => {
 
         expect(badges(3)).toEqual(["book", "best", "book", undefined]);
         expect(badges(0)).toEqual([undefined, "best", undefined, undefined]);
+    });
+
+    it("keep the AI's drawings beside the book's badge, and drop its review during a game with the helps off (D-78)", () => {
+        const [record] = readPgn("1. e4 {[%badge good]} e5 {[%cal Gg8f6]} *");
+        const plies = withBook(pliesOf(record!), 2);
+
+        expect(plies.map((ply) => ply.review)).toEqual([{ badge: "good" }, { badge: "book", arrows: [{ colour: "green", from: "g8", to: "f6" }] }]);
+        expect(withoutReviews(pliesOf(record!)).map((ply) => ply.review)).toEqual([undefined, undefined]);
     });
 
     it("keep only the words of a comment, never the AI's plan an ended game shows nor the mark of a draw offer", () => {

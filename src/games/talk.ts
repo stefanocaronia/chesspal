@@ -2,8 +2,8 @@
 import { type CurrentGame, endOf, type Speaker, type TalkLine } from "./current-game.ts";
 import type { TableTalk } from "./table-talk.ts";
 
-/** The most the player may write in a move, in all their lines, and the most a line of the AI's may hold (D-54). */
-export const talkLimits = { player: 200, ai: 300 } as const;
+/** The most the player may write in a move, in all their lines, and the most a line of the AI's may hold (D-54); with the helps on, as an analyst's note (D-78). */
+export const talkLimits = { player: 200, ai: 300, aiHelps: 700 } as const;
 
 /** Who says a line: the player, the AI in the chat, or the AI's agent thinking on the player's time (D-72), whose lines are the AI's on the page. */
 export type Sayer = Speaker | "agent";
@@ -15,11 +15,11 @@ export type Talk = CurrentGame | TableTalk;
  * A new line of the talk, said when the game has `ply` moves: refused when it is empty or too long. The player writes 200 characters a move in all, the
  * words sent with the move included; the AI speaks once a move of theirs, on their time, and its agent's word leaves it an answer to what they write after (D-54, D-72).
  */
-export function talkLine(current: Talk, sayer: Sayer, text: string, at: Date, ply = isGame(current) ? current.game.record.moves.length : 0): TalkLine
+export function talkLine(current: Talk, sayer: Sayer, text: string, at: Date, ply = isGame(current) ? current.game.record.moves.length : 0, aiMost: number = talkLimits.ai): TalkLine
 {
     const who = sayer === "agent" ? "ai" : sayer;
     const words = text.trim();
-    const most = who === "player" ? wordsLeft(current) : talkLimits.ai;
+    const most = who === "player" ? wordsLeft(current) : aiMost;
 
     if (words === "") {
         throw new WordsRefused("There is nothing to say: write the words first.", "empty");

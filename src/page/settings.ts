@@ -26,6 +26,8 @@ export interface Settings
     readonly explain: boolean;
     /** Whether the moves of the opening book show its badge while the game goes on, as the AI's review shows it after. */
     readonly book: boolean;
+    /** Whether the AI teaches: it tells its intentions, draws on the board and judges the player's moves during the game (D-78); the server reads it too. */
+    readonly helps: boolean;
     readonly sound: boolean;
     /** Whether the AI's words are read aloud, by the browser's local voices. */
     readonly voice: boolean;
@@ -53,6 +55,7 @@ export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | 
         dots: typeof stored.dots === "boolean" ? stored.dots : true,
         explain: typeof stored.explain === "boolean" ? stored.explain : true,
         book: typeof stored.book === "boolean" ? stored.book : true,
+        helps: typeof stored.helps === "boolean" ? stored.helps : false,
         sound: typeof stored.sound === "boolean" ? stored.sound : defaults.sound,
         voice: typeof stored.voice === "boolean" ? stored.voice : false,
         language: oneOf(stored.language, ["auto", "it", "en"], "auto"),

@@ -13,10 +13,12 @@ import type { Text } from "./text.ts";
  * picks one, and the legal moves of the piece picked show as dots, rings on captures; a second press on one of them, or a drag there, plays it. At any time
  * the right button lights a square, or draws an arrow when dragged, until a left click.
  */
-export function Board({ fen, bottom, lastMove, badge, drawn, nextMove, jumped, check, end, player, selected, targets, dots, notice, promotion, onSelect, onMove, onRefuse, onPromote, text }: {
+export function Board({ fen, bottom, lastMove, pointed, badge, drawn, nextMove, jumped, check, end, player, selected, targets, dots, notice, promotion, onSelect, onMove, onRefuse, onPromote, text }: {
     fen: string;
     bottom: Side;
     lastMove?: Move;
+    /** The square the player points at in the AI's words (T-111). */
+    pointed?: string;
     /** The AI's badge on the last move, in a game in analysis (D-69): on the square it went to, by its name. */
     badge?: { badge: MoveBadge; name: string; };
     /** The arrows and squares the AI drew with its note on the move shown (D-69), under the player's own marks. */
@@ -366,6 +368,7 @@ export function Board({ fen, bottom, lastMove, badge, drawn, nextMove, jumped, c
                             selected === square ? "selected" : "",
                             tinted === undefined ? "" : `noted ${tinted}`,
                             marks.squares.includes(square) ? "marked" : "",
+                            pointed === square ? "pointed" : "",
                             notice?.explanation?.ring === square ? "culprit" : "",
                             own(square) ? "own" : "",
                             target === undefined ? "" : !dots ? "target" : target.san.includes("x") ? "hint capture" : "hint",

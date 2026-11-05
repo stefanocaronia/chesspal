@@ -1,20 +1,16 @@
 // The AI's review of a game over (D-69): a badge on each move that matters, as chess.com marks them, with a note when it needs one, and its word on the
 // whole game, kept in the game's PGN for the board page. The judgment is the AI's alone: Chesspal gives no criteria (D-6, D-43).
 import { z } from "zod";
-import { arrowOf, badges, type GameRecord, reviewed, reviewOf, squareOf, withGameReview } from "../core/index.ts";
+import { badges, type GameRecord, reviewed, reviewOf, withGameReview } from "../core/index.ts";
 import { gameInAnalysis, rewriteGame, startAnalysis } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
+import { arrowsInput, drawingsOf, noteLimit, squaresInput } from "./drawings.ts";
 import { defineCommand } from "./registry.ts";
 import { folderOf, moveIndex, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
 
-const noteLimit = 700;
 const summaryLimit = 1500;
 const closingLimit = 400;
-const drawLimit = 6;
-const arrowText = /^[GRYB][a-h][1-8][a-h][1-8]$/;
-const squareText = /^[GRYB][a-h][1-8]$/;
-const colourLegend = "G green: the better move or the good idea; R red: a threat or the mistake; Y yellow: another way; B blue: a plan.";
 
 /** What the review kept: the game's name, how many moves it marked, and whether it holds a word on the whole game. */
 interface Annotated
@@ -40,10 +36,8 @@ export const annotateGame = defineCommand({
             move: z.string().describe("the move, as analyse_game numbers it: 12. for White's, 12... for Black's"),
             badge: z.enum(badges).optional(),
             note: z.string().max(noteLimit).optional().describe("why, in a few sentences, with the better move when there was one"),
-            arrows: z.array(z.string().regex(arrowText, "an arrow is a colour's letter and two squares: Gf6e4; a single square goes in squares")).max(drawLimit).optional()
-                .describe(`arrows that show the note on the board after the move, as PGN's %cal writes them: Rf2e1. ${colourLegend}`),
-            squares: z.array(z.string().regex(squareText, "a square is a colour's letter and the square: Rf2")).max(drawLimit).optional()
-                .describe("squares to mark with them, as PGN's %csl writes them: Rf2; colours as for arrows"),
+            arrows: arrowsInput,
+            squares: squaresInput,
         })).optional().describe("the moves that matter, each with its badge, its note, or both"),
         summary: z.string().max(summaryLimit).optional().describe("your word on the whole game: a short paragraph, with a few points as lines starting with - if it helps; the moves have their own notes"),
         closing: z.string().max(closingLimit).optional().describe("your last word on how the game ended, its win or loss, in a sentence or two: the page shows it at the end"),
@@ -67,15 +61,7 @@ export const annotateGame = defineCommand({
             const index = moveIndex(studied.record, move);
             // A note alone on a move of the book keeps its book badge: a fact Chesspal put there, not the AI's judgment.
             const kept = badge ?? (reviewOf(moves[index]!.comment)?.badge === "book" ? "book" : undefined);
-            const drawnArrows = arrows.map(arrowOf).filter((arrow) => arrow !== undefined);
-            const drawnSquares = squares.map(squareOf).filter((square) => square !== undefined);
-
-            moves[index] = reviewed(moves[index]!, {
-                ...(kept === undefined ? {} : { badge: kept }),
-                ...(note === undefined ? {} : { note }),
-                ...(drawnArrows.length === 0 ? {} : { arrows: drawnArrows }),
-                ...(drawnSquares.length === 0 ? {} : { squares: drawnSquares }),
-            });
+            moves[index] = reviewed(moves[index]!, { ...(kept === undefined ? {} : { badge: kept }), ...(note === undefined ? {} : { note }), ...drawingsOf(arrows, squares) });
         }
 
         const marked: GameRecord = { ...studied.record, moves };

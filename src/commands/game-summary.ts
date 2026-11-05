@@ -1,7 +1,8 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
 import { type AiLevel, type Facts, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, sees, type Side, type Square } from "../core/index.ts";
-import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, type Thought, thoughtForLastMove } from "../games/index.ts";
+import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, talkLimits, type Thought, thoughtForLastMove } from "../games/index.ts";
 import { onQuickModel } from "../host-files/index.ts";
+import { helpsIn } from "../profiles/index.ts";
 import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
 import { boardView, colourName, compactView, materialText } from "./view.ts";
@@ -29,6 +30,8 @@ export interface GameSummary
     plan?: string;
     /** When the AI is to move: what it thought of the player's move on their time (D-72). */
     thought?: Thought;
+    /** When the AI is to move and the player has turned the helps on: it may teach (D-78). */
+    helps?: true;
     /** In a game with a time control: the time each side had left when the command ran (D-13). */
     clock?: ClockSummary;
     /** Who offered a draw, while the offer stands (D-65). */
@@ -105,11 +108,15 @@ export function summaryOf(current: CurrentGame, now: Date, archive?: string): Ga
     return summary;
 }
 
-/** The summary with what the AI thought of the player's last move on their time, when it is to move and thought of it (D-72). */
+/** The summary with what the AI reads when it is to move: what it thought of the player's last move on their time (D-72), and whether the helps are on (D-78). */
 export function withThought(summary: GameSummary, folder: string, current: CurrentGame): GameSummary
 {
-    const thought = summary.turn === summary.ai && summary.end === undefined ? thoughtForLastMove(folder, current) : undefined;
-    return thought === undefined ? summary : { ...summary, thought };
+    if (summary.turn !== summary.ai || summary.end !== undefined) {
+        return summary;
+    }
+
+    const thought = thoughtForLastMove(folder, current);
+    return { ...summary, ...(thought === undefined ? {} : { thought }), ...(helpsIn(folder) ? { helps: true as const } : {}) };
 }
 
 /** The current game `now`, refused when there is none or when it is over, on time too. */
@@ -144,8 +151,13 @@ export function positionLines(game: GameSummary, withLastMove = true): string[]
         ...(game.plan === undefined ? [] : [`Plan: ${game.plan}`]),
         ...(game.thought === undefined ? [] : [thoughtLine(game.thought, game.level)]),
         ...moodLines(game),
+        ...(game.helps === true ? [helpsLine] : []),
     ];
 }
+
+/** The helps turned on: the AI may teach as the analyst does (D-62, D-78). */
+const helpsLine = "Helps on: the player wants to learn. You may tell your intentions and help them; ai_move may judge their last move (badge, note), draw arrows and "
+    + `squares, and its comment and ai_say may run to ${talkLimits.aiHelps} characters.`;
 
 /** The head of a view: where the game stands, the last move unless the lines before named it, the opening, the material as the player sees it, and the FEN. */
 export function headLines(game: GameSummary, withLastMove = true): string[]

@@ -18,7 +18,7 @@ import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
 import { useOpeningBook } from "./opening-book.ts";
 import { ChosenSet } from "./pieces.tsx";
 import { ClockFace, PlayerCard } from "./player-card.tsx";
-import { aiSpoke, aiWords, playerSpent, playerWords, pliesOf, type TalkLine, withBook } from "./plies.ts";
+import { aiSpoke, aiWords, playerSpent, playerWords, pliesOf, type TalkLine, withBook, withoutReviews } from "./plies.ts";
 import { NameButton, PictureButton, PictureDialog, ProfilesDialog, Wizard } from "./profile-dialogs.tsx";
 import { keepSettings, type Profile } from "./profile.ts";
 import { SettingsPanel } from "./settings-panel.tsx";
@@ -26,7 +26,7 @@ import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } 
 import { endSoundOf, playSound, soundOf, wakeSounds } from "./sounds.ts";
 import { type StudiedSide, studiedSides } from "./studied.ts";
 import { type Studied, StudyDialog } from "./study-dialog.tsx";
-import { AiNote, AiWords, Compose, TalkFaces } from "./talk.tsx";
+import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "./talk.tsx";
 import { type ServerRefusal, type Text, textFor } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
 
@@ -148,7 +148,9 @@ export function App({ start }: { start: Settings; })
     const pieces = useMemo(() => piecesOf(live.position.fen), [live]);
     // While the game goes on, the book's first moves carry its badge, when the player wants it, as the AI's review gives it after (D-69).
     const inBook = studied === undefined && settings.book ? game?.book ?? 0 : 0;
-    const plies = useMemo(() => withBook(pliesOf(replayed.record), inBook), [replayed, inBook]);
+    // The AI's judgments of the player's moves, and its drawings, show during a game only with the helps on, always once it is over (D-78).
+    const judged = !going || settings.helps;
+    const plies = useMemo(() => withBook(judged ? pliesOf(replayed.record) : withoutReviews(pliesOf(replayed.record)), inBook), [replayed, inBook, judged]);
     const book = useOpeningBook(live.record.moves.length > 0);
     const opening = useMemo(() => book === undefined ? undefined : openingOf(live.record, book), [live, book]);
     // The player's move shows at once, before the server has it: the game it sends next takes its place (T-70).
@@ -297,7 +299,9 @@ export function App({ start }: { start: Settings; })
     const mood = moodAt(live.record, sides?.white.who === "ai" ? "white" : sides?.black.who === "ai" ? "black" : ai, at).mood;
     const playerToMove = going && live.position.turn === player;
     const ahead = (side: Side): number => side === "white" ? material.balance : -material.balance;
-    const reviewed = studied !== undefined || at <= inBook ? plies[at - 1] : undefined;
+    const reviewed = judged || at <= inBook ? plies[at - 1] : undefined;
+    // The square the player points at in the AI's words, lit on the board (T-111).
+    const [pointed, setPointed] = useState<string | undefined>(undefined);
     const review = reviewed?.review;
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
     const closing = studied === undefined ? undefined : closingOf(live.record);
@@ -454,194 +458,197 @@ export function App({ start }: { start: Settings; })
 
     return (
         <ChosenSet.Provider value={settings.set}>
-            {panel}
-            <PictureDialog open={dialog === "picture"} profile={profile} onClose={() => setDialog(undefined)} text={text} />
-            <ProfilesDialog
-                open={dialog === "profiles"}
-                profiles={served.profiles}
-                active={profile}
-                playing={going}
-                onClose={() => setDialog(undefined)}
-                text={text}
-            />
-            <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
-            <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} text={text} />
-            {offline ? <p class="offline" role="alert">{text.offline(name)}</p> : null}
-            <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`} inert={offline}>
-                {header}
-                {sides === undefined
-                    ? (
-                        <TalkFaces
-                            name={name}
-                            aiPicture={<Torretta size={40} mood={mood} />}
-                            you={profile.name}
-                            picture={picture}
-                            ai={ai}
-                            player={player}
-                            aiMoves={going && !playerToMove}
-                            playerMoves={playerToMove}
-                            unread={unread || asleep}
-                            text={text}
-                        />
-                    )
-                    : (
-                        <TalkFaces
-                            name={sides[ai].name}
-                            aiPicture={pictureOf(sides[ai], profile, 40, mood)}
-                            you={sides[player].name}
-                            picture={pictureOf(sides[player], profile, 40, mood)}
-                            ai={ai}
-                            player={player}
-                            aiMoves={false}
-                            playerMoves={false}
-                            unread={asleep}
-                            text={text}
-                        />
-                    )}
-                <FoldTab column="talk" folded={folds.talk === "folded"} label={text.talk} unread={(unread || asleep) && folds.talk === "folded"} onFold={fold} />
-                <FoldTab column="game" folded={folds.game === "folded"} label={text.game} onFold={fold} />
-                <span class="visually-hidden" aria-live="polite">{unread ? text.wrote(name) : ""}</span>
-                <div class={sides === undefined ? "talk" : "talk studied"} id="talk">
-                    {sides !== undefined
-                        ? (
-                            <>
-                                <section class="ai-block" aria-label={sides[top].name}>
-                                    {studiedCard(top, "ai")}
-                                    {asleepNote}
-                                    <AiNote
-                                        {...(reviewed === undefined ? {} : { ply: reviewed })}
-                                        {...(shownOpening === undefined ? {} : { opening: shownOpening })}
-                                        {...(at === total && closing !== undefined ? { closing } : {})}
-                                        {...(at === 0 && summary !== undefined ? { summary } : {})}
-                                        name={name}
-                                        mood={mood}
-                                        {...(settings.voice ? { voice: text.language } : {})}
-                                        text={text}
-                                    />
-                                </section>
-                                <section class="you-block" aria-label={sides[bottom].name}>
-                                    {studiedCard(bottom, "you")}
-                                </section>
-                            </>
-                        )
-                        : (
-                            <>
-                                <section class="ai-block" aria-label={name}>
-                                    <PlayerCard
-                                        place="ai"
-                                        picture={<Torretta size={48} mood={mood} />}
-                                        name={name}
-                                        side={idle ? undefined : ai}
-                                        {...(idle ? {} : { level: text.start.levels[level] })}
-                                        taken={material.taken[ai]}
-                                        ahead={ahead(ai)}
-                                        clock={clockOf(ai)}
-                                        text={text}
-                                    />
-                                    {asleepNote}
-                                    <AiWords words={aiWords(plies, ai, talk)} newestFirst={!flipped} {...(settings.voice ? { voice: text.language } : {})} />
-                                </section>
-                                <section class="you-block" aria-label={profile.name}>
-                                    <Compose
-                                        lines={said}
-                                        newestFirst={flipped}
-                                        // Between games, and before the first, the player writes freely, a line at a time, as the AI does (D-74, D-77).
-                                        spent={going ? playerSpent(plies, ai, talk) : 0}
-                                        draft={draft}
-                                        onDraft={(words) => {
-                                            setDraft(words);
-                                            setUnsent(undefined);
-                                        }}
-                                        onSend={sendWords}
-                                        canMove={playerToMove}
-                                        name={name}
-                                        problem={unsent}
-                                        text={text}
-                                    />
-                                    <PlayerCard
-                                        place="you"
-                                        picture={<PictureButton profile={profile} onOpen={() => setDialog("picture")} text={text} />}
-                                        name={<NameButton profile={profile} onOpen={() => setDialog("profiles")} text={text} />}
-                                        side={idle ? undefined : player}
-                                        taken={material.taken[player]}
-                                        ahead={ahead(player)}
-                                        turn={playerToMove}
-                                        clock={
-                                            <>
-                                                {clockOf(player)}
-                                                {startClocks}
-                                                {nextGame}
-                                            </>
-                                        }
-                                        text={text}
-                                    />
-                                </section>
-                            </>
-                        )}
-                </div>
-                <div
-                    // Between games the board goes off (D-77): a game the page saw end once its effects are over, its final position less off than the table set.
-                    class={between && !justEnded ? "board-wrap off" : "board-wrap"}
-                    onWheel={wheel}
-                    // A press on the board while the player looks back brings the game as it is: the next one plays.
-                    onPointerDownCapture={viewing === undefined || studied !== undefined ? undefined : (event) => event.button === 0 && goTo(total)}
-                >
-                    <Board
-                        fen={shown.position.fen}
-                        bottom={flipped ? ai : player}
-                        lastMove={shown.lastMove}
-                        {...(review?.badge === undefined ? {} : { badge: { badge: review.badge, name: text.badges[review.badge] } })}
-                        {...(review === undefined ? {} : { drawn: review })}
-                        nextMove={next}
-                        jumped={jumped}
-                        check={shown.position.check}
-                        end={ended && viewing === undefined && pending === undefined ? { how, winner, player, fresh: justEnded } : undefined}
-                        player={playerToMove && pending === undefined && viewing === undefined ? player : undefined}
-                        selected={selected}
-                        targets={selected === undefined || viewing !== undefined ? [] : live.legalMoves(selected as Square)}
-                        dots={settings.dots}
-                        notice={viewing === undefined ? refusal : undefined}
-                        promotion={promoting === undefined || viewing !== undefined || !playerToMove ? undefined : { ...promoting, side: player }}
-                        onPromote={(piece) => piece === undefined ? setPromoting(undefined) : play(promoting!.from, promoting!.to, piece)}
-                        onSelect={select}
-                        onMove={play}
-                        onRefuse={refuse}
-                        text={text}
-                    />
-                    {/* With the talk folded, the note on the chat that does not listen (Stefano) and the button that starts the clocks come over the board's far edge */}
-                    {folds.talk !== "open" && (asleep || clockWaits)
-                        ? (
-                            <div class="over-board">
-                                {asleep ? <p class="asleep" role="status">{text.asleep(name)}</p> : null}
-                                {startClocks}
-                            </div>
-                        )
-                        : null}
-                </div>
-                {/* On a phone the steps of a game in analysis sit under the board, by the thumb (Zoe, T-40) */}
-                {studied === undefined ? null : (
-                    <div class="board-steps">
-                        <Steps shown={at} total={total} onStep={step} text={text} />
-                    </div>
-                )}
-                <GameColumn
-                    plies={idle ? [] : plies}
-                    result={ended ? result : undefined}
-                    how={how}
-                    lit={justEnded}
-                    started={idle ? undefined : played?.started}
-                    move={live.position.moveNumber}
-                    toMove={live.position.turn}
-                    opening={opening}
-                    {...(studied === undefined ? {} : { analysis: summary === undefined ? { by: name } : { by: name, summary } })}
-                    shownPlies={at}
-                    onShow={goTo}
-                    onStep={step}
-                    {...(studied === undefined ? {} : { onDownload: () => download(studied.pgn, pgnName(live.record.tags)) })}
-                    {...(between && game !== null ? { onAnalyse: () => void studyGame({ last: true }) } : {})}
+            <PointSquare.Provider value={setPointed}>
+                {panel}
+                <PictureDialog open={dialog === "picture"} profile={profile} onClose={() => setDialog(undefined)} text={text} />
+                <ProfilesDialog
+                    open={dialog === "profiles"}
+                    profiles={served.profiles}
+                    active={profile}
+                    playing={going}
+                    onClose={() => setDialog(undefined)}
                     text={text}
                 />
-            </main>
+                <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
+                <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} text={text} />
+                {offline ? <p class="offline" role="alert">{text.offline(name)}</p> : null}
+                <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`} inert={offline}>
+                    {header}
+                    {sides === undefined
+                        ? (
+                            <TalkFaces
+                                name={name}
+                                aiPicture={<Torretta size={40} mood={mood} />}
+                                you={profile.name}
+                                picture={picture}
+                                ai={ai}
+                                player={player}
+                                aiMoves={going && !playerToMove}
+                                playerMoves={playerToMove}
+                                unread={unread || asleep}
+                                text={text}
+                            />
+                        )
+                        : (
+                            <TalkFaces
+                                name={sides[ai].name}
+                                aiPicture={pictureOf(sides[ai], profile, 40, mood)}
+                                you={sides[player].name}
+                                picture={pictureOf(sides[player], profile, 40, mood)}
+                                ai={ai}
+                                player={player}
+                                aiMoves={false}
+                                playerMoves={false}
+                                unread={asleep}
+                                text={text}
+                            />
+                        )}
+                    <FoldTab column="talk" folded={folds.talk === "folded"} label={text.talk} unread={(unread || asleep) && folds.talk === "folded"} onFold={fold} />
+                    <FoldTab column="game" folded={folds.game === "folded"} label={text.game} onFold={fold} />
+                    <span class="visually-hidden" aria-live="polite">{unread ? text.wrote(name) : ""}</span>
+                    <div class={sides === undefined ? "talk" : "talk studied"} id="talk">
+                        {sides !== undefined
+                            ? (
+                                <>
+                                    <section class="ai-block" aria-label={sides[top].name}>
+                                        {studiedCard(top, "ai")}
+                                        {asleepNote}
+                                        <AiNote
+                                            {...(reviewed === undefined ? {} : { ply: reviewed })}
+                                            {...(shownOpening === undefined ? {} : { opening: shownOpening })}
+                                            {...(at === total && closing !== undefined ? { closing } : {})}
+                                            {...(at === 0 && summary !== undefined ? { summary } : {})}
+                                            name={name}
+                                            mood={mood}
+                                            {...(settings.voice ? { voice: text.language } : {})}
+                                            text={text}
+                                        />
+                                    </section>
+                                    <section class="you-block" aria-label={sides[bottom].name}>
+                                        {studiedCard(bottom, "you")}
+                                    </section>
+                                </>
+                            )
+                            : (
+                                <>
+                                    <section class="ai-block" aria-label={name}>
+                                        <PlayerCard
+                                            place="ai"
+                                            picture={<Torretta size={48} mood={mood} />}
+                                            name={name}
+                                            side={idle ? undefined : ai}
+                                            {...(idle ? {} : { level: text.start.levels[level] })}
+                                            taken={material.taken[ai]}
+                                            ahead={ahead(ai)}
+                                            clock={clockOf(ai)}
+                                            text={text}
+                                        />
+                                        {asleepNote}
+                                        <AiWords words={aiWords(plies, ai, talk)} newestFirst={!flipped} {...(settings.voice ? { voice: text.language } : {})} />
+                                    </section>
+                                    <section class="you-block" aria-label={profile.name}>
+                                        <Compose
+                                            lines={said}
+                                            newestFirst={flipped}
+                                            // Between games, and before the first, the player writes freely, a line at a time, as the AI does (D-74, D-77).
+                                            spent={going ? playerSpent(plies, ai, talk) : 0}
+                                            draft={draft}
+                                            onDraft={(words) => {
+                                                setDraft(words);
+                                                setUnsent(undefined);
+                                            }}
+                                            onSend={sendWords}
+                                            canMove={playerToMove}
+                                            name={name}
+                                            problem={unsent}
+                                            text={text}
+                                        />
+                                        <PlayerCard
+                                            place="you"
+                                            picture={<PictureButton profile={profile} onOpen={() => setDialog("picture")} text={text} />}
+                                            name={<NameButton profile={profile} onOpen={() => setDialog("profiles")} text={text} />}
+                                            side={idle ? undefined : player}
+                                            taken={material.taken[player]}
+                                            ahead={ahead(player)}
+                                            turn={playerToMove}
+                                            clock={
+                                                <>
+                                                    {clockOf(player)}
+                                                    {startClocks}
+                                                    {nextGame}
+                                                </>
+                                            }
+                                            text={text}
+                                        />
+                                    </section>
+                                </>
+                            )}
+                    </div>
+                    <div
+                        // Between games the board goes off (D-77): a game the page saw end once its effects are over, its final position less off than the table set.
+                        class={between && !justEnded ? "board-wrap off" : "board-wrap"}
+                        onWheel={wheel}
+                        // A press on the board while the player looks back brings the game as it is: the next one plays.
+                        onPointerDownCapture={viewing === undefined || studied !== undefined ? undefined : (event) => event.button === 0 && goTo(total)}
+                    >
+                        <Board
+                            fen={shown.position.fen}
+                            bottom={flipped ? ai : player}
+                            lastMove={shown.lastMove}
+                            pointed={pointed}
+                            {...(review?.badge === undefined ? {} : { badge: { badge: review.badge, name: text.badges[review.badge] } })}
+                            {...(review === undefined ? {} : { drawn: review })}
+                            nextMove={next}
+                            jumped={jumped}
+                            check={shown.position.check}
+                            end={ended && viewing === undefined && pending === undefined ? { how, winner, player, fresh: justEnded } : undefined}
+                            player={playerToMove && pending === undefined && viewing === undefined ? player : undefined}
+                            selected={selected}
+                            targets={selected === undefined || viewing !== undefined ? [] : live.legalMoves(selected as Square)}
+                            dots={settings.dots}
+                            notice={viewing === undefined ? refusal : undefined}
+                            promotion={promoting === undefined || viewing !== undefined || !playerToMove ? undefined : { ...promoting, side: player }}
+                            onPromote={(piece) => piece === undefined ? setPromoting(undefined) : play(promoting!.from, promoting!.to, piece)}
+                            onSelect={select}
+                            onMove={play}
+                            onRefuse={refuse}
+                            text={text}
+                        />
+                        {/* With the talk folded, the note on the chat that does not listen (Stefano) and the button that starts the clocks come over the board's far edge */}
+                        {folds.talk !== "open" && (asleep || clockWaits)
+                            ? (
+                                <div class="over-board">
+                                    {asleep ? <p class="asleep" role="status">{text.asleep(name)}</p> : null}
+                                    {startClocks}
+                                </div>
+                            )
+                            : null}
+                    </div>
+                    {/* On a phone the steps of a game in analysis sit under the board, by the thumb (Zoe, T-40) */}
+                    {studied === undefined ? null : (
+                        <div class="board-steps">
+                            <Steps shown={at} total={total} onStep={step} text={text} />
+                        </div>
+                    )}
+                    <GameColumn
+                        plies={idle ? [] : plies}
+                        result={ended ? result : undefined}
+                        how={how}
+                        lit={justEnded}
+                        started={idle ? undefined : played?.started}
+                        move={live.position.moveNumber}
+                        toMove={live.position.turn}
+                        opening={opening}
+                        {...(studied === undefined ? {} : { analysis: summary === undefined ? { by: name } : { by: name, summary } })}
+                        shownPlies={at}
+                        onShow={goTo}
+                        onStep={step}
+                        {...(studied === undefined ? {} : { onDownload: () => download(studied.pgn, pgnName(live.record.tags)) })}
+                        {...(between && game !== null ? { onAnalyse: () => void studyGame({ last: true }) } : {})}
+                        text={text}
+                    />
+                </main>
+            </PointSquare.Provider>
         </ChosenSet.Provider>
     );
 }

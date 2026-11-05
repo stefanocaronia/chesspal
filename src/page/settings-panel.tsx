@@ -60,6 +60,7 @@ export function SettingsPanel({ open, settings, onChange, onClose, text }: {
             <Toggle on={settings.dots} onSwitch={(on) => set("dots", on)}>{text.dots}</Toggle>
             <Toggle on={settings.explain} onSwitch={(on) => set("explain", on)}>{text.explain}</Toggle>
             <Toggle on={settings.book} onSwitch={(on) => set("book", on)}>{text.bookBadges}</Toggle>
+            <Toggle on={settings.helps} onSwitch={(on) => set("helps", on)}>{text.helps}</Toggle>
             <Toggle on={settings.sound} onSwitch={(on) => set("sound", on)}>{text.sounds}</Toggle>
             <Toggle on={settings.voice} onSwitch={(on) => set("voice", on)}>{text.voice}</Toggle>
             <h3>{text.languageChoice}</h3>

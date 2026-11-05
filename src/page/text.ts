@@ -38,6 +38,8 @@ export interface Text
     readonly explain: string;
     /** The setting that marks the opening book's moves while the game goes on. */
     readonly bookBadges: string;
+    /** The setting that makes the AI teach during the game (D-78). */
+    readonly helps: string;
     readonly languageChoice: string;
     readonly languages: Readonly<Record<"auto" | "it" | "en", string>>;
     /** The names of the settings' choices by their ids: the piece sets, the boards' skins, the pieces' colours, the marks' colours. */
@@ -260,6 +262,7 @@ const english: Text = {
     dots: "Dots on the legal moves",
     explain: "Explain the moves refused",
     bookBadges: "Mark the book moves",
+    helps: "Helps: the AI teaches as you play",
     languageChoice: "Language",
     languages: { auto: "As the browser", it: "Italiano", en: "English" },
     names: {
@@ -467,6 +470,7 @@ const italian: Text = {
     dots: "Pallini sulle mosse legali",
     explain: "Spiega le mosse vietate",
     bookBadges: "Segna le mosse da libro",
+    helps: "Aiuti: l'AI ti insegna mentre giochi",
     languageChoice: "Lingua",
     languages: { auto: "Come il browser", it: "Italiano", en: "English" },
     names: {

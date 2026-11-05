@@ -1,6 +1,6 @@
 // The talk on the board page (D-51, D-53): the AI's words in bubbles that point at the Torretta, the player's above the box they write in.
-import { type ComponentChildren, type RefObject } from "preact";
-import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { type ComponentChildren, createContext, type RefObject } from "preact";
+import { useContext, useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { Mood, MoveReview, Opening, Side } from "../core/index.ts";
 import { BadgeIcon, NoteIcon } from "./badges.tsx";
 import { Figurines } from "./move-list.tsx";
@@ -119,9 +119,27 @@ export function Marked({ text }: { text: string; })
     );
 }
 
+/** Where the pointer is among the squares and moves in the AI's words (T-111): the board lights that square up. */
+export const PointSquare = createContext<(square: string | undefined) => void>(() => undefined);
+
 function OnBoard({ text }: { text: string; })
 {
-    return <>{text.split(boardWords).map((part, index) => index % 2 === 1 ? <b key={index} class="on-board">{part}</b> : part)}</>;
+    const point = useContext(PointSquare);
+    return (
+        <>
+            {text.split(boardWords).map((part, index) =>
+                index % 2 === 1
+                    ? <b key={index} class="on-board" onPointerEnter={() => point(squareIn(part))} onPointerLeave={() => point(undefined)}>{part}</b>
+                    : part
+            )}
+        </>
+    );
+}
+
+/** The square a word names: a square, or where a move goes, the last square in it; none for a castling. */
+function squareIn(word: string): string | undefined
+{
+    return /[a-h][1-8](?!.*[a-h][1-8])/.exec(word)?.[0];
 }
 
 // **a few words** the AI put in bold, as Markdown writes them.
