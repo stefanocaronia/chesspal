@@ -17,12 +17,16 @@ export interface Context
     page?: string;
     /** Whether a browser has the board page open now, when the MCP server serves it. */
     pageOpen?: () => boolean;
+    /** Opens the New game window on the board pages open now, where the player chooses the game: whether one was open. */
+    askNewGame?: () => boolean;
     /** The AI host, as it names itself to the MCP server: claude-code, which notes how each chat starts (D-57); none on the command line. */
     host?: () => string | undefined;
     /** The player's words on the board page given to the AI in this process, by line: each comes once (T-65). */
     readonly given: Set<string>;
     /** Told when the AI is given words it had not had: the board page shows them read (D-53). */
     heard?: () => void;
+    /** Told when the chat calls a tool, before it runs: the board page hears the chat listens, and the AI's clock, held while nobody did, starts. */
+    calls?: () => void;
     /** The game the chat saw when its last tool ended, its folder and its stamp: the doorbell wakes it only for a game changed since. */
     seen?: string | undefined;
     /** The instructions the MCP server gave in this chat, by their name and the chat's start: each comes once a chat (D-68); none on the command line. */

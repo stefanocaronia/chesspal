@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { recordChatStart } from "../src/cli/chat-hook.ts";
 import type { Context } from "../src/commands/context.ts";
 import { newGame } from "../src/commands/new-game.ts";
+import { status } from "../src/commands/status.ts";
 import { createProfile } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
 
@@ -59,6 +60,46 @@ describe("a new game after one played in the chat (D-57)", () => {
         const context = chatWith(longGame);
         await recordChatStart(Readable.from([JSON.stringify({ source: "clear", session_id: "abc", cwd: context.folder })]), context.folder, after);
         expect(JSON.parse(readFileSync(join(context.folder, "chat.json"), "utf8"))).toEqual({ source: "clear", at: after.toISOString(), session: "abc" });
+    });
+});
+
+describe("a new game chosen on the board page", () => {
+    it("opens the page's New game window without choices, or gives its address while it is closed, and asks in the chat without a page", async () => {
+        const context = chatWith("1. e4 *");
+        let asked = 0;
+        const ask = (open: boolean): Context => ({ ...context, page: "http://127.0.0.1:5876", askNewGame: () => (asked++, open) });
+
+        expect(newGame.format(await newGame.run({ replace: false }, ask(true)))).toMatch(/The New game window is open on the board page/);
+        expect(asked).toBe(1);
+        expect(newGame.format(await newGame.run({ replace: false }, ask(false)))).toMatch(/give the player its address, http:\/\/127\.0\.0\.1:5876/);
+        expect(() => newGame.run({ replace: false }, context)).toThrow(/There is no board page here: ask the player/);
+        expect(() => newGame.run({ replace: false, clock: "5+0" }, context)).toThrow(/ai_colour: say the colour you play/);
+    });
+
+    it("refuses to open the window in a chat still holding the game before (D-57)", async () => {
+        const context = chatWith(longGame);
+        await chatStarted(context, "startup", before);
+        expect(() => newGame.run({ replace: false }, { ...context, askNewGame: () => true })).toThrow(/\/clear/);
+    });
+});
+
+describe("a game from before the chat", () => {
+    it("is told once, at the chat's first status, when the game began before a clean chat", async () => {
+        const context: Context = { ...chatWith("1. e4 *"), told: new Set() };
+        await chatStarted(context, "clear", after);
+
+        expect(status.format(await status.run({}, context))).toMatch(/A game from before this chat is going on: ask the player whether to go on with it/);
+        expect(status.format(await status.run({}, context))).not.toMatch(/from before this chat/);
+    });
+
+    it("is not told for the game a summarized chat holds, nor on the command line", async () => {
+        const compacted: Context = { ...chatWith("1. e4 *"), told: new Set() };
+        await chatStarted(compacted, "compact", after);
+        expect(status.format(await status.run({}, compacted))).not.toMatch(/from before this chat/);
+
+        const line = chatWith("1. e4 *");
+        await chatStarted(line, "clear", after);
+        expect(status.format(await status.run({}, line))).not.toMatch(/from before this chat/);
     });
 });
 

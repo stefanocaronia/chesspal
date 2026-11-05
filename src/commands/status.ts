@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { archivedName, gameInAnalysis } from "../games/index.ts";
+import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { gameAt } from "./clock.ts";
-import { closingLines, type GameSummary, nextStep, positionLines, sidesLine, summaryOf, withThought, wordLines } from "./game-summary.ts";
+import type { Context } from "./context.ts";
+import { closingLines, type GameSummary, newGameStep, nextStep, positionLines, sidesLine, summaryOf, withThought, wordLines } from "./game-summary.ts";
 import { levelText } from "./levels.ts";
 import { closedPage, pageLine } from "./page-link.ts";
 import { playerLine } from "./profiles.ts";
@@ -27,6 +28,8 @@ interface Status
     words?: string[];
     /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there (T-92). */
     analysis?: { game: string; brought?: true; };
+    /** A game going on from before this chat, told once a chat: the player says whether to go on with it. */
+    fromBefore?: true;
 }
 
 /** What Chesspal sees now, the first call of a chat: a dashboard under 150 tokens while the player is to move, with the next step. */
@@ -57,12 +60,18 @@ export const status = defineCommand({
             status.player = player;
         }
 
+        const first = firstInChat(context);
+
         try {
             const current = gameAt(folder, context.now());
 
             if (current !== undefined) {
                 status.game = withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current);
                 status.words = unansweredWords(context);
+
+                if (first && endOf(current.game) === undefined && fromBeforeChat(context, current.started)) {
+                    status.fromBefore = true;
+                }
             }
 
             const analysis = current === undefined || status.game?.end !== undefined ? gameInAnalysis(folder) : undefined;
@@ -76,15 +85,42 @@ export const status = defineCommand({
 
         return status;
     },
-    format: ({ version, folder, page, pageClosed, player, game, problem, words = [], analysis }) =>
+    format: ({ version, folder, page, pageClosed, player, game, problem, words = [], analysis, fromBefore }) =>
         [
             `Chesspal ${version}. Folder: ${folder}`,
             ...(page === undefined ? [] : [pageLine(page, pageClosed === true)]),
             ...(player === undefined ? [] : [player]),
+            ...(fromBefore === true ? [fromBeforeLine] : []),
             ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true)),
             ...(analysis === undefined ? [] : [analysisLine(analysis)]),
         ].join("\n"),
 });
+
+// The game going on as a chat starts: the player may have come back for it, or want another.
+const fromBeforeLine = "A game from before this chat is going on: ask the player whether to go on with it. For a new one, " + newGameStep;
+
+/**
+ * Whether this is the chat's first status: once a chat where the MCP server keeps what it told, again in a chat cleared or summarized, since its start keys
+ * it (D-57); never on the command line.
+ */
+function firstInChat(context: Context): boolean
+{
+    const key = `game before ${lastChatStart(context.folder)?.at ?? ""}`;
+
+    if (context.told === undefined || context.told.has(key)) {
+        return false;
+    }
+
+    context.told.add(key);
+    return true;
+}
+
+/** Whether a game began before the chat: one a summarized or resumed chat still holds is its own; without the host's word, any game is. */
+function fromBeforeChat(context: Context, started: string): boolean
+{
+    const start = lastChatStart(context.folder);
+    return start === undefined || cleanSince(start, started);
+}
 
 /** The game in analysis; the next step when the player has just brought it on the board page (T-92). */
 function analysisLine({ game, brought }: NonNullable<Status["analysis"]>): string

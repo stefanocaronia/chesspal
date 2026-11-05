@@ -188,15 +188,18 @@ export function wordLines(words: readonly string[]): string[]
 export function nextStep(game: GameSummary | undefined, words: readonly string[] = []): string
 {
     if (game === undefined) {
-        return "Next: ask the player which colour they want, whether they want a clock and at which level you play (if they leave it to you, leave level out: "
-            + "Chesspal picks the one that suits them), then call new_game.";
+        return `Next: when the player wants a game, ${newGameStep}`;
     }
 
     if (game.end !== undefined) {
         return words.length === 0
             ? "Next: tell the player how the game ended, with ai_say if they play on the board page; then offer them, in words, another game or to go over this one "
-                + "(analyse_game). On the board page they start the next game with its New game button; in the chat, with new_game."
-            : "Next: answer the player with ai_say; they start another game with the board page's New game button.";
+                + `(analyse_game). For another, ${newGameStep}`
+            : `Next: answer the player with ai_say. When they want another game, ${newGameStep}`;
+    }
+
+    if (game.turn === game.ai && game.clock?.waiting === true) {
+        return "Next: don't move yet: the player starts the game with Start on the board page, and the doorbell wakes you then. End your turn.";
     }
 
     if (game.turn === game.ai) {
@@ -211,6 +214,10 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
 
     return words.length === 0 ? "Next: wait for the player's move, then call player_move with it." : "Next: answer the player with ai_say, then wait for their move.";
 }
+
+/** How a new game starts: the player chooses it in the board page's window, which new_game without choices opens; in the chat only without the page. */
+export const newGameStep = "call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the "
+    + "level. Ask them in the chat, and call new_game with them, only when the player plays without the page.";
 
 /** Who plays what, from the AI's side. */
 export function sidesLine(ai: Side): string

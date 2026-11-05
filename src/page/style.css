@@ -1518,6 +1518,26 @@ button {
     color: #fff;
 }
 
+/* The clocks wait for the player (Zoe): the button that starts them takes a line of the player's card, under the clock it starts, off the board's squares */
+.player-line:has(> .start-clocks) {
+    flex-wrap: wrap;
+    row-gap: 10px;
+}
+
+.start-clocks {
+    flex: 1 0 100%;
+    justify-content: center;
+    padding: 8px 14px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.start-clocks .icon {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
 /* The pieces taken overlap within a kind, close enough that all fifteen and the score stay on one line */
 .taken {
     display: flex;
@@ -2433,28 +2453,125 @@ button {
     padding: 0 16px;
 }
 
-/* The page without its server, after /clear in Claude's app: a bar over the page, which waits under it, dimmed and still */
+/* The page without its server, after /clear in Claude's app (Zoe): a card in the middle of the window, over the page that waits under it, dimmed and still;
+   its light breathes while the page tries again */
 .offline {
     position: fixed;
-    top: 12px;
+    top: 50%;
     left: 50%;
     z-index: 20;
-    width: min(560px, calc(100vw - 32px));
+    width: min(400px, calc(100vw - 32px));
     margin: 0;
-    padding: 12px 16px;
-    transform: translateX(-50%);
-    border: 1px solid var(--accent);
+    padding: 20px 24px;
+    transform: translate(-50%, -50%);
+    border: 1px solid color-mix(in oklab, var(--accent) 40%, var(--line));
     border-radius: var(--radius);
     background: var(--card);
     color: var(--ink);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
-    font-size: 14px;
+    /* The dialogs' backdrop, over the whole window */
+    box-shadow: 0 0 0 100vmax rgba(16, 22, 29, 0.4), 0 16px 40px rgb(0 0 0 / 22%);
+    font-size: 15px;
+    line-height: 1.5;
     text-align: center;
+    text-wrap: pretty;
+}
+
+.offline::before {
+    content: "";
+    display: block;
+    width: 10px;
+    height: 10px;
+    margin: 0 auto 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: reconnecting 1.6s ease-in-out infinite;
+}
+
+@keyframes reconnecting {
+    50% {
+        opacity: 0.25;
+    }
 }
 
 .offline + .app {
-    opacity: 0.45;
-    filter: grayscale(0.6);
+    filter: grayscale(0.8);
+}
+
+/* No chat hears the player (Zoe): a note under the AI's card, by its stopped clock, on a page still in use. The AI's words below it lose their tail */
+.asleep {
+    flex: none;
+    margin: var(--between) 0 0;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in oklab, var(--hover-edge) 55%, var(--line));
+    border-radius: var(--radius);
+    background: var(--warn-back);
+    color: var(--ink);
+    font-size: 13.5px;
+    line-height: 1.45;
+    text-wrap: pretty;
+}
+
+.flipped .asleep {
+    margin: 0 0 var(--between);
+}
+
+.ai-block:has(> .asleep) .say::before,
+.ai-block:has(> .asleep) .say::after {
+    content: none;
+}
+
+/* With the talk folded, the same note and the button that starts the clocks over the board's edge on the AI's side, away from the squares of the player's
+   first move (Stefano); clicks go through the note to the squares, and both step aside for a lifted piece, a promotion and a refused move */
+.over-board {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: min(460px, calc(100% - 24px));
+    transform: translateX(-50%);
+    pointer-events: none;
+    animation: appear 200ms;
+}
+
+.flipped .over-board {
+    top: auto;
+    bottom: 12px;
+    flex-direction: column-reverse;
+}
+
+.over-board > .asleep {
+    margin: 0;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 14%), 0 10px 28px rgb(0 0 0 / 20%);
+}
+
+.over-board > .start-clocks {
+    flex: none;
+    padding: 9px 22px;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 14%), 0 8px 20px rgb(0 0 0 / 22%);
+    pointer-events: auto;
+}
+
+:root.dragging .over-board,
+.board-wrap:has(.promotion, .notice) > .over-board {
+    visibility: hidden;
+}
+
+/* A phone shows the talk whatever its fold: the note and the button stay in the cards */
+@media (max-width: 840px) {
+    .over-board {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .offline::before,
+    .over-board {
+        animation: none;
+    }
 }
 
 /* The settings (D-56): a dialog over the page; each choice shows at once */
@@ -3615,6 +3732,17 @@ button {
     .talk.studied .ai-note {
         grid-area: note;
         margin-top: 0;
+    }
+
+    /* With no chat listening, its note comes before the Torretta's (Zoe) */
+    .app:has(.talk.studied > .ai-block > .asleep),
+    .app.flipped:has(.talk.studied > .ai-block > .asleep) {
+        grid-template-areas: "head" "ai" "board" "steps" "asleep" "note" "you" "side";
+    }
+
+    .talk.studied > .ai-block > .asleep {
+        grid-area: asleep;
+        margin: 0;
     }
 
     .board-steps {

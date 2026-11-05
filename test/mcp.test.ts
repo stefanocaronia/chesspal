@@ -87,7 +87,7 @@ describe("the MCP server", () => {
     it("runs a tool and answers with its text", async () => {
         expect(await call("status", {})).toEqual({
             text:
-                `Chesspal ${version}. Folder: /the/player\nNo game.\nNext: ask the player which colour they want, whether they want a clock and at which level you play (if they leave it to you, leave level out: Chesspal picks the one that suits them), then call new_game.`,
+                `Chesspal ${version}. Folder: /the/player\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.`,
             isError: false,
         });
     });

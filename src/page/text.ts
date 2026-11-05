@@ -36,6 +36,8 @@ export interface Text
     readonly play: string;
     readonly dots: string;
     readonly explain: string;
+    /** The setting that marks the opening book's moves while the game goes on. */
+    readonly bookBadges: string;
     readonly languageChoice: string;
     readonly languages: Readonly<Record<"auto" | "it" | "en", string>>;
     /** The names of the settings' choices by their ids: the piece sets, the boards' skins, the pieces' colours, the marks' colours. */
@@ -73,6 +75,10 @@ export interface Text
     readonly clearChat: string;
     /** The page lost its server, which lives in Claude's chat: where to write to bring it back. */
     readonly offline: string;
+    /** The page is served, but no chat hears the player (never started, or just cleared): where to write to wake it; its clock waits. */
+    asleep(name: string): string;
+    /** The button that starts the clocks, which wait for the player from the game's start. */
+    readonly startClocks: string;
     /** A command such as /clear written in the page's talk, which is for Claude's app. */
     readonly commandHere: string;
     /** The choice of the piece a pawn becomes on the last rank (T-11). */
@@ -248,6 +254,7 @@ const english: Text = {
     play: "Play",
     dots: "Dots on the legal moves",
     explain: "Explain the moves refused",
+    bookBadges: "Mark the book moves",
     languageChoice: "Language",
     languages: { auto: "As the browser", it: "Italiano", en: "English" },
     names: {
@@ -321,6 +328,8 @@ const english: Text = {
     boardLabel: (turn, lastMove) => `Chessboard, ${english.toMove(turn)}${lastMove === undefined ? "" : `, last move ${lastMove}`}`,
     clearChat: 'Before a new game, clear your chat with Claude: in Claude\'s app, not here, write /clear, then a message such as "new game". A clean chat plays faster.',
     offline: "Claude is not connected. Write it a message in Claude's app, not in this page's chat: the page connects again by itself.",
+    startClocks: "Start",
+    asleep: (name) => `${name} is not listening: write a message, such as "hi", in the window where you opened ${name}, not here. Its clock waits until it answers.`,
     commandHere: "/clear and the other commands go in Claude's app, not here.",
     refused: {
         "no-game": () => "There is no game going on: press + to start one, or ask for one in the chat.",
@@ -450,6 +459,7 @@ const italian: Text = {
     play: "Gioco",
     dots: "Pallini sulle mosse legali",
     explain: "Spiega le mosse vietate",
+    bookBadges: "Segna le mosse da libro",
     languageChoice: "Lingua",
     languages: { auto: "Come il browser", it: "Italiano", en: "English" },
     names: {
@@ -523,6 +533,8 @@ const italian: Text = {
     boardLabel: (turn, lastMove) => `Scacchiera, ${italian.toMove(turn)}${lastMove === undefined ? "" : `, ultima mossa ${lastMove}`}`,
     clearChat: "Prima di una nuova partita azzera la conversazione con Claude: nell'app di Claude, non qui, scrivi /clear e poi un messaggio, per esempio \"nuova partita\". Con la chat pulita l'AI gioca più veloce.",
     offline: "Claude è scollegato. Scrivigli un messaggio nell'app di Claude, non nella chat di questa pagina: la pagina si ricollega da sola.",
+    startClocks: "Inizia",
+    asleep: (name) => `${name} non ti sta ascoltando: scrivi un messaggio, per esempio "ciao", nella finestra dove hai aperto ${name}, non qui. Il suo orologio aspetta che risponda.`,
     commandHere: "/clear e gli altri comandi vanno scritti nell'app di Claude, non qui.",
     refused: {
         "no-game": () => "Nessuna partita in corso: premi + per iniziarne una, o chiedila nella chat.",

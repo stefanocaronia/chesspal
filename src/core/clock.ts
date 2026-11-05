@@ -14,6 +14,8 @@ export interface Clock
     readonly control: TimeControl;
     readonly left: Readonly<Record<Side, number>>;
     readonly since: string;
+    /** The clock waits for the player to start it, on the board page or with their first move: no side's time runs until then. */
+    readonly waiting?: true;
 }
 
 /** A time control written as minutes and seconds added, as Lichess and chess.com write it: 10+5, 3+0, 0.5+0; the minutes make whole seconds. */
@@ -50,25 +52,36 @@ export function timeControlOfTag(tag: string): TimeControl | undefined
     return base === undefined || Number(base) === 0 ? undefined : { base: Number(base) * second, increment: Number(increment ?? 0) * second };
 }
 
-/** The clock at the start of a game: each side with the whole time. */
-export function startClock(control: TimeControl, now: Date): Clock
+/** The clock at the start of a game: each side with the whole time, `waiting` for the player to start it or running at once. */
+export function startClock(control: TimeControl, now: Date, waiting: boolean): Clock
 {
-    return { control, left: { white: control.base, black: control.base }, since: now.toISOString() };
+    const clock = { control, left: { white: control.base, black: control.base }, since: now.toISOString() };
+    return waiting ? { ...clock, waiting: true } : clock;
 }
 
-/** The time each side has left `now`: the side to move, `turn`, has spent the time since its turn began; never below nothing. */
+/** The clock started `now`, the turn of the side to move beginning then; a clock already running stays as it is. */
+export function clockStarted(clock: Clock, now: Date): Clock
+{
+    return clock.waiting === true ? { control: clock.control, left: clock.left, since: now.toISOString() } : clock;
+}
+
+/** The time each side has left `now`: the side to move, `turn`, has spent the time since its turn began; never below nothing, and nothing while it waits. */
 export function timeLeft(clock: Clock, turn: Side, now: Date): Record<Side, number>
 {
-    const spent = Math.max(0, now.getTime() - Date.parse(clock.since));
+    const spent = clock.waiting === true ? 0 : Math.max(0, now.getTime() - Date.parse(clock.since));
     return { ...clock.left, [turn]: Math.max(0, clock.left[turn] - spent) };
 }
 
 /**
  * The clock after `mover`'s move `now`: the time spent taken off, less an `allowance` for time that was not theirs, the increment added, and the other side's
- * turn beginning.
+ * turn beginning. A clock that waits takes nothing off and stays waiting, unless the move `starts` it: the player's first.
  */
-export function clockAfterMove(clock: Clock, mover: Side, now: Date, allowance = 0): Clock
+export function clockAfterMove(clock: Clock, mover: Side, now: Date, allowance = 0, starts = false): Clock
 {
+    if (clock.waiting === true) {
+        return starts ? clockStarted(clock, now) : { ...clock, since: now.toISOString() };
+    }
+
     const left = timeLeft(clock, mover, new Date(now.getTime() - allowance));
     return { ...clock, left: { ...left, [mover]: left[mover] + clock.control.increment }, since: now.toISOString() };
 }

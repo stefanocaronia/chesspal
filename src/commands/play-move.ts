@@ -30,6 +30,10 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
     // The words are checked before the move, which changes the live game; they count as said after it.
     const line = said === undefined ? undefined : talkLine(before, mover, said.text, said.at, game.record.moves.length + 1);
 
+    if (mover === "ai" && before.clock?.waiting === true) {
+        throw new Error("The clocks wait for the player to start the game with Start on the board page: don't move yet, the doorbell wakes you then. Nothing changed.");
+    }
+
     if (offerDraw && game.record.moves.length === 0) {
         throw new Error("A draw can be offered once each side has made a move: play the move without offer_draw. Nothing changed.");
     }
@@ -40,7 +44,7 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
         throw new Error(refused(played.message, played.legal));
     }
 
-    const clock = before.clock === undefined ? undefined : clockAfterMove(before.clock, position.turn, now, allowance);
+    const clock = before.clock === undefined ? undefined : clockAfterMove(before.clock, position.turn, now, allowance, mover === "player");
     // A move declines the other side's draw offer; the mover's own stands, and the move carries it in the record as FIDE writes it, (=) (D-65). A move that
     // ends the game leaves no offer.
     const offers = (offerDraw || before.drawOffer === mover) && endOf(game) === undefined;

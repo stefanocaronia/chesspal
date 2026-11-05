@@ -34,6 +34,12 @@ export function pliesOf(record: GameRecord): Ply[]
     });
 }
 
+/** The moves with the book's badge on the first `book` of them that have no review of the AI's. */
+export function withBook(plies: Ply[], book: number): Ply[]
+{
+    return book === 0 ? plies : plies.map((ply, index) => index < book && ply.review === undefined ? { ...ply, review: { badge: "book" } } : ply);
+}
+
 /** How long a line of the player's may be: the server's limit (D-54), which a test keeps equal. */
 export const talkLimits = { line: 200 } as const;
 

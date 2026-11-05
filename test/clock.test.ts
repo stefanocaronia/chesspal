@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Context } from "../src/commands/context.ts";
-import { canMate, clockTag, clockText, timeControlOf, timeControlTag } from "../src/core/index.ts";
+import { canMate, clockStarted, clockTag, clockText, timeControlOf, timeControlTag } from "../src/core/index.ts";
+import { loadGame, saveGame } from "../src/games/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -99,6 +100,28 @@ describe("a game with a clock (D-13)", () => {
         expect(await run(game.at(70), "export", { format: "pgn" })).toMatch(/\[Result "1-0"\]/);
     });
 
+    it("waits for the player to start the clocks with the page open: the AI as White does not move, the player's first move starts them", async () => {
+        const game = clockGame("1+2", undefined, "white", true);
+        const status = await run(game.at(100), "status");
+        expect(status).toMatch(/Clock: you 1:00, player 1:00 \(1\+2\)\. The clocks wait: they start when the player presses Start/);
+        expect(status).toMatch(/Next: don't move yet: the player starts the game with Start/);
+        await expect(run(game.at(120), "ai_move", { move: "e4", plan: "The centre." })).rejects.toThrow(/The clocks wait for the player/);
+        expect(gameFile(game.context).clock).toMatchObject({ white: 60_000, black: 60_000, waiting: true });
+
+        const black = clockGame("1+2", undefined, "black", true);
+        await run(black.at(500), "player_move", { move: "e4" });
+        expect(gameFile(black.context).clock).toMatchObject({ white: 60_000, black: 60_000 });
+        expect(gameFile(black.context).clock).not.toHaveProperty("waiting");
+        const started = await run(black.at(530), "status");
+        expect(started).toMatch(/Clock: you 0:30, player 1:00 \(1\+2\)\./);
+        expect(started).not.toMatch(/The clocks wait/);
+    });
+
+    it("starts the clocks at once without a page open", () => {
+        const game = clockGame("1+2", undefined, "white", true, false);
+        expect(gameFile(game.context).clock).not.toHaveProperty("waiting");
+    });
+
     it("stops the clock when the game ends by a resignation", async () => {
         const game = clockGame("5+0");
         await run(game.at(30), "player_move", { move: "e4" });
@@ -114,16 +137,25 @@ describe("a game with a clock (D-13)", () => {
     });
 });
 
-/** A new game in a folder of its own, the AI Black unless said, with the clock given; `at` is the context some seconds after it started. */
-function clockGame(clock: string | undefined, from?: string, ai = "black"): { context: Context; at: (seconds: number) => Context; }
+/**
+ * A new game in a folder of its own, the AI Black unless said, with the clock given, started by the player as the game starts unless it `waits` for them
+ * on the board page, open unless said; `at` is the context some seconds after it started.
+ */
+function clockGame(clock: string | undefined, from?: string, ai = "black", waits = false, pageOpen = true): { context: Context; at: (seconds: number) => Context; }
 {
     const folder = mkdtempSync(join(tmpdir(), "chesspal-"));
     folders.push(folder);
-    const context = testContext(folder, 0, start);
+    const context: Context = { ...testContext(folder, 0, start), ...(waits ? { pageOpen: () => pageOpen } : {}) };
     const at = (seconds: number): Context => ({ ...context, now: () => new Date(start.getTime() + seconds * 1000) });
     const input = { ai_colour: ai, ...(clock === undefined ? {} : { clock }), ...(from === undefined ? {} : { from }) };
     const newGame = command("new_game");
     newGame.run(newGame.input.parse(input), context);
+    const current = loadGame(folder);
+
+    if (!waits && current?.clock !== undefined) {
+        saveGame(folder, { ...current, clock: clockStarted(current.clock, start) });
+    }
+
     return { context, at };
 }
 

@@ -58,10 +58,12 @@ export function opponentOf(host: string | undefined): string | undefined
 async function pageOf(context: Context, opponent: () => string | undefined): Promise<string | undefined>
 {
     try {
-        const { url, heard, open } = await startPage(context, opponent);
+        const { url, heard, chatCalls, open, askNewGame } = await startPage(context, opponent);
         // Words the AI is given change no file: the pages hear of them from the commands.
         context.heard = heard;
+        context.calls = chatCalls;
         context.pageOpen = open;
+        context.askNewGame = askNewGame;
 
         if (!pagePorts(context.folder).includes(Number(new URL(url).port))) {
             process.stderr.write(`The board page is at ${url}, off its usual ports: the doorbell cannot find it, so moves on the page do not wake the chat.\n`);
@@ -98,6 +100,10 @@ function toolConfig(command: AnyCommand)
 async function runTool(command: AnyCommand, input: unknown, context: Context): Promise<CallToolResult>
 {
     try {
+        if (command.byAgent !== true) {
+            context.calls?.();
+        }
+
         const result: unknown = await command.run(checkedInput(command, input), context);
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {

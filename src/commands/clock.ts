@@ -8,6 +8,8 @@ export interface ClockSummary
 {
     control: string;
     left: Record<Side, number>;
+    /** The clocks wait for the player to start them. */
+    waiting?: true;
 }
 
 /** The current game of a folder `now`, or undefined: a game whose side to move has run out of time is over, saved and archived first. */
@@ -42,14 +44,15 @@ export function clockSummaryOf(current: CurrentGame, now: Date): ClockSummary | 
     }
 
     const left = endOf(game) === undefined ? timeLeft(clock, game.position.turn, now) : { ...clock.left };
-    return { control: timeControlText(clock.control), left };
+    return { control: timeControlText(clock.control), left, ...(clock.waiting === true && endOf(game) === undefined ? { waiting: true as const } : {}) };
 }
 
-/** The clock's line: Clock: you 4:32, player 5:01 (10+5). */
-export function clockLine({ control, left }: ClockSummary, ai: Side): string
+/** The clock's line: Clock: you 4:32, player 5:01 (10+5), and whether the clocks still wait for the player. */
+export function clockLine({ control, left, waiting }: ClockSummary, ai: Side): string
 {
     const player = ai === "white" ? "black" : "white";
-    return `Clock: you ${clockText(left[ai])}, player ${clockText(left[player])} (${control}).`;
+    const line = `Clock: you ${clockText(left[ai])}, player ${clockText(left[player])} (${control}).`;
+    return waiting === true ? `${line} The clocks wait: they start when the player presses Start on the board page, or plays their first move.` : line;
 }
 
 /** The game lost on time by `loser`, or drawn when the other side could not mate with any series of legal moves (FIDE 6.9). */

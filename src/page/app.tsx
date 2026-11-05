@@ -18,7 +18,7 @@ import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
 import { useOpeningBook } from "./opening-book.ts";
 import { ChosenSet } from "./pieces.tsx";
 import { ClockFace, PlayerCard } from "./player-card.tsx";
-import { aiSpoke, aiWords, playerSpent, playerWords, pliesOf, type TalkLine } from "./plies.ts";
+import { aiSpoke, aiWords, playerSpent, playerWords, pliesOf, type TalkLine, withBook } from "./plies.ts";
 import { NameButton, PictureButton, PictureDialog, ProfilesDialog, Wizard } from "./profile-dialogs.tsx";
 import { keepSettings, type Profile } from "./profile.ts";
 import { SettingsPanel } from "./settings-panel.tsx";
@@ -104,7 +104,8 @@ export function App({ start }: { start: Settings; })
             load();
         };
 
-        events.onmessage = load;
+        // The chat asks for a new game: the player chooses it in the New game window, which opens here.
+        events.onmessage = (event) => event.data === "new-game" ? setDialog("new-game") : load();
         events.onerror = () => setOffline(events.readyState !== EventSource.OPEN);
         return () => events.close();
     }, []);
@@ -133,7 +134,9 @@ export function App({ start }: { start: Settings; })
     );
     const material = useMemo(() => materialOf(live.position.fen), [live]);
     const pieces = useMemo(() => piecesOf(live.position.fen), [live]);
-    const plies = useMemo(() => pliesOf(live.record), [live]);
+    // While the game goes on, the book's first moves carry its badge, when the player wants it, as the AI's review gives it after (D-69).
+    const inBook = studied === undefined && settings.book ? game?.book ?? 0 : 0;
+    const plies = useMemo(() => withBook(pliesOf(live.record), inBook), [live, inBook]);
     const book = useOpeningBook(live.record.moves.length > 0);
     const opening = useMemo(() => book === undefined ? undefined : openingOf(live.record, book), [live, book]);
     // The player's move shows at once, before the server has it: the game it sends next takes its place (T-70).
@@ -268,24 +271,40 @@ export function App({ start }: { start: Settings; })
     const mood = moodAt(live.record, sides?.white.who === "ai" ? "white" : sides?.black.who === "ai" ? "black" : ai, at).mood;
     const playerToMove = going && live.position.turn === player;
     const ahead = (side: Side): number => side === "white" ? material.balance : -material.balance;
-    const reviewed = studied === undefined ? undefined : plies[at - 1];
+    const reviewed = studied !== undefined || at <= inBook ? plies[at - 1] : undefined;
     const review = reviewed?.review;
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
     const closing = studied === undefined ? undefined : closingOf(live.record);
     const talk = game?.talk ?? [];
     const said = playerWords(talk);
     const clock = game?.clock;
+    // No chat hears the player: the page says where to wake it, and the AI's clock waits, as the server holds it.
+    const asleep = served.listening === false && !offline;
+    // The clocks wait for the player from the game's start: a button over the board starts them, as the player's first move does.
+    const clockWaits = clock?.waiting === true && !ended && studied === undefined && viewing === undefined;
     const clockOf = (side: Side): ComponentChildren =>
         clock === undefined ? undefined : (
             <ClockFace
                 clock={clock}
                 side={side}
                 toMove={!ended && live.position.turn === side}
-                held={pending !== undefined}
+                held={pending !== undefined || (asleep && side === ai)}
                 onFlag={() => reload.current()}
                 text={text}
             />
         );
+    // Where to wake the chat, under the AI's card (over the board when the talk is folded); the button that starts the clocks, under the player's (Zoe).
+    const asleepNote = asleep ? <p class="asleep" role="status">{text.asleep(name)}</p> : null;
+    const startClocks = clockWaits
+        ? (
+            <button type="button" class="command primary start-clocks" onClick={() => act("/api/start", {})}>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 5.5v13l10.5-6.5z" />
+                </svg>
+                {text.startClocks}
+            </button>
+        )
+        : null;
 
     // Words sent leave the box; what the player wrote on while they went stays.
     const clearSent = (refused: string | undefined, words: string): void => {
@@ -422,7 +441,7 @@ export function App({ start }: { start: Settings; })
                             player={player}
                             aiMoves={going && !playerToMove}
                             playerMoves={playerToMove}
-                            unread={unread}
+                            unread={unread || asleep}
                             text={text}
                         />
                     )
@@ -436,11 +455,11 @@ export function App({ start }: { start: Settings; })
                             player={player}
                             aiMoves={false}
                             playerMoves={false}
-                            unread={false}
+                            unread={asleep}
                             text={text}
                         />
                     )}
-                <FoldTab column="talk" folded={folds.talk === "folded"} label={text.talk} unread={unread && folds.talk === "folded"} onFold={fold} />
+                <FoldTab column="talk" folded={folds.talk === "folded"} label={text.talk} unread={(unread || asleep) && folds.talk === "folded"} onFold={fold} />
                 <FoldTab column="game" folded={folds.game === "folded"} label={text.game} onFold={fold} />
                 <span class="visually-hidden" aria-live="polite">{unread ? text.wrote(name) : ""}</span>
                 <div class={sides === undefined ? "talk" : "talk studied"} id="talk">
@@ -449,6 +468,7 @@ export function App({ start }: { start: Settings; })
                             <>
                                 <section class="ai-block" aria-label={sides[top].name}>
                                     {studiedCard(top, "ai")}
+                                    {asleepNote}
                                     <AiNote
                                         {...(reviewed === undefined ? {} : { ply: reviewed })}
                                         {...(shownOpening === undefined ? {} : { opening: shownOpening })}
@@ -479,6 +499,7 @@ export function App({ start }: { start: Settings; })
                                         clock={clockOf(ai)}
                                         text={text}
                                     />
+                                    {asleepNote}
                                     <AiWords words={aiWords(plies, ai, talk)} newestFirst={!flipped} {...(settings.voice ? { voice: text.language } : {})} />
                                 </section>
                                 <section class="you-block" aria-label={profile.name}>
@@ -507,7 +528,12 @@ export function App({ start }: { start: Settings; })
                                         taken={material.taken[player]}
                                         ahead={ahead(player)}
                                         turn={playerToMove}
-                                        clock={clockOf(player)}
+                                        clock={
+                                            <>
+                                                {clockOf(player)}
+                                                {startClocks}
+                                            </>
+                                        }
                                         text={text}
                                     />
                                 </section>
@@ -542,6 +568,15 @@ export function App({ start }: { start: Settings; })
                         onRefuse={refuse}
                         text={text}
                     />
+                    {/* With the talk folded, the note on the chat that does not listen (Stefano) and the button that starts the clocks come over the board's far edge */}
+                    {folds.talk !== "open" && (asleep || clockWaits)
+                        ? (
+                            <div class="over-board">
+                                {asleep ? <p class="asleep" role="status">{text.asleep(name)}</p> : null}
+                                {startClocks}
+                            </div>
+                        )
+                        : null}
                 </div>
                 {/* On a phone the steps of a game in analysis sit under the board, by the thumb (Zoe, T-40) */}
                 {studied === undefined ? null : (
@@ -585,10 +620,14 @@ interface Served
         readonly talk: readonly TalkLine[];
         readonly clock?: Clock;
         readonly drawOffer?: "player" | "ai";
+        /** How many of its first moves are the book's. */
+        readonly book?: number;
     } | null;
     /** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review. */
     readonly analysis?: { readonly name: string; readonly pgn: string; readonly book: number; };
     readonly opponent?: string;
+    /** Whether a chat hears the player: in a turn, or waiting for the doorbell. */
+    readonly listening?: boolean;
     readonly profile?: Profile;
     readonly profiles: readonly Profile[];
     readonly settings?: object;

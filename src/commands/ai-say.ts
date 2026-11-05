@@ -2,7 +2,7 @@ import { z } from "zod";
 import { moods } from "../core/index.ts";
 import { talkLimits } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
-import { type GameSummary, nextStep, summaryOf, wordLines } from "./game-summary.ts";
+import { type GameSummary, newGameStep, nextStep, summaryOf, wordLines } from "./game-summary.ts";
 import { defineCommand } from "./registry.ts";
 import { give, say, waitingWords } from "./say.ts";
 
@@ -38,7 +38,7 @@ export const aiSay = defineCommand({
 function afterWords(game: GameSummary, words: readonly string[]): string
 {
     if (words.length === 0 && game.end !== undefined) {
-        return "Next: the player starts another game with the board page's New game button when they want one.";
+        return `Next: when the player wants another game, ${newGameStep}`;
     }
 
     if (words.length === 0 && game.drawOffer === "player" && game.turn !== game.ai) {

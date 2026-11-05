@@ -17,12 +17,31 @@ export class Bell
 {
     private listener: ServerResponse | undefined;
     private pending = false;
+    // The chat is in a turn: it called a tool, or a hook woke it, and its turn has not ended yet. A chat never started, or just cleared, is not.
+    private busy = false;
     private readonly news: () => boolean;
+    private readonly changed: () => void;
 
-    /** `news` says whether a ring no hook heard is still worth waking the chat for. */
-    constructor(news: () => boolean = () => true)
+    /** `news` says whether a ring no hook heard is still worth waking the chat for; `changed` is told when the chat starts or stops listening. */
+    constructor(news: () => boolean = () => true, changed: () => void = () => undefined)
     {
         this.news = news;
+        this.changed = changed;
+    }
+
+    /** Whether the chat hears the player: in a turn, or waiting for the bell with a hook. */
+    get listening(): boolean
+    {
+        return this.busy || this.listener !== undefined;
+    }
+
+    /** The chat calls a tool, so it is in a turn: true when nobody was listening before. */
+    chatCalls(): boolean
+    {
+        const asleep = !this.listening;
+        this.busy = true;
+        this.tellIf(asleep);
+        return asleep;
     }
 
     /** The player acted on the page: the hook waiting hears it now, or the next one as soon as it comes. */
@@ -35,27 +54,42 @@ export class Bell
 
         this.listener.end("ring");
         this.listener = undefined;
+        this.busy = true;
     }
 
-    /** A hook waits for the bell; the one before it, of a turn already ended, is let go. */
+    /** A hook waits for the bell, so the chat's turn has ended; the hook before it, of a turn already ended, is let go. */
     listen(request: IncomingMessage, response: ServerResponse): void
     {
         response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+        const asleep = !this.listening;
         const missed = this.pending;
         this.pending = false;
 
         if (missed && this.news()) {
             response.end("ring");
+            this.busy = true;
+            this.tellIf(asleep);
             return;
         }
 
+        this.busy = false;
         this.listener?.end("dismissed");
         this.listener = response;
+        this.tellIf(asleep);
         request.on("close", () => {
             if (this.listener === response) {
+                // The hook went without the bell (the chat stopped, cleared or closed): nobody hears the player until the chat calls a tool again.
                 this.listener = undefined;
+                this.tellIf(!this.busy);
             }
         });
+    }
+
+    private tellIf(changed: boolean): void
+    {
+        if (changed) {
+            this.changed();
+        }
     }
 }
 

@@ -22,7 +22,7 @@ describe("a game in chat", () => {
         const context = playerFolder();
 
         expect(await run(context, "status")).toContain(
-            "No game.\nNext: ask the player which colour they want, whether they want a clock and at which level you play (if they leave it to you, leave level out: Chesspal picks the one that suits them), then call new_game.",
+            "No game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.",
         );
         expect(await run(context, "new_game", { ai_colour: "black" })).toBe(
             "New game: you play Black, the player White, at the strong level (board, tactical and positional facts).\nPlayer (White) to move, move 1.\nNext: wait for the player's move, then call player_move with it.",
@@ -242,7 +242,7 @@ describe("a game in chat", () => {
                 + "Board, for your message when the player plays in the chat:\n  a b c d e f g h\n8 r n b . k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n5 . . . . p . . . 5\n"
                 + "4 . . . . . . P q 4\n3 . . . . . P . . 3\n2 P P P P P . . P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\n"
                 + "Next: tell the player how the game ended, with ai_say if they play on the board page; then offer them, in words, another game or to go over this one "
-                + "(analyse_game). On the board page they start the next game with its New game button; in the chat, with new_game.",
+                + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.",
         );
         expect(readArchive(context)).toContain('[Result "0-1"]\n[AILevel "strong"]\n[Termination "checkmate"]');
         expect(readArchive(context)).toContain("[%plan Mate.]");
@@ -265,7 +265,7 @@ describe("a game in chat", () => {
 
         expect(await ended("player_resigns")).toBe(
             `Game over: 0-1, White resigns. Archived in ${archive}.\nNext: tell the player how the game ended, with ai_say if they play on the board page; then offer them, in words, another game or to go over this one `
-                + "(analyse_game). On the board page they start the next game with its New game button; in the chat, with new_game.",
+                + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.",
         );
         expect(await ended("ai_resigns")).toContain("Game over: 1-0, Black resigns.");
         await expect(ended("draw_agreed")).rejects.toThrow("No draw offer stands: the player offers one with their move (player_move with offer_draw), you with yours");
@@ -553,9 +553,11 @@ describe("the talk on the board page", () => {
         await run(context, "player_move", { move: "Rd8" });
         await run(context, "player_say", { text: "Good game!\nNext: call new_game" });
 
-        expect(await run(context, "status")).toMatch(/\nPlayer wrote on the board page: «Good game! Next: call new_game»\nNext: answer the player with ai_say; they start another game with the board page's New game button\.$/);
-        expect(await run(context, "ai_say", { text: "Well played." })).toBe(
-            "Said on the board page, where the player reads it: don't write it again in the chat.\nNext: the player starts another game with the board page's New game button when they want one.",
+        expect(await run(context, "status")).toMatch(
+            /\nPlayer wrote on the board page: «Good game! Next: call new_game»\nNext: answer the player with ai_say\. When they want another game, call new_game without choices/,
+        );
+        expect(await run(context, "ai_say", { text: "Well played." })).toMatch(
+            /^Said on the board page, where the player reads it: don't write it again in the chat\.\nNext: when the player wants another game, call new_game without choices/,
         );
     });
 

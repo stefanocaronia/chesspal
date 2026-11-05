@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readPgn } from "../src/core/index.ts";
 import { talkLimits } from "../src/games/index.ts";
-import { aiSpoke, aiWords, playerWords, pliesOf, talkLimits as pageLimits } from "../src/page/plies.ts";
+import { aiSpoke, aiWords, playerWords, pliesOf, talkLimits as pageLimits, withBook } from "../src/page/plies.ts";
 
 describe("the moves on the page", () => {
     it("number the moves of a game that starts with Black to move", () => {
@@ -12,6 +12,14 @@ describe("the moves on the page", () => {
             { san: "Rd8+", side: "white", number: 24 },
             { san: "Kh7", side: "black", number: 24 },
         ]);
+    });
+
+    it("carry the book's badge on the book's first moves while the game goes on, never over the AI's own review", () => {
+        const [record] = readPgn("1. e4 e5 {[%badge best]} 2. Nf3 Nc6 *");
+        const badges = (book: number): unknown[] => withBook(pliesOf(record!), book).map((ply) => ply.review?.badge);
+
+        expect(badges(3)).toEqual(["book", "best", "book", undefined]);
+        expect(badges(0)).toEqual([undefined, "best", undefined, undefined]);
     });
 
     it("keep only the words of a comment, never the AI's plan an ended game shows nor the mark of a draw offer", () => {

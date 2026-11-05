@@ -16,8 +16,8 @@ import { bookPlies } from "../commands/opening-book.ts";
 import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
 import { gameToStudy, namedGame } from "../commands/study.ts";
-import { type GameRecord, writePgn } from "../core/index.ts";
-import { type CurrentGame, drawOfferOf, endOf, gameInAnalysis, gameStamp, heardLines, loadGame, playerLinesThisMove, playerPgn, startAnalysis, talkLimits, WordsRefused } from "../games/index.ts";
+import { clockStarted, type GameRecord, writePgn } from "../core/index.ts";
+import { type CurrentGame, drawOfferOf, endOf, gameInAnalysis, gameStamp, heardLines, loadGame, playerLinesThisMove, playerPgn, saveGame, startAnalysis, talkLimits, WordsRefused } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { analysesOf, isReviewed } from "./analyses.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
@@ -29,8 +29,12 @@ export interface Page
 {
     readonly url: string;
     heard(): void;
+    /** The chat calls a tool: the page hears it listens, and the AI's clock, held while nobody heard the player, starts now. */
+    chatCalls(): void;
     /** Whether a browser has the page open now: one listens to the game's changes. */
     open(): boolean;
+    /** Opens the New game window on every page open now, for the player to choose the game there: whether one was open. */
+    askNewGame(): boolean;
     close(): Promise<void>;
 }
 
@@ -41,7 +45,8 @@ export interface Page
 export async function startPage(context: Context, opponent: () => string | undefined = () => undefined): Promise<Page>
 {
     const { folder } = context;
-    const served: Served = { folder, context, opponent, bell: new Bell(() => hasNews(context)), watchers: new Set(), port: 0 };
+    const watchers = new Set<ServerResponse>();
+    const served: Served = { folder, context, opponent, bell: new Bell(() => hasNews(context), () => tellWatchers(served)), watchers, port: 0 };
     const server = createServer((request, response) => answer(request, response, served));
 
     for (const port of [...pagePorts(folder), 0]) {
@@ -49,7 +54,14 @@ export async function startPage(context: Context, opponent: () => string | undef
             server.unref();
             served.port = portOf(server);
             const stopWatching = watchGame(served);
-            return { url: `http://127.0.0.1:${served.port}/`, heard: () => tellWatchers(served), open: () => served.watchers.size > 0, close: () => closed(server, stopWatching) };
+            return {
+                url: `http://127.0.0.1:${served.port}/`,
+                heard: () => tellWatchers(served),
+                chatCalls: () => chatCalls(served),
+                open: () => watchers.size > 0,
+                askNewGame: () => askNewGame(served),
+                close: () => closed(server, stopWatching),
+            };
         }
     }
 
@@ -143,6 +155,11 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         return;
     }
 
+    if (request.method === "POST" && path === "/api/start") {
+        startFromPage(request, response, served);
+        return;
+    }
+
     if (request.method === "POST" && path === "/api/study") {
         void studyFromPage(request, response, served);
         return;
@@ -154,7 +171,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
             response,
             405,
             "text/plain; charset=utf-8",
-            "The page only reads, moves with POST /api/move, writes with POST /api/message, starts a game with POST /api/new, "
+            "The page only reads, moves with POST /api/move, writes with POST /api/message, starts a game with POST /api/new and its clocks with POST /api/start, "
                 + "offers or answers a draw with POST /api/draw, resigns with POST /api/resign, brings a game to analyse or opens one again with POST /api/study, and keeps the profiles with POST /api/profile/… and /api/settings.",
         );
         return;
@@ -285,7 +302,8 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
             return;
         }
 
-        newGame.run(input.data, served.context);
+        // The game starts from the page, open: its clocks wait for the player's Start there.
+        newGame.run(input.data, { ...served.context, pageOpen: () => true });
     } catch (error) {
         send(response, 409, json, JSON.stringify(refusalFrom(error)));
         return;
@@ -328,6 +346,31 @@ async function drawFromPage(request: IncomingMessage, response: ServerResponse, 
     }
 
     send(response, 200, json, JSON.stringify({ done: true }));
+}
+
+/** The player starts the clocks from the page, which wait from the game's start; the doorbell wakes the chat when its move is first, waiting for this. */
+function startFromPage(request: IncomingMessage, response: ServerResponse, served: Served): void
+{
+    if (!isJson(request)) {
+        send(response, 415, json, JSON.stringify({ error: "Send the request as JSON: {}." }));
+        return;
+    }
+
+    const folder = gameFolder(served.folder);
+    const current = loadGame(folder);
+
+    if (current?.clock?.waiting !== true || endOf(current.game) !== undefined) {
+        send(response, 409, json, JSON.stringify({ error: "No clock waits to start: start a game with a clock first." }));
+        return;
+    }
+
+    saveGame(folder, { ...current, clock: clockStarted(current.clock, served.context.now()) });
+
+    if (current.game.position.turn === current.ai) {
+        served.bell.ring();
+    }
+
+    send(response, 200, json, JSON.stringify({ started: true }));
 }
 
 /** The player resigns from the page (D-65), whoever is to move: the game ends and goes to the archive, and the doorbell tells the chat. */
@@ -472,6 +515,12 @@ function gameNow(served: Served): CurrentGame | undefined
 {
     const folder = gameFolder(served.folder);
     const before = loadGame(folder);
+
+    // The AI's clock is held while nobody hears the player: its flag cannot fall before the chat is there to move.
+    if (before !== undefined && aiHeld(served, before)) {
+        return before;
+    }
+
     const current = gameAt(folder, served.context.now());
 
     if (before !== undefined && endOf(before.game) === undefined && current !== undefined && endOf(current.game) !== undefined) {
@@ -479,6 +528,24 @@ function gameNow(served: Served): CurrentGame | undefined
     }
 
     return current;
+}
+
+/** Whether the AI's clock is held: a game with a clock, going on, the AI to move, and nobody hearing the player. */
+function aiHeld(served: Served, current: CurrentGame): boolean
+{
+    return !served.bell.listening && current.clock !== undefined && endOf(current.game) === undefined && current.game.position.turn === current.ai;
+}
+
+/** The chat calls a tool: when nobody heard the player before, the AI's clock, held since, starts now, with the time it was held given back. */
+function chatCalls(served: Served): void
+{
+    const folder = gameFolder(served.folder);
+    const current = loadGame(folder);
+    const held = current !== undefined && aiHeld(served, current);
+
+    if (served.bell.chatCalls() && held) {
+        saveGame(folder, { ...current, clock: { ...current.clock!, since: served.context.now().toISOString() } });
+    }
 }
 
 /** The chat has read the game as it is now, at the end of a tool's call: the doorbell wakes it only for what changes it after. */
@@ -511,6 +578,16 @@ function keepPosted(request: IncomingMessage, response: ServerResponse, served: 
     response.write(": posted\n\n");
     served.watchers.add(response);
     request.on("close", () => served.watchers.delete(response));
+}
+
+/** The pages open now open their New game window; whether there was one. */
+function askNewGame(served: Served): boolean
+{
+    for (const watcher of served.watchers) {
+        watcher.write("data: new-game\n\n");
+    }
+
+    return served.watchers.size > 0;
 }
 
 function tellWatchers(served: Served): void
@@ -588,11 +665,13 @@ function sendGame(response: ServerResponse, served: Served): void
             ai: current.ai,
             started: current.started,
             talk,
+            // How many of its first moves are the book's: the page marks them while the game goes on, as the AI's review does after.
+            book: bookPlies(current.game.record),
             ...(current.clock === undefined ? {} : { clock: current.clock }),
             ...(offer === undefined ? {} : { drawOffer: offer }),
         };
         const analysis = current === undefined || endOf(current.game) !== undefined ? analysisShown(served) : undefined;
-        const body = { game, ...(analysis === undefined ? {} : { analysis }), opponent: served.opponent(), ...profilesShown(served.folder) };
+        const body = { game, ...(analysis === undefined ? {} : { analysis }), opponent: served.opponent(), listening: served.bell.listening, ...profilesShown(served.folder) };
         send(response, 200, json, JSON.stringify(body));
     } catch (error) {
         send(response, 500, json, JSON.stringify({ error: (error as Error).message }));

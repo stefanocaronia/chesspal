@@ -71,7 +71,7 @@ export function PlayerCard({ place, picture, name, side, level, taken, ahead, tu
 export function ClockFace({ clock, side, toMove, held, onFlag, text }: { clock: Clock; side: Side; toMove: boolean; held: boolean; onFlag: () => void; text: Text; })
 {
     const [now, setNow] = useState(() => Date.now());
-    const running = toMove && !held;
+    const running = toMove && !held && clock.waiting !== true;
 
     useEffect(() => {
         if (!running) {

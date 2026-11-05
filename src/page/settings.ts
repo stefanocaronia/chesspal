@@ -24,6 +24,8 @@ export interface Settings
     readonly dots: boolean;
     /** Whether the board says why a move is refused (T-11, D-18). */
     readonly explain: boolean;
+    /** Whether the moves of the opening book show its badge while the game goes on, as the AI's review shows it after. */
+    readonly book: boolean;
     readonly sound: boolean;
     /** Whether the AI's words are read aloud, by the browser's local voices. */
     readonly voice: boolean;
@@ -50,6 +52,7 @@ export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | 
         marks: oneOf(stored.marks, looks.marks, looks.marks[0]),
         dots: typeof stored.dots === "boolean" ? stored.dots : true,
         explain: typeof stored.explain === "boolean" ? stored.explain : true,
+        book: typeof stored.book === "boolean" ? stored.book : true,
         sound: typeof stored.sound === "boolean" ? stored.sound : defaults.sound,
         voice: typeof stored.voice === "boolean" ? stored.voice : false,
         language: oneOf(stored.language, ["auto", "it", "en"], "auto"),

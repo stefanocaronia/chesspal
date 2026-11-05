@@ -123,7 +123,14 @@ export function gameStamp(folder: string): string | undefined
 const fileName = "game.json";
 
 const savedLine = z.object({ who: z.enum(["player", "ai"]), text: z.string(), ply: z.int().min(0), at: z.iso.datetime() });
-const savedClock = z.object({ base: z.int().positive(), increment: z.int().min(0), white: z.number().min(0), black: z.number().min(0), since: z.iso.datetime() });
+const savedClock = z.object({
+    base: z.int().positive(),
+    increment: z.int().min(0),
+    white: z.number().min(0),
+    black: z.number().min(0),
+    since: z.iso.datetime(),
+    waiting: z.literal(true).optional(),
+});
 const gameFile = z.object({
     format: z.literal(1),
     ai: z.enum(["white", "black"]),
@@ -170,14 +177,14 @@ function parsed(text: string, path: string): CurrentGame
 }
 
 /** The clock as game.json keeps it, flat, in milliseconds. */
-function savedClockOf({ control, left, since }: Clock): z.infer<typeof savedClock>
+function savedClockOf({ control, left, since, waiting }: Clock): z.infer<typeof savedClock>
 {
-    return { base: control.base, increment: control.increment, white: left.white, black: left.black, since };
+    return { base: control.base, increment: control.increment, white: left.white, black: left.black, since, ...(waiting === true ? { waiting } : {}) };
 }
 
-function clockOf({ base, increment, white, black, since }: z.infer<typeof savedClock>): Clock
+function clockOf({ base, increment, white, black, since, waiting }: z.infer<typeof savedClock>): Clock
 {
-    return { control: { base, increment }, left: { white, black }, since };
+    return { control: { base, increment }, left: { white, black }, since, ...(waiting === true ? { waiting } : {}) };
 }
 
 function problemOf(error: unknown): string

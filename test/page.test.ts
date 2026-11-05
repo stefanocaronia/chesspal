@@ -49,13 +49,15 @@ describe("the page's server", () => {
         const folder = playerFolder();
         const page = await open(folder);
 
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, profiles: [] });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, listening: false, profiles: [] });
         await run(folder, "new_game", { ai_colour: "black" });
         await run(folder, "player_move", { move: "e4" });
         await run(folder, "ai_move", { move: "e5", plan: "A secret plan.", comment: "The open game." });
-        const { game } = JSON.parse((await get(page, "/api/game")).body) as { game: { pgn: string; ai: string; }; };
+        const { game } = JSON.parse((await get(page, "/api/game")).body) as { game: { pgn: string; ai: string; book: number; }; };
 
         expect(game.ai).toBe("black");
+        // Both moves are the book's: the page marks them while the game goes on.
+        expect(game.book).toBe(2);
         expect(game.pgn).toContain("1. e4 e5 {The open game.}");
         expect(game.pgn).not.toContain("secret");
     });
@@ -64,9 +66,9 @@ describe("the page's server", () => {
         let host: string | undefined;
         const page = await open(playerFolder(), () => host);
 
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, profiles: [] });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, listening: false, profiles: [] });
         host = "Claude";
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, opponent: "Claude", profiles: [] });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, opponent: "Claude", listening: false, profiles: [] });
     });
 
     it("gives the game in analysis, with the AI's review, once no game goes on (D-69)", async () => {
@@ -441,6 +443,74 @@ describe("the doorbell of the chat", () => {
         expect(hookAt(bell).heard).toBeUndefined();
     });
 
+    it("knows whether the chat hears the player: in a turn, or with a hook waiting, never before its first tool or once its hook went", () => {
+        let told = 0;
+        const bell = new Bell(() => true, () => told++);
+
+        expect(bell.listening).toBe(false);
+        expect(bell.chatCalls()).toBe(true);
+        expect(bell.chatCalls()).toBe(false);
+        expect([bell.listening, told]).toEqual([true, 1]);
+
+        // The turn ends with a hook that waits, then the hook goes without the bell: the chat was stopped or cleared.
+        const request = new EventEmitter();
+        const response = { writeHead: () => response, end: () => undefined };
+        bell.listen(request as never, response as never);
+        expect([bell.listening, told]).toEqual([true, 1]);
+        request.emit("close");
+        expect([bell.listening, told]).toEqual([false, 2]);
+
+        // A ring no hook heard wakes the next hook at once, and the chat is in a turn again.
+        bell.ring();
+        expect(hookAt(bell).heard).toBe("ring");
+        expect([bell.listening, told]).toEqual([true, 3]);
+    });
+
+    it("holds the AI's clock while no chat hears the player, and starts it when the chat calls a tool", async () => {
+        const folder = playerFolder();
+        const base = testContext(folder);
+        const start = base.now().getTime();
+        let seconds = 0;
+        const page = await open(folder, undefined, { ...base, now: () => new Date(start + seconds * 1000) });
+        const game = async (): Promise<{ pgn: string; clock: { since: string; }; }> => JSON.parse((await get(page, "/api/game")).body).game;
+
+        expect(await post(page, "/api/new", { ai_colour: "white", clock: "0.5+0" })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/start", {})).toMatchObject({ status: 200 });
+        seconds = 31;
+        expect((await game()).pgn).toContain('[Result "*"]');
+        expect(JSON.parse((await get(page, "/api/game")).body).listening).toBe(false);
+
+        page.chatCalls();
+        expect((await game()).clock.since).toBe(new Date(start + 31_000).toISOString());
+        seconds = 62;
+        expect((await game()).pgn).toContain('[Result "0-1"]');
+    });
+
+    it("rings the chat when the player presses Start and the AI is to move", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const port = Number(new URL(page.url).port);
+        const hook = JSON.stringify({ cwd: folder });
+        await post(page, "/api/new", { ai_colour: "white", clock: "5+0" });
+        expect(await waitForBell(hook, [port])).toBe(true);
+
+        const waiting = waitForBell(hook, [port]);
+        expect(await Promise.race([waiting, new Promise((done) => setTimeout(() => done("waiting"), 300))])).toBe("waiting");
+        await post(page, "/api/start", {});
+        expect(await waiting).toBe(true);
+    });
+
+    it("opens the New game window on the pages that watch, when the chat asks for a game", async () => {
+        const page = await open(playerFolder());
+        expect(page.askNewGame()).toBe(false);
+        const events = listenTo(page);
+
+        await events.next();
+        expect(page.askNewGame()).toBe(true);
+        expect(await events.next()).toBe("data: new-game");
+        events.close();
+    });
+
     it("keeps quiet for the player's words once the chat has read them, and rings for their move", async () => {
         const folder = playerFolder();
         const chat = testContext(folder);
@@ -514,13 +584,20 @@ describe("the doorbell of the chat", () => {
         const base = testContext(folder);
         const start = base.now().getTime();
         let seconds = 0;
-        const chat: Context = { ...base, now: () => new Date(start + seconds * 1000) };
+        const chat: Context = { ...base, now: () => new Date(start + seconds * 1000), pageOpen: () => true };
         const page = await open(folder, undefined, chat);
         await run(folder, "new_game", { ai_colour: "black", clock: "1+0" }, chat);
         const game = async (): Promise<{ pgn: string; clock: Record<string, unknown>; }> => JSON.parse((await get(page, "/api/game")).body).game;
 
+        // The clocks wait for the player to start them.
+        expect((await game()).clock).toMatchObject({ waiting: true });
+        seconds = 30;
         expect((await game()).clock).toMatchObject({ left: { white: 60_000, black: 60_000 } });
-        seconds = 61;
+        expect(await post(page, "/api/start", {})).toMatchObject({ status: 200, body: '{"started":true}' });
+        expect(await post(page, "/api/start", {})).toMatchObject({ status: 409, body: expect.stringContaining("No clock waits to start") });
+
+        expect((await game()).clock).toMatchObject({ left: { white: 60_000, black: 60_000 } });
+        seconds = 91;
         expect((await game()).pgn).toContain('[Result "0-1"]');
         expect(await waitForBell(JSON.stringify({ cwd: folder }), [Number(new URL(page.url).port)])).toBe(true);
     });
