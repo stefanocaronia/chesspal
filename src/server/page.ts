@@ -29,6 +29,8 @@ export interface Page
 {
     readonly url: string;
     heard(): void;
+    /** Whether a browser has the page open now: one listens to the game's changes. */
+    open(): boolean;
     close(): Promise<void>;
 }
 
@@ -47,7 +49,7 @@ export async function startPage(context: Context, opponent: () => string | undef
             server.unref();
             served.port = portOf(server);
             const stopWatching = watchGame(served);
-            return { url: `http://127.0.0.1:${served.port}/`, heard: () => tellWatchers(served), close: () => closed(server, stopWatching) };
+            return { url: `http://127.0.0.1:${served.port}/`, heard: () => tellWatchers(served), open: () => served.watchers.size > 0, close: () => closed(server, stopWatching) };
         }
     }
 

@@ -5,6 +5,7 @@ import { version } from "../version.ts";
 import { gameAt } from "./clock.ts";
 import { closingLines, type GameSummary, nextStep, positionLines, sidesLine, summaryOf, withThought, wordLines } from "./game-summary.ts";
 import { levelText } from "./levels.ts";
+import { closedPage, pageLine } from "./page-link.ts";
 import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
 import { unansweredWords } from "./say.ts";
@@ -15,6 +16,8 @@ interface Status
     folder: string;
     /** The board page's address, where the player plays when the chat serves it. */
     page?: string;
+    /** No browser has the board page open: the player needs its address first. */
+    pageClosed?: true;
     /** Who plays, from the profile in use (D-23). */
     player?: string;
     game?: GameSummary;
@@ -44,6 +47,10 @@ export const status = defineCommand({
             status.page = context.page;
         }
 
+        if (closedPage(context) !== undefined) {
+            status.pageClosed = true;
+        }
+
         const player = playerLine(context);
 
         if (player !== undefined) {
@@ -69,10 +76,10 @@ export const status = defineCommand({
 
         return status;
     },
-    format: ({ version, folder, page, player, game, problem, words = [], analysis }) =>
+    format: ({ version, folder, page, pageClosed, player, game, problem, words = [], analysis }) =>
         [
             `Chesspal ${version}. Folder: ${folder}`,
-            ...(page === undefined ? [] : [`Board page: ${page}`]),
+            ...(page === undefined ? [] : [pageLine(page, pageClosed === true)]),
             ...(player === undefined ? [] : [player]),
             ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true)),
             ...(analysis === undefined ? [] : [analysisLine(analysis)]),

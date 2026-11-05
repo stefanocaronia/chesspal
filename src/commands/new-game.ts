@@ -6,6 +6,7 @@ import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 import { type GameSummary, nextStep, positionLines, sidesLine, summaryOf } from "./game-summary.ts";
 import { levelText, levelToPlay } from "./levels.ts";
+import { closedPage, pageLine } from "./page-link.ts";
 import { pastGameLines } from "./past-games.ts";
 import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
@@ -19,6 +20,8 @@ interface NewGame
     past: string[];
     /** Who plays, from the profile in use (D-23). */
     player?: string;
+    /** The board page's address when no browser has it open: the player needs it first. */
+    closedPage?: string;
 }
 
 /** A new game against the player, from the standard position or from a FEN or PGN; a game going on is never lost (D-41). */
@@ -66,20 +69,23 @@ export const newGame = defineCommand({
         endAnalysis(folder);
         const past = pastGameLines(folder, remembered);
         const player = playerLine(context);
+        const closed = closedPage(context);
         return {
             game: summaryOf(current, now),
             ...(archived === undefined ? {} : { archived: { name: archived, finished: going === undefined } }),
             past,
             ...(player === undefined ? {} : { player }),
+            ...(closed === undefined ? {} : { closedPage: closed }),
         };
     },
-    format: ({ game, archived, past, player }) =>
+    format: ({ game, archived, past, player, closedPage: closed }) =>
         [
             `New game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`,
             ...(player === undefined ? [] : [player]),
             ...(archived === undefined ? [] : [`The game before is in ${archived.name}${archived.finished ? "" : ", unfinished"}.`]),
             ...(past.length === 0 ? [] : ["Last games with this player (past_games gives more, and their moves):", ...past]),
             ...positionLines(game),
+            ...(closed === undefined ? [] : [pageLine(closed, true)]),
             nextStep(game),
         ].join("\n"),
 });

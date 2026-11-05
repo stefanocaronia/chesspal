@@ -15,6 +15,8 @@ export interface Context
     language?: string;
     /** The address of the board page, when the MCP server serves it (D-47). */
     page?: string;
+    /** Whether a browser has the board page open now, when the MCP server serves it. */
+    pageOpen?: () => boolean;
     /** The AI host, as it names itself to the MCP server: claude-code, which notes how each chat starts (D-57); none on the command line. */
     host?: () => string | undefined;
     /** The player's words on the board page given to the AI in this process, by line: each comes once (T-65). */
