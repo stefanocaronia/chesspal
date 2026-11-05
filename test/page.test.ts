@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import { status } from "../src/commands/status.ts";
-import { Bell, bellLine, codexBellAnswer, waitForBell } from "../src/server/bell.ts";
+import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page.ts";
 import { testContext } from "./commands.ts";
 
@@ -533,6 +533,34 @@ describe("the doorbell of the chat", () => {
 
     it("wakes Codex with a Stop hook's block and the same fixed line, never the move", () => {
         expect(JSON.parse(codexBellAnswer)).toEqual({ decision: "block", reason: bellLine });
+    });
+
+    it("says why a hook heard no bell: no page of its folder, or another hook took its place", async () => {
+        const other = playerFolder();
+        const port = Number(new URL((await open(other)).url).port);
+        const folder = playerFolder();
+        const lost = await bellHeard(JSON.stringify({ cwd: folder }), [port]);
+
+        expect(lost).toEqual({ folder: resolve(folder), rang: false, why: `no page of it at ports ${port}; ${port} is ${resolve(other)}'s` });
+
+        const hook = JSON.stringify({ cwd: other });
+        const first = bellHeard(hook, [port]);
+        await new Promise((done) => setTimeout(done, 100));
+        void bellHeard(hook, [port]);
+        expect(await first).toEqual({ folder: resolve(other), rang: false, why: `the page at port ${port} said "dismissed"` });
+    });
+
+    it("logs the hooks that heard no bell in the chat's folder, keeping the last hundred", () => {
+        const folder = playerFolder();
+
+        for (let index = 0; index < 101; index++) {
+            noteSilence(folder, `silence ${index}`, new Date(Date.UTC(2026, 10, 5, 0, 0, index)));
+        }
+
+        const lines = readFileSync(join(folder, "listen.log"), "utf8").trimEnd().split("\n");
+        expect(lines).toHaveLength(100);
+        expect(lines[0]).toBe("2026-11-05T00:00:01.000Z silence 1");
+        expect(lines.at(-1)).toBe("2026-11-05T00:01:40.000Z silence 100");
     });
 });
 

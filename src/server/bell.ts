@@ -1,8 +1,10 @@
 // The doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes for Claude Code and Codex (T-62), waits at the page of its chat and, when
 // the player moves or writes there (T-65), tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { get, type IncomingMessage, type ServerResponse } from "node:http";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { writeAtomically } from "../games/index.ts";
 
 /** What the chat hears from the doorbell: one line for whatever the player did, never what, only where to read it. */
 export const bellLine = "The player acted on the board page: call status to see it.";
@@ -85,8 +87,15 @@ export async function listen(codex = false): Promise<void>
         input += String(chunk);
     }
 
+    const heard = await bellHeard(input).catch((error: unknown): BellHeard => ({ folder: chatFolder(hookInput(input)), rang: false, why: `failed: ${(error as Error).message}` }));
+
+    // Codex's turn ends with a hook that heard no bell, and the player's next move on the page wakes nobody: the log keeps why (T-62).
+    if (codex && !heard.rang) {
+        noteSilence(heard.folder, heard.why);
+    }
+
     // It ends as soon as it knows: the chat hears the hook only once it ends.
-    if (!(await waitForBell(input))) {
+    if (!heard.rang) {
         process.exit(0);
     } else if (codex) {
         process.stdout.write(`${codexBellAnswer}\n`, () => process.exit(0));
@@ -101,17 +110,57 @@ export async function listen(codex = false): Promise<void>
  */
 export async function waitForBell(input: string, ports?: number[]): Promise<boolean>
 {
+    return (await bellHeard(input, ports)).rang;
+}
+
+/** What the hook heard at the page of its chat, in its folder: the bell, or why not. */
+export type BellHeard = { folder: string; rang: true; } | { folder: string; rang: false; why: string; };
+
+/** Waits at the page of the hook's chat, as waitForBell does, and says what it heard. */
+export async function bellHeard(input: string, ports?: number[]): Promise<BellHeard>
+{
     const hook = hookInput(input);
-    // The chat's folder, where its server started: Claude Code names it, and the hook's cwd follows the cd's of the chat.
-    const folder = resolve(process.env.CLAUDE_PROJECT_DIR ?? hook.cwd ?? process.cwd());
-    const probes = await Promise.all((ports ?? pagePorts(folder)).map(async (port) => ({ port, said: probeOf(await body(port, "/api/bell?probe", probeWait)) })));
+    const folder = chatFolder(hook);
+    const tried = ports ?? pagePorts(folder);
+    const probes = await Promise.all(tried.map(async (port) => ({ port, said: probeOf(await body(port, "/api/bell?probe", probeWait)) })));
     const ours = probes.filter((one) => one.said !== undefined && samePath(one.said.folder, folder));
     const port = (ours.find((one) => hook.session !== undefined && one.said?.session === hook.session) ?? (ours.length === 1 ? ours[0] : undefined))?.port;
-    return port === undefined ? false : (await body(port, "/api/bell")) === "ring";
+
+    if (port === undefined) {
+        const others = probes.flatMap((one) => (one.said === undefined ? [] : [`${one.port} is ${one.said.folder}'s`]));
+        const pages = ours.length > 1 ? `${ours.length} pages of it, none of this chat's session` : "no page of it";
+        return { folder, rang: false, why: `${pages} at ports ${tried.join(", ")}${others.length > 0 ? `; ${others.join(", ")}` : ""}` };
+    }
+
+    const said = await body(port, "/api/bell");
+    return said === "ring" ? { folder, rang: true } : { folder, rang: false, why: said === undefined ? `the page at port ${port} did not answer` : `the page at port ${port} said "${said}"` };
 }
 
 // How long a port may take to say whose page it is: one of this computer answers at once.
 const probeWait = 1000;
+
+// The log of Codex's hooks that heard no bell, in the chat's folder: its last lines only.
+const silenceLog = "listen.log";
+const silenceLines = 100;
+
+/** The chat's folder, where its server started: Claude Code names it, and the hook's cwd follows the cd's of the chat. */
+function chatFolder(hook: { cwd?: string; }): string
+{
+    return resolve(process.env.CLAUDE_PROJECT_DIR ?? hook.cwd ?? process.cwd());
+}
+
+/** Adds a line to the log of the hooks that heard no bell, keeping its last lines; a log that cannot be written never stops the hook. */
+export function noteSilence(folder: string, why: string, now = new Date()): void
+{
+    const path = join(folder, silenceLog);
+
+    try {
+        const before = existsSync(path) ? readFileSync(path, "utf8").split("\n").filter((line) => line !== "") : [];
+        writeAtomically(path, `${[...before, `${now.toISOString()} ${why}`].slice(-silenceLines).join("\n")}\n`);
+    } catch {
+        // The log only explains; the hook ends the same.
+    }
+}
 
 function hookInput(input: string): { session?: string; cwd?: string; }
 {
