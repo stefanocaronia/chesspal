@@ -34,7 +34,7 @@ describe("chesspal init", () => {
 
         expect(exitCode).toBe(0);
         expect(output).toBe(
-            `♞ Chesspal is ready in ${chess}\n\n  To play:\n`
+            `♜ Chesspal is ready in ${chess}\n\n  To play:\n`
                 + "  1. Open Claude Code or Codex in this folder.\n"
                 + "  2. Say hello: the AI opens the board for you.\n"
                 + "  3. The first time, it asks whether to trust the folder: say yes.\n"
@@ -89,16 +89,16 @@ describe("chesspal init", () => {
         });
         expect(text(folder, ".codex/config.toml")).toBe('model = "gpt-5"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n\n[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
         expect(json(folder, ".codex/hooks.json")).toEqual({ hooks: { Stop: [ownStop, { hooks: [codexBellHook] }] } });
-        expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/^♞ Chesspal is ready in .*: nothing to change\n/);
+        expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/^♜ Chesspal is ready in .*: nothing to change\n/);
     });
 
     it("speaks the system's language: Italian, else English", async () => {
         const folder = playerFolder();
         const output = (await runCommandLine(["init"], { ...testContext(folder), language: "it-IT" })).output;
 
-        expect(output).toMatch(/^♞ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code o Codex in questa cartella\.\n/);
+        expect(output).toMatch(/^♜ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code o Codex in questa cartella\.\n/);
         expect(output).toContain("  Aggiornati: .mcp.json");
-        expect((await runCommandLine(["init"], { ...testContext(folder), language: "fr-FR" })).output).toMatch(/^♞ Chesspal is ready in .*: nothing to change\n/);
+        expect((await runCommandLine(["init"], { ...testContext(folder), language: "fr-FR" })).output).toMatch(/^♜ Chesspal is ready in .*: nothing to change\n/);
     });
 
     it("refuses a settings file that is not JSON, and says how to fix it", async () => {

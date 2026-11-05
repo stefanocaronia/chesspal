@@ -103,7 +103,7 @@ describe("a game with a clock (D-13)", () => {
     it("waits for the player to start the clocks with the page open: the AI as White does not move, the player's first move starts them", async () => {
         const game = clockGame("1+2", undefined, "white", true);
         const status = await run(game.at(100), "status");
-        expect(status).toMatch(/Clock: you 1:00, player 1:00 \(1\+2\)\. The clocks wait: they start when the player presses Start/);
+        expect(status).toMatch(/Clock: you 1:00, player 1:00 \(1\+2\)\. The clocks wait: they start with the player's first move, or with Start on the board page/);
         expect(status).toMatch(/Next: don't move yet: the player starts the game with Start/);
         await expect(run(game.at(120), "ai_move", { move: "e4", plan: "The centre." })).rejects.toThrow(/The clocks wait for the player/);
         expect(gameFile(game.context).clock).toMatchObject({ white: 60_000, black: 60_000, waiting: true });

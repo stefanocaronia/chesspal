@@ -52,7 +52,7 @@ export function clockLine({ control, left, waiting }: ClockSummary, ai: Side): s
 {
     const player = ai === "white" ? "black" : "white";
     const line = `Clock: you ${clockText(left[ai])}, player ${clockText(left[player])} (${control}).`;
-    return waiting === true ? `${line} The clocks wait: they start when the player presses Start on the board page, or plays their first move.` : line;
+    return waiting === true ? `${line} The clocks wait: they start with the player's first move, or with Start on the board page when your move is first.` : line;
 }
 
 /** The game lost on time by `loser`, or drawn when the other side could not mate with any series of legal moves (FIDE 6.9). */

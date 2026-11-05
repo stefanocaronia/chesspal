@@ -28,7 +28,7 @@ export const init = defineCommand({
     format: ({ folder, written }, context) => {
         const words = wordsFor(context?.language);
         return [
-            styleText(["bold", "green"], `♞ ${written.length === 0 ? words.ready(folder) : words.set(folder)}`),
+            styleText(["bold", "green"], `♜ ${written.length === 0 ? words.ready(folder) : words.set(folder)}`),
             "",
             `  ${words.toPlay}`,
             ...words.steps.map((step, index) => `  ${styleText("cyan", `${index + 1}.`)} ${step.join("\n     ")}`),

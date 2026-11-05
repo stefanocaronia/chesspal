@@ -303,8 +303,8 @@ export function App({ start }: { start: Settings; })
     const clock = going ? game?.clock : undefined;
     // No chat hears the player: the page says where to wake it, and the AI's clock waits, as the server holds it.
     const asleep = served.listening === false && !offline;
-    // The clocks wait for the player from the game's start: a button over the board starts them, as the player's first move does.
-    const clockWaits = clock?.waiting === true && !ended && studied === undefined && viewing === undefined;
+    // The clocks wait for the player from the game's start: when the AI moves first, a button gives it the start; else the player's first move does (Stefano).
+    const clockWaits = clock?.waiting === true && !ended && studied === undefined && viewing === undefined && live.position.turn === ai;
     const clockOf = (side: Side): ComponentChildren =>
         clock === undefined ? undefined : (
             <ClockFace
