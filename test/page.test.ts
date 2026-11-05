@@ -627,6 +627,30 @@ describe("the doorbell of the chat", () => {
         expect(await first).toEqual({ folder: resolve(other), rang: false, why: `the page at port ${port} said "dismissed"` });
     });
 
+    it("waits at the page a browser has open when its folder has several and none says the chat's session, as with Codex", async () => {
+        const folder = playerFolder();
+        const left = await open(folder);
+        const played = await open(folder);
+        const ports = [left, played].map((page) => Number(new URL(page.url).port));
+        const hook = JSON.stringify({ cwd: folder });
+
+        expect(await bellHeard(hook, ports)).toMatchObject({ rang: false, why: expect.stringContaining(`2 pages of it, none of this chat's session, 0 open in a browser at ports ${ports.join(", ")};`) });
+
+        const browser = listenTo(played);
+        await browser.next();
+        const first = bellHeard(hook, ports);
+
+        // The open page hears the first hook before the second takes its place.
+        for (let tries = 0; JSON.parse((await get(played, "/api/game")).body).listening !== true; tries++) {
+            expect(tries).toBeLessThan(200);
+            await new Promise((done) => setTimeout(done, 10));
+        }
+
+        void bellHeard(hook, ports);
+        expect(await first).toEqual({ folder: resolve(folder), rang: false, why: `the page at port ${ports[1]} said "dismissed"` });
+        browser.close();
+    });
+
     it("logs the hooks that heard no bell in the chat's folder, keeping the last hundred", () => {
         const folder = playerFolder();
 

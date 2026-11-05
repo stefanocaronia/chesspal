@@ -93,10 +93,18 @@ export class Bell
     }
 }
 
-/** Whose page answers at a port, for the hook to find its own: the chat's session and the player's folder. */
-export function bellProbe(folder: string): { session: string | null; folder: string; }
+/** Whose page answers at a port, for the hook to find its own: the chat's session, the player's folder, and whether a browser has the page open. */
+export function bellProbe(folder: string, open = false): BellProbe
 {
-    return { session: process.env.CLAUDE_CODE_SESSION_ID ?? null, folder: resolve(folder) };
+    return { session: process.env.CLAUDE_CODE_SESSION_ID ?? null, folder: resolve(folder), open };
+}
+
+/** What a page says of itself at `/api/bell?probe`. */
+export interface BellProbe
+{
+    session: string | null;
+    folder: string;
+    open: boolean;
 }
 
 /** The ports a folder's page tries first: one in each of a few ranges, by its path, since Windows may reserve a range. The hook looks for it there. */
@@ -157,12 +165,13 @@ export async function bellHeard(input: string, ports?: number[]): Promise<BellHe
     const folder = chatFolder(hook);
     const tried = ports ?? pagePorts(folder);
     const probes = await Promise.all(tried.map(async (port) => ({ port, said: probeOf(await body(port, "/api/bell?probe", probeWait)) })));
-    const ours = probes.filter((one) => one.said !== undefined && samePath(one.said.folder, folder));
-    const port = (ours.find((one) => hook.session !== undefined && one.said?.session === hook.session) ?? (ours.length === 1 ? ours[0] : undefined))?.port;
+    const ours = probes.flatMap(({ port, said }) => (said !== undefined && samePath(said.folder, folder) ? [{ port, said }] : []));
+    const port = chatPage(ours, hook.session)?.port;
 
     if (port === undefined) {
         const others = probes.flatMap((one) => (one.said === undefined ? [] : [`${one.port} is ${one.said.folder}'s`]));
-        const pages = ours.length > 1 ? `${ours.length} pages of it, none of this chat's session` : "no page of it";
+        const open = ours.filter(({ said }) => said.open).length;
+        const pages = ours.length > 1 ? `${ours.length} pages of it, none of this chat's session, ${open} open in a browser` : "no page of it";
         return { folder, rang: false, why: `${pages} at ports ${tried.join(", ")}${others.length > 0 ? `; ${others.join(", ")}` : ""}` };
     }
 
@@ -209,11 +218,23 @@ function hookInput(input: string): { session?: string; cwd?: string; }
     }
 }
 
-function probeOf(said: string | undefined): { session: string | null; folder: string; } | undefined
+/**
+ * The chat's page among those of its folder: the one of its session; else the only one, or the only one a browser has open, where the player plays. Codex
+ * gives the page no session, and a chat closed may leave its page behind for a while.
+ */
+function chatPage(pages: { port: number; said: BellProbe; }[], session: string | undefined): { port: number; } | undefined
+{
+    const open = pages.filter(({ said }) => said.open);
+    return pages.find(({ said }) => session !== undefined && said.session === session) ?? (pages.length === 1 ? pages[0] : open.length === 1 ? open[0] : undefined);
+}
+
+function probeOf(said: string | undefined): BellProbe | undefined
 {
     try {
-        const parsed = said === undefined ? undefined : JSON.parse(said) as { session?: unknown; folder?: unknown; };
-        return parsed === undefined || typeof parsed.folder !== "string" ? undefined : { session: typeof parsed.session === "string" ? parsed.session : null, folder: parsed.folder };
+        const parsed = said === undefined ? undefined : JSON.parse(said) as { session?: unknown; folder?: unknown; open?: unknown; };
+        return parsed === undefined || typeof parsed.folder !== "string"
+            ? undefined
+            : { session: typeof parsed.session === "string" ? parsed.session : null, folder: parsed.folder, open: parsed.open === true };
     } catch {
         return undefined;
     }

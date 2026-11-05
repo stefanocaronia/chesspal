@@ -187,7 +187,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         keepPosted(request, response, served);
     } else if (path === "/api/bell") {
         if (url.searchParams.has("probe")) {
-            send(response, 200, json, JSON.stringify(bellProbe(served.folder)));
+            send(response, 200, json, JSON.stringify(bellProbe(served.folder, served.watchers.size > 0)));
         } else {
             served.bell.listen(request, response);
         }
