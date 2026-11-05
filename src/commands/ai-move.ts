@@ -24,8 +24,8 @@ export const aiMove = defineCommand({
         ),
         offer_draw: z.boolean().optional().describe("true offers the player a draw with this move: it stands until their move"),
         mood: z.enum(moods).optional().describe(
-            "only when your feeling about the game changes: your face on the board page shows it for three of your moves, this one included (a surprise for this one only), then "
-                + "turns neutral by itself; leave it out otherwise",
+            "how you feel, on a move where the game turns for you: your face on the board page shows it for three of your moves, this one included (a surprise for this one "
+                + "only), then turns neutral by itself",
         ),
     }),
     alwaysLoad: true,

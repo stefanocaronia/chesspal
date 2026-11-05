@@ -193,7 +193,8 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
 
     if (game.end !== undefined) {
         return words.length === 0
-            ? "Next: tell the player how the game ended, with ai_say if they play on the board page; then offer them, in words, another game or to go over this one "
+            ? "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or "
+                + "to go over this one "
                 + `(analyse_game). For another, ${newGameStep}`
             : `Next: answer the player with ai_say. When they want another game, ${newGameStep}`;
     }

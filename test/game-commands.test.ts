@@ -241,7 +241,7 @@ describe("a game in chat", () => {
             `Played 2...Qh4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Archived in ${archive}.\n`
                 + "Board, for your message when the player plays in the chat:\n  a b c d e f g h\n8 r n b . k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n5 . . . . p . . . 5\n"
                 + "4 . . . . . . P q 4\n3 . . . . . P . . 3\n2 P P P P P . . P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\n"
-                + "Next: tell the player how the game ended, with ai_say if they play on the board page; then offer them, in words, another game or to go over this one "
+                + "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one "
                 + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.",
         );
         expect(readArchive(context)).toContain('[Result "0-1"]\n[AILevel "strong"]\n[Termination "checkmate"]');
@@ -264,7 +264,7 @@ describe("a game in chat", () => {
         };
 
         expect(await ended("player_resigns")).toBe(
-            `Game over: 0-1, White resigns. Archived in ${archive}.\nNext: tell the player how the game ended, with ai_say if they play on the board page; then offer them, in words, another game or to go over this one `
+            `Game over: 0-1, White resigns. Archived in ${archive}.\nNext: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one `
                 + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.",
         );
         expect(await ended("ai_resigns")).toContain("Game over: 1-0, Black resigns.");
