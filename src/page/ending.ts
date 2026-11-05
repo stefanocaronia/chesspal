@@ -58,6 +58,34 @@ export function useJustEnded(state: "going" | "over" | undefined): boolean
 }
 
 /**
+ * Whether the page saw the game end, from going on to over, while it stays over (D-77): its final position stays on the board until the next game. A game
+ * already over when the page reads it does not count. `state` is undefined until the page has the game.
+ */
+export function useSawEnd(state: GameState): boolean
+{
+    // Known in the render itself: a frame of the table set in place of the final position would cost the last move its slide.
+    const seen = useRef<EndSeen>({ state, saw: false });
+    seen.current = seeEnd(seen.current, state);
+    return seen.current.saw;
+}
+
+/** A game as the page reads it: going on, over, or none yet. */
+export type GameState = "going" | "over" | undefined;
+
+/** What the page knows of a game's end: the game's state at the last read, and whether the page saw it end. */
+export interface EndSeen
+{
+    readonly state: GameState;
+    readonly saw: boolean;
+}
+
+/** What the page knows after reading the game again in `state`: it saw the end when the game went from going on to over, and while it stays over. */
+export function seeEnd(before: EndSeen, state: GameState): EndSeen
+{
+    return { state, saw: state === "over" && (before.saw || before.state === "going") };
+}
+
+/**
  * Whether the AI declined the player's draw offer by its move (D-65): their offer gone with a move more and the game going on, until the next move. `moves`
  * is how many the game has.
  */

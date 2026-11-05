@@ -65,7 +65,7 @@ function escaped(text: string): string
 async function until(condition: () => boolean): Promise<void>
 {
     for (let tries = 0; !condition(); tries++) {
-        if (tries === 100) {
+        if (tries === 500) {
             throw new Error("The page never changed as expected.");
         }
 

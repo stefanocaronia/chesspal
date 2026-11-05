@@ -7,7 +7,7 @@ import { PlayerPicture } from "./avatars.tsx";
 import { BadgeCounts } from "./badges.tsx";
 import { Board, type Notice, piecesOf } from "./board.tsx";
 import { flipKeys, type Step, stepKeys, stepped } from "./browse.ts";
-import { howEnded, useDeclined, useJustEnded } from "./ending.ts";
+import { howEnded, useDeclined, useJustEnded, useSawEnd } from "./ending.ts";
 import { explain } from "./explain.ts";
 import { FoldTab } from "./fold-tab.tsx";
 import { type Column, foldKeys, gameUnderBoard, nextFold, oneColumn, rememberFold, startFolds } from "./folds.ts";
@@ -128,15 +128,24 @@ export function App({ start }: { start: Settings; })
     // (D-69), with the AI's badges and notes: replayed again only when its review changed.
     const game = served?.game;
     const studied = served?.analysis;
-    const live = useMemo(
+    const replayed = useMemo(
         () => studied !== undefined ? new Game(readPgn(studied.pgn)[0]) : game === undefined || game === null ? new Game() : new Game(readPgn(game.pgn)[0]),
         [studied === undefined ? game : studied.pgn],
     );
+    // Between games the board shows the table set for the next (D-77): before the first, and on a game over the page did not see end; one it saw end keeps
+    // its final position until the next starts. The talk keeps the game's words all the same.
+    const over = isOver(resultOf(replayed));
+    const going = studied === undefined && game !== undefined && game !== null && !over;
+    const between = studied === undefined && game !== undefined && !going;
+    const sawEnd = useSawEnd(studied !== undefined || game === undefined || game === null ? undefined : over ? "over" : "going");
+    const idle = between && !sawEnd;
+    const tableSet = useMemo(() => new Game(), []);
+    const live = idle ? tableSet : replayed;
     const material = useMemo(() => materialOf(live.position.fen), [live]);
     const pieces = useMemo(() => piecesOf(live.position.fen), [live]);
     // While the game goes on, the book's first moves carry its badge, when the player wants it, as the AI's review gives it after (D-69).
     const inBook = studied === undefined && settings.book ? game?.book ?? 0 : 0;
-    const plies = useMemo(() => withBook(pliesOf(live.record), inBook), [live, inBook]);
+    const plies = useMemo(() => withBook(pliesOf(replayed.record), inBook), [replayed, inBook]);
     const book = useOpeningBook(live.record.moves.length > 0);
     const opening = useMemo(() => book === undefined ? undefined : openingOf(live.record, book), [live, book]);
     // The player's move shows at once, before the server has it: the game it sends next takes its place (T-70).
@@ -154,7 +163,7 @@ export function App({ start }: { start: Settings; })
         setPromoting(undefined);
     }, [studied === undefined ? game : studied.name]);
     const played = studied === undefined ? game : null;
-    useGameSounds(played, live, sound);
+    useGameSounds(played, replayed, sound);
     const unread = useUnread(played === undefined || played === null ? undefined : aiSpoke(plies, played.ai, played.talk), folds.talk !== "open");
 
     const fold = (column: Column): void => {
@@ -203,12 +212,12 @@ export function App({ start }: { start: Settings; })
     const ended = isOver(result);
     const how = ended ? howEnded(live.outcome, live.record.tags.Termination) : undefined;
     const winner = result === "1-0" ? "white" : result === "0-1" ? "black" : undefined;
-    const justEnded = useJustEnded(played === undefined || played === null ? undefined : ended ? "over" : "going");
+    const justEnded = useJustEnded(played === undefined || played === null ? undefined : over ? "over" : "going");
     const offer = played?.drawOffer;
     const declined = useDeclined(offer, total, ended);
 
     // In a game going on the player offers a draw on their turn once each side has moved, answers the AI's, or resigns, saying so first (D-65).
-    const actions: GameActions | undefined = played === undefined || played === null || ended ? undefined : {
+    const actions: GameActions | undefined = !going || played === undefined || played === null ? undefined : {
         ...(offer === undefined ? {} : { offer }),
         canOffer: offer === undefined && pending === undefined && live.position.turn !== played.ai && total >= 2,
         onOffer: () => act("/api/draw", { action: "offer" }),
@@ -223,12 +232,26 @@ export function App({ start }: { start: Settings; })
     const header = (
         <Header
             text={text}
-            kind={studied !== undefined ? "analysis" : ended ? "over" : offer !== undefined || declined ? "offer" : undefined}
-            verdict={studied !== undefined ? text.analysing : ended ? text.verdict(how, winner) : offer === "ai" ? text.offers : offer === "player" ? text.drawOffered : declined ? text.declines : undefined}
+            kind={studied !== undefined ? "analysis" : idle ? "idle" : ended ? "over" : offer !== undefined || declined ? "offer" : undefined}
+            verdict={studied !== undefined
+                ? text.analysing
+                : idle
+                ? text.noGameNow
+                : ended
+                ? text.verdict(how, winner)
+                : offer === "ai"
+                ? text.offers
+                : offer === "player"
+                ? text.drawOffered
+                : declined
+                ? text.declines
+                : undefined}
             {...(!ended && (offer === "ai" || declined) ? { who: served?.opponent ?? text.ai } : {})}
             actions={actions}
             onNewGame={served === undefined ? undefined : () => setDialog("new-game")}
-            onStudy={served === undefined || (played !== null && !ended) ? undefined : () => setDialog("study")}
+            // Between games the new one stands out in the player's card (D-77): in the header only when the talk, and the card with it, is folded away.
+            standOut={studied !== undefined || (between && folds.talk !== "open")}
+            onStudy={served === undefined || going ? undefined : () => setDialog("study")}
             flipped={flipped}
             onFlip={() => setFlipped(!flipped)}
             sound={sound}
@@ -260,7 +283,6 @@ export function App({ start }: { start: Settings; })
 
     const profile = served.profile;
     const picture = <PlayerPicture profile={profile} />;
-    const going = played !== null && !ended;
     const name = served.opponent ?? text.ai;
     // In analysis the cards name the players of the game, the player's side at the bottom when they played it (D-69).
     const sides = studied === undefined ? undefined : studiedSides(live.record.tags, profile.name, name, text.sides);
@@ -277,7 +299,8 @@ export function App({ start }: { start: Settings; })
     const closing = studied === undefined ? undefined : closingOf(live.record);
     const talk = game?.talk ?? [];
     const said = playerWords(talk);
-    const clock = game?.clock;
+    // The clocks only in a game going on: between games the player's card holds the next one in their place (D-77).
+    const clock = going ? game?.clock : undefined;
     // No chat hears the player: the page says where to wake it, and the AI's clock waits, as the server holds it.
     const asleep = served.listening === false && !offline;
     // The clocks wait for the player from the game's start: a button over the board starts them, as the player's first move does.
@@ -302,6 +325,17 @@ export function App({ start }: { start: Settings; })
                     <path d="M8 5.5v13l10.5-6.5z" />
                 </svg>
                 {text.startClocks}
+            </button>
+        )
+        : null;
+    // Between games the next starts from the player's card, where the clock and the button that starts it stand in a game (D-77).
+    const nextGame = between
+        ? (
+            <button type="button" class="command primary next-game" onClick={() => setDialog("new-game")}>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 5V19M5 12H19" />
+                </svg>
+                {text.newGame}
             </button>
         )
         : null;
@@ -375,8 +409,9 @@ export function App({ start }: { start: Settings; })
     };
 
     // The new game starts from the choices of the game before; the first, from the level that suits the player (T-58).
-    const level = suggestedLevel(played === null ? undefined : live.record, profile.level);
-    const lastClock = clock === undefined ? undefined : timeControlText(clock.control);
+    const level = suggestedLevel(played === null ? undefined : replayed.record, profile.level);
+    const lastControl = game?.clock?.control;
+    const lastClock = lastControl === undefined ? undefined : timeControlText(lastControl);
     const choice: NewGameChoice = { colour: player, level, ...(lastClock === undefined ? {} : { clock: lastClock }) };
 
     const startNewGame = ({ colour, level: chosen, clock: control }: NewGameChoice): void => {
@@ -492,8 +527,8 @@ export function App({ start }: { start: Settings; })
                                         place="ai"
                                         picture={<Torretta size={48} mood={mood} />}
                                         name={name}
-                                        side={ai}
-                                        {...(game === null ? {} : { level: text.start.levels[level] })}
+                                        side={idle ? undefined : ai}
+                                        {...(idle ? {} : { level: text.start.levels[level] })}
                                         taken={material.taken[ai]}
                                         ahead={ahead(ai)}
                                         clock={clockOf(ai)}
@@ -524,7 +559,7 @@ export function App({ start }: { start: Settings; })
                                         place="you"
                                         picture={<PictureButton profile={profile} onOpen={() => setDialog("picture")} text={text} />}
                                         name={<NameButton profile={profile} onOpen={() => setDialog("profiles")} text={text} />}
-                                        side={player}
+                                        side={idle ? undefined : player}
                                         taken={material.taken[player]}
                                         ahead={ahead(player)}
                                         turn={playerToMove}
@@ -532,6 +567,7 @@ export function App({ start }: { start: Settings; })
                                             <>
                                                 {clockOf(player)}
                                                 {startClocks}
+                                                {nextGame}
                                             </>
                                         }
                                         text={text}
@@ -541,7 +577,8 @@ export function App({ start }: { start: Settings; })
                         )}
                 </div>
                 <div
-                    class="board-wrap"
+                    // Between games the board goes off (D-77): a game the page saw end once its effects are over, its final position less off than the table set.
+                    class={between && !justEnded ? "board-wrap off" : "board-wrap"}
                     onWheel={wheel}
                     // A press on the board while the player looks back brings the game as it is: the next one plays.
                     onPointerDownCapture={viewing === undefined || studied !== undefined ? undefined : (event) => event.button === 0 && goTo(total)}
@@ -585,11 +622,11 @@ export function App({ start }: { start: Settings; })
                     </div>
                 )}
                 <GameColumn
-                    plies={plies}
+                    plies={idle ? [] : plies}
                     result={ended ? result : undefined}
                     how={how}
                     lit={justEnded}
-                    started={played?.started}
+                    started={idle ? undefined : played?.started}
                     move={live.position.moveNumber}
                     toMove={live.position.turn}
                     opening={opening}
@@ -598,7 +635,7 @@ export function App({ start }: { start: Settings; })
                     onShow={goTo}
                     onStep={step}
                     {...(studied === undefined ? {} : { onDownload: () => download(studied.pgn, pgnName(live.record.tags)) })}
-                    {...(studied === undefined && played !== null && played !== undefined && ended ? { onAnalyse: () => void studyGame({ last: true }) } : {})}
+                    {...(between && game !== null ? { onAnalyse: () => void studyGame({ last: true }) } : {})}
                     text={text}
                 />
             </main>

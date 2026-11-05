@@ -13,7 +13,8 @@ export function PlayerCard({ place, picture, name, side, level, taken, ahead, tu
     picture: ComponentChildren;
     /** The name, or the button that opens the profiles. */
     name: ComponentChildren;
-    side: Side;
+    /** The side played; none between games, with the table set for the next (D-77). */
+    side?: Side;
     /** The AI's level in a game: its name, and what the AI sees there (D-61). */
     level?: readonly [name: string, note: string, sees: string];
     taken: readonly PieceLetter[];
@@ -33,21 +34,23 @@ export function PlayerCard({ place, picture, name, side, level, taken, ahead, tu
                 {picture}
                 <div class="who">
                     <div class="name" title={typeof name === "string" ? name : undefined}>{name}</div>
-                    <div class="note">
-                        {text.sides[side]}
-                        {level === undefined ? null : (
-                            <>
-                                {" "}· <LevelTip level={level} />
-                            </>
-                        )}
-                        {turn
-                            ? (
+                    {side === undefined ? null : (
+                        <div class="note">
+                            {text.sides[side]}
+                            {level === undefined ? null : (
                                 <>
-                                    {" "}· <b class="turn">{text.yourTurn}</b>
+                                    {" "}· <LevelTip level={level} />
                                 </>
-                            )
-                            : null}
-                    </div>
+                            )}
+                            {turn
+                                ? (
+                                    <>
+                                        {" "}· <b class="turn">{text.yourTurn}</b>
+                                    </>
+                                )
+                                : null}
+                        </div>
+                    )}
                     <div class="taken" role="img" aria-label={text.taken(taken.map((piece) => text.piece(piece, opponent)), ahead)}>
                         {groupsOf(taken).map((group) => (
                             <span key={group[0]} class={group[0]?.toUpperCase() === "P" ? "group pawns" : "group"}>

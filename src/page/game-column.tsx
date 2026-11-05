@@ -28,48 +28,61 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     onStep: (step: Step) => void;
     /** In analysis (T-106): saves the game with its review as a PGN. */
     onDownload?: () => void;
-    /** Once the game is over: opens it in analysis. */
+    /** Once the game is over: opens it in analysis, also from the table set for the next (D-77). */
     onAnalyse?: () => void;
     text: Text;
 })
 {
     return (
         <aside class="side" id="game" aria-label={text.game}>
-            {started === undefined && analysis === undefined ? <p class="card empty">{text.noGame}</p> : (
-                <>
-                    <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} text={text} />
-                    {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
-                    {onDownload === undefined ? null : (
-                        <div class="card analysis-actions">
-                            <button type="button" onClick={onDownload}>
-                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M12 4V15M7 10L12 15L17 10M5 19H19" />
-                                </svg>
-                                {text.study.download}
-                            </button>
-                        </div>
-                    )}
-                    {onAnalyse === undefined ? null : (
-                        <div class="card analysis-actions">
-                            <button type="button" onClick={onAnalyse}>
-                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M12 4V20M8 20H16M5 7H19M5 7L2.5 13A2.5 2 0 0 0 7.5 13ZM19 7L16.5 13A2.5 2 0 0 0 21.5 13Z" />
-                                </svg>
-                                {text.study.analyseIt}
-                            </button>
-                        </div>
-                    )}
-                    {analysis === undefined || analysis.summary !== undefined ? null : (
-                        <p class="card review waiting" role="status">
-                            <span class="spinner" aria-hidden="true" />
-                            {text.reviewing(analysis.by)}
-                        </p>
-                    )}
-                    <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} text={text} />
-                    <Steps shown={shownPlies} total={plies.length} onStep={onStep} text={text} />
-                </>
-            )}
+            {started === undefined && analysis === undefined
+                ? (
+                    <>
+                        <p class="card empty">{text.noGame}</p>
+                        {onAnalyse === undefined ? null : <AnalyseButton label={text.study.analyseLast} onAnalyse={onAnalyse} />}
+                    </>
+                )
+                : (
+                    <>
+                        <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} text={text} />
+                        {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
+                        {onDownload === undefined ? null : (
+                            <div class="card analysis-actions">
+                                <button type="button" onClick={onDownload}>
+                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 4V15M7 10L12 15L17 10M5 19H19" />
+                                    </svg>
+                                    {text.study.download}
+                                </button>
+                            </div>
+                        )}
+                        {onAnalyse === undefined ? null : <AnalyseButton label={text.study.analyseIt} onAnalyse={onAnalyse} />}
+                        {analysis === undefined || analysis.summary !== undefined ? null : (
+                            <p class="card review waiting" role="status">
+                                <span class="spinner" aria-hidden="true" />
+                                {text.reviewing(analysis.by)}
+                            </p>
+                        )}
+                        <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} text={text} />
+                        <Steps shown={shownPlies} total={plies.length} onStep={onStep} text={text} />
+                    </>
+                )}
         </aside>
+    );
+}
+
+/** The button that opens the game over in analysis. */
+function AnalyseButton({ label, onAnalyse }: { label: string; onAnalyse: () => void; })
+{
+    return (
+        <div class="card analysis-actions">
+            <button type="button" onClick={onAnalyse}>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 4V20M8 20H16M5 7H19M5 7L2.5 13A2.5 2 0 0 0 7.5 13ZM19 7L16.5 13A2.5 2 0 0 0 21.5 13Z" />
+                </svg>
+                {label}
+            </button>
+        </div>
     );
 }
 

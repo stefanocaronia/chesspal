@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game, readPgn } from "../src/core/index.ts";
-import { howEnded } from "../src/page/ending.ts";
+import { type EndSeen, type GameState, howEnded, seeEnd } from "../src/page/ending.ts";
 
 describe("how a game ended", () => {
     it("is the board's ending when the board ended it", () => {
@@ -30,5 +30,27 @@ describe("how a game ended", () => {
 
         expect(howEnded(going, undefined)).toBeUndefined();
         expect(howEnded(going, "Abandoned")).toBeUndefined();
+    });
+});
+
+describe("the end the page saw", () => {
+    const read = (...states: GameState[]): boolean[] => {
+        let seen: EndSeen = { state: states[0], saw: false };
+        return states.map((state) => (seen = seeEnd(seen, state)).saw);
+    };
+
+    it("is seen when the game goes from going on to over, and stays while it is over (D-77)", () => {
+        expect(read(undefined, "going", "going", "over", "over", "over")).toEqual([false, false, false, true, true, true]);
+    });
+
+    it("is not seen on a game already over when the page reads it, nor before the first game", () => {
+        expect(read(undefined, "over", "over")).toEqual([false, false, false]);
+        expect(read("over", "over")).toEqual([false, false]);
+        expect(read(undefined, undefined)).toEqual([false, false]);
+    });
+
+    it("ends with the next game, and with a game opened in analysis", () => {
+        expect(read("going", "over", "going", "over")).toEqual([false, true, false, true]);
+        expect(read("going", "over", undefined, "over")).toEqual([false, true, false, false]);
     });
 });

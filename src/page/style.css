@@ -1518,13 +1518,15 @@ button {
     color: #fff;
 }
 
-/* The clocks wait for the player (Zoe): the button that starts them takes a line of the player's card, under the clock it starts, off the board's squares */
-.player-line:has(> .start-clocks) {
+/* The clocks wait for the player (Zoe): the button that starts them takes a line of the player's card, under the clock it starts, off the board's squares;
+   between games the new game takes the same line, in the clock's place (D-77) */
+.player-line:has(> .start-clocks, > .next-game) {
     flex-wrap: wrap;
     row-gap: 10px;
 }
 
-.start-clocks {
+.start-clocks,
+.next-game {
     flex: 1 0 100%;
     justify-content: center;
     padding: 8px 14px;
@@ -1536,6 +1538,21 @@ button {
     width: 14px;
     height: 14px;
     fill: currentColor;
+}
+
+.next-game .icon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.2;
+}
+
+/* Between games a card has no side under the name (D-77): the name alone, in the middle of the picture */
+.player-line > .who:not(:has(.note)) {
+    align-self: center;
+}
+
+.player-line > .who:not(:has(.note)) .taken:empty {
+    display: none;
 }
 
 /* The pieces taken overlap within a kind, close enough that all fifteen and the score stay on one line */
@@ -2571,6 +2588,93 @@ button {
     .offline::before,
     .over-board {
         animation: none;
+    }
+}
+
+/* Between games the board goes off (D-77): the squares sink toward the page and the pieces fade, the table set and nobody playing. A game the page saw end
+   keeps its final position less off, once its effects are over, with the kings' badges and the last move in full. A thin line keeps its edge, which the
+   light squares would lose in the page */
+.board-wrap.off > .board {
+    box-shadow: 0 0 0 1px var(--line);
+}
+
+.board-wrap.off .square.light {
+    background-color: color-mix(in oklab, var(--light-square) 40%, var(--page));
+}
+
+.board-wrap.off .square.dark {
+    background-color: color-mix(in oklab, var(--dark-square) 40%, var(--page));
+}
+
+.board-wrap.off .piece {
+    opacity: 0.45;
+}
+
+.board-wrap.off .coordinate {
+    opacity: 0.4;
+}
+
+.board-wrap.off > .ended .square.light {
+    background-color: color-mix(in oklab, var(--light-square) 62%, var(--page));
+}
+
+.board-wrap.off > .ended .square.dark {
+    background-color: color-mix(in oklab, var(--dark-square) 62%, var(--page));
+}
+
+.board-wrap.off > .ended .piece {
+    opacity: 0.75;
+}
+
+.board-wrap.off > .ended .badge .piece {
+    opacity: 1;
+}
+
+/* It goes off gently, and comes back at once with the next game */
+@media (prefers-reduced-motion: no-preference) {
+    .board-wrap.off .square {
+        transition: background-color 400ms ease;
+    }
+
+    .board-wrap.off .piece,
+    .board-wrap.off .coordinate {
+        transition: opacity 400ms ease;
+    }
+}
+
+/* The header's chip when no game goes on: neutral, not the accent, with a pause sign (D-77) */
+.verdict.idle {
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--ink);
+}
+
+.verdict.idle .icon {
+    color: var(--soft);
+    stroke-width: 2.4;
+}
+
+/* Between games the chip is never cut: beside it the Torretta stands for the name at every width, and the flip keeps only its icon */
+@media (min-width: 841px) {
+    .top:has(.verdict.idle, .verdict.over) .title {
+        display: none;
+    }
+
+    .top:has(.verdict.idle, .verdict.over) .verdict {
+        margin-right: auto;
+    }
+}
+
+.top:has(.verdict.idle, .verdict.over) .command:has(.icon.flip) span {
+    display: none;
+}
+
+/* On a phone the player's card is under the board, below the fold: between games the header's new game stands out too, on the first screen */
+@media (max-width: 840px) {
+    .top:has(.verdict.idle, .verdict.over) .command:has(.icon.new) {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--on-accent);
     }
 }
 
