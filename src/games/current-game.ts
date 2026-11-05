@@ -25,13 +25,14 @@ export interface CurrentGame
 /** Who speaks on the board page. */
 export type Speaker = "player" | "ai";
 
-/** A line said on the board page: who said it, its words, how many moves the game had then, and when, as an ISO date. */
+/** A line said on the board page: who said it, its words, how many moves the game had then, and when, as an ISO date; the AI's agent on the player's time (D-72). */
 export interface TalkLine
 {
     readonly who: Speaker;
     readonly text: string;
     readonly ply: number;
     readonly at: string;
+    readonly agent?: true;
 }
 
 /** How a game ended: its result, and why when the record says it or the board decided it. */
@@ -122,7 +123,7 @@ export function gameStamp(folder: string): string | undefined
 
 const fileName = "game.json";
 
-const savedLine = z.object({ who: z.enum(["player", "ai"]), text: z.string(), ply: z.int().min(0), at: z.iso.datetime() });
+const savedLine = z.object({ who: z.enum(["player", "ai"]), text: z.string(), ply: z.int().min(0), at: z.iso.datetime(), agent: z.literal(true).optional() });
 const savedClock = z.object({
     base: z.int().positive(),
     increment: z.int().min(0),

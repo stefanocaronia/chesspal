@@ -4,12 +4,16 @@ import { type CurrentGame, endOf, type Speaker, type TalkLine } from "./current-
 /** The most the player may write in a move, in all their lines, and the most a line of the AI's may hold (D-54). */
 export const talkLimits = { player: 200, ai: 300 } as const;
 
+/** Who says a line: the player, the AI in the chat, or the AI's agent thinking on the player's time (D-72), whose lines are the AI's on the page. */
+export type Sayer = Speaker | "agent";
+
 /**
  * A new line of the talk, said when the game has `ply` moves: refused when it is empty or too long. The player writes 200 characters a move in all, the
- * words sent with the move included; the AI speaks once a move of theirs, on their time (D-54, D-72).
+ * words sent with the move included; the AI speaks once a move of theirs, on their time, and its agent's word leaves it an answer to what they write after (D-54, D-72).
  */
-export function talkLine(current: CurrentGame, who: Speaker, text: string, at: Date, ply = current.game.record.moves.length): TalkLine
+export function talkLine(current: CurrentGame, sayer: Sayer, text: string, at: Date, ply = current.game.record.moves.length): TalkLine
 {
+    const who = sayer === "agent" ? "ai" : sayer;
     const words = text.trim();
     const most = who === "player" ? wordsLeft(current) : talkLimits.ai;
 
@@ -27,10 +31,10 @@ export function talkLine(current: CurrentGame, who: Speaker, text: string, at: D
     }
 
     if (who === "ai") {
-        refuseAiWords(current);
+        refuseAiWords(current, sayer === "agent");
     }
 
-    return { who, text: words, ply, at: at.toISOString() };
+    return { who, text: words, ply, at: at.toISOString(), ...(sayer === "agent" ? { agent: true } : {}) };
 }
 
 /** Words refused, and why, for the page to say it in the player's language (T-11): none, the move's characters spent, more than a line or what is left holds. */
@@ -98,9 +102,10 @@ export function heardLines(current: CurrentGame, given: ReadonlySet<string>): (H
 
 /**
  * The AI speaks apart from its move once a move of the player's, on their time, with something to say or to answer (D-72), and never while its move waits:
- * it speaks in the move's comment then. Between games it talks freely, about the game just over or to start another (D-74).
+ * it speaks in the move's comment then. Its agent speaks only first, when the player has written nothing to answer, and its word leaves the chat one answer
+ * to what they write after. Between games it talks freely, about the game just over or to start another (D-74).
  */
-function refuseAiWords(current: CurrentGame): void
+function refuseAiWords(current: CurrentGame, byAgent: boolean): void
 {
     const { game, ai } = current;
     const since = sinceAiMoved(current);
@@ -113,8 +118,31 @@ function refuseAiWords(current: CurrentGame): void
         throw new Error("It is your move: speak in ai_move's comment. Nothing changed.");
     }
 
-    if (current.talk.some((line) => line.who === "ai" && line.ply >= since)) {
+    const spoken = current.talk.filter((line) => line.who === "ai" && line.ply >= since);
+
+    if (byAgent) {
+        refuseAgentWords(current, spoken);
+        return;
+    }
+
+    if (spoken.some((line) => line.agent !== true)) {
         throw new Error("You have spoken once for this move: say the rest in ai_move's comment. Nothing changed.");
+    }
+
+    if (spoken.length > 0 && unanswered(current).length === 0) {
+        throw new Error("You have said a word on the player's time already: speak again only to answer them, else in ai_move's comment. Nothing changed.");
+    }
+}
+
+/** The agent's word on the player's time: one, and none once they have written, since the chat answers them. */
+function refuseAgentWords(current: CurrentGame, spoken: readonly TalkLine[]): void
+{
+    if (spoken.length > 0) {
+        throw new Error("You have spoken for this move already: say nothing more. Nothing changed.");
+    }
+
+    if (unanswered(current).length > 0) {
+        throw new Error("The player has written to you, and the AI in the chat answers them: say nothing. Nothing changed.");
     }
 }
 

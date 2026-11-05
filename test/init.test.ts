@@ -51,7 +51,7 @@ describe("chesspal init", () => {
         expect(json(chess, ".codex/hooks.json")).toEqual({ hooks: { Stop: [{ hooks: [codexBellHook] }] } });
         expect(opponentInstructions()).toContain("call `status`");
         expect(text(chess, ".claude/agents/chesspal-ponder-quick.md")).toMatch(
-            /^---\nname: chesspal-ponder-quick\n.*\ntools: mcp__chesspal__ponder, ToolSearch\nmodel: haiku\n---\n\nYou are the player's chess opponent/s,
+            /^---\nname: chesspal-ponder-quick\n.*\ntools: mcp__chesspal__ponder\nmodel: haiku\n---\n\nYou are the player's chess opponent/s,
         );
         expect(text(chess, ".claude/agents/chesspal-ponder.md")).toContain("\nmodel: inherit\n");
     });

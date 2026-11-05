@@ -20,9 +20,25 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
     // The server keeps what it told the chat, the instructions a tool gives once.
     context.told ??= new Set();
 
+    const forOneHost: { host: string; tool: { enable(): void; }; }[] = [];
+
     for (const command of list.filter((each) => each.cliOnly !== true)) {
-        server.registerTool(command.name, toolConfig(command), (input: unknown) => track(runTool(command, input, context)));
+        const tool = server.registerTool(command.name, toolConfig(command), (input: unknown) => track(runTool(command, input, context)));
+
+        if (command.host !== undefined) {
+            tool.disable();
+            forOneHost.push({ host: command.host, tool });
+        }
     }
+
+    // A tool for one host is offered once the host has said its name, before it lists the tools.
+    server.server.oninitialized = () => {
+        const host = server.server.getClientVersion()?.name;
+
+        for (const { tool } of forOneHost.filter((each) => each.host === host)) {
+            tool.enable();
+        }
+    };
 
     return server;
 }

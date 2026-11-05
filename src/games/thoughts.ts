@@ -1,6 +1,6 @@
 // What the AI thought on the player's time (D-72): its answers to the player's likely replies, in thoughts.json beside game.json, hidden from the player
-// as its plan is (D-29), and kept only for the position they were thought on.
-import { readFileSync, rmSync } from "node:fs";
+// as its plan is (D-29), and kept only for the position they were thought on: the next position's replace them.
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import type { CurrentGame } from "./current-game.ts";
@@ -14,32 +14,23 @@ export interface Thought
     readonly why: string;
 }
 
-/** The most thoughts kept for a position: a few likely replies, not every legal one. */
-export const mostThoughts = 8;
-
 /** The key of the position the player is to move in: the game, by its start, and how many moves it has. */
 export function thoughtKey(current: CurrentGame, ply = current.game.record.moves.length): string
 {
     return `${current.started}#${ply}`;
 }
 
-/** The thoughts kept for a position, none when there are none for it. */
-export function thoughtsAt(folder: string, key: string): Thought[]
-{
-    const kept = read(folder);
-    return kept?.key === key ? kept.thoughts : [];
-}
-
 /** Keeps a thought for a position, in place of one for the same reply; thoughts of another position go. The thoughts kept now. */
 export function keepThought(folder: string, key: string, thought: Thought): Thought[]
 {
-    const thoughts = [...thoughtsAt(folder, key).filter((one) => one.reply !== thought.reply), thought];
+    const kept = keptAt(folder, key);
+    const thoughts = [...kept.thoughts.filter((one) => one.reply !== thought.reply), thought];
 
     if (thoughts.length > mostThoughts) {
         throw new Error(`You have ${mostThoughts} thoughts for this position already: they are enough. Nothing changed.`);
     }
 
-    writeAtomically(join(folder, fileName), `${JSON.stringify({ key, thoughts }, null, 2)}\n`);
+    write(folder, { ...kept, thoughts });
     return thoughts;
 }
 
@@ -48,20 +39,43 @@ export function thoughtForLastMove(folder: string, current: CurrentGame): Though
 {
     const { moves } = current.game.record;
     const last = moves.at(-1);
-    return last === undefined ? undefined : thoughtsAt(folder, thoughtKey(current, moves.length - 1)).find((thought) => thought.reply === last.san);
+    return last === undefined ? undefined : keptAt(folder, thoughtKey(current, moves.length - 1)).thoughts.find((thought) => thought.reply === last.san);
 }
 
-/** Forgets every thought: the AI has moved, and they were for a position gone. */
-export function forgetThoughts(folder: string): void
+/** Since when the AI has waited for the player's move in a position: the first time it asked, `now` then, kept with its thoughts. */
+export function waitingSince(folder: string, key: string, now: Date): Date
 {
-    rmSync(join(folder, fileName), { force: true });
+    const kept = keptAt(folder, key);
+
+    if (kept.since !== undefined) {
+        return new Date(kept.since);
+    }
+
+    write(folder, { ...kept, since: now.toISOString() });
+    return now;
 }
+
+/** The most thoughts kept for a position: a few likely replies, not every legal one. */
+const mostThoughts = 8;
 
 const fileName = "thoughts.json";
 
-const thoughtsFile = z.object({ key: z.string(), thoughts: z.array(z.object({ reply: z.string(), move: z.string(), why: z.string() })) });
+const thoughtsFile = z.object({
+    key: z.string(),
+    thoughts: z.array(z.object({ reply: z.string(), move: z.string(), why: z.string() })),
+    since: z.iso.datetime().optional(),
+});
 
-function read(folder: string): z.infer<typeof thoughtsFile> | undefined
+type ThoughtsFile = z.infer<typeof thoughtsFile>;
+
+/** What is kept for a position: nothing yet when the file is for another, or missing. */
+function keptAt(folder: string, key: string): ThoughtsFile
+{
+    const kept = read(folder);
+    return kept?.key === key ? kept : { key, thoughts: [] };
+}
+
+function read(folder: string): ThoughtsFile | undefined
 {
     try {
         return thoughtsFile.parse(JSON.parse(readFileSync(join(folder, fileName), "utf8")));
@@ -69,4 +83,9 @@ function read(folder: string): z.infer<typeof thoughtsFile> | undefined
         // None yet, or one Chesspal cannot read: thoughts are only a help, and the next one written replaces it.
         return undefined;
     }
+}
+
+function write(folder: string, kept: ThoughtsFile): void
+{
+    writeAtomically(join(folder, fileName), `${JSON.stringify(kept, null, 2)}\n`);
 }

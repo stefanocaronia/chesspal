@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import type { Context } from "./context.ts";
 
 /** A command is defined once: the command line and the MCP server are generated from it (D-5), and later the page's actions. */
@@ -18,6 +18,8 @@ export interface Command<Schema extends z.ZodObject = z.ZodObject, Result = unkn
     alwaysLoad?: boolean;
     /** An agent calls it apart from the chat, as ponder (D-72): the doorbell's record of what the chat has read stays as it was. */
     byAgent?: boolean;
+    /** The only host the MCP server offers it to, by the client's name, as ponder to Claude Code: elsewhere its description would cost tokens for nothing. */
+    host?: string;
     /** Only the command line has it, as init: the MCP server leaves it out, and its description costs the AI no tokens. */
     cliOnly?: boolean;
     /** Fields the command line takes as positional arguments, in order. */
@@ -35,6 +37,12 @@ export type AnyCommand = Command<any, any>;
 export function defineCommand<Schema extends z.ZodObject, Result>(command: Command<Schema, Result>): Command<Schema, Result>
 {
     return command;
+}
+
+/** One sentence of the AI's, kept in a PGN comment: no brackets or braces, which would break it. */
+export function sentence(most: number): z.ZodString
+{
+    return z.string().trim().min(1, "write one sentence").max(most, `write one sentence of ${most} characters at most`).regex(/^[^[\]{}]*$/, "write it without [ ] { }");
 }
 
 /**

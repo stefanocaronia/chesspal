@@ -1,6 +1,6 @@
 // A move of the AI or of the player on the current game: played, timed by the clock, saved, and archived when it ends the game.
 import { clockAfterMove, clockTag } from "../core/index.ts";
-import { archiveEnded, type CurrentGame, endOf, forgetThoughts, saveGame, talkLine } from "../games/index.ts";
+import { archiveEnded, type CurrentGame, endOf, saveGame, talkLine } from "../games/index.ts";
 import { gameGoingOn, type MovePlayed, summaryOf, withThought } from "./game-summary.ts";
 import { colourName } from "./view.ts";
 
@@ -60,11 +60,6 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
     }
 
     saveGame(folder, current);
-
-    // The AI's thoughts on the player's time were for the position its move leaves (D-72).
-    if (mover === "ai") {
-        forgetThoughts(folder);
-    }
 
     const { archive, warning } = endOf(game) === undefined ? {} : archiveEnded(folder, current);
     const result: MovePlayed = { move: `${position.moveNumber}${position.turn === "white" ? "." : "..."}${played.move.san}`, game: withThought(summaryOf(current, now, archive), folder, current) };

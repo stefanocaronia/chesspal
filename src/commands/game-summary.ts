@@ -1,6 +1,7 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
 import { type AiLevel, type Facts, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, sees, type Side, type Square } from "../core/index.ts";
 import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, type Thought, thoughtForLastMove } from "../games/index.ts";
+import { onQuickModel } from "../host-files/index.ts";
 import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
 import { boardView, colourName, compactView, materialText } from "./view.ts";
@@ -141,7 +142,7 @@ export function positionLines(game: GameSummary, withLastMove = true): string[]
         ...(game.facts === undefined ? [] : (sees(game.level, "tactics") ? compactView : boardView)(game.facts, game.turn)),
         ...(game.book === undefined ? [] : [`Book moves, most named lines first: ${game.book.join(", ")}`]),
         ...(game.plan === undefined ? [] : [`Plan: ${game.plan}`]),
-        ...(game.thought === undefined ? [] : [`Thought on their time: ${game.thought.move}, ${game.thought.why} Check it against the facts before you play it.`]),
+        ...(game.thought === undefined ? [] : [thoughtLine(game.thought, game.level)]),
         ...moodLines(game),
     ];
 }
@@ -257,6 +258,12 @@ function offerLines({ drawOffer, turn, ai }: GameSummary): string[]
     }
 
     return [];
+}
+
+/** What the AI thought on the player's time, saying by which model and that Chesspal checked only that it is legal: the facts do not cover every blunder (Anatolij, round of T-109). */
+function thoughtLine({ move, why }: Thought, level: AiLevel): string
+{
+    return `Thought on their time ${onQuickModel(level) ? "by a quicker model" : "by your model"} (legal, not checked): ${move}, ${why}`;
 }
 
 /** The AI's mood while it lasts, and how long its face shows it (D-70). */

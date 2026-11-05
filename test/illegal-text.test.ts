@@ -62,7 +62,7 @@ describe("the page's words for a refusal", () => {
 
         for (const language of ["en", "it"]) {
             for (const refusal of Object.keys(refusals) as ServerRefusal[]) {
-                expect(textFor([language]).refused[refusal](40).trim(), `${language} ${refusal}`).not.toBe("");
+                expect(textFor([language]).refused[refusal](40, "Codex").trim(), `${language} ${refusal}`).not.toBe("");
             }
         }
     });

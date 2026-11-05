@@ -6,5 +6,5 @@ export { bothSidesMoved, type CurrentGame, drawOfferOf, endOf, type GameEnd, gam
 export { makeFolder, writeAtomically } from "./files.ts";
 export { moveGames } from "./move-games.ts";
 export { commentWithPlan, currentPlan, planOf, withoutPlans } from "./plans.ts";
-export { type Heard, heardLines, playerLinesThisMove, talkLimits, talkLine, unheardWords, wakesTheChat, type Words, WordsRefused } from "./talk.ts";
-export { forgetThoughts, keepThought, mostThoughts, type Thought, thoughtForLastMove, thoughtKey, thoughtsAt } from "./thoughts.ts";
+export { type Heard, heardLines, playerLinesThisMove, type Sayer, talkLimits, talkLine, unheardWords, wakesTheChat, type Words, WordsRefused } from "./talk.ts";
+export { keepThought, type Thought, thoughtForLastMove, thoughtKey, waitingSince } from "./thoughts.ts";

@@ -35,11 +35,22 @@ describe("the MCP server", () => {
 
     it("offers every command as a tool, with its description, but those of the command line alone", async () => {
         const { tools } = await (await connect()).listTools();
-        const offered = commands.filter((command) => command.cliOnly !== true);
+        const offered = commands.filter((command) => command.cliOnly !== true && command.host === undefined);
 
         expect(tools.map((tool) => tool.name)).toEqual(offered.map((command) => command.name));
         expect(tools[0]?.description).toBe(offered[0]?.description);
         expect(tools.map((tool) => tool.name)).not.toContain("init");
+    });
+
+    it("offers a host's own tool to that host alone: ponder to Claude Code (D-72)", async () => {
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await createMcpServer(testContext()).connect(serverTransport);
+        client = new Client({ name: "claude-code", version: "2.1.316" });
+        await client.connect(clientTransport);
+        const { tools } = await client.listTools();
+
+        expect(tools.map((tool) => tool.name)).toContain("ponder");
+        expect((await (await connect()).listTools()).tools.map((tool) => tool.name)).not.toContain("ponder");
     });
 
     it("sends the host to status, keeps the board out of the AI's head, and loads status at once", async () => {

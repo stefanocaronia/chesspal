@@ -124,6 +124,9 @@ export function App({ start }: { start: Settings; })
         }
     }, [profileId]);
 
+    // The AI as the host names it (Claude, Codex), also where the page sends the player to write; the last known while the page is offline.
+    const name = served?.opponent ?? text.ai;
+
     // The game is replayed from its PGN once for each one the server sends, not at every click. Once no game goes on, the game in analysis shows in its place
     // (D-69), with the AI's badges and notes: replayed again only when its review changed.
     const game = served?.game;
@@ -205,7 +208,7 @@ export function App({ start }: { start: Settings; })
     // An action of the player's on the game: the game the server sends next shows it; a refusal shows on the board.
     const act = (path: string, body: object): void => {
         setSelected(undefined);
-        void post(path, body, text).then((refused) => setRefusal(refused === undefined ? undefined : { text: refused.text }));
+        void post(path, body, text, name).then((refused) => setRefusal(refused === undefined ? undefined : { text: refused.text }));
     };
 
     const result = resultOf(live);
@@ -246,7 +249,7 @@ export function App({ start }: { start: Settings; })
                 : declined
                 ? text.declines
                 : undefined}
-            {...(!ended && (offer === "ai" || declined) ? { who: served?.opponent ?? text.ai } : {})}
+            {...(!ended && (offer === "ai" || declined) ? { who: name } : {})}
             actions={actions}
             onNewGame={served === undefined ? undefined : () => setDialog("new-game")}
             // Between games the new one stands out in the player's card (D-77): in the header only when the talk, and the card with it, is folded away.
@@ -283,7 +286,6 @@ export function App({ start }: { start: Settings; })
 
     const profile = served.profile;
     const picture = <PlayerPicture profile={profile} />;
-    const name = served.opponent ?? text.ai;
     // In analysis the cards name the players of the game, the player's side at the bottom when they played it (D-69).
     const sides = studied === undefined ? undefined : studiedSides(live.record.tags, profile.name, name, text.sides);
 
@@ -367,9 +369,9 @@ export function App({ start }: { start: Settings; })
         const move = `${from}${to}${piece ?? ""}`;
         setPromoting(undefined);
         setPending(move);
-        void sendMove(move, words, text).then((refused) => {
+        void sendMove(move, words, text, name).then((refused) => {
             setRefusal(refused === undefined || refused.words ? undefined : { text: refused.text, square: from });
-            setUnsent(refused?.words === true ? refused.text : command ? text.commandHere : undefined);
+            setUnsent(refused?.words === true ? refused.text : command ? text.commandHere(name) : undefined);
             clearSent(refused?.text, words);
 
             if (refused !== undefined) {
@@ -397,12 +399,12 @@ export function App({ start }: { start: Settings; })
 
         // /clear and the other commands are for Claude's app: written here they would reach the AI as words (Sebastiano's playtest).
         if (isCommand(words)) {
-            setUnsent(text.commandHere);
+            setUnsent(text.commandHere(name));
             return;
         }
 
         setUnsent(undefined);
-        void sendMessage(words, text).then((refused) => {
+        void sendMessage(words, text, name).then((refused) => {
             setUnsent(refused?.text);
             clearSent(refused?.text, words);
         });
@@ -439,7 +441,7 @@ export function App({ start }: { start: Settings; })
 
     // A game brought to analyse (T-92): the page shows it once the server has it in analysis; a refusal stays in the dialog.
     const studyGame = async (studied: Studied): Promise<string | undefined> => {
-        const refused = await post("/api/study", studied, text);
+        const refused = await post("/api/study", studied, text, name);
 
         if (refused === undefined) {
             setDialog(undefined);
@@ -462,7 +464,7 @@ export function App({ start }: { start: Settings; })
             />
             <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
             <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} text={text} />
-            {offline ? <p class="offline" role="alert">{text.offline}</p> : null}
+            {offline ? <p class="offline" role="alert">{text.offline(name)}</p> : null}
             <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`} inert={offline}>
                 {header}
                 {sides === undefined
@@ -824,16 +826,16 @@ function forThePage(event: KeyboardEvent): boolean
 }
 
 /** Sends the player's move to the server, which plays it as the chat would, with the words written for the AI: the reason it was refused, or undefined. */
-function sendMove(move: string, words: string, text: Text): Promise<Refused | undefined>
+function sendMove(move: string, words: string, text: Text, name: string): Promise<Refused | undefined>
 {
     const message = words.trim();
-    return post("/api/move", message === "" ? { move } : { move, message }, text);
+    return post("/api/move", message === "" ? { move } : { move, message }, text, name);
 }
 
 /** Sends the player's words alone: the reason they were refused, or undefined. */
-function sendMessage(words: string, text: Text): Promise<Refused | undefined>
+function sendMessage(words: string, text: Text, name: string): Promise<Refused | undefined>
 {
-    return post("/api/message", { text: words.trim() }, text);
+    return post("/api/message", { text: words.trim() }, text, name);
 }
 
 /** Whether the words are a command for Claude's app, such as /clear, rather than words for the AI. */
@@ -849,8 +851,11 @@ interface Refused
     readonly words: boolean;
 }
 
-/** Sends a request to the server: the reason it was refused, in the player's language when the page knows the refusal (T-11, D-57), or undefined. */
-async function post(path: string, body: object, text: Text): Promise<Refused | undefined>
+/**
+ * Sends a request to the server: the reason it was refused, in the player's language when the page knows the refusal (T-11, D-57), with the host's name where
+ * it sends the player, or undefined.
+ */
+async function post(path: string, body: object, text: Text, name: string): Promise<Refused | undefined>
 {
     try {
         const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -860,8 +865,8 @@ async function post(path: string, body: object, text: Text): Promise<Refused | u
         }
 
         const refused = (await response.json()) as { error?: string; refusal?: string; most?: number; };
-        const known = refused.refusal === undefined ? undefined : text.refused[refused.refusal as ServerRefusal] as ((most: number) => string) | undefined;
-        return { text: known?.(refused.most ?? 0) ?? refused.error ?? response.statusText, words: refused.refusal?.startsWith("words-") === true };
+        const known = refused.refusal === undefined ? undefined : text.refused[refused.refusal as ServerRefusal] as ((most: number, name: string) => string) | undefined;
+        return { text: known?.(refused.most ?? 0, name) ?? refused.error ?? response.statusText, words: refused.refusal?.startsWith("words-") === true };
     } catch (error) {
         return { text: String(error), words: false };
     }

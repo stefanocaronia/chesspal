@@ -6,7 +6,7 @@ import { gameFolder } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 import { closingLines, moveLines, type MovePlayed } from "./game-summary.ts";
 import { playMove } from "./play-move.ts";
-import { defineCommand } from "./registry.ts";
+import { defineCommand, sentence } from "./registry.ts";
 import { give, waitingWords } from "./say.ts";
 
 /** The AI's move, with its plan, kept hidden (D-29), and its comment for the player when it has something to say (D-12, D-54). */
@@ -75,10 +75,4 @@ function ponderAgent(context: Context, played: MovePlayed): string | undefined
 function ponderLine(agent: string): string
 {
     return `Think on the player's time: start the ${agent} agent in the background with the prompt "Ponder."; write nothing about it in the chat, now or when it ends.`;
-}
-
-/** One sentence of the AI's, kept in a PGN comment: no brackets or braces, which would break it. */
-export function sentence(most: number): z.ZodString
-{
-    return z.string().trim().min(1, "write one sentence").max(most, `write one sentence of ${most} characters at most`).regex(/^[^[\]{}]*$/, "write it without [ ] { }");
 }

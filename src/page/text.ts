@@ -74,23 +74,24 @@ export interface Text
     readonly opening: string;
     readonly outOfBook: string;
     readonly inBook: string;
-    readonly clearChat: string;
-    /** The page lost its server, which lives in Claude's chat: where to write to bring it back. */
-    readonly offline: string;
+    /** Before a new game the chat is cleared in the host named (Claude, Codex), not on the page. */
+    clearChat(name: string): string;
+    /** The page lost its server, which lives in the host's chat: where to write to bring it back. */
+    offline(name: string): string;
     /** The page is served, but no chat hears the player (never started, or just cleared): where to write to wake it; its clock waits. */
     asleep(name: string): string;
     /** The button that starts the clocks, which wait for the player from the game's start. */
     readonly startClocks: string;
-    /** A command such as /clear written in the page's talk, which is for Claude's app. */
-    readonly commandHere: string;
+    /** A command such as /clear written in the page's talk, which is for the host's window. */
+    commandHere(name: string): string;
     /** The choice of the piece a pawn becomes on the last rank (T-11). */
     readonly promoteTo: string;
     /** A square the piece picked may go to, for a screen reader (T-11). */
     readonly canGo: string;
     /** The board for a screen reader (T-11): who moves, and the last move. */
     boardLabel(turn: Side, lastMove: string | undefined): string;
-    /** A request the server refused, by its code (T-11), with the characters left for words too long. */
-    readonly refused: Readonly<Record<ServerRefusal, (most: number) => string>>;
+    /** A request the server refused, by its code (T-11), with the characters left for words too long and the host's name. */
+    readonly refused: Readonly<Record<ServerRefusal, (most: number, name: string) => string>>;
     piece(letter: PieceLetter, side: Side): string;
     taken(pieces: readonly string[], ahead: number): string;
     writeTo(name: string): string;
@@ -331,16 +332,16 @@ const english: Text = {
     promoteTo: "Promote to",
     canGo: "a legal move",
     boardLabel: (turn, lastMove) => `Chessboard, ${english.toMove(turn)}${lastMove === undefined ? "" : `, last move ${lastMove}`}`,
-    clearChat: 'Before a new game, clear your chat with Claude: in Claude\'s app, not here, write /clear, then a message such as "new game". A clean chat plays faster.',
-    offline: "Claude is not connected. Write it a message in Claude's app, not in this page's chat: the page connects again by itself.",
+    clearChat: (name) => `Before a new game, clear your chat with ${name}: in the window where you opened ${name}, not here, write /clear, then a message such as "new game". A clean chat plays faster.`,
+    offline: (name) => `${name} is not connected. Write it a message in the window where you opened ${name}, not in this page's chat: the page connects again by itself.`,
     startClocks: "Start",
     asleep: (name) => `${name} is not listening: write a message, such as "hi", in the window where you opened ${name}, not here. Its clock waits until it answers.`,
-    commandHere: "/clear and the other commands go in Claude's app, not here.",
+    commandHere: (name) => `/clear and the other commands go in the window where you opened ${name}, not here.`,
     refused: {
         "no-game": () => "There is no game going on: press + to start one, or ask for one in the chat.",
         "ai-to-move": () => "Wait for the AI's move.",
         illegal: () => "That move is not legal here.",
-        "clear-chat": () => english.clearChat,
+        "clear-chat": (most, name) => english.clearChat(name),
         "words-empty": () => "Write something first.",
         "words-spent": () => "You have used up your words for this move: write again after the AI's move.",
         "words-long": (most) => `Write at most ${most} characters.`,
@@ -538,16 +539,17 @@ const italian: Text = {
     promoteTo: "Promuovi a",
     canGo: "mossa possibile",
     boardLabel: (turn, lastMove) => `Scacchiera, ${italian.toMove(turn)}${lastMove === undefined ? "" : `, ultima mossa ${lastMove}`}`,
-    clearChat: "Prima di una nuova partita azzera la conversazione con Claude: nell'app di Claude, non qui, scrivi /clear e poi un messaggio, per esempio \"nuova partita\". Con la chat pulita l'AI gioca più veloce.",
-    offline: "Claude è scollegato. Scrivigli un messaggio nell'app di Claude, non nella chat di questa pagina: la pagina si ricollega da sola.",
+    clearChat: (name) =>
+        `Prima di una nuova partita azzera la conversazione con ${name}: nella finestra dove hai aperto ${name}, non qui, scrivi /clear e poi un messaggio, per esempio "nuova partita". Con la chat pulita l'AI gioca più veloce.`,
+    offline: (name) => `${name} è scollegato. Scrivigli un messaggio nella finestra dove hai aperto ${name}, non nella chat di questa pagina: la pagina si ricollega da sola.`,
     startClocks: "Inizia",
     asleep: (name) => `${name} non ti sta ascoltando: scrivi un messaggio, per esempio "ciao", nella finestra dove hai aperto ${name}, non qui. Il suo orologio aspetta che risponda.`,
-    commandHere: "/clear e gli altri comandi vanno scritti nell'app di Claude, non qui.",
+    commandHere: (name) => `/clear e gli altri comandi vanno scritti nella finestra dove hai aperto ${name}, non qui.`,
     refused: {
         "no-game": () => "Nessuna partita in corso: premi + per iniziarne una, o chiedila nella chat.",
         "ai-to-move": () => "Aspetta la mossa dell'AI.",
         illegal: () => "Questa mossa qui non è legale.",
-        "clear-chat": () => italian.clearChat,
+        "clear-chat": (most, name) => italian.clearChat(name),
         "words-empty": () => "Scrivi prima qualcosa.",
         "words-spent": () => "Hai finito le parole per questa mossa: scrivi di nuovo dopo quella dell'AI.",
         "words-long": (most) => `Scrivi al massimo ${most} caratteri.`,

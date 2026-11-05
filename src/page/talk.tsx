@@ -13,14 +13,14 @@ import { hush, speak } from "./voice.ts";
 export function AiWords({ words, newestFirst, voice }: { words: readonly string[]; newestFirst: boolean; voice?: string; })
 {
     const list = useRef<HTMLOListElement>(null);
-    useScrolledToNewest(list, words, newestFirst);
+    useOnlyWhole(list, words);
     useSpokenNews(words, voice);
 
     return (
         <ol ref={list} class="says" aria-live="polite">
             {inOrder(
                 words.map((word, index) => (
-                    <li key={index} class="say">
+                    <li key={index} class="say" style={aged(words.length - 1 - index)}>
                         <Marked text={word} />
                     </li>
                 )),
@@ -197,7 +197,7 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
 })
 {
     const list = useRef<HTMLOListElement>(null);
-    useScrolledToNewest(list, lines.map((line) => line.text), newestFirst);
+    useOnlyWhole(list, lines.map((line) => line.text));
     const left = talkLimits.line - spent;
     const blank = draft.trim() === "";
 
@@ -212,7 +212,7 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
             <ol ref={list} class="sent" aria-live="polite">
                 {inOrder(
                     lines.map((line, index) => (
-                        <li key={index}>
+                        <li key={index} style={aged(lines.length - 1 - index)}>
                             <p class="said">{line.text}</p>
                             {index === lines.length - 1 ? <Status heard={line.heard} name={name} text={text} /> : null}
                         </li>
@@ -326,14 +326,39 @@ function inOrder<Item>(items: Item[], newestFirst: boolean): Item[]
     return newestFirst ? items.reverse() : items;
 }
 
-/** A list that scrolls, kept at its newest line, the first or the last, whenever its lines change. */
-function useScrolledToNewest(list: RefObject<HTMLElement>, lines: readonly string[], newestFirst: boolean): void
+/** A word fades with age: the newest whole, the older ones far back, so they never pass for the newest (Stefano), each fainter down to a floor. */
+function aged(age: number): { opacity: number; }
+{
+    return { opacity: age === 0 ? 1 : Math.max(0.2, 0.4 - (age - 1) * 0.1) };
+}
+
+/**
+ * A list that never scrolls: a bubble that does not fit whole in it is hidden, the oldest first since the newest sit by the card, and shows again when the
+ * window grows.
+ */
+function useOnlyWhole(list: RefObject<HTMLElement>, lines: readonly string[]): void
 {
     useLayoutEffect(() => {
-        if (list.current !== null) {
-            list.current.scrollTop = newestFirst ? 0 : list.current.scrollHeight;
+        const element = list.current;
+
+        if (element === null) {
+            return;
         }
-    }, [list, lines.length, lines.at(-1), newestFirst]);
+
+        const fit = (): void => {
+            const box = element.getBoundingClientRect();
+
+            for (const item of element.children) {
+                const place = item.getBoundingClientRect();
+                (item as HTMLElement).style.visibility = place.top >= box.top - 1 && place.bottom <= box.bottom + 1 ? "" : "hidden";
+            }
+        };
+
+        fit();
+        const observer = new ResizeObserver(fit);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [list, lines.length, lines.at(-1)]);
 }
 
 /** Under the player's last line: one check once written, two once the AI has read it. */

@@ -1181,15 +1181,22 @@ button {
     --piece-edge-width: 6.5px;
 }
 
+/* How much of its colours a piece keeps against the page: all of them, but on a board that is off (D-77). Opaque, so no square shows through it */
+@property --kept {
+    syntax: "<percentage>";
+    inherits: true;
+    initial-value: 100%;
+}
+
 .piece.white {
-    --piece-fill: var(--white-piece);
-    --piece-edge: #000;
+    --piece-fill: color-mix(in oklab, var(--white-piece) var(--kept), var(--page));
+    --piece-edge: color-mix(in oklab, #000 var(--kept), var(--page));
 }
 
 .piece.black {
-    --piece-fill: var(--black-piece);
-    --piece-edge: #000;
-    --piece-detail: var(--white-piece);
+    --piece-fill: color-mix(in oklab, var(--black-piece) var(--kept), var(--page));
+    --piece-edge: color-mix(in oklab, #000 var(--kept), var(--page));
+    --piece-detail: color-mix(in oklab, var(--white-piece) var(--kept), var(--page));
 }
 
 /* Why a move was refused (T-11): a bubble over the square it went to, its tail on the square; a ring on the piece that forbids it */
@@ -1741,9 +1748,10 @@ button {
     gap: 6px;
 }
 
+/* The bubbles never scroll: those that do not fit whole are hidden, and on the side away from the card they overflow toward */
 .says {
-    overflow: auto;
-    min-height: 84px;
+    overflow: hidden;
+    min-height: 0;
     padding-top: 12px;
 }
 
@@ -1775,12 +1783,9 @@ button {
 
 .sent {
     align-items: flex-end;
+    justify-content: flex-end;
     margin-bottom: 8px;
-    overflow: auto;
-    min-height: 48px;
-}
-
-.sent:empty {
+    overflow: hidden;
     min-height: 0;
 }
 
@@ -1937,6 +1942,7 @@ button {
 }
 
 .flipped .says {
+    justify-content: flex-end;
     padding: 0 0 12px;
 }
 
@@ -1965,6 +1971,7 @@ button {
 }
 
 .flipped .sent {
+    justify-content: flex-start;
     margin: 8px 0 0;
 }
 
@@ -2464,6 +2471,13 @@ button {
     color: var(--soft);
 }
 
+/* With no game, the game's column opens with this note, as tall as the game's card, so the column's tab sits in its middle */
+.side > .card.empty {
+    min-height: 74px;
+    display: flex;
+    align-items: center;
+}
+
 .problem {
     max-width: 40em;
     margin: 24px auto;
@@ -2486,7 +2500,7 @@ button {
     background: var(--card);
     color: var(--ink);
     /* The dialogs' backdrop, over the whole window */
-    box-shadow: 0 0 0 100vmax rgba(16, 22, 29, 0.4), 0 16px 40px rgb(0 0 0 / 22%);
+    box-shadow: 0 0 0 100vmax rgba(16, 22, 29, 0.5), 0 16px 40px rgb(0 0 0 / 22%);
     font-size: 15px;
     line-height: 1.5;
     text-align: center;
@@ -2510,8 +2524,9 @@ button {
     }
 }
 
+/* Grey, darker and a little blurred, so it reads as stopped even when the board's theme is already grey */
 .offline + .app {
-    filter: grayscale(0.8);
+    filter: grayscale(1) brightness(0.85) blur(2px);
 }
 
 /* No chat hears the player (Zoe): a note under the AI's card, by its stopped clock, on a page still in use. The AI's words below it lose their tail */
@@ -2606,8 +2621,22 @@ button {
     background-color: color-mix(in oklab, var(--dark-square) 40%, var(--page));
 }
 
+/* The pieces fade toward the page and never turn see-through, so each side keeps one colour on every square; cburnett, which ignores the variables, loses
+   contrast instead, opaque as well */
 .board-wrap.off .piece {
-    opacity: 0.45;
+    --kept: 45%;
+}
+
+:root[data-set="cburnett"] .board-wrap.off .piece {
+    filter: grayscale(0.5) contrast(0.55);
+}
+
+:root[data-set="cburnett"] .board-wrap.off > .ended .piece {
+    filter: grayscale(0.3) contrast(0.8);
+}
+
+:root[data-set="cburnett"] .board-wrap.off > .ended .badge .piece {
+    filter: none;
 }
 
 .board-wrap.off .coordinate {
@@ -2623,11 +2652,11 @@ button {
 }
 
 .board-wrap.off > .ended .piece {
-    opacity: 0.75;
+    --kept: 75%;
 }
 
 .board-wrap.off > .ended .badge .piece {
-    opacity: 1;
+    --kept: 100%;
 }
 
 /* It goes off gently, and comes back at once with the next game */
@@ -2638,7 +2667,7 @@ button {
 
     .board-wrap.off .piece,
     .board-wrap.off .coordinate {
-        transition: opacity 400ms ease;
+        transition: opacity 400ms ease, --kept 400ms ease;
     }
 }
 

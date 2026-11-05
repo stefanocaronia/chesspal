@@ -6,7 +6,13 @@ import type { AiLevel } from "../core/index.ts";
 /** The agent that thinks for the AI at a level: on the quick model at the beginner and club levels, on the AI's own above. */
 export function ponderAgentFor(level: AiLevel): string
 {
-    return level === "beginner" || level === "club" ? quickAgent : ownAgent;
+    return onQuickModel(level) ? quickAgent : ownAgent;
+}
+
+/** Whether the AI's thoughts on the player's time come from a quicker model than its own at a level. */
+export function onQuickModel(level: AiLevel): boolean
+{
+    return level === "beginner" || level === "club";
 }
 
 /** Whether the player's folder has the agent, as init writes it: a folder set up before it has none, and the AI then plays as before. */
@@ -38,8 +44,8 @@ export function ponderAgentFiles(folder: string): { path: string; text: string; 
 const quickAgent = "chesspal-ponder-quick";
 const ownAgent = "chesspal-ponder";
 
-// The chesspal tool it works with, and the tool search through which Claude Code may load it.
-const tools = ["mcp__chesspal__ponder", "ToolSearch"];
+// The one tool it works with: Claude Code gives an agent its MCP tools loaded, with no search first (Priya, round of T-109).
+const tools = ["mcp__chesspal__ponder"];
 
 function agentPath(folder: string, agent: string): string
 {
