@@ -1,6 +1,6 @@
 // The moves of a game as the page shows them: each with its side and number, the comment the player may read and the AI's review; and the words said on
 // the page.
-import { type GameRecord, type MoveReview, reviewOf, type Side } from "../core/index.ts";
+import { drawingsIn, type GameRecord, type MoveReview, reviewOf, type Side } from "../core/index.ts";
 
 /** A move of a record with its side and number, as the record's start position counts them, its comment for the player, and the AI's badge on it (D-69). */
 export interface Ply
@@ -23,7 +23,9 @@ export function pliesOf(record: GameRecord): Ply[]
     const offset = turn === "b" ? 1 : 0;
     return record.moves.map((move, index) => {
         const comment = move.comment?.replace(/\s*\[%[^\]]*\]/g, "").replace(/^\s*\(=\)/, "").trim();
-        const review = reviewOf(move.comment);
+        // The AI's drawings with its own move, with the helps on, come without a badge or a note (D-78).
+        const drawings = drawingsIn(move.comment);
+        const review = reviewOf(move.comment) ?? (Object.keys(drawings).length === 0 ? undefined : drawings);
         const ply = {
             san: move.san,
             side: (index + offset) % 2 === 0 ? "white" : "black",
@@ -45,6 +47,15 @@ export function withBook(plies: Ply[], book: number): Ply[]
 export function withoutReviews(plies: Ply[]): Ply[]
 {
     return plies.map(({ review, ...ply }) => ply);
+}
+
+/** The player's last move when the AI judged it, with a badge of its own or a note, and has moved since (D-78); none else. */
+export function judgmentOf(plies: readonly Ply[], player: Side): Ply | undefined
+{
+    const judged = plies.at(-2);
+    const review = judged?.review;
+    const answered = plies.at(-1)?.side !== player && judged?.side === player;
+    return answered && review !== undefined && (review.note !== undefined || (review.badge !== undefined && review.badge !== "book")) ? judged : undefined;
 }
 
 /** How long a line of the player's may be: the server's limit (D-54), which a test keeps equal. */

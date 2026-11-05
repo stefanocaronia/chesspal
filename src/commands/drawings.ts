@@ -9,9 +9,14 @@ export const noteLimit = 700;
 // The most arrows, and the most squares, on one move.
 const drawLimit = 6;
 
+/** A note of the AI's on a move, as its input reads it: on one line of commands, so without brackets or braces. */
+export const noteInput = z.string().trim().min(1).max(noteLimit).regex(/^[^[\]{}]*$/, "write it without [ ] { }");
+
 /** The arrows the AI draws, as their input reads them. */
-export const arrowsInput = z.array(z.string().regex(/^[GRYB][a-h][1-8][a-h][1-8]$/, "an arrow is a colour's letter and two squares: Gf6e4; a single square goes in squares"))
-    .max(drawLimit).optional()
+export const arrowsInput = z.array(
+    z.string().regex(/^[GRYB][a-h][1-8][a-h][1-8]$/, "an arrow is a colour's letter and two squares: Gf6e4; a single square goes in squares")
+        .refine((arrow) => arrow.slice(1, 3) !== arrow.slice(3, 5), "an arrow goes from a square to another: a single square goes in squares"),
+).max(drawLimit).optional()
     .describe(
         "arrows on the board, as PGN's %cal writes them: Rf2e1. G green: the better move or the good idea; R red: a threat or the mistake; Y yellow: another way; B blue: a plan.",
     );

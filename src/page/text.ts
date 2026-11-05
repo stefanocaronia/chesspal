@@ -262,7 +262,7 @@ const english: Text = {
     dots: "Dots on the legal moves",
     explain: "Explain the moves refused",
     bookBadges: "Mark the book moves",
-    helps: "Helps: the AI teaches as you play",
+    helps: "The AI teaches as you play",
     languageChoice: "Language",
     languages: { auto: "As the browser", it: "Italiano", en: "English" },
     names: {
@@ -470,7 +470,7 @@ const italian: Text = {
     dots: "Pallini sulle mosse legali",
     explain: "Spiega le mosse vietate",
     bookBadges: "Segna le mosse da libro",
-    helps: "Aiuti: l'AI ti insegna mentre giochi",
+    helps: "L'AI ti insegna mentre giochi",
     languageChoice: "Lingua",
     languages: { auto: "Come il browser", it: "Italiano", en: "English" },
     names: {

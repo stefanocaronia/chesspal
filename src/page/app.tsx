@@ -18,7 +18,7 @@ import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
 import { useOpeningBook } from "./opening-book.ts";
 import { ChosenSet } from "./pieces.tsx";
 import { ClockFace, PlayerCard } from "./player-card.tsx";
-import { aiSpoke, aiWords, playerSpent, playerWords, pliesOf, type TalkLine, withBook, withoutReviews } from "./plies.ts";
+import { aiSpoke, aiWords, judgmentOf, playerSpent, playerWords, pliesOf, type TalkLine, withBook, withoutReviews } from "./plies.ts";
 import { NameButton, PictureButton, PictureDialog, ProfilesDialog, Wizard } from "./profile-dialogs.tsx";
 import { keepSettings, type Profile } from "./profile.ts";
 import { SettingsPanel } from "./settings-panel.tsx";
@@ -157,9 +157,13 @@ export function App({ start }: { start: Settings; })
     const [pending, setPending] = useState<string | undefined>(undefined);
     // The player may look back through the moves played (T-88): `viewing` how many are shown, undefined for the game as it is; a new move brings it back.
     const [viewing, setViewing] = useState<number | undefined>(undefined);
+    // The square the player points at in the AI's words, lit on the board (T-111).
+    const [pointed, setPointed] = useState<string | undefined>(undefined);
     const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
     const next = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove, [live, viewing]);
     const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
+    // A square lit from the AI's words goes off with the position: a touch keeps it lit until then, a mouse until it leaves the word (T-111).
+    useEffect(() => setPointed(undefined), [shown]);
     // A game read again ends what the player was doing on the one before: the move sent, the look back, the choice of a promotion. A review written on the
     // game in analysis leaves the player where they are in it.
     useEffect(() => {
@@ -300,8 +304,8 @@ export function App({ start }: { start: Settings; })
     const playerToMove = going && live.position.turn === player;
     const ahead = (side: Side): number => side === "white" ? material.balance : -material.balance;
     const reviewed = judged || at <= inBook ? plies[at - 1] : undefined;
-    // The square the player points at in the AI's words, lit on the board (T-111).
-    const [pointed, setPointed] = useState<string | undefined>(undefined);
+    // With the helps on, the AI's judgment of the player's last move, once it has answered it (D-78).
+    const judgment = going && settings.helps ? judgmentOf(plies, player) : undefined;
     const review = reviewed?.review;
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
     const closing = studied === undefined ? undefined : closingOf(live.record);
@@ -544,7 +548,13 @@ export function App({ start }: { start: Settings; })
                                             text={text}
                                         />
                                         {asleepNote}
-                                        <AiWords words={aiWords(plies, ai, talk)} newestFirst={!flipped} {...(settings.voice ? { voice: text.language } : {})} />
+                                        <AiWords
+                                            words={aiWords(plies, ai, talk)}
+                                            newestFirst={!flipped}
+                                            {...(settings.voice ? { voice: text.language } : {})}
+                                            {...(judgment === undefined ? {} : { judged: judgment })}
+                                            text={text}
+                                        />
                                     </section>
                                     <section class="you-block" aria-label={profile.name}>
                                         <Compose

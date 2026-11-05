@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readPgn } from "../src/core/index.ts";
 import { talkLimits } from "../src/games/index.ts";
-import { aiSpoke, aiWords, playerWords, pliesOf, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/plies.ts";
+import { aiSpoke, aiWords, judgmentOf, playerWords, pliesOf, type Ply, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/plies.ts";
+import { isReviewed } from "../src/server/analyses.ts";
 
 describe("the moves on the page", () => {
     it("number the moves of a game that starts with Black to move", () => {
@@ -20,6 +21,19 @@ describe("the moves on the page", () => {
 
         expect(badges(3)).toEqual(["book", "best", "book", undefined]);
         expect(badges(0)).toEqual([undefined, "best", undefined, undefined]);
+    });
+
+    it("give the AI's judgment of the player's last move once it has answered it, never the book's (D-78)", () => {
+        const plies = (pgn: string): Ply[] => withBook(pliesOf(readPgn(pgn)[0]!), 2);
+
+        expect(judgmentOf(plies("1. e4 e5 2. d4 {[%badge mistake] [%review Too soon.]} exd4 *"), "white")?.san).toBe("d4");
+        expect(judgmentOf(plies("1. e4 e5 2. d4 {[%badge mistake]} *"), "white")).toBeUndefined();
+        expect(judgmentOf(plies("1. e4 e5 *"), "white")).toBeUndefined();
+    });
+
+    it("take a game as reviewed only for the analyst's word, never for the opponent's badges (D-78)", () => {
+        expect(isReviewed(readPgn("1. e4 {[%badge good] [%review The centre.]} e5 *")[0]!)).toBe(false);
+        expect(isReviewed(readPgn("{[%review A quiet game.]} 1. e4 e5 *")[0]!)).toBe(true);
     });
 
     it("keep the AI's drawings beside the book's badge, and drop its review during a game with the helps off (D-78)", () => {

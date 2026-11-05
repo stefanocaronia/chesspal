@@ -22,7 +22,7 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
     }
 
     // With the helps on the AI writes as long as the analyst (D-78).
-    current.talk.push(talkLine(current, who, text, at, undefined, aiMost(folder)));
+    current.talk.push(talkLine(current, who, text, at, undefined, aiMost(folder, who, text)));
 
     if (mood !== undefined) {
         endWithMood(current.game, mood);
@@ -37,10 +37,22 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
     return current;
 }
 
-/** The most a line of the AI's may hold in the games of `folder`: an analyst's note with the helps on (D-78). */
-export function aiMost(folder: string): number
+/** The most a line of the AI's may hold in the games of `folder`: an analyst's note with the helps on (D-78); a longer one with them off is refused. */
+function aiMost(folder: string, who: Sayer, text: string): number
 {
-    return helpsIn(folder) ? talkLimits.aiHelps : talkLimits.ai;
+    if (who !== "ai") {
+        return talkLimits.ai;
+    }
+
+    if (helpsIn(folder)) {
+        return talkLimits.aiHelps;
+    }
+
+    if (text.trim().length > talkLimits.ai) {
+        throw new Error(`The player has the helps off: write at most ${talkLimits.ai} characters. Nothing changed.`);
+    }
+
+    return talkLimits.ai;
 }
 
 /** What the player wrote on the board page that the AI has not been given in this chat, given now: each game tool gives it once. */
@@ -95,7 +107,7 @@ function sayAtTable(folder: string, who: Sayer, text: string, at: Date, mood: Mo
     }
 
     const before = loadTableTalk(folder);
-    const table = { started: before.started === "" ? at.toISOString() : before.started, talk: [...before.talk, talkLine(before, who, text, at)] };
+    const table = { started: before.started === "" ? at.toISOString() : before.started, talk: [...before.talk, talkLine(before, who, text, at, undefined, aiMost(folder, who, text))] };
     saveTableTalk(folder, table);
     return table;
 }

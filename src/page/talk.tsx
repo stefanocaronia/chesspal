@@ -9,14 +9,17 @@ import type { Text } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
 import { hush, speak } from "./voice.ts";
 
-/** The AI's words of the game, a bubble each, the newest by the Torretta: below it, or above it on a board turned round; the first points at it. */
-export function AiWords({ words, newestFirst, voice }: { words: readonly string[]; newestFirst: boolean; voice?: string; })
+/**
+ * The AI's words of the game, a bubble each, the newest by the Torretta: below it, or above it on a board turned round; the first points at it. With the helps
+ * on, its judgment of the player's last move comes newest, in a line that opens on its note (D-78).
+ */
+export function AiWords({ words, newestFirst, voice, judged, text }: { words: readonly string[]; newestFirst: boolean; voice?: string; judged?: Ply; text: Text; })
 {
     const list = useRef<HTMLOListElement>(null);
-    useOnlyWhole(list, words);
+    useOnlyWhole(list, words, newestFirst);
     useSpokenNews(words, voice);
 
-    return (
+    const says = (
         <ol ref={list} class="says" aria-live="polite">
             {inOrder(
                 words.map((word, index) => (
@@ -28,6 +31,14 @@ export function AiWords({ words, newestFirst, voice }: { words: readonly string[
             )}
         </ol>
     );
+
+    // The judgment sits by the Torretta, out of the bubbles' order: it never pushes the AI's words away.
+    if (judged === undefined) {
+        return says;
+    }
+
+    const line = <Judged ply={judged} text={text} />;
+    return newestFirst ? <>{line}{says}</> : <>{says}{line}</>;
 }
 
 /**
@@ -100,6 +111,35 @@ export function AiNote({ ply, opening, closing, summary, name, mood, voice, text
     );
 }
 
+/** The AI's judgment of the player's move, with the helps on: its badge and the move in a line, which opens on its note (D-78). */
+function Judged({ ply, text }: { ply: Ply; text: Text; })
+{
+    const { badge, note } = ply.review ?? {};
+    const head = (
+        <>
+            {badge === undefined ? <NoteIcon /> : <BadgeIcon badge={badge} />}
+            <b>
+                <span class="move-number">{ply.number}{ply.side === "white" ? "." : "..."}</span>
+                <Figurines san={ply.san} side={ply.side} />
+            </b>{" "}
+            {badge === undefined ? null : text.badges[badge]}
+        </>
+    );
+
+    return (
+        <div class={`say move-note judged ${badge ?? ""}`}>
+            {note === undefined ? <span class="head">{head}</span> : (
+                <details>
+                    <summary class="head">{head}</summary>
+                    <span class="note">
+                        <Marked text={note} />
+                    </span>
+                </details>
+            )}
+        </div>
+    );
+}
+
 /** The squares and moves in the AI's words, such as e3, Cxe4, 7.Nd4 or O-O: in bold, as the player looks for them on the board. */
 export function Marked({ text }: { text: string; })
 {
@@ -129,7 +169,7 @@ function OnBoard({ text }: { text: string; })
         <>
             {text.split(boardWords).map((part, index) =>
                 index % 2 === 1
-                    ? <b key={index} class="on-board" onPointerEnter={() => point(squareIn(part))} onPointerLeave={() => point(undefined)}>{part}</b>
+                    ? <b key={index} class="on-board" onPointerEnter={() => point(squareIn(part))} onPointerLeave={(event) => event.pointerType === "mouse" && point(undefined)}>{part}</b>
                     : part
             )}
         </>
@@ -354,7 +394,7 @@ function aged(age: number): { opacity: number; }
  * A list that never scrolls: a bubble that does not fit whole in it is hidden, the oldest first since the newest sit by the card, and shows again when the
  * window grows.
  */
-function useOnlyWhole(list: RefObject<HTMLElement>, lines: readonly string[]): void
+function useOnlyWhole(list: RefObject<HTMLElement>, lines: readonly string[], newestFirst = false): void
 {
     useLayoutEffect(() => {
         const element = list.current;
@@ -365,10 +405,15 @@ function useOnlyWhole(list: RefObject<HTMLElement>, lines: readonly string[]): v
 
         const fit = (): void => {
             const box = element.getBoundingClientRect();
+            const newest = newestFirst ? element.firstElementChild : element.lastElementChild;
 
             for (const item of element.children) {
                 const place = item.getBoundingClientRect();
-                (item as HTMLElement).style.visibility = place.top >= box.top - 1 && place.bottom <= box.bottom + 1 ? "" : "hidden";
+                const style = (item as HTMLElement).style;
+                // The newest never hides: one longer than the column, as a note with the helps on (D-78), scrolls in itself.
+                style.maxHeight = item === newest ? box.height + "px" : "";
+                style.overflowY = item === newest && item.scrollHeight > box.height ? "auto" : "";
+                style.visibility = item === newest || (place.top >= box.top - 1 && place.bottom <= box.bottom + 1) ? "" : "hidden";
             }
         };
 

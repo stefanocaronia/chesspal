@@ -5,7 +5,7 @@ import { badges, type GameRecord, reviewed, reviewOf, withGameReview } from "../
 import { gameInAnalysis, rewriteGame, startAnalysis } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
-import { arrowsInput, drawingsOf, noteLimit, squaresInput } from "./drawings.ts";
+import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
 import { defineCommand } from "./registry.ts";
 import { folderOf, moveIndex, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
 
@@ -35,7 +35,7 @@ export const annotateGame = defineCommand({
         notes: z.array(z.object({
             move: z.string().describe("the move, as analyse_game numbers it: 12. for White's, 12... for Black's"),
             badge: z.enum(badges).optional(),
-            note: z.string().max(noteLimit).optional().describe("why, in a few sentences, with the better move when there was one"),
+            note: noteInput.optional().describe("why, in a few sentences, with the better move when there was one"),
             arrows: arrowsInput,
             squares: squaresInput,
         })).optional().describe("the moves that matter, each with its badge, its note, or both"),

@@ -38,20 +38,21 @@ export interface MoveReview
     readonly squares?: readonly DrawnSquare[];
 }
 
-/** The review a move's comment carries: a badge, a note, or the drawings the AI made with its move (D-78); none without any. */
+/** The review a move's comment carries: a badge, a note or both, with the arrows and squares drawn to show it; none without a badge or a note. */
 export function reviewOf(comment: string | undefined): MoveReview | undefined
 {
     const found = badgePattern.exec(comment ?? "")?.[1];
     const badge = isBadge(found) ? found : undefined;
     const note = notePattern.exec(comment ?? "")?.[1]?.trim() || undefined;
+    return badge === undefined && note === undefined ? undefined : { ...(badge === undefined ? {} : { badge }), ...(note === undefined ? {} : { note }), ...drawingsIn(comment) };
+}
+
+/** The arrows and squares a move's comment carries, as the AI draws them with its move when the helps are on (D-78); none without any. */
+export function drawingsIn(comment: string | undefined): Pick<MoveReview, "arrows" | "squares">
+{
     const arrows = drawn(arrowPattern, comment, arrowOf);
     const squares = drawn(squarePattern, comment, squareOf);
-
-    if (badge === undefined && note === undefined && arrows.length === 0 && squares.length === 0) {
-        return undefined;
-    }
-
-    return { ...(badge === undefined ? {} : { badge }), ...(note === undefined ? {} : { note }), ...(arrows.length === 0 ? {} : { arrows }), ...(squares.length === 0 ? {} : { squares }) };
+    return { ...(arrows.length === 0 ? {} : { arrows }), ...(squares.length === 0 ? {} : { squares }) };
 }
 
 /** An arrow as PGN's [%cal] writes it, a colour's letter and two squares (Gf6e4); none when it is not one. */

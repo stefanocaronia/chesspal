@@ -30,8 +30,8 @@ export interface GameSummary
     plan?: string;
     /** When the AI is to move: what it thought of the player's move on their time (D-72). */
     thought?: Thought;
-    /** When the AI is to move and the player has turned the helps on: it may teach (D-78). */
-    helps?: true;
+    /** When the AI is to move: the helps on, so it may teach (D-78), or turned off since it judged or drew on a move. */
+    helps?: "on" | "off now";
     /** In a game with a time control: the time each side had left when the command ran (D-13). */
     clock?: ClockSummary;
     /** Who offered a draw, while the offer stands (D-65). */
@@ -116,7 +116,8 @@ export function withThought(summary: GameSummary, folder: string, current: Curre
     }
 
     const thought = thoughtForLastMove(folder, current);
-    return { ...summary, ...(thought === undefined ? {} : { thought }), ...(helpsIn(folder) ? { helps: true as const } : {}) };
+    const helps = helpsIn(folder) ? "on" : judgedBefore(current) ? "off now" : undefined;
+    return { ...summary, ...(thought === undefined ? {} : { thought }), ...(helps === undefined ? {} : { helps }) };
 }
 
 /** The current game `now`, refused when there is none or when it is over, on time too. */
@@ -151,13 +152,22 @@ export function positionLines(game: GameSummary, withLastMove = true): string[]
         ...(game.plan === undefined ? [] : [`Plan: ${game.plan}`]),
         ...(game.thought === undefined ? [] : [thoughtLine(game.thought, game.level)]),
         ...moodLines(game),
-        ...(game.helps === true ? [helpsLine] : []),
+        ...(game.helps === "on" ? [helpsLine] : game.helps === "off now" ? [helpsOffLine] : []),
     ];
 }
 
-/** The helps turned on: the AI may teach as the analyst does (D-62, D-78). */
-const helpsLine = "Helps on: the player wants to learn. You may tell your intentions and help them; ai_move may judge their last move (badge, note), draw arrows and "
-    + `squares, and its comment and ai_say may run to ${talkLimits.aiHelps} characters.`;
+/** The helps turned on: the AI may teach as the analyst does (D-62, D-78), never playing for the player. */
+const helpsLine = "Helps on: the player wants to learn. Tell your intentions, never their best move; after their move judge it when it stands out (ai_move's badge "
+    + `and note), draw arrows and squares to show what you say, and write up to ${talkLimits.aiHelps} characters.`;
+
+/** The helps turned off during a game: what the AI said and drew before no longer holds (Priya, round of D-78). */
+const helpsOffLine = `Helps off now: play as at a tournament again: no intentions, badges or arrows, comments of ${talkLimits.ai} characters at most.`;
+
+/** Whether the AI judged or drew on a move of this game, which only the helps allow: a sign they were on. */
+function judgedBefore(current: CurrentGame): boolean
+{
+    return current.game.record.moves.some((move) => /\[%(badge|review|cal|csl) /.test(move.comment ?? ""));
+}
 
 /** The head of a view: where the game stands, the last move unless the lines before named it, the opening, the material as the player sees it, and the FEN. */
 export function headLines(game: GameSummary, withLastMove = true): string[]

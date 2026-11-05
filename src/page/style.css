@@ -652,9 +652,16 @@ button {
     background-image: linear-gradient(var(--mark-square), var(--mark-square));
 }
 
-/* The square the player points at in the AI's words (T-111): a ring in the accent, over everything else on it */
+/* The square the player points at in the AI's words (T-111): a white ring with a dark edge, which reads on every board and over the rings the AI draws */
 .square.pointed {
-    box-shadow: inset 0 0 0 4px var(--accent), inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 35%, transparent);
+    outline: max(4px, 0.8cqw) solid #fff;
+    outline-offset: calc(-1 * max(4px, 0.8cqw));
+    box-shadow: inset 0 0 0 calc(max(4px, 0.8cqw) + 2px) rgba(0, 0, 0, 0.55);
+}
+
+/* On a square the AI marked, the pointer's ring takes the place of the AI's while it lasts */
+.square.noted.pointed::after {
+    box-shadow: inset 0 0 0 max(4px, 0.8cqw) #fff, inset 0 0 0 calc(max(4px, 0.8cqw) + 2px) rgba(0, 0, 0, 0.55);
 }
 
 .arrows {
@@ -2276,6 +2283,16 @@ button {
 }
 
 /* The note is the bubble's content: in the bubble's own ink, not the soft one of a side note (Zoe, T-40) */
+/* The AI's judgment of the player's last move, with the helps on (D-78): a line that opens on its note */
+.move-note.judged summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.move-note.judged summary::-webkit-details-marker {
+    display: none;
+}
+
 .move-note .note {
     display: block;
     margin-top: 4px;

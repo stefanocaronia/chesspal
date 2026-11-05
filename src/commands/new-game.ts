@@ -4,7 +4,7 @@ import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, e
 import { gameFolder, gameFolders } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
-import { type GameSummary, nextStep, positionLines, sidesLine, summaryOf } from "./game-summary.ts";
+import { type GameSummary, nextStep, positionLines, sidesLine, summaryOf, withThought } from "./game-summary.ts";
 import { levelText, levelToPlay } from "./levels.ts";
 import { closedPage, pageLine } from "./page-link.ts";
 import { pastGameLines } from "./past-games.ts";
@@ -88,7 +88,7 @@ export const newGame = defineCommand({
         const player = playerLine(context);
         const closed = closedPage(context);
         return {
-            game: summaryOf(current, now),
+            game: withThought(summaryOf(current, now), folder, current),
             ...(archived === undefined ? {} : { archived: { name: archived, finished: going === undefined } }),
             past,
             ...(player === undefined ? {} : { player }),
