@@ -1,7 +1,8 @@
 // The page's words in the player's language (D-32): Italian or English, from the browser's or as the settings say (D-56).
-import type { AiLevel, Badge, DrawColour, IllegalReason, PieceLetter, Side } from "../core/index.ts";
+import type { AiLevel, Badge, DrawColour, IllegalReason, Phase, PieceLetter, Side } from "../core/index.ts";
 import type { Step } from "./browse.ts";
 import type { HowEnded } from "./ending.ts";
+import type { StrategyRow } from "./helps-view.ts";
 import type { AvatarId, Level, RatingSite } from "./profile.ts";
 
 /** The words of the page in one language. */
@@ -116,6 +117,49 @@ export interface Text
     readonly start: StartText;
     /** The dialog that brings a game played elsewhere to analyse (T-92). */
     readonly study: StudyText;
+    /** The helps' card (D-78): the facts the AI sees at the game's level. */
+    readonly helpsCard: HelpsCardText;
+}
+
+/** The words of the helps' card. */
+export interface HelpsCardText
+{
+    readonly title: string;
+    seen(level: string): string;
+    readonly tactics: string;
+    readonly strategy: string;
+    readonly map: string;
+    readonly mapHint: string;
+    readonly hold: string;
+    readonly attackers: string;
+    readonly defenders: string;
+    /** Why a piece is at risk, as a noun (Anatolij's words). */
+    readonly undefended: string;
+    readonly cheaper: string;
+    readonly outnumbered: string;
+    /** A pin, after the pinned piece: the piece behind it, then the one that pins it, each with its article. */
+    pinnedTo(letter: PieceLetter): string;
+    pinnedBy(letter: PieceLetter): string;
+    readonly nothingAtRisk: string;
+    /** The checks of a side: `toMove` its own, else the ones it would have if it moved. */
+    checks(side: Side, toMove: boolean): string;
+    readonly loose: string;
+    readonly white: string;
+    readonly black: string;
+    /** Each line of the strategy's table: its name, and what it means for whoever does not know the word (Rosa). */
+    readonly rows: Readonly<Record<StrategyRow, readonly [name: string, meaning: string]>>;
+    readonly yes: string;
+    readonly notYet: string;
+    readonly noMore: string;
+    readonly phases: Readonly<Record<Phase, string>>;
+    openFiles(files: string): string;
+    controlled(white: number, black: number, both: number): string;
+    readonly oppositeBishops: string;
+    repetitions(times: number): string;
+    fiftyMoves(halfMoves: number): string;
+    readonly insufficient: string;
+    pawnSquare(pawn: string, caught: boolean): string;
+    opposition(side: Side): string;
 }
 
 /** The words of the dialog that brings a game to analyse. */
@@ -440,6 +484,55 @@ const english: Text = {
         analyseIt: "Analyse the game",
         analyseLast: "Analyse the last game",
     },
+    helpsCard: {
+        title: "Helps",
+        seen: (level) => `as the AI sees them · ${level}`,
+        tactics: "Tactics",
+        strategy: "Strategy",
+        map: "Map",
+        mapHint: "Hold it, or the M key, to see who controls each square; on a phone, a touch turns it on and off",
+        hold: "hold",
+        attackers: "attackers",
+        defenders: "defenders",
+        undefended: "no defender",
+        cheaper: "a cheaper attacker",
+        outnumbered: "more attackers than defenders",
+        pinnedTo: (letter) => `pinned to the ${englishNames[letter]}`,
+        pinnedBy: (letter) => `by the ${englishNames[letter]}`,
+        nothingAtRisk: "No piece at risk, no pins.",
+        checks: (side, toMove) => `${side === "white" ? "White" : "Black"}'s checks${toMove ? "" : `, if it were ${side === "white" ? "White" : "Black"}'s move`}`,
+        loose: "Pieces neither attacked nor defended",
+        white: "White",
+        black: "Black",
+        rows: {
+            isolated: ["Isolated pawns", "A pawn with no pawn of its colour on the files beside it: no pawn can defend it."],
+            doubled: ["Doubled pawns", "Two pawns of one colour on the same file."],
+            backward: ["Backward pawns", "A pawn left behind the pawns beside it, with the square in front of it attacked by an enemy pawn."],
+            passed: ["Passed pawns", "No enemy pawn in front of it, on its file or the files beside it."],
+            islands: ["Pawn islands", "Groups of pawns on neighbouring files, apart from each other."],
+            halfOpen: ["Half-open files", "Files with enemy pawns and none of one's own."],
+            heavyOnFiles: ["Rooks and queens on open files", "Rooks and queens on open or half-open files."],
+            onSeventh: ["Rooks and queens on the seventh", "Rooks and queens on the enemy's second rank: the seventh for White, the second for Black."],
+            outposts: ["Outposts", "Squares on one's ranks 4 to 6, defended by a pawn, that no enemy pawn can ever attack."],
+            bishopPair: ["Bishop pair", "Both bishops still on the board."],
+            space: ["Space (squares in the enemy's half)", "How many squares of the enemy's half one's pieces attack."],
+            undeveloped: ["Minor pieces not developed", "Knights and bishops still on their first squares."],
+            castled: ["Castling", "How it castled; not yet while it still can, no more once the king or the rooks have moved."],
+            kingAttacks: ["Enemy attacks around the king", "How many enemy attacks fall on the squares next to the king."],
+        },
+        yes: "yes",
+        notYet: "not yet",
+        noMore: "no more",
+        phases: { opening: "opening", middlegame: "middlegame", endgame: "endgame" },
+        openFiles: (files) => `Open files: ${files}`,
+        controlled: (white, black, both) => `Squares only White's ${white}, only Black's ${black}, both ${both}`,
+        oppositeBishops: "Bishops of opposite colours",
+        repetitions: (times) => `This position has stood ${times} times`,
+        fiftyMoves: (halfMoves) => `${halfMoves} half-moves left before the fifty-move draw`,
+        insufficient: "Too little material to mate",
+        pawnSquare: (pawn, caught) => `The enemy king is ${caught ? "inside" : "outside"} the square of the pawn on ${pawn}`,
+        opposition: (side) => `${side === "white" ? "White" : "Black"} has the opposition`,
+    },
 };
 
 const italian: Text = {
@@ -650,6 +743,55 @@ const italian: Text = {
         analyseIt: "Analizza la partita",
         analyseLast: "Analizza l'ultima partita",
     },
+    helpsCard: {
+        title: "Aiuti",
+        seen: (level) => `come li vede l'AI · ${level}`,
+        tactics: "Tattica",
+        strategy: "Strategia",
+        map: "Mappa",
+        mapHint: "Tienilo premuto, o tieni premuto il tasto M, per vedere chi controlla ogni casa; sul telefono un tocco la accende e la spegne",
+        hold: "tieni premuto",
+        attackers: "attaccanti",
+        defenders: "difensori",
+        undefended: "nessun difensore",
+        cheaper: "un attaccante vale meno",
+        outnumbered: "più attaccanti che difensori",
+        pinnedTo: (letter) => `davanti ${italianWith("a", letter)}`,
+        pinnedBy: (letter) => italianWith("da", letter),
+        nothingAtRisk: "Nessun pezzo in pericolo, nessuna inchiodatura.",
+        checks: (side, toMove) => `Scacchi del ${side === "white" ? "Bianco" : "Nero"}${toMove ? "" : ", se toccasse a lui"}`,
+        loose: "Pezzi né attaccati né difesi",
+        white: "Bianco",
+        black: "Nero",
+        rows: {
+            isolated: ["Pedoni isolati", "Un pedone senza pedoni del suo colore sulle colonne accanto: nessun pedone può difenderlo."],
+            doubled: ["Pedoni doppiati", "Due pedoni dello stesso colore sulla stessa colonna."],
+            backward: ["Pedoni arretrati", "Un pedone rimasto indietro rispetto a quelli accanto, con la casa davanti attaccata da un pedone nemico."],
+            passed: ["Pedoni passati", "Nessun pedone nemico davanti a lui, né sulla sua colonna né su quelle accanto."],
+            islands: ["Isole di pedoni", "Gruppi di pedoni su colonne vicine, separati fra loro."],
+            halfOpen: ["Colonne semiaperte", "Colonne con pedoni nemici e nessuno dei propri."],
+            heavyOnFiles: ["Torri e donna su colonne aperte", "Torri e donna su colonne aperte o semiaperte."],
+            onSeventh: ["Torri e donna in settima", "Torri e donna sulla seconda traversa del nemico: la settima per il Bianco, la seconda per il Nero."],
+            outposts: ["Avamposti", "Case sulle proprie traverse dalla quarta alla sesta, difese da un pedone, che nessun pedone nemico potrà mai attaccare."],
+            bishopPair: ["Coppia degli alfieri", "Tutti e due gli alfieri ancora sulla scacchiera."],
+            space: ["Spazio (case nella metà avversaria)", "Quante case della metà avversaria attaccano i propri pezzi."],
+            undeveloped: ["Pezzi minori non sviluppati", "Cavalli e alfieri ancora sulle case di partenza."],
+            castled: ["Arrocco", "Come ha arroccato; non ancora finché può farlo, non più quando il re o le torri si sono già mossi."],
+            kingAttacks: ["Attacchi nemici attorno al re", "Quanti attacchi nemici cadono sulle case accanto al re."],
+        },
+        yes: "sì",
+        notYet: "non ancora",
+        noMore: "non più",
+        phases: { opening: "apertura", middlegame: "mediogioco", endgame: "finale" },
+        openFiles: (files) => `Colonne aperte: ${files}`,
+        controlled: (white, black, both) => `Case solo del Bianco ${white}, solo del Nero ${black}, di tutti e due ${both}`,
+        oppositeBishops: "Alfieri di colore contrario",
+        repetitions: (times) => `Questa posizione si è vista ${times} volte`,
+        fiftyMoves: (halfMoves) => `Mancano ${halfMoves} semimosse alla patta delle cinquanta mosse`,
+        insufficient: "Materiale insufficiente per dare matto",
+        pawnSquare: (pawn, caught) => `Il re nemico è ${caught ? "dentro il" : "fuori dal"} quadrato del pedone in ${pawn}`,
+        opposition: (side) => `L'opposizione è del ${side === "white" ? "Bianco" : "Nero"}`,
+    },
 };
 
 // Why a move is refused, from the piece moved, the square it went to and the piece that forbids it, each named with its article.
@@ -719,6 +861,12 @@ function englishCulprit(by: RefusedMove["by"]): string
 function italianCulprit(by: RefusedMove["by"]): string
 {
     return by === undefined ? "" : `${italianThe[by.letter]}${by.letter === "K" ? (by.side === "white" ? " bianco" : " nero") : ""} in ${by.square}`;
+}
+
+/** A piece with its article joined to a preposition: "alla donna", "dall'alfiere". */
+function italianWith(preposition: "a" | "da", letter: PieceLetter): string
+{
+    return italianThe[letter].replace(/^il /, `${preposition}l `).replace(/^la /, `${preposition}lla `).replace(/^l'/, `${preposition}ll'`);
 }
 
 /** The words with their first letter capital, to open a sentence. */

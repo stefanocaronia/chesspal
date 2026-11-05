@@ -24,16 +24,20 @@ export function MoveList({ plies, result, shown, onShow, text }: { plies: readon
     }, [plies.length]);
 
     // Only the list scrolls to the move shown: the page under the board stays where the player has it.
-    useEffect(() => {
-        const box = list.current?.getBoundingClientRect();
-        const move = list.current?.querySelector(".current")?.getBoundingClientRect();
+    useEffect(() => keepInSight(list.current), [shown]);
 
-        if (box === undefined || move === undefined) {
+    // The cards above it change height with the position, the helps' card above all: the list follows, its move still in sight.
+    useEffect(() => {
+        const element = list.current;
+
+        if (element === null) {
             return;
         }
 
-        list.current!.scrollTop += Math.min(0, move.top - box.top) + Math.max(0, move.bottom - box.bottom);
-    }, [shown]);
+        const observer = new ResizeObserver(() => keepInSight(element));
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
 
     const move = (ply: Ply | undefined): JSX.Element => <Move ply={ply} current={ply !== undefined && ply === current} onShow={() => onShow(plies.indexOf(ply!) + 1)} text={text} />;
 
@@ -105,6 +109,19 @@ export function Figurines({ san, side }: { san: string; side: Side; })
             {san.split(/([KQRBNx])/).map((part, index) => index % 2 === 0 ? part : part === "x" ? <span key={index} class="takes">x</span> : <Figurine key={index} letter={part} side={side} />)}
         </>
     );
+}
+
+/** Scrolls the list, and only the list, as little as it takes to show its current move. */
+function keepInSight(list: HTMLDivElement | null): void
+{
+    const box = list?.getBoundingClientRect();
+    const move = list?.querySelector(".current")?.getBoundingClientRect();
+
+    if (box === undefined || move === undefined) {
+        return;
+    }
+
+    list!.scrollTop += Math.min(0, move.top - box.top) + Math.max(0, move.bottom - box.bottom);
 }
 
 /** The plies in rows of one number: White's move and Black's. */

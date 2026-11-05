@@ -703,6 +703,21 @@ button {
     --mark: #2563eb;
 }
 
+/* The AI's arrows have a white edge, as its rings do (D-78): they read as its own whatever colour the player marks in */
+.arrows .edge {
+    stroke: #fff;
+}
+
+.arrows path.edge {
+    stroke-width: 0.3;
+}
+
+.arrows polygon.edge {
+    fill: #fff;
+    stroke-width: 0.1;
+    stroke-linejoin: round;
+}
+
 /* The AI's squares are rings (Zoe, T-40): the last move's fill and the player's marks stay seen under them */
 .square.noted::after {
     content: "";
@@ -2358,7 +2373,8 @@ button {
     font-weight: 400;
 }
 
-.board-steps {
+.board-steps,
+.board-map {
     display: none;
 }
 
@@ -3823,6 +3839,25 @@ button {
         grid-template-areas: "head" "you" "board" "ai" "side";
     }
 
+    /* The helps' map right under the board, by the thumb, so the board stays in sight while it shows (D-78, Zoe) */
+    .app:has(.board-map) {
+        grid-template-areas: "head" "ai" "board" "map" "you" "side";
+    }
+
+    .app.flipped:has(.board-map) {
+        grid-template-areas: "head" "you" "board" "map" "ai" "side";
+    }
+
+    .board-map {
+        display: flex;
+        justify-content: flex-end;
+        grid-area: map;
+    }
+
+    .helps-card .map-button {
+        display: none;
+    }
+
     .talk,
     .app.talk-rail .talk,
     .app.talk-folded .talk {
@@ -3912,4 +3947,325 @@ button {
     .move-note .move-number {
         display: inline;
     }
+}
+
+/* The helps (D-78, Zoe's sketch B): one ink for all they draw, never one of the AI's colours, a fill or a ring. The board says where, the card says what. */
+:root {
+    --help-ink: #11161d;
+    --help-on: #fff;
+    --help-line: rgba(17, 22, 29, 0.78);
+    --help-halo: rgba(255, 255, 255, 0.85);
+}
+
+/* A piece at risk: a corner folded in ink, bottom left, the square's free corner */
+.help-notch {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    z-index: 2;
+    display: block;
+    width: clamp(14px, 6.5cqw, 44px);
+    height: clamp(14px, 6.5cqw, 44px);
+    pointer-events: none;
+}
+
+.help-notch svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.help-notch path {
+    fill: var(--help-ink);
+    stroke: var(--help-halo);
+    stroke-width: 0.9;
+    stroke-linejoin: round;
+}
+
+.help-notch circle {
+    fill: var(--help-on);
+}
+
+/* A pin: a thin dashed ink line from the pinner to what stands behind, under the arrows; without a head, never an arrow */
+.helps-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    aspect-ratio: 1;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.helps-layer line.halo {
+    stroke: rgba(255, 255, 255, 0.35);
+    stroke-width: 0.13;
+}
+
+.helps-layer line:not(.halo) {
+    stroke: var(--help-line);
+    stroke-width: 0.065;
+    stroke-dasharray: 0.16 0.12;
+    stroke-linecap: round;
+}
+
+/* The map (Zoe, after the round): every square on one neutral ground, then light where only White reaches, dark where only Black does, half and half
+   when both do; the two counts together in the middle, as a domino. The drawings and the pieces step back */
+.board.mapping ~ .arrows,
+.board.mapping .move-badge {
+    opacity: 0.12;
+}
+
+.board.mapping .square.noted::after {
+    opacity: 0.15;
+}
+
+.board.mapping .piece {
+    opacity: 0.45;
+}
+
+.control-ground {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: #8d96a1;
+}
+
+.control-ground.white {
+    background: #eef1f4;
+}
+
+.control-ground.black {
+    background: #2b323c;
+}
+
+.control-ground.both {
+    background: linear-gradient(135deg, #eef1f4 50%, #2b323c 50%);
+}
+
+.control-count {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 1;
+    display: flex;
+    translate: -50% -50%;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(17, 22, 29, 0.55);
+    pointer-events: none;
+    font: 800 clamp(10px, 2.2cqw, 17px) / 1 "Segoe UI", system-ui, sans-serif;
+}
+
+.control-count b {
+    min-width: 1.35em;
+    padding: 0.2em 0.25em;
+    text-align: center;
+}
+
+.control-count .white {
+    background: #fff;
+    color: #11161d;
+}
+
+.control-count .black {
+    background: #11161d;
+    color: #fff;
+}
+
+/* The helps' card in the game's column */
+.helps-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    min-height: 0;
+    flex: 0 1 auto;
+    overflow: auto;
+}
+
+.helps-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.helps-title span {
+    font-weight: 400;
+    color: var(--soft);
+}
+
+.help-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--soft);
+}
+
+.help-rows li {
+    position: relative;
+    padding: 3px 6px 3px 26px;
+    border-radius: 6px;
+    line-height: 1.35;
+}
+
+.help-rows li.points:hover {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--ink);
+}
+
+.help-rows li.quiet {
+    font-size: 12px;
+}
+
+.help-rows .square-name {
+    color: var(--ink);
+}
+
+/* The checks and the loose pieces in figures, as the move list draws them; the loose ones White's first, then Black's. */
+.help-rows .help-move {
+    margin-right: 0.5em;
+    color: var(--ink);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.help-rows .help-pieces + .help-pieces {
+    margin-left: 0.4em;
+    padding-left: 0.6em;
+    border-left: 1px solid var(--line);
+}
+
+.help-rows .help-notch {
+    left: 6px;
+    top: 4px;
+    bottom: auto;
+    width: 14px;
+    height: 14px;
+}
+
+.help-rows .help-notch path {
+    fill: var(--ink);
+    stroke: none;
+}
+
+.help-rows .help-notch circle {
+    fill: var(--card);
+}
+
+.help-rows .row-icon {
+    position: absolute;
+    left: 6px;
+    top: 3px;
+    width: 14px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    color: var(--ink);
+    font-weight: 800;
+}
+
+.helps-card .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--line);
+}
+
+.helps-card .tabs [role="tab"] {
+    border: 0;
+    background: none;
+    color: var(--soft);
+    font: inherit;
+    font-weight: 600;
+    padding: 4px 8px 6px;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+}
+
+.helps-card .tabs [role="tab"][aria-selected="true"] {
+    color: var(--ink);
+    border-bottom-color: var(--accent);
+}
+
+/* The map's button: in the card's tabs, or under the board on a phone */
+.map-button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 2px 8px;
+    background: var(--card);
+    color: var(--soft);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+}
+
+.tabs .map-button {
+    margin: 0 0 4px auto;
+}
+
+.board-map .map-button {
+    padding: 6px 12px;
+}
+
+.map-button svg {
+    width: 13px;
+    height: 13px;
+    fill: currentColor;
+}
+
+.map-button small {
+    font-weight: 400;
+}
+
+.map-button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+}
+
+.profile-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    color: var(--soft);
+}
+
+.profile-table th,
+.profile-table td {
+    padding: 2px 4px;
+    text-align: left;
+    font-weight: 400;
+}
+
+.profile-table thead th {
+    color: var(--ink);
+    font-weight: 700;
+}
+
+.profile-table tbody tr + tr {
+    border-top: 1px solid var(--line);
+}
+
+/* A term with its meaning under the pointer (Rosa). */
+.profile-table tbody th[title] {
+    text-decoration: underline dotted color-mix(in srgb, var(--soft) 60%, transparent);
+    text-underline-offset: 3px;
+    cursor: help;
+}
+
+.profile-foot {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--soft);
 }

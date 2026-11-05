@@ -1,10 +1,12 @@
 // The board: eight ranks of squares from a FEN, one side at the bottom, Zoe's pieces (T-9), the ranks and files on the edge squares. The player moves
 // with two clicks or by dragging a piece, which lifts off the board, in Zoe's design (T-70).
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { Badge as MoveBadge, DrawColour, DrawnArrow, DrawnSquare, Move, PieceLetter, Promotion, Side } from "../core/index.ts";
+import type { Badge as MoveBadge, DrawColour, DrawnArrow, DrawnSquare, Move, PieceLetter, Profile, Promotion, Side, Square } from "../core/index.ts";
 import { BadgeIcon } from "./badges.tsx";
 import type { HowEnded } from "./ending.ts";
 import { type BubblePlace, bubblePlace, type ExplainKind, type Explanation, keptSquares } from "./explain.ts";
+import { atRiskOn, type HelpsView } from "./helps-view.ts";
+import { Notch } from "./helps.tsx";
 import { Piece } from "./pieces.tsx";
 import type { Text } from "./text.ts";
 
@@ -13,12 +15,16 @@ import type { Text } from "./text.ts";
  * picks one, and the legal moves of the piece picked show as dots, rings on captures; a second press on one of them, or a drag there, plays it. At any time
  * the right button lights a square, or draws an arrow when dragged, until a left click.
  */
-export function Board({ fen, bottom, lastMove, pointed, badge, drawn, nextMove, jumped, check, end, player, selected, targets, dots, notice, promotion, onSelect, onMove, onRefuse, onPromote, text }: {
+export function Board({ fen, bottom, lastMove, pointed, helps, control, badge, drawn, nextMove, jumped, check, end, player, selected, targets, dots, notice, promotion, onSelect, onMove, onRefuse, onPromote, text }: {
     fen: string;
     bottom: Side;
     lastMove?: Move;
-    /** The square the player points at in the AI's words (T-111). */
-    pointed?: string;
+    /** The squares the player points at in the AI's words (T-111) or in the helps' card (D-78). */
+    pointed?: readonly string[];
+    /** The helps (D-78): a corner folded on each piece at risk, a dashed line for each pin. */
+    helps?: HelpsView;
+    /** The control map, while it is held (D-78): how many pieces of each side attack each square, [White, Black]. */
+    control?: Profile["control"];
     /** The AI's badge on the last move, in a game in analysis (D-69): on the square it went to, by its name. */
     badge?: { badge: MoveBadge; name: string; };
     /** The arrows and squares the AI drew with its note on the move shown (D-69), under the player's own marks. */
@@ -336,7 +342,7 @@ export function Board({ fen, bottom, lastMove, pointed, badge, drawn, nextMove, 
         <>
             <div
                 ref={board}
-                class={["board", player === undefined ? "" : "playable", end === undefined ? "" : endClasses(end)].filter((name) => name !== "").join(" ")}
+                class={["board", player === undefined ? "" : "playable", end === undefined ? "" : endClasses(end), control === undefined ? "" : "mapping"].filter((name) => name !== "").join(" ")}
                 role="group"
                 aria-label={text.boardLabel(fen.split(" ")[1] === "b" ? "black" : "white", lastMove?.san)}
                 onPointerDown={down}
@@ -368,7 +374,7 @@ export function Board({ fen, bottom, lastMove, pointed, badge, drawn, nextMove, 
                             selected === square ? "selected" : "",
                             tinted === undefined ? "" : `noted ${tinted}`,
                             marks.squares.includes(square) ? "marked" : "",
-                            pointed === square ? "pointed" : "",
+                            pointed?.includes(square) === true ? "pointed" : "",
                             notice?.explanation?.ring === square ? "culprit" : "",
                             own(square) ? "own" : "",
                             target === undefined ? "" : !dots ? "target" : target.san.includes("x") ? "hint capture" : "hint",
@@ -416,13 +422,18 @@ export function Board({ fen, bottom, lastMove, pointed, badge, drawn, nextMove, 
                                         <Piece letter={gone.letter} />
                                     </span>
                                 ))}
+                                {control === undefined ? null : <span class={`control-ground ${controlOf(control[square as Square])}`} aria-hidden="true" />}
                                 {piece === undefined ? null : <Piece key={moving ? fen : "still"} letter={piece} />}
                                 {sign === undefined ? null : <Badge kind={sign.badge} />}
+                                {helps !== undefined && atRiskOn(helps, square) ? <Notch /> : null}
+                                {control === undefined ? null : <ControlCount counts={control[square as Square]} />}
                                 {badge === undefined || lastMove?.to !== square ? null : <BadgeIcon badge={badge.badge} title={badge.name} />}
                             </div>
                         );
                     })
                 )}
+                {/* Inside the board, under the corners of the pieces at risk */}
+                {helps === undefined || helps.pins.length === 0 || control !== undefined ? null : <Pins pins={helps.pins} at={centreOf} />}
             </div>
             {drawn?.arrows === undefined ? null : <Arrows arrows={drawn.arrows} at={centreOf} occupied={(square) => pieces.has(square)} />}
             <Arrows arrows={drawing === undefined ? marks.arrows : [...marks.arrows, drawing]} at={centreOf} />
@@ -749,14 +760,67 @@ function Arrows({ arrows, at, explain, occupied }: {
                 const side = (sign: number): string => `${endX - dy * arrowHead.width * sign},${endY + dx * arrowHead.width * sign}`;
                 // The shaft runs halfway into the point, so no seam shows where they meet; the layer's opacity hides the overlap.
                 const [shaftX, shaftY] = [x1 - dx * arrowHead.length / 2, y1 - dy * arrowHead.length / 2];
+                const shaft = `M${x0} ${y0}${corner === undefined ? "" : ` L${corner[0]} ${corner[1]}`} L${shaftX} ${shaftY}`;
+                const head = `${side(1)} ${x1},${y1} ${side(-1)}`;
                 return (
                     <g key={`${from}${to}`} class={colour}>
-                        <path d={`M${x0} ${y0}${corner === undefined ? "" : ` L${corner[0]} ${corner[1]}`} L${shaftX} ${shaftY}`} />
-                        <polygon points={`${side(1)} ${x1},${y1} ${side(-1)}`} />
+                        {/* The AI's arrows on a white edge (D-78) */}
+                        {occupied === undefined ? null : (
+                            <>
+                                <path class="edge" d={shaft} />
+                                <polygon class="edge" points={head} />
+                            </>
+                        )}
+                        <path d={shaft} />
+                        <polygon points={head} />
                     </g>
                 );
             })}
         </svg>
+    );
+}
+
+/** Each pin as a dashed line from the pinning piece through the pinned one to what stands behind it (D-78), over a halo that reads on every board. */
+function Pins({ pins, at }: { pins: HelpsView["pins"]; at: (square: string) => [number, number]; })
+{
+    return (
+        <svg class="helps-layer" viewBox="0 0 8 8" aria-hidden="true">
+            {pins.map((pin) => {
+                // The line stops short of both ends, as an explaining arrow does: it hides neither piece, nor the corner of a pinner at risk.
+                const [x0, y0] = towards(at(pin.by.square), at(pin.to.square), pinTrim);
+                const [x1, y1] = towards(at(pin.to.square), at(pin.by.square), pinTrim);
+                return (
+                    <g key={`${pin.by.square}${pin.piece.square}`} class="pin">
+                        <line class="halo" x1={x0} y1={y0} x2={x1} y2={y1} />
+                        <line x1={x0} y1={y0} x2={x1} y2={y1} />
+                    </g>
+                );
+            })}
+        </svg>
+    );
+}
+
+/** Who reaches a square on the control map: only White, only Black, both or none. */
+function controlOf(counts: readonly [number, number] | undefined): "white" | "black" | "both" | "none"
+{
+    const [white, black] = counts ?? [0, 0];
+    return white > 0 && black > 0 ? "both" : white > 0 ? "white" : black > 0 ? "black" : "none";
+}
+
+/** A square's counts on the control map, as a domino in its middle: how many of White's pieces reach it, and of Black's; none when no piece does. */
+function ControlCount({ counts }: { counts: readonly [number, number] | undefined; })
+{
+    const [white, black] = counts ?? [0, 0];
+
+    if (white === 0 && black === 0) {
+        return null;
+    }
+
+    return (
+        <span class="control-count" aria-hidden="true">
+            <b class="white">{white}</b>
+            <b class="black">{black}</b>
+        </span>
     );
 }
 
@@ -866,6 +930,9 @@ const explainTrim = { start: 0.36, end: 0.4 };
 
 // A board narrower than this, in pixels, is a phone's: its bubble takes the board's width, and goes under the board when it has no room on it.
 const narrowBoard = 520;
+
+// How much a pin's line is cut at each end, in squares.
+const pinTrim = 0.35;
 
 // An arrow's head, in squares: how long, and how far each side of its line.
 const arrowHead = { length: 0.42, width: 0.3 };

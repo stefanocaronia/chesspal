@@ -2,7 +2,7 @@
 // words (T-65), in Zoe's three columns (D-53): the talk, the board, the game, the side ones folded as the player likes (T-84).
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { type Clock, closingOf, Game, gameReviewOf, materialOf, type Mood, moodAt, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square, suggestedLevel, timeControlText } from "../core/index.ts";
+import { type Clock, closingOf, Game, gameReviewOf, levelOf, materialOf, type Mood, moodAt, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square, suggestedLevel, timeControlText } from "../core/index.ts";
 import { PlayerPicture } from "./avatars.tsx";
 import { BadgeCounts } from "./badges.tsx";
 import { Board, type Notice, piecesOf } from "./board.tsx";
@@ -13,6 +13,8 @@ import { FoldTab } from "./fold-tab.tsx";
 import { type Column, foldKeys, gameUnderBoard, nextFold, oneColumn, rememberFold, startFolds } from "./folds.ts";
 import { GameColumn } from "./game-column.tsx";
 import { type GameActions, Header } from "./header.tsx";
+import { helpsOf } from "./helps-view.ts";
+import { HelpsCard, MapButton } from "./helps.tsx";
 import { Steps } from "./move-list.tsx";
 import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
 import { useOpeningBook } from "./opening-book.ts";
@@ -157,13 +159,19 @@ export function App({ start }: { start: Settings; })
     const [pending, setPending] = useState<string | undefined>(undefined);
     // The player may look back through the moves played (T-88): `viewing` how many are shown, undefined for the game as it is; a new move brings it back.
     const [viewing, setViewing] = useState<number | undefined>(undefined);
-    // The square the player points at in the AI's words, lit on the board (T-111).
-    const [pointed, setPointed] = useState<string | undefined>(undefined);
+    // The squares the player points at in the AI's words or the helps' card, lit on the board (T-111); the control map while it is held (D-78).
+    const [pointed, setPointed] = useState<readonly string[]>(noSquares);
+    const pointSquare = useMemo(() => (square: string | undefined) => setPointed(square === undefined ? noSquares : [square]), []);
+    const [mapping, setMapping] = useState(false);
     const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
     const next = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove, [live, viewing]);
     const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
     // A square lit from the AI's words goes off with the position: a touch keeps it lit until then, a mouse until it leaves the word (T-111).
-    useEffect(() => setPointed(undefined), [shown]);
+    useEffect(() => setPointed(noSquares), [shown]);
+    // With the helps on, the player sees what the AI sees at the game's level, only that (D-78): from Club the tactics, from Strong the strategy and the map.
+    const helps = useMemo(() => going && settings.helps ? helpsOf(shown, levelOf(replayed.record)) : undefined, [shown, going, settings.helps]);
+    const strategic = helps?.strategy !== undefined;
+    useMapKey(strategic, setMapping);
     // A game read again ends what the player was doing on the one before: the move sent, the look back, the choice of a promotion. A review written on the
     // game in analysis leaves the player where they are in it.
     useEffect(() => {
@@ -462,7 +470,7 @@ export function App({ start }: { start: Settings; })
 
     return (
         <ChosenSet.Provider value={settings.set}>
-            <PointSquare.Provider value={setPointed}>
+            <PointSquare.Provider value={pointSquare}>
                 {panel}
                 <PictureDialog open={dialog === "picture"} profile={profile} onClose={() => setDialog(undefined)} text={text} />
                 <ProfilesDialog
@@ -606,6 +614,8 @@ export function App({ start }: { start: Settings; })
                             bottom={flipped ? ai : player}
                             lastMove={shown.lastMove}
                             pointed={pointed}
+                            {...(helps === undefined ? {} : { helps })}
+                            {...(mapping && helps?.strategy !== undefined ? { control: helps.strategy.control } : {})}
                             {...(review?.badge === undefined ? {} : { badge: { badge: review.badge, name: text.badges[review.badge] } })}
                             {...(review === undefined ? {} : { drawn: review })}
                             nextMove={next}
@@ -640,6 +650,12 @@ export function App({ start }: { start: Settings; })
                             <Steps shown={at} total={total} onStep={step} text={text} />
                         </div>
                     )}
+                    {/* On a phone the helps' map sits under the board too, turned on and off by a touch (D-78) */}
+                    {helps?.strategy === undefined ? null : (
+                        <div class="board-map">
+                            <MapButton mapping={mapping} onMap={setMapping} held={false} text={text} />
+                        </div>
+                    )}
                     <GameColumn
                         plies={idle ? [] : plies}
                         result={ended ? result : undefined}
@@ -649,6 +665,15 @@ export function App({ start }: { start: Settings; })
                         move={live.position.moveNumber}
                         toMove={live.position.turn}
                         opening={opening}
+                        helps={helps === undefined ? undefined : (
+                            <HelpsCard
+                                helps={helps}
+                                onPoint={setPointed}
+                                onMap={setMapping}
+                                mapping={mapping}
+                                text={text}
+                            />
+                        )}
                         {...(studied === undefined ? {} : { analysis: summary === undefined ? { by: name } : { by: name, summary } })}
                         shownPlies={at}
                         onShow={goTo}
@@ -792,6 +817,42 @@ function useFoldKeys(fold: (column: Column) => void): void
     });
 }
 
+/** M held shows the control map while the helps show the strategy (D-78); it goes off when M is let go or the page loses the focus. */
+function useMapKey(strategic: boolean, map: (held: boolean) => void): void
+{
+    useEffect(() => {
+        if (!strategic) {
+            map(false);
+            return;
+        }
+
+        const down = (event: KeyboardEvent): void => {
+            if (forThePage(event) && event.key.toLowerCase() === "m") {
+                event.preventDefault();
+                map(true);
+            }
+        };
+
+        const up = (event: KeyboardEvent): void => {
+            if (event.key.toLowerCase() === "m") {
+                map(false);
+            }
+        };
+
+        const away = (): void => map(false);
+
+        window.addEventListener("keydown", down);
+        window.addEventListener("keyup", up);
+        window.addEventListener("blur", away);
+
+        return () => {
+            window.removeEventListener("keydown", down);
+            window.removeEventListener("keyup", up);
+            window.removeEventListener("blur", away);
+        };
+    }, [strategic]);
+}
+
 /** The keys of Lichess and chess.com: the arrows, Home and End step through the moves (T-88), f and x turn the board round. */
 function useBrowseKeys(step: (to: Step) => void, flip: () => void): void
 {
@@ -836,6 +897,8 @@ function useWheelSteps(step: (to: Step) => void): (event: WheelEvent) => void
 
 // How far a wheel turns in one notch, in pixels.
 const notch = 100;
+
+const noSquares: readonly string[] = [];
 
 /** Whether a key is the page's: not one the player types into a box or the settings, nor with a modifier, nor while a piece is in the air. */
 function forThePage(event: KeyboardEvent): boolean

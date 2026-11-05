@@ -1,4 +1,6 @@
-// The game's column on the right of the board (D-53): the game's card, its opening (D-16), the moves and the buttons that step through them (T-88).
+// The game's column on the right of the board (D-53): the game's card, its opening (D-16), the helps (D-78), the moves and the buttons that step through
+// them (T-88).
+import type { ComponentChildren } from "preact";
 import { type Opening, outOfBookMove, type Side } from "../core/index.ts";
 import type { Step } from "./browse.ts";
 import type { HowEnded } from "./ending.ts";
@@ -11,7 +13,7 @@ import type { Text } from "./text.ts";
  * The column, which the player folds with its tab (T-84); under the board, where three columns would leave the board small, always open. A game in analysis
  * (D-69) says above the moves that the AI is going over it, until its word on the whole game comes, which the talk shows.
  */
-export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, analysis, shownPlies, onShow, onStep, onDownload, onAnalyse, text }: {
+export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, helps, analysis, shownPlies, onShow, onStep, onDownload, onAnalyse, text }: {
     plies: readonly Ply[];
     result?: string;
     how?: HowEnded;
@@ -21,6 +23,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     move: number;
     toMove: Side;
     opening?: Opening;
+    /** The helps' card, under the opening, while the helps are on (D-78). */
+    helps?: ComponentChildren;
     /** The game in analysis: who reviews it, and their word on the whole game, once written. */
     analysis?: { by: string; summary?: string; };
     shownPlies: number;
@@ -46,6 +50,7 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                     <>
                         <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} text={text} />
                         {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
+                        {helps}
                         {onDownload === undefined ? null : (
                             <div class="card analysis-actions">
                                 <button type="button" onClick={onDownload}>
