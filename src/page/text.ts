@@ -125,7 +125,6 @@ export interface Text
 export interface HelpsCardText
 {
     readonly title: string;
-    seen(level: string): string;
     readonly tactics: string;
     readonly strategy: string;
     readonly map: string;
@@ -486,7 +485,6 @@ const english: Text = {
     },
     helpsCard: {
         title: "Helps",
-        seen: (level) => `as the AI sees them · ${level}`,
         tactics: "Tactics",
         strategy: "Strategy",
         map: "Map",
@@ -745,7 +743,6 @@ const italian: Text = {
     },
     helpsCard: {
         title: "Aiuti",
-        seen: (level) => `come li vede l'AI · ${level}`,
         tactics: "Tattica",
         strategy: "Strategia",
         map: "Mappa",

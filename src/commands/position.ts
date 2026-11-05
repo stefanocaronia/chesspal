@@ -13,7 +13,8 @@ type Described = Profile & { where?: string; };
 /** The positional profile of the game in progress (D-19, T-12), or of any position of a game over (D-68): separate facts, never a score. */
 export const position = defineCommand({
     name: "position",
-    description: "Shows the positional facts of the position, from the strong level up: material, pawns (isolated, doubled, backward, passed, islands), open files, rooks and queens on the seventh, bishops, "
+    description:
+        "Shows the positional facts of the position, from the strong level up and at every level once the game is over: material, pawns (isolated, doubled, backward, passed, islands), open files, rooks and queens on the seventh, bishops, "
         + "outposts, centre, space, control, mobility, development and castling, king safety, the phase, the draw rules and, with only kings and pawns, "
         + "the rule of the square and the opposition. Facts only, never a score: weigh them yourself. Call it when you set or change your plan: out of "
         + "the opening, after a big exchange, in the endgame; not at every move. With move, and game for a game of the archive, the facts of any position of a "

@@ -5,38 +5,25 @@ import { atRiskOn, helpsOf, strategyOf } from "../src/page/helps-view.ts";
 // White's knight on f3 pinned to its queen by the bishop on g4, which h3 attacks undefended.
 const pinned = game("1. e4 e5 2. Nf3 d6 3. Bc4 Bg4 4. Nc3 Nc6 5. h3 *");
 
-describe("the helps on the page (D-78)", () => {
-    it("show nothing at Beginner, which sees no tactics", () => {
-        expect(helpsOf(pinned, "beginner")).toBeUndefined();
-    });
+describe("the helps on the page (D-78, D-79)", () => {
+    it("show the tactics, the strategy and the control map, whatever the AI's level", () => {
+        const helps = helpsOf(pinned);
 
-    it("show the tactics from Club, with no strategy", () => {
-        const helps = helpsOf(pinned, "club")!;
-
-        expect(helps.level).toBe("club");
         expect(helps.atRisk).toContainEqual({ piece: expect.objectContaining({ square: "g4", piece: "B", side: "black", attackers: ["h3"] }), why: "undefended" });
         expect(helps.pins).toContainEqual({
             piece: expect.objectContaining({ square: "f3", piece: "N", side: "white" }),
             by: expect.objectContaining({ square: "g4", piece: "B", side: "black" }),
             to: expect.objectContaining({ square: "d1", piece: "Q", side: "white" }),
         });
-        expect(helps.strategy).toBeUndefined();
-    });
-
-    it("add the strategy and the control map from Strong, as Master", () => {
-        for (const level of ["strong", "master"] as const) {
-            const helps = helpsOf(pinned, level)!;
-
-            expect(helps.strategy).toBe(pinned.profile);
-            expect(helps.strategy!.control.e4).toBeDefined();
-        }
+        expect(helps.strategy).toBe(pinned.profile);
+        expect(helps.strategy.control.e4).toBeDefined();
     });
 
     it("list the pieces at risk undefended first, then attacked by a cheaper piece, then outnumbered, each with its piece", () => {
         // Black's knight on e5 is defended by d6 and attacked by the pawn on d4, cheaper; the rook on a5 is attacked by the bishop and undefended.
         const position = game('[FEN "4k3/8/3p4/r3n3/3P4/8/3B4/4K3 b - - 0 1"]\n\n*');
         const facts = position.facts;
-        const helps = helpsOf(position, "club")!;
+        const helps = helpsOf(position);
 
         expect(facts.undefended).toContain("a5");
         expect(facts.attackedByCheaper).toContain("e5");
@@ -50,7 +37,7 @@ describe("the helps on the page (D-78)", () => {
     });
 
     it("give who moves, the checks of both sides and the loose pieces as the facts do", () => {
-        const helps = helpsOf(pinned, "club")!;
+        const helps = helpsOf(pinned);
 
         expect(helps.toMove).toBe("black");
         expect(helps.checks).toEqual(pinned.facts.checks);

@@ -92,6 +92,16 @@ describe("the AI's levels (D-60)", () => {
         expect(await run(context, "look", { only: "board" })).toContain("a b c d e f g h");
     });
 
+    it("give every layer of a game over to its analysis, whatever the level it was played at (D-81)", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black", level: "beginner" });
+        await run(context, "player_move", { move: "e4" });
+        await run(context, "end_game", { result: "player_resigns" });
+
+        expect(await run(context, "look")).toContain("Legal by piece");
+        expect(await run(context, "position")).toContain("Phase: opening");
+    });
+
     it("give the club the tactical facts but not position, and the master the book's moves", async () => {
         const context = playerFolder();
 

@@ -4091,11 +4091,6 @@ button {
     color: var(--ink);
 }
 
-.helps-title span {
-    font-weight: 400;
-    color: var(--soft);
-}
-
 .help-rows {
     list-style: none;
     margin: 0;

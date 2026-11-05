@@ -1,6 +1,6 @@
 // The helps on the page (D-78, Zoe's sketch B): the board says where, the card says what, the facts the AI sees at the game's level and only those.
 import { useState } from "preact/hooks";
-import type { PieceFacts, Side } from "../core/index.ts";
+import type { PieceFacts, Profile, Side } from "../core/index.ts";
 import { type HelpsView, type StrategyCell, strategyOf } from "./helps-view.ts";
 import { Figurines } from "./move-list.tsx";
 import { Figurine } from "./pieces.tsx";
@@ -20,7 +20,7 @@ export function Notch()
 }
 
 /**
- * The helps' card, between the opening and the moves: the tactics in lines, from Strong the strategy in a table and the control map, seen while its button
+ * The helps' card, between the opening and the moves: the tactics in lines, the strategy in a table and the control map, seen while its button
  * or M is held. A line under the pointer lights its squares on the board.
  */
 export function HelpsCard({ helps, onPoint, onMap, mapping, text }: {
@@ -32,22 +32,19 @@ export function HelpsCard({ helps, onPoint, onMap, mapping, text }: {
 })
 {
     const [tab, setTab] = useState<"tactics" | "strategy">("tactics");
-    const strategy = helps.strategy;
     const words = text.helpsCard;
 
     return (
         <section class="card helps-card" aria-label={words.title}>
             <h3 class="helps-title">
-                {words.title} <span>{words.seen(text.start.levels[helps.level][0])}</span>
+                {words.title}
             </h3>
-            {strategy === undefined ? null : (
-                <div class="tabs" role="tablist">
-                    <button type="button" role="tab" aria-selected={tab === "tactics"} onClick={() => setTab("tactics")}>{words.tactics}</button>
-                    <button type="button" role="tab" aria-selected={tab === "strategy"} onClick={() => setTab("strategy")}>{words.strategy}</button>
-                    <MapButton mapping={mapping} onMap={onMap} held text={text} />
-                </div>
-            )}
-            {strategy === undefined || tab === "tactics" ? <Tactics helps={helps} onPoint={onPoint} text={text} /> : <Strategy profile={strategy} text={text} />}
+            <div class="tabs" role="tablist">
+                <button type="button" role="tab" aria-selected={tab === "tactics"} onClick={() => setTab("tactics")}>{words.tactics}</button>
+                <button type="button" role="tab" aria-selected={tab === "strategy"} onClick={() => setTab("strategy")}>{words.strategy}</button>
+                <MapButton mapping={mapping} onMap={onMap} held text={text} />
+            </div>
+            {tab === "tactics" ? <Tactics helps={helps} onPoint={onPoint} text={text} /> : <Strategy profile={helps.strategy} text={text} />}
         </section>
     );
 }
@@ -161,7 +158,7 @@ function Squares({ squares }: { squares: readonly string[]; })
     return <b class="square-name">{squares.join(", ")}</b>;
 }
 
-function Strategy({ profile, text }: { profile: NonNullable<HelpsView["strategy"]>; text: Text; })
+function Strategy({ profile, text }: { profile: Profile; text: Text; })
 {
     const words = text.helpsCard;
     const files = profile.openFiles.length === 0 ? "–" : profile.openFiles.join(", ");

@@ -31,7 +31,7 @@ interface StudyView
 /** The whole view (D-26), when the compact one after the player's move is not enough; or the board for the player, where the host does not show it (D-36). */
 export const look = defineCommand({
     name: "look",
-    description: "Shows the whole view of the position, from the club level up: the FEN and, for every piece, what attacks and defends it, then the pins, the checks and the legal "
+    description: "Shows the whole view of the position, from the club level up and at every level once the game is over: the FEN and, for every piece, what attacks and defends it, then the pins, the checks and the legal "
         + "moves of each piece. The views of player_move, status and new_game give attackers and defenders only for the pieces attacked: call look "
         + 'before you attack or capture a piece that is not attacked yet, or plan an exchange. With only: "board", the board as text for the player, to '
         + "copy into your message where they do not see it. With move, and game for a game of the archive, the same of any position of a game over, to "

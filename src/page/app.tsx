@@ -2,7 +2,7 @@
 // words (T-65), in Zoe's three columns (D-53): the talk, the board, the game, the side ones folded as the player likes (T-84).
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { type Clock, closingOf, Game, gameReviewOf, levelOf, materialOf, type Mood, moodAt, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square, suggestedLevel, timeControlText } from "../core/index.ts";
+import { type Clock, closingOf, Game, gameReviewOf, materialOf, type Mood, moodAt, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square, suggestedLevel, timeControlText } from "../core/index.ts";
 import { PlayerPicture } from "./avatars.tsx";
 import { BadgeCounts } from "./badges.tsx";
 import { Board, type Notice, piecesOf } from "./board.tsx";
@@ -168,10 +168,9 @@ export function App({ start }: { start: Settings; })
     const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
     // A square lit from the AI's words goes off with the position: a touch keeps it lit until then, a mouse until it leaves the word (T-111).
     useEffect(() => setPointed(noSquares), [shown]);
-    // With the helps on, the player sees what the AI sees at the game's level, only that (D-78): from Club the tactics, from Strong the strategy and the map.
-    const helps = useMemo(() => going && settings.helps ? helpsOf(shown, levelOf(replayed.record)) : undefined, [shown, going, settings.helps]);
-    const strategic = helps?.strategy !== undefined;
-    useMapKey(strategic, setMapping);
+    // With the helps on, the player sees all of Chesspal's facts, whatever the AI's level (D-79).
+    const helps = useMemo(() => going && settings.helps ? helpsOf(shown) : undefined, [shown, going, settings.helps]);
+    useMapKey(helps !== undefined, setMapping);
     // A game read again ends what the player was doing on the one before: the move sent, the look back, the choice of a promotion. A review written on the
     // game in analysis leaves the player where they are in it.
     useEffect(() => {
@@ -615,7 +614,7 @@ export function App({ start }: { start: Settings; })
                             lastMove={shown.lastMove}
                             pointed={pointed}
                             {...(helps === undefined ? {} : { helps })}
-                            {...(mapping && helps?.strategy !== undefined ? { control: helps.strategy.control } : {})}
+                            {...(mapping && helps !== undefined ? { control: helps.strategy.control } : {})}
                             {...(review?.badge === undefined ? {} : { badge: { badge: review.badge, name: text.badges[review.badge] } })}
                             {...(review === undefined ? {} : { drawn: review })}
                             nextMove={next}
@@ -651,7 +650,7 @@ export function App({ start }: { start: Settings; })
                         </div>
                     )}
                     {/* On a phone the helps' map sits under the board too, turned on and off by a touch (D-78) */}
-                    {helps?.strategy === undefined ? null : (
+                    {helps === undefined ? null : (
                         <div class="board-map">
                             <MapButton mapping={mapping} onMap={setMapping} held={false} text={text} />
                         </div>
@@ -817,11 +816,11 @@ function useFoldKeys(fold: (column: Column) => void): void
     });
 }
 
-/** M held shows the control map while the helps show the strategy (D-78); it goes off when M is let go or the page loses the focus. */
-function useMapKey(strategic: boolean, map: (held: boolean) => void): void
+/** M held shows the control map while the helps are on (D-78); it goes off when M is let go or the page loses the focus. */
+function useMapKey(helping: boolean, map: (held: boolean) => void): void
 {
     useEffect(() => {
-        if (!strategic) {
+        if (!helping) {
             map(false);
             return;
         }
@@ -850,7 +849,7 @@ function useMapKey(strategic: boolean, map: (held: boolean) => void): void
             window.removeEventListener("keyup", up);
             window.removeEventListener("blur", away);
         };
-    }, [strategic]);
+    }, [helping]);
 }
 
 /** The keys of Lichess and chess.com: the arrows, Home and End step through the moves (T-88), f and x turn the board round. */

@@ -1,6 +1,6 @@
 // The level of a game as the AI reads it (D-60, D-61): what it sees, and the refusal of a tool its level does not give.
 import { type AiLevel, type Layer, levelOf, sees, suggestedLevel } from "../core/index.ts";
-import type { CurrentGame } from "../games/index.ts";
+import { type CurrentGame, endOf } from "../games/index.ts";
 import { activeProfile } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 
@@ -16,12 +16,12 @@ export function levelText(level: AiLevel): string
     return `at the ${level} level (${seenText[level]})`;
 }
 
-/** Throws when the game's level does not give a layer, saying what the level gives instead. */
+/** Throws when the game's level does not give a layer, saying what the level gives instead; a game over gives every layer, to its analysis (D-81). */
 export function refuseUnseen(current: CurrentGame, layer: Layer, tool: string): void
 {
     const level = levelOf(current.game.record);
 
-    if (!sees(level, layer)) {
+    if (!sees(level, layer) && endOf(current.game) === undefined) {
         throw new Error(`${tool} is not yours in this game: you play ${levelText(level)}. Decide with the facts you have.`);
     }
 }

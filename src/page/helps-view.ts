@@ -1,10 +1,9 @@
-// What the helps show of a position (D-78): the facts the AI sees at the game's level, only those. From Club the tactics, from Strong also the strategy.
-import { type AiLevel, type Game, type PieceFacts, type Profile, sees, type Side, type SideProfile, type Square } from "../core/index.ts";
+// What the helps show of a position (D-78, D-79): Chesspal's facts, the tactics and the strategy, at every level of the AI.
+import type { Game, PieceFacts, Profile, Side, SideProfile, Square } from "../core/index.ts";
 
 /** The helps of a position, for the board and the card. */
 export interface HelpsView
 {
-    readonly level: AiLevel;
     /** Who moves: the checks are theirs, the other checks the other side's. */
     readonly toMove: Side;
     /** Undefended first, then attacked by a cheaper piece, then outnumbered: three lists that never share a piece. */
@@ -13,8 +12,8 @@ export interface HelpsView
     readonly checks: readonly string[];
     readonly otherChecks: readonly string[];
     readonly loose: readonly PieceFacts[];
-    /** The profile, from Strong only: the strategy and the control map. */
-    readonly strategy?: Profile;
+    /** The profile: the strategy and the control map. */
+    readonly strategy: Profile;
 }
 
 /** A piece at risk and why. */
@@ -32,27 +31,22 @@ export interface PinnedPiece
     readonly to: PieceFacts;
 }
 
-/** The helps of a game's position at a level; none at Beginner, which sees no tactics. */
-export function helpsOf(game: Game, level: AiLevel): HelpsView | undefined
+/** The helps of a game's position, whatever the AI's level (D-79). */
+export function helpsOf(game: Game): HelpsView
 {
-    if (!sees(level, "tactics")) {
-        return undefined;
-    }
-
     const facts = game.facts;
     const pieces = new Map(facts.pieces.map((piece) => [piece.square, piece]));
     const on = (square: Square): PieceFacts => pieces.get(square)!;
     const atRisk = (squares: readonly Square[], why: PieceAtRisk["why"]): PieceAtRisk[] => squares.map((square) => ({ piece: on(square), why }));
 
     return {
-        level,
         toMove: game.position.turn,
         atRisk: [...atRisk(facts.undefended, "undefended"), ...atRisk(facts.attackedByCheaper, "cheaper"), ...atRisk(facts.outnumbered, "outnumbered")],
         pins: facts.pins.map((pin) => ({ piece: on(pin.square), by: on(pin.by), to: on(pin.to) })),
         checks: facts.checks,
         otherChecks: facts.otherChecks ?? [],
         loose: facts.loose.map(on),
-        ...(sees(level, "strategy") ? { strategy: game.profile } : {}),
+        strategy: game.profile,
     };
 }
 
