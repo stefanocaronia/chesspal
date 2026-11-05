@@ -4,7 +4,7 @@ import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
-import { closingLines, type GameSummary, newGameStep, nextStep, positionLines, sidesLine, summaryOf, withThought, wordLines } from "./game-summary.ts";
+import { closingLines, type GameSummary, newGameStep, positionLines, sidesLine, summaryOf, withThought, wordLines } from "./game-summary.ts";
 import { levelText } from "./levels.ts";
 import { closedPage, pageLine } from "./page-link.ts";
 import { playerLine } from "./profiles.ts";
@@ -65,9 +65,15 @@ export const status = defineCommand({
         try {
             const current = gameAt(folder, context.now());
 
+            // With no game the player may have written before the first (D-77).
+            const words = unansweredWords(context);
+
+            if (words.length > 0) {
+                status.words = words;
+            }
+
             if (current !== undefined) {
                 status.game = withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current);
-                status.words = unansweredWords(context);
 
                 if (first && endOf(current.game) === undefined && fromBeforeChat(context, current.started)) {
                     status.fromBefore = true;
@@ -134,7 +140,7 @@ function analysisLine({ game, brought }: NonNullable<Status["analysis"]>): strin
 function gameLines(game: GameSummary | undefined, words: readonly string[], brought: boolean): string[]
 {
     if (game === undefined) {
-        return brought ? ["No game."] : ["No game.", nextStep(game)];
+        return ["No game.", ...(brought ? wordLines(words) : closingLines(game, words))];
     }
 
     const moves = game.lastMoves === "" ? [] : [`Moves: ${game.lastMoves}`];

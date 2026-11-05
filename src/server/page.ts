@@ -17,7 +17,7 @@ import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
 import { gameToStudy, namedGame } from "../commands/study.ts";
 import { clockStarted, type GameRecord, writePgn } from "../core/index.ts";
-import { type CurrentGame, drawOfferOf, endOf, gameInAnalysis, gameStamp, heardLines, loadGame, playerPgn, saveGame, startAnalysis, talkLimits, wakesTheChat, WordsRefused } from "../games/index.ts";
+import { type CurrentGame, drawOfferOf, endOf, gameInAnalysis, gameStamp, heardLines, loadGame, loadTableTalk, playerPgn, saveGame, startAnalysis, talkLimits, wakesTheChat, WordsRefused } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { analysesOf, isReviewed } from "./analyses.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
@@ -645,9 +645,9 @@ function watchFolder(folder: string, heard: (name: string | null) => void): FSWa
     }
 }
 
-// The current game, the game in analysis, the profile in use, and what a profile keeps (who plays, their picture, their settings); a folder's name, for a
+// The current game, the talk before the first, the game in analysis, the profile in use, and what a profile keeps (who plays, their picture, their settings); a folder's name, for a
 // profile made or gone.
-const watched = /^(?:game\.json|analysis\.json|active\.json|profile\.md|settings\.json|avatar\.\w+|[a-z0-9-]+)$/;
+const watched = /^(?:game\.json|talk\.json|analysis\.json|active\.json|profile\.md|settings\.json|avatar\.\w+|[a-z0-9-]+)$/;
 
 /**
  * The game in progress or just ended, as the player may see it: its PGN without the AI's plans while it goes on, the AI's side, when it started, and the
@@ -657,8 +657,10 @@ function sendGame(response: ServerResponse, served: Served): void
 {
     try {
         const current = gameNow(served);
-        const heard = current === undefined ? [] : heardLines(current, served.context.given);
-        const talk = current?.talk.map(({ who, text, ply }, index) => heard[index] === undefined ? { who, text, ply } : { who, text, ply, heard: heard[index] });
+        // With no game the page still shows the talk before the first (D-77).
+        const spoken = current ?? loadTableTalk(gameFolder(served.folder));
+        const heard = heardLines(spoken, served.context.given);
+        const talk = spoken.talk.map(({ who, text, ply }, index) => heard[index] === undefined ? { who, text, ply } : { who, text, ply, heard: heard[index] });
         const offer = current === undefined ? undefined : drawOfferOf(current);
         const game = current === undefined ? null : {
             pgn: playerPgn(current),
@@ -671,7 +673,7 @@ function sendGame(response: ServerResponse, served: Served): void
             ...(offer === undefined ? {} : { drawOffer: offer }),
         };
         const analysis = current === undefined || endOf(current.game) !== undefined ? analysisShown(served) : undefined;
-        const body = { game, ...(analysis === undefined ? {} : { analysis }), opponent: served.opponent(), listening: served.bell.listening, ...profilesShown(served.folder) };
+        const body = { game, ...(game === null && talk.length > 0 ? { talk } : {}), ...(analysis === undefined ? {} : { analysis }), opponent: served.opponent(), listening: served.bell.listening, ...profilesShown(served.folder) };
         send(response, 200, json, JSON.stringify(body));
     } catch (error) {
         send(response, 500, json, JSON.stringify({ error: (error as Error).message }));

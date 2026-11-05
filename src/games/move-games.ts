@@ -22,8 +22,8 @@ export function moveGames(from: string, to: string): void
     }
 }
 
-// The current game, and the archive of the finished ones.
-const names = ["game.json", "games"];
+// The current game, the talk before the first (D-77), and the archive of the finished ones.
+const names = ["game.json", "talk.json", "games"];
 
 function movedBack(path: string, back: string): boolean
 {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../core/index.ts";
-import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, endOf, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../games/index.ts";
+import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../games/index.ts";
 import { gameFolder, gameFolders } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
@@ -83,6 +83,7 @@ export const newGame = defineCommand({
         const archived = before === undefined || (going === undefined && archivedName(folder, before) !== undefined) ? undefined : archiveBefore(folder, before);
         saveGame(folder, current);
         endAnalysis(folder);
+        endTableTalk(folder);
         const past = pastGameLines(folder, remembered);
         const player = playerLine(context);
         const closed = closedPage(context);

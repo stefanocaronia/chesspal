@@ -123,7 +123,8 @@ export function gameStamp(folder: string): string | undefined
 
 const fileName = "game.json";
 
-const savedLine = z.object({ who: z.enum(["player", "ai"]), text: z.string(), ply: z.int().min(0), at: z.iso.datetime(), agent: z.literal(true).optional() });
+/** A line of the talk as game.json and talk.json keep it. */
+export const savedLine = z.object({ who: z.enum(["player", "ai"]), text: z.string(), ply: z.int().min(0), at: z.iso.datetime(), agent: z.literal(true).optional() });
 const savedClock = z.object({
     base: z.int().positive(),
     increment: z.int().min(0),

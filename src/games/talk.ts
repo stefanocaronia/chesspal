@@ -1,5 +1,6 @@
-// The talk on the board page (D-51, T-65): the player's words and the AI's answers, kept in game.json beside the PGN.
+// The talk on the board page (D-51, T-65): the player's words and the AI's answers, kept in game.json beside the PGN, or in talk.json with no game (D-77).
 import { type CurrentGame, endOf, type Speaker, type TalkLine } from "./current-game.ts";
+import type { TableTalk } from "./table-talk.ts";
 
 /** The most the player may write in a move, in all their lines, and the most a line of the AI's may hold (D-54). */
 export const talkLimits = { player: 200, ai: 300 } as const;
@@ -7,11 +8,14 @@ export const talkLimits = { player: 200, ai: 300 } as const;
 /** Who says a line: the player, the AI in the chat, or the AI's agent thinking on the player's time (D-72), whose lines are the AI's on the page. */
 export type Sayer = Speaker | "agent";
 
+/** A talk: a game's, going on or over, or the one with no game, where both talk freely as between games (D-74, D-77). */
+export type Talk = CurrentGame | TableTalk;
+
 /**
  * A new line of the talk, said when the game has `ply` moves: refused when it is empty or too long. The player writes 200 characters a move in all, the
  * words sent with the move included; the AI speaks once a move of theirs, on their time, and its agent's word leaves it an answer to what they write after (D-54, D-72).
  */
-export function talkLine(current: CurrentGame, sayer: Sayer, text: string, at: Date, ply = current.game.record.moves.length): TalkLine
+export function talkLine(current: Talk, sayer: Sayer, text: string, at: Date, ply = isGame(current) ? current.game.record.moves.length : 0): TalkLine
 {
     const who = sayer === "agent" ? "ai" : sayer;
     const words = text.trim();
@@ -30,7 +34,7 @@ export function talkLine(current: CurrentGame, sayer: Sayer, text: string, at: D
         throw new WordsRefused(`The words are ${words.length} characters long: write at most ${most}${more ? " more until the AI's next move" : ""}.`, more ? "longer-than-left" : "long", most);
     }
 
-    if (who === "ai") {
+    if (who === "ai" && isGame(current)) {
         refuseAiWords(current, sayer === "agent");
     }
 
@@ -59,9 +63,9 @@ export function playerLinesThisMove(current: CurrentGame): TalkLine[]
 }
 
 /** How many characters the player may still write for this move; between games a whole line each time, with no count (D-74). */
-export function wordsLeft(current: CurrentGame): number
+export function wordsLeft(current: Talk): number
 {
-    if (endOf(current.game) !== undefined) {
+    if (!going(current)) {
         return talkLimits.player;
     }
 
@@ -69,9 +73,9 @@ export function wordsLeft(current: CurrentGame): number
 }
 
 /** Whether the player's last line wakes the chat: the first of a move, and between games the first since the AI last spoke (D-54, D-74). */
-export function wakesTheChat(current: CurrentGame): boolean
+export function wakesTheChat(current: Talk): boolean
 {
-    return endOf(current.game) === undefined ? playerLinesThisMove(current).length === 1 : unanswered(current).length === 1;
+    return going(current) ? playerLinesThisMove(current).length === 1 : unanswered(current).length === 1;
 }
 
 /** Words of the player's, with the key that tells them apart across games. */
@@ -82,7 +86,7 @@ export interface Words
 }
 
 /** What the player said that the AI has not answered, but for the words whose keys are in `given`. */
-export function unheardWords(current: CurrentGame, given: ReadonlySet<string>): Words[]
+export function unheardWords(current: Talk, given: ReadonlySet<string>): Words[]
 {
     return unanswered(current).filter(({ key }) => !given.has(key)).map(({ key, line }) => ({ key, text: line.text }));
 }
@@ -91,7 +95,7 @@ export function unheardWords(current: CurrentGame, given: ReadonlySet<string>): 
 export type Heard = "sent" | "read" | "answered";
 
 /** How far each line of the talk got: the player's by `Heard`, the AI's undefined (D-53). */
-export function heardLines(current: CurrentGame, given: ReadonlySet<string>): (Heard | undefined)[]
+export function heardLines(current: Talk, given: ReadonlySet<string>): (Heard | undefined)[]
 {
     const waiting = new Set(unanswered(current).map(({ key }) => key));
     return current.talk.map((line, index) => {
@@ -156,18 +160,36 @@ function sinceAiMoved(current: CurrentGame): number
 }
 
 /** The player's lines after the AI's last words and its last move, each with a key of its own across games. */
-function unanswered(current: CurrentGame): { key: string; line: TalkLine; }[]
+function unanswered(current: Talk): { key: string; line: TalkLine; }[]
 {
-    const { talk, game, ai } = current;
-    const moves = game.record.moves.length;
+    const { talk } = current;
     const lastSaid = talk.findLastIndex((line) => line.who === "ai");
-    // The last move is the AI's when the AI is not to move: two moves on, one of them is.
-    const aiMovedSince = (ply: number): boolean => moves > ply + 1 || (moves === ply + 1 && game.position.turn !== ai);
-
-    return talk.flatMap((line, index) => index > lastSaid && line.who === "player" && !aiMovedSince(line.ply) ? [{ key: keyOf(current, index), line }] : []);
+    return talk.flatMap((line, index) => index > lastSaid && line.who === "player" && !aiMovedSince(current, line.ply) ? [{ key: keyOf(current, index), line }] : []);
 }
 
-function keyOf(current: CurrentGame, index: number): string
+/** Whether the AI has moved since the game had `ply` moves: the last move is the AI's when the AI is not to move, and two moves on, one of them is. */
+function aiMovedSince(current: Talk, ply: number): boolean
+{
+    if (!isGame(current)) {
+        return false;
+    }
+
+    const moves = current.game.record.moves.length;
+    return moves > ply + 1 || (moves === ply + 1 && current.game.position.turn !== current.ai);
+}
+
+function isGame(current: Talk): current is CurrentGame
+{
+    return "game" in current;
+}
+
+/** Whether a game goes on, with its limits to the talk; none with no game or once it is over. */
+function going(current: Talk): current is CurrentGame
+{
+    return isGame(current) && endOf(current.game) === undefined;
+}
+
+function keyOf(current: Talk, index: number): string
 {
     return `${current.started}#${index}`;
 }

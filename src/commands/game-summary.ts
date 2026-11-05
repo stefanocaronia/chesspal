@@ -189,7 +189,7 @@ export function wordLines(words: readonly string[]): string[]
 export function nextStep(game: GameSummary | undefined, words: readonly string[] = []): string
 {
     if (game === undefined) {
-        return `Next: when the player wants a game, ${newGameStep}`;
+        return words.length === 0 ? `Next: when the player wants a game, ${newGameStep}` : `Next: answer the player with ai_say. When they want a game, ${newGameStep}`;
     }
 
     if (game.end !== undefined) {

@@ -167,7 +167,9 @@ export function App({ start }: { start: Settings; })
     }, [studied === undefined ? game : studied.name]);
     const played = studied === undefined ? game : null;
     useGameSounds(played, replayed, sound);
-    const unread = useUnread(played === undefined || played === null ? undefined : aiSpoke(plies, played.ai, played.talk), folds.talk !== "open");
+    // Before the first game the AI speaks in the talk alone (D-77).
+    const spoke = played === undefined ? undefined : played === null ? served?.talk?.filter((line) => line.who === "ai").length ?? 0 : aiSpoke(plies, played.ai, played.talk);
+    const unread = useUnread(spoke, folds.talk !== "open");
 
     const fold = (column: Column): void => {
         const next = nextFold(column, folds[column]);
@@ -299,7 +301,7 @@ export function App({ start }: { start: Settings; })
     const review = reviewed?.review;
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
     const closing = studied === undefined ? undefined : closingOf(live.record);
-    const talk = game?.talk ?? [];
+    const talk = game?.talk ?? served.talk ?? [];
     const said = playerWords(talk);
     // The clocks only in a game going on: between games the player's card holds the next one in their place (D-77).
     const clock = going ? game?.clock : undefined;
@@ -540,24 +542,22 @@ export function App({ start }: { start: Settings; })
                                     <AiWords words={aiWords(plies, ai, talk)} newestFirst={!flipped} {...(settings.voice ? { voice: text.language } : {})} />
                                 </section>
                                 <section class="you-block" aria-label={profile.name}>
-                                    {game === null ? null : (
-                                        <Compose
-                                            lines={said}
-                                            newestFirst={flipped}
-                                            // Between games the player writes freely, a line at a time, as the AI does (D-74).
-                                            spent={going ? playerSpent(plies, ai, talk) : 0}
-                                            draft={draft}
-                                            onDraft={(words) => {
-                                                setDraft(words);
-                                                setUnsent(undefined);
-                                            }}
-                                            onSend={sendWords}
-                                            canMove={playerToMove}
-                                            name={name}
-                                            problem={unsent}
-                                            text={text}
-                                        />
-                                    )}
+                                    <Compose
+                                        lines={said}
+                                        newestFirst={flipped}
+                                        // Between games, and before the first, the player writes freely, a line at a time, as the AI does (D-74, D-77).
+                                        spent={going ? playerSpent(plies, ai, talk) : 0}
+                                        draft={draft}
+                                        onDraft={(words) => {
+                                            setDraft(words);
+                                            setUnsent(undefined);
+                                        }}
+                                        onSend={sendWords}
+                                        canMove={playerToMove}
+                                        name={name}
+                                        problem={unsent}
+                                        text={text}
+                                    />
                                     <PlayerCard
                                         place="you"
                                         picture={<PictureButton profile={profile} onOpen={() => setDialog("picture")} text={text} />}
@@ -663,6 +663,8 @@ interface Served
         /** How many of its first moves are the book's. */
         readonly book?: number;
     } | null;
+    /** The talk before the first game (D-77), with no game. */
+    readonly talk?: readonly TalkLine[];
     /** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review. */
     readonly analysis?: { readonly name: string; readonly pgn: string; readonly book: number; };
     readonly opponent?: string;

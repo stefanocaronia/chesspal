@@ -525,9 +525,17 @@ describe("the talk on the board page", () => {
     it("takes 200 characters of the player's a move, and lets the AI speak apart from its move once, on their time (D-72)", async () => {
         const context = playerFolder();
 
-        await expect(run(context, "ai_say", { text: "Hello." })).rejects.toThrow("There is no game: the board page shows your words beside one. Nothing changed.");
-        await expect(run(context, "player_say", { text: "Hello." })).rejects.toThrow("There is no game going on: start one in the chat.");
+        // Before the first game both talk freely, in talk.json, until a game starts (D-77).
+        await run(context, "player_say", { text: "Hello." });
+        expect(await run(context, "status")).toMatch(/No game\.\nPlayer wrote on the board page: «Hello\.»\nNext: answer the player with ai_say\./);
+        await expect(run(context, "ai_say", { text: "Hi!", mood: "happy" })).rejects.toThrow("There is no game: a mood goes with a game's end.");
+        expect(await run(context, "ai_say", { text: "Hi! Shall we play?" })).toContain("Next: when the player wants a game");
+        expect(await run(context, "status")).not.toContain("Player wrote");
+        await run(context, "player_say", { text: "Yes." });
+        expect(existsSync(join(context.folder, "talk.json"))).toBe(true);
         await run(context, "new_game", { ai_colour: "black" });
+        expect(await run(context, "status")).not.toContain("Player wrote");
+        expect(existsSync(join(context.folder, "talk.json"))).toBe(false);
         await expect(run(context, "player_say", { text: "o".repeat(201) })).rejects.toThrow("write 200 characters at most");
 
         await run(context, "player_say", { text: "o".repeat(150) });

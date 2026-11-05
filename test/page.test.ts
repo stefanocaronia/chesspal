@@ -254,8 +254,11 @@ describe("the player's moves on the page", () => {
         const folder = playerFolder();
         const page = await open(folder);
 
-        expect(await post(page, "/api/message", { text: "Hi" })).toMatchObject({ status: 409, body: '{"error":"There is no game going on: start one in the chat.","refusal":"no-game"}' });
+        // Before the first game the words go in the talk with no game, and the page shows them (D-77).
+        expect(await post(page, "/api/message", { text: "Hi" })).toMatchObject({ status: 200, body: '{"said":true}' });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ game: null, talk: [{ who: "player", text: "Hi", ply: 0, heard: "sent" }] });
         await run(folder, "new_game", { ai_colour: "black" });
+        expect(JSON.parse((await get(page, "/api/game")).body)).not.toHaveProperty("talk");
 
         expect(await post(page, "/api/message", { text: "  Hi!  " })).toMatchObject({ status: 200, body: '{"said":true}' });
         // 200 characters a move: the words sent alone count with those sent with the move.

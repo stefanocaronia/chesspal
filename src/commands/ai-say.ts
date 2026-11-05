@@ -8,7 +8,8 @@ import { give, say, waitingWords } from "./say.ts";
 
 interface Said
 {
-    game: GameSummary;
+    /** The game, none when the AI spoke before the first (D-77). */
+    game?: GameSummary;
     words: string[];
 }
 
@@ -16,7 +17,7 @@ interface Said
 export const aiSay = defineCommand({
     name: "ai_say",
     description: "Says a word on the board page without a move, once while the player is to move: an answer to what they wrote or to their draw offer, or "
-        + "something you have to say; when you are to move, speak in ai_move's comment. Between games it speaks freely: about the game just over, or to start another. "
+        + "something you have to say; when you are to move, speak in ai_move's comment. Between games, and before the first, it speaks freely: about the game just over, or to start another. "
         + 'Example: ai_say {text: "Sure, I\'ll play faster."}.',
     input: z.object({
         text: z.string().trim().min(1, "write what you say").max(talkLimits.ai, `write ${talkLimits.ai} characters at most`).describe(
@@ -29,19 +30,20 @@ export const aiSay = defineCommand({
         // The player's words are read before the AI's line is saved: those written while it thought would fall before it, unread.
         const waiting = waitingWords(context);
         const current = say(gameFolder(context.folder), "ai", text, context.now(), mood);
-        return { game: summaryOf(current, context.now()), words: give(context, waiting) };
+        const words = give(context, waiting);
+        return "game" in current ? { game: summaryOf(current, context.now()), words } : { words };
     },
     format: ({ game, words }) => ["Said on the board page, where the player reads it: don't write it again in the chat.", ...wordLines(words), afterWords(game, words)].join("\n"),
 });
 
 /** The next step once the AI has spoken: the end of a game over has been told already, and the player's draw offer answered in words. */
-function afterWords(game: GameSummary, words: readonly string[]): string
+function afterWords(game: GameSummary | undefined, words: readonly string[]): string
 {
-    if (words.length === 0 && game.end !== undefined) {
+    if (words.length === 0 && game?.end !== undefined) {
         return `Next: when the player wants another game, ${newGameStep}`;
     }
 
-    if (words.length === 0 && game.drawOffer === "player" && game.turn !== game.ai) {
+    if (words.length === 0 && game?.drawOffer === "player" && game.turn !== game.ai) {
         return "Next: accept the draw with end_game draw_agreed, or wait for the player's move.";
     }
 
