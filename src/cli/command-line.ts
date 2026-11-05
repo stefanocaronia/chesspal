@@ -75,7 +75,7 @@ async function runCommand(command: AnyCommand, args: string[], context: Context)
     }
 
     const result: unknown = await command.run(parsed.data, context);
-    return asJson ? JSON.stringify(result, null, 2) : command.format(result);
+    return asJson ? JSON.stringify(result, null, 2) : command.format(result, context);
 }
 
 /** An input refused, in the words the MCP server uses (inputProblems), with the command's usage. */

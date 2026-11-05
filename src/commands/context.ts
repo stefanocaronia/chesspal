@@ -11,6 +11,8 @@ export interface Context
     pause?: (milliseconds: number) => Promise<void>;
     /** The operating system, as process.platform names it: how a host starts the server. */
     platform: string;
+    /** The player's language, as the system names it (it-IT): the command line's words to the player, in English when none or another. */
+    language?: string;
     /** The address of the board page, when the MCP server serves it (D-47). */
     page?: string;
     /** The AI host, as it names itself to the MCP server: claude-code, which notes how each chat starts (D-57); none on the command line. */
@@ -28,5 +30,11 @@ export interface Context
 /** The context of a process started in the player's folder. */
 export function defaultContext(): Context
 {
-    return { folder: process.cwd(), random: Math.random, now: () => new Date(), platform: process.platform, given: new Set() };
+    return { folder: process.cwd(), random: Math.random, now: () => new Date(), platform: process.platform, language: systemLanguage(), given: new Set() };
+}
+
+/** The system's language, as Node reads it: the user's locale on Windows, LANG and LC_ALL elsewhere. */
+function systemLanguage(): string
+{
+    return Intl.DateTimeFormat().resolvedOptions().locale;
 }

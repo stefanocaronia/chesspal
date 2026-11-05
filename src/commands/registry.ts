@@ -24,8 +24,8 @@ export interface Command<Schema extends z.ZodObject = z.ZodObject, Result = unkn
     positionals?: Extract<keyof Schema["shape"], string>[];
     /** Returns a value, never prints: the MCP server speaks on stdout, and only the command line writes there. */
     run(input: z.infer<Schema>, context: Context): Result | Promise<Result>;
-    /** Plain-text rendering of the result, for the AI and the terminal alike. */
-    format(result: Result): string;
+    /** Plain-text rendering of the result, for the AI and the terminal alike; the context, for a command that speaks to the player, as init. */
+    format(result: Result, context?: Context): string;
 }
 
 // A command of any input and result, as the lists of commands hold them.

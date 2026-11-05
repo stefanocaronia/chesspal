@@ -1,4 +1,6 @@
 import { relative, resolve } from "node:path";
+// Colours only on a terminal that shows them: none in a file, a pipe or with NO_COLOR.
+import { styleText } from "node:util";
 import { z } from "zod";
 import { setUpHosts } from "../host-files/index.ts";
 import { defineCommand } from "./registry.ts";
@@ -23,10 +25,54 @@ export const init = defineCommand({
         const root = resolve(context.folder, folder ?? ".");
         return { folder: root, written: setUpHosts(root, context.platform).map((path) => relative(root, path)) };
     },
-    format: ({ folder, written }) =>
-        [
-            written.length === 0 ? `${folder} is set up already: nothing to change.` : `Set up ${folder}: ${written.join(", ")}.`,
-            "To play, open Claude Code or Codex in this folder and say hello; the first time, they ask whether to trust the folder: say yes, or Chesspal cannot start.",
-            "Chesspal must stay installed: npm install -g chesspal.",
-        ].join("\n"),
+    format: ({ folder, written }, context) => {
+        const words = wordsFor(context?.language);
+        return [
+            styleText(["bold", "green"], `♞ ${written.length === 0 ? words.ready(folder) : words.set(folder)}`),
+            "",
+            `  ${words.toPlay}`,
+            ...words.steps.map((step, index) => `  ${styleText("cyan", `${index + 1}.`)} ${step.join("\n     ")}`),
+            ...(written.length === 0 ? [] : ["", styleText("gray", `  ${words.written} ${written.join(", ")}`)]),
+        ].join("\n");
+    },
 });
+
+/** What init says to the player, in their language (D-32): Italian or English. */
+interface InitWords
+{
+    set: (folder: string) => string;
+    ready: (folder: string) => string;
+    toPlay: string;
+    /** Each step in lines short enough for a narrow terminal. */
+    steps: string[][];
+    written: string;
+}
+
+const english: InitWords = {
+    set: (folder) => `Chesspal is ready in ${folder}`,
+    ready: (folder) => `Chesspal is ready in ${folder}: nothing to change`,
+    toPlay: "To play:",
+    steps: [
+        ["Open Claude Code or Codex in this folder."],
+        ["Say hello: the AI opens the board for you."],
+        ["The first time, it asks whether to trust the folder: say yes.", "Codex also asks to allow its hook: allow it,", "so that your moves on the board wake it."],
+    ],
+    written: "Updated:",
+};
+
+const italian: InitWords = {
+    set: (folder) => `Chesspal è pronto in ${folder}`,
+    ready: (folder) => `Chesspal è già pronto in ${folder}: niente da cambiare`,
+    toPlay: "Per giocare:",
+    steps: [
+        ["Apri Claude Code o Codex in questa cartella."],
+        ["Saluta: l'AI ti apre la scacchiera."],
+        ["La prima volta ti chiede se fidarti della cartella: rispondi sì.", "Codex ti chiede anche di consentire il suo hook: consentilo,", "così le tue mosse sulla scacchiera lo svegliano."],
+    ],
+    written: "Aggiornati:",
+};
+
+function wordsFor(language: string | undefined): InitWords
+{
+    return language?.slice(0, 2).toLowerCase() === "it" ? italian : english;
+}

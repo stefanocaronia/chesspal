@@ -34,10 +34,14 @@ describe("chesspal init", () => {
 
         expect(exitCode).toBe(0);
         expect(output).toBe(
-            `Set up ${chess}: .mcp.json, AGENTS.md, CLAUDE.md, ${join(".claude", "settings.json")}, ${join(".claude", "agents", "chesspal-ponder-quick.md")}, `
-                + `${join(".claude", "agents", "chesspal-ponder.md")}, ${join(".codex", "config.toml")}, ${join(".codex", "hooks.json")}.\n`
-                + "To play, open Claude Code or Codex in this folder and say hello; the first time, they ask whether to trust the folder: say yes, or Chesspal cannot start.\n"
-                + "Chesspal must stay installed: npm install -g chesspal.",
+            `♞ Chesspal is ready in ${chess}\n\n  To play:\n`
+                + "  1. Open Claude Code or Codex in this folder.\n"
+                + "  2. Say hello: the AI opens the board for you.\n"
+                + "  3. The first time, it asks whether to trust the folder: say yes.\n"
+                + "     Codex also asks to allow its hook: allow it,\n"
+                + "     so that your moves on the board wake it.\n\n"
+                + `  Updated: .mcp.json, AGENTS.md, CLAUDE.md, ${join(".claude", "settings.json")}, ${join(".claude", "agents", "chesspal-ponder-quick.md")}, `
+                + `${join(".claude", "agents", "chesspal-ponder.md")}, ${join(".codex", "config.toml")}, ${join(".codex", "hooks.json")}`,
         );
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${opponentInstructions()}\n<!-- chesspal: end -->\n`);
@@ -85,7 +89,16 @@ describe("chesspal init", () => {
         });
         expect(text(folder, ".codex/config.toml")).toBe('model = "gpt-5"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n\n[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
         expect(json(folder, ".codex/hooks.json")).toEqual({ hooks: { Stop: [ownStop, { hooks: [codexBellHook] }] } });
-        expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/is set up already: nothing to change\.\n/);
+        expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/^♞ Chesspal is ready in .*: nothing to change\n/);
+    });
+
+    it("speaks the system's language: Italian, else English", async () => {
+        const folder = playerFolder();
+        const output = (await runCommandLine(["init"], { ...testContext(folder), language: "it-IT" })).output;
+
+        expect(output).toMatch(/^♞ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code o Codex in questa cartella\.\n/);
+        expect(output).toContain("  Aggiornati: .mcp.json");
+        expect((await runCommandLine(["init"], { ...testContext(folder), language: "fr-FR" })).output).toMatch(/^♞ Chesspal is ready in .*: nothing to change\n/);
     });
 
     it("refuses a settings file that is not JSON, and says how to fix it", async () => {
