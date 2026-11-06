@@ -34,3 +34,6 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test
+      # The package as a player installs it: packed, installed elsewhere, run through npm's shim, and its MCP server started as .mcp.json starts it.
+      - run: npm run smoke
+        timeout-minutes: 5

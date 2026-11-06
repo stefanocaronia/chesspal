@@ -64,6 +64,8 @@ npm test
 - `npm run page -- <folder>` serves the board page of a player's folder, with the data of `CHESSPAL_HOME` or Documents, to look at it while it is built.
 - `npm run endings` shows the ends of a game on the board: checkmate, resignation, a flag fallen, the draws.
 - `npm run bench` times the commands against their budgets.
+- `npm run smoke`, after the build, packs the package, installs it in a temporary folder and runs it as a player would: its version, `chesspal init`
+  and its MCP server, as CI does.
 
 [AGENTS.md](AGENTS.md) is the guide for development: the layout, the architecture's rules, performance, the coding guidelines. It is written for AI
 coding agents and people alike.

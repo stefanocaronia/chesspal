@@ -25,6 +25,7 @@
     "format": "eslint --fix . && dprint fmt",
     "lint": "eslint . && dprint check && tsc -p tsconfig.test.json && tsc -p tsconfig.core.json && tsc -p src/page --noEmit",
     "bench": "npm run build && node --experimental-strip-types test/bench/core.ts && node --experimental-strip-types test/bench/commands.ts",
+    "smoke": "node --experimental-strip-types --no-warnings test/smoke/tarball.ts",
     "page": "npm run build && node --experimental-strip-types --no-warnings test/demo/page.ts",
     "endings": "npm run build && node --experimental-strip-types --no-warnings test/demo/endings.ts"
   },
