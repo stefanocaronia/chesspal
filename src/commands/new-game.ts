@@ -166,20 +166,23 @@ export const pliesBeforeClearing = 20;
 const fenPattern = /^[pnbrqkPNBRQK1-8]+(?:\/[pnbrqkPNBRQK1-8]+){7}(?:\s|$)/;
 
 /**
- * Whether the chat must be cleared first: the last game begun, in any profile, was played in it at some length, and the host says how chats start (Claude
- * Code's hook, T-85). Another profile does not clear the chat (D-66).
+ * Whether the chat must be cleared first: the last game begun, in any profile, was played in it at some length, and the host says how chats start (the hook
+ * of Claude Code and Codex, T-85, T-104). Another profile does not clear the chat (D-66).
  */
 function chatToClear(context: Context): boolean
 {
     const start = lastChatStart(context.folder);
 
-    if (context.host?.() !== "claude-code" || start === undefined) {
+    if (!hostsNotingChats.has(context.host?.() ?? "") || start === undefined) {
         return false;
     }
 
     const last = gameFolders(context.folder).flatMap((folder) => loadGame(folder) ?? []).sort((one, other) => Date.parse(other.started) - Date.parse(one.started))[0];
     return last !== undefined && last.game.record.moves.length >= pliesBeforeClearing && !cleanSince(start, last.started);
 }
+
+// The hosts whose SessionStart hook, written by init, notes how each chat starts: Claude Code and Codex, by the names they give the server.
+const hostsNotingChats = new Set(["claude-code", "codex-mcp-client"]);
 
 function archiveBefore(folder: string, before: CurrentGame): string
 {

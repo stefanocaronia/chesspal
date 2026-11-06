@@ -19,6 +19,8 @@ const codexBellHook = {
     timeout: 86_400,
     statusMessage: "Waiting for your move on the board page",
 };
+// How each chat starts, noted in Codex too (T-104).
+const codexChatHook = { type: "command", command: "chesspal chat", commandWindows: "chesspal.cmd chat" };
 
 afterEach(() => {
     for (const folder of folders.splice(0)) {
@@ -38,8 +40,8 @@ describe("chesspal init", () => {
                 + "  1. Open Claude Code or Codex in this folder.\n"
                 + "  2. Say hello: the AI opens the board for you.\n"
                 + "  3. The first time, it asks whether to trust the folder: say yes.\n"
-                + "     Codex also asks to allow its hook: allow it,\n"
-                + "     so that your moves on the board wake it.\n\n"
+                + "     In Codex, also allow Chesspal's two hooks in /hooks:\n"
+                + "     small helpers that let it notice your moves on the board.\n\n"
                 + `  Updated: .mcp.json, AGENTS.md, CLAUDE.md, ${join(".claude", "settings.json")}, ${join(".claude", "agents", "chesspal-ponder-quick.md")}, `
                 + `${join(".claude", "agents", "chesspal-ponder.md")}, ${join(".codex", "config.toml")}, ${join(".codex", "hooks.json")}`,
         );
@@ -48,7 +50,7 @@ describe("chesspal init", () => {
         expect(text(chess, "CLAUDE.md")).toBe("@AGENTS.md\n");
         expect(json(chess, ".claude/settings.json")).toEqual({ enabledMcpjsonServers: ["chesspal"], permissions: { allow: ["mcp__chesspal"] }, hooks: { Stop: [{ hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] } });
         expect(text(chess, ".codex/config.toml")).toBe('[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
-        expect(json(chess, ".codex/hooks.json")).toEqual({ hooks: { Stop: [{ hooks: [codexBellHook] }] } });
+        expect(json(chess, ".codex/hooks.json")).toEqual({ hooks: { Stop: [{ hooks: [codexBellHook] }], SessionStart: [{ hooks: [codexChatHook] }] } });
         expect(opponentInstructions()).toContain("call `status`");
         expect(text(chess, ".claude/agents/chesspal-ponder-quick.md")).toMatch(
             /^---\nname: chesspal-ponder-quick\n.*\ntools: mcp__chesspal__ponder\nmodel: haiku\n---\n\nYou are the player's chess opponent/s,
@@ -88,7 +90,7 @@ describe("chesspal init", () => {
             hooks: { Stop: [ownStop, { hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] },
         });
         expect(text(folder, ".codex/config.toml")).toBe('model = "gpt-5"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n\n[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
-        expect(json(folder, ".codex/hooks.json")).toEqual({ hooks: { Stop: [ownStop, { hooks: [codexBellHook] }] } });
+        expect(json(folder, ".codex/hooks.json")).toEqual({ hooks: { Stop: [ownStop, { hooks: [codexBellHook] }], SessionStart: [{ hooks: [codexChatHook] }] } });
         expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/^♜ Chesspal is ready in .*: nothing to change\n/);
     });
 

@@ -35,14 +35,23 @@ describe("a new game after one played in the chat (D-57)", () => {
         expect(() => startAgain(context)).not.toThrow();
     });
 
+    it("waits for it in Codex too, whose hook notes how chats start (T-104)", async () => {
+        const codex = chatWith(longGame, "codex-mcp-client");
+        await chatStarted(codex, "compact", after);
+        expect(() => startAgain(codex)).toThrow(/\/clear/);
+
+        await chatStarted(codex, "startup", after);
+        expect(() => startAgain(codex)).not.toThrow();
+    });
+
     it("starts at once after a game left after a few moves, from another host, or where no hook notes the chat", async () => {
         const short = chatWith("1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Nf6 5. d3 d6 6. O-O O-O 7. a4 a6 8. Re1 Ba7 9. h3 h6 10. Nbd2 *");
         await chatStarted(short, "startup", before);
         expect(() => startAgain(short)).not.toThrow();
 
-        const codex = chatWith(longGame, "codex-mcp-client");
-        await chatStarted(codex, "startup", before);
-        expect(() => startAgain(codex)).not.toThrow();
+        const other = chatWith(longGame, "gemini-cli-mcp-client");
+        await chatStarted(other, "startup", before);
+        expect(() => startAgain(other)).not.toThrow();
 
         expect(() => startAgain(chatWith(longGame))).not.toThrow();
     });

@@ -141,13 +141,13 @@ function codexConfigFile(folder: string, platform: string): FileChange | undefin
     return text === before ? undefined : { path, text };
 }
 
-/** Codex's hooks, read once the player has reviewed them in /hooks: the doorbell of the moves on the page (T-62) beside the player's own. */
+/** Codex's hooks, read once the player has reviewed them in /hooks: the doorbell of the moves on the page (T-62) and how each chat starts (T-104), beside the player's own. */
 function codexHooksFile(folder: string): FileChange | undefined
 {
     const path = join(folder, ".codex", "hooks.json");
     const config = jsonOf(path);
     const hooks = isObject(config.hooks) ? config.hooks : {};
-    return changed(path, { ...config, hooks: withHook(hooks, "Stop", codexBellHook) });
+    return changed(path, { ...config, hooks: withHook(withHook(hooks, "Stop", codexBellHook), "SessionStart", codexChatHook) });
 }
 
 // Codex's Stop hook for the doorbell (T-62): it holds the turn until the player acts on the page, then Codex goes on; a day at most. On Windows Codex runs
@@ -159,6 +159,9 @@ const codexBellHook = {
     timeout: 86_400,
     statusMessage: "Waiting for your move on the board page",
 };
+
+// Codex's SessionStart hook (T-104): it notes how each chat starts, as Claude Code's does (D-57).
+const codexChatHook = { type: "command", command: "chesspal chat", commandWindows: "chesspal.cmd chat" };
 
 /** A JSON file's new content, when it differs from what is there. */
 function changed(path: string, value: Record<string, unknown>): FileChange | undefined

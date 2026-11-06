@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomically } from "./files.ts";
 
-/** How a chat started, as Claude Code's SessionStart hook says it: new, cleared, resumed or compacted; when, as an ISO date; and its session, for the logs. */
+/** How a chat started, as the host's SessionStart hook says it: new, cleared, resumed or compacted; when, as an ISO date; and its session, for the logs. */
 export interface ChatStart
 {
     readonly source: string;

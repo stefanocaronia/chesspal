@@ -1,4 +1,4 @@
-// `chesspal chat`, Claude Code's SessionStart hook (D-57): it writes how the chat started, new, cleared, resumed or compacted, for new_game to read.
+// `chesspal chat`, the SessionStart hook of Claude Code and Codex (D-57, T-104): it writes how the chat started, new, cleared, resumed or compacted, for new_game to read.
 import { saveChatStart } from "../games/index.ts";
 
 /** Reads the hook's input and writes how the chat started; a failure is told on stderr and never stops the chat. */

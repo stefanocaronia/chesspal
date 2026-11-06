@@ -30,7 +30,8 @@ with a local model.
 
 Chesspal is an MCP server, a command line, `chesspal`, and a board page, all made from the same commands. `chesspal init` sets up a folder to play in:
 the few files that tell the AI agent where Chesspal is, and its instructions as an opponent. The game lives in that folder, on disk, and only
-Chesspal's commands change it: they check every move with [chess.js](https://github.com/jhlywa/chess.js) and write atomically.
+Chesspal's commands change it: they check every move with [chess.js](https://github.com/jhlywa/chess.js) and write atomically. In Codex, allow Chesspal's two
+hooks in `/hooks` the first time: small helpers that let it notice your moves on the board page.
 
 ## Development
 
