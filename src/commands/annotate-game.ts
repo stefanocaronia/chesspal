@@ -7,7 +7,7 @@ import { gameFolder } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
 import { defineCommand } from "./registry.ts";
-import { folderOf, moveIndex, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
+import { moveIndex, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
 
 const summaryLimit = 1500;
 const closingLimit = 400;
@@ -69,7 +69,7 @@ export const annotateGame = defineCommand({
         const kept = caller === undefined || (caller.hostOnly === true && annotatorOf(studied.record) !== undefined);
         const marked: GameRecord = { ...(kept ? studied.record : withAnnotator(studied.record, caller)), moves };
         rewriteGame(
-            folderOf(context, studied.name),
+            gameFolder(context.home()),
             studied.name,
             summary === undefined && closing === undefined ? marked : withGameReview(marked, { ...(summary === undefined ? {} : { summary }), ...(closing === undefined ? {} : { closing }) }),
         );

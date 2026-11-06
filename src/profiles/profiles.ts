@@ -2,7 +2,7 @@
 // there is always one, the first made by Chesspal.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { makeFolder, writeAtomically } from "../games/index.ts";
+import { makeFolder, renameOver, writeAtomically } from "../games/index.ts";
 import { readFrontMatter, writeFrontMatter } from "./front-matter.ts";
 
 /** How the player says they play, from who has just learned to who plays tournaments. */
@@ -84,15 +84,19 @@ export function profileFolder(root: string, id: string): string
     return join(root, folderName, id);
 }
 
-/** Makes a profile, named from the player's name, and puts it in use; the one Chesspal made, while new, becomes it instead, with its games. */
+/**
+ * Makes a profile, its folder named from the player's name, and puts it in use; the one Chesspal made, while new, becomes it instead, with its games, and
+ * its folder takes the player's name too (D-71).
+ */
 export function createProfile(root: string, fields: ProfileFields): PlayerProfile
 {
     const id = activeId(root);
 
     if (id !== undefined && readProfile(root, id).new === true) {
         const { level, rating, avatar } = fields;
-        writeProfile(root, id, { name: fields.name, level, rating, avatar, new: false });
-        return readProfile(root, id);
+        const named = renamed(root, id, fields.name);
+        writeProfile(root, named, { name: fields.name, level, rating, avatar, new: false });
+        return readProfile(root, named);
     }
 
     let made = freeId(root, slugOf(fields.name));
@@ -197,6 +201,38 @@ function fillProfile(root: string, id: string, fields: ProfileFields, made: bool
     return readProfile(root, id);
 }
 
+/**
+ * The folder of the profile Chesspal made, named after the account, moved to the player's name and put in use; it keeps the account's for a name without
+ * letters or digits, and where it cannot move, as with a file held open in it.
+ */
+function renamed(root: string, id: string, name: string): string
+{
+    const plain = plainName(name);
+
+    if (plain === "" || id === plain || (id.startsWith(`${plain}-`) && /^\d+$/.test(id.slice(plain.length + 1)))) {
+        return id;
+    }
+
+    const target = freeId(root, plain);
+
+    // On Linux and macOS a folder another process made between the look and the move would be replaced: two profiles made in the same instant.
+    try {
+        renameOver(profileFolder(root, id), profileFolder(root, target));
+    } catch {
+        return id;
+    }
+
+    try {
+        writeActive(root, target);
+    } catch (error) {
+        // Moved back, or the first folder would be put in use in its place.
+        renameOver(profileFolder(root, target), profileFolder(root, id));
+        throw error;
+    }
+
+    return target;
+}
+
 function activeNamed(root: string): string | undefined
 {
     try {
@@ -270,11 +306,16 @@ function profileText(root: string, id: string): string
     }
 }
 
-/** A folder's name from the player's name: plain letters and digits, lower case, words joined by hyphens. */
+/** A folder's name from the player's name: its plain letters and digits, or player for a name without any. */
 function slugOf(name: string): string
 {
-    const slug = name.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "").slice(0, 32).replace(/-+$/, "");
-    return slug === "" ? "player" : slug;
+    return plainName(name) || "player";
+}
+
+/** A name in plain letters and digits, lower case, words joined by hyphens; empty for a name without any. */
+function plainName(name: string): string
+{
+    return name.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "").slice(0, 32).replace(/-+$/, "");
 }
 
 function freeId(root: string, slug: string): string

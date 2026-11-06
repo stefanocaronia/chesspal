@@ -81,7 +81,7 @@ export function archivedGame(folder: string, name: string): GameRecord
     return gameNamed(folder, "games", name);
 }
 
-/** The names of the games kept to study, in the player's folder for every profile, the latest kept first: study/2026-11-04-153012.pgn. */
+/** The names of the games kept to study in a profile's folder, the latest kept first: study/2026-11-04-153012.pgn. */
 export function keptGames(root: string): string[]
 {
     return gameNames(root, "study");
@@ -101,7 +101,7 @@ export function archivedWhen(name: string): string
 }
 
 /**
- * Keeps a game played elsewhere to study (D-68), apart from the games played here and for every profile, and gives its name, by `now`:
+ * Keeps a game played elsewhere to study (D-68) in a profile's folder, apart from the games played here, and gives its name, by `now`:
  * study/2026-11-04-153012.pgn; the same game again keeps the name it has.
  */
 export function keepToStudy(root: string, record: GameRecord, now: Date): string
@@ -131,7 +131,7 @@ export function keepToStudy(root: string, record: GameRecord, now: Date): string
     return name;
 }
 
-/** Writes again a game of the archive, in a profile's folder, or kept to study, in the player's, by its name as listed: with the AI's review (D-69). */
+/** Writes again a game of a profile, played or kept to study, by its name as listed: with the AI's review (D-69). */
 export function rewriteGame(folder: string, name: string, record: GameRecord): void
 {
     const [, shelf, file] = /^(games|study)\/(.*)$/.exec(name) ?? [];
@@ -147,7 +147,7 @@ export function rewriteGame(folder: string, name: string, record: GameRecord): v
     }
 }
 
-// The games played here, by profile, and the games kept to study, for every profile: each with how the AI lists them.
+// The games of a profile, played here or kept to study: each with how the AI lists them.
 type Shelf = "games" | "study";
 const shelves = { games: { what: "of the archive", list: "past_games" }, study: { what: "kept to study", list: "study_games" } };
 const namePattern = /^\d{4}-\d{2}-\d{2}-\d{6}\.pgn$/;

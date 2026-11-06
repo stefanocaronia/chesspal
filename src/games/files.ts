@@ -27,8 +27,11 @@ export function makeFolder(path: string): void
 
 const attempts = 10;
 
-// Windows refuses to rename over a file another program holds open (an editor, an antivirus, a sync client): Chesspal waits a little and tries again, half a second at most.
-function renameOver(from: string, to: string): void
+/**
+ * Renames a file or a folder. Windows refuses while another program holds a file in it open (an editor, an antivirus, a sync client): Chesspal waits a
+ * little and tries again, half a second at most.
+ */
+export function renameOver(from: string, to: string): void
 {
     for (let attempt = 1;; attempt++) {
         try {

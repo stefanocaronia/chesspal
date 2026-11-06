@@ -1,7 +1,8 @@
-// The games kept to study (D-68): played elsewhere and brought to analyse_game as a PGN, in the data folder for every profile.
+// The games kept to study (D-68): played elsewhere and brought to analyse_game as a PGN, in the folder of the profile that brought them.
 import { z } from "zod";
 import type { GameRecord } from "../core/index.ts";
 import { keptGame, keptGames } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { openingName } from "./opening-book.ts";
 import { defineCommand } from "./registry.ts";
 import { knownTag } from "./study.ts";
@@ -9,13 +10,16 @@ import { knownTag } from "./study.ts";
 /** The games kept to study, one line each, the latest kept first. */
 export const studyGames = defineCommand({
     name: "study_games",
-    description: "Lists the games kept to study, which the player brought from elsewhere, for every profile, the latest kept first: who played, when, "
+    description: "Lists the games kept to study, which the player brought from elsewhere, the latest kept first: who played, when, "
         + "the result, the opening, how long, and its name. analyse_game with pgn keeps a game here; analyse_game, look and position take its name as game. "
         + "Example: study_games {}.",
     input: z.object({}),
     readOnly: true,
     idempotent: true,
-    run: (_input, context): { games: string[]; } => ({ games: keptGames(context.home()).flatMap((name) => studyLines(context.home(), name)) }),
+    run: (_input, context): { games: string[]; } => {
+        const folder = gameFolder(context.home());
+        return { games: keptGames(folder).flatMap((name) => studyLines(folder, name)) };
+    },
     format: ({ games }) => (games.length === 0 ? "No game kept to study yet: analyse_game with the PGN of a game played elsewhere keeps it here." : games.join("\n")),
 });
 

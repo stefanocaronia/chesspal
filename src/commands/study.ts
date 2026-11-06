@@ -71,14 +71,9 @@ export function gameToStudy(context: Context, name?: string): Studied
 /** A game played or kept to study by its name as the lists write it, or without its folder or its .pgn; refused when it is not there. */
 export function namedGame(context: Context, name: string): Required<Studied>
 {
-    const full = fullName(context, gameFolder(context.home()), name);
-    return { record: full.startsWith("study/") ? keptGame(context.home(), full) : archivedGame(gameFolder(context.home()), full), name: full };
-}
-
-/** The folder a game's name is in: the data folder for a game kept to study, the profile's for a game played. */
-export function folderOf(context: Context, name: string): string
-{
-    return name.startsWith("study/") ? context.home() : gameFolder(context.home());
+    const folder = gameFolder(context.home());
+    const full = fullName(folder, name);
+    return { record: full.startsWith("study/") ? keptGame(folder, full) : archivedGame(folder, full), name: full };
 }
 
 /** The index of a move in the game's record, given as analyse_game numbers it: 12. for White's, 12... for Black's, 12...Kf8 too. */
@@ -133,7 +128,7 @@ export function positionLine({ game, move }: StudiedPosition, name?: string): st
  * A game's name as the lists write it, from a name without its folder or its .pgn too: 2026-11-04-173054 is games/2026-11-04-173054.pgn, or the game kept
  * to study by that name when no game played has it; any other name as it is, for the archive to refuse.
  */
-function fullName(context: Context, folder: string, name: string): string
+function fullName(folder: string, name: string): string
 {
     const [, shelf, stem] = /^\s*(?:(games|study)\/)?(\d{4}-\d{2}-\d{2}-\d{6})(?:\.pgn)?\s*$/.exec(name) ?? [];
 
@@ -147,7 +142,7 @@ function fullName(context: Context, folder: string, name: string): string
 
     const played = `games/${stem}.pgn`;
     const kept = `study/${stem}.pgn`;
-    return !archivedGames(folder).includes(played) && keptGames(context.home()).includes(kept) ? kept : played;
+    return !archivedGames(folder).includes(played) && keptGames(folder).includes(kept) ? kept : played;
 }
 
 function plyOf(record: GameRecord, numbers: readonly string[], move: string): number

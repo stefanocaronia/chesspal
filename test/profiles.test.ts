@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Context } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
+import { positionIn, refuseOtherGame, refuseUnseenPosition } from "../src/commands/play-move.ts";
 import * as page from "../src/page/profile.ts";
 import { readFrontMatter, writeFrontMatter } from "../src/profiles/front-matter.ts";
 import {
@@ -58,15 +59,55 @@ describe("the profiles (D-23)", () => {
         writeFileSync(join(gameFolder(root), "game.json"), "{}");
         const stefano = createProfile(root, { name: "Stefano", level: "regular", rating: { value: 1450, site: "lichess" }, avatar: "owl" });
 
-        expect(stefano).toEqual({ id: "stefano-caronia", name: "Stefano", level: "regular", rating: { value: 1450, site: "lichess" }, avatar: "owl" });
+        // Completed, its folder takes the player's name, with the game.
+        expect(stefano).toEqual({ id: "stefano", name: "Stefano", level: "regular", rating: { value: 1450, site: "lichess" }, avatar: "owl" });
+        expect(gameFolder(root)).toBe(profileFolder(root, "stefano"));
         expect(readFileSync(join(gameFolder(root), "game.json"), "utf8")).toBe("{}");
+        expect(JSON.parse(readFileSync(join(root, "profiles", "active.json"), "utf8"))).toEqual({ profile: "stefano" });
 
         // Another profile starts with no games, and is put in use.
         const anna = createProfile(root, { name: "Anna" });
 
         expect(gameFolder(root)).toBe(profileFolder(root, anna.id));
         expect(existsSync(join(gameFolder(root), "game.json"))).toBe(false);
-        expect(listProfiles(root).map(({ id }) => id)).toEqual(["anna", "stefano-caronia"]);
+        expect(listProfiles(root).map(({ id }) => id)).toEqual(["anna", "stefano"]);
+    });
+
+    it("keep the account's folder when the player's name gives the same or none, and take a free one when the name's is taken (D-71)", () => {
+        const same = playerFolder();
+        ensureProfile(same, "Anna");
+
+        expect(createProfile(same, { name: "ANNA" }).id).toBe("anna");
+
+        const numbered = playerFolder();
+        ensureProfile(numbered, "con");
+
+        expect(createProfile(numbered, { name: "Con" }).id).toBe("con-2");
+
+        const symbols = playerFolder();
+        ensureProfile(symbols, "stefa");
+
+        expect(createProfile(symbols, { name: "♞♞" })).toEqual({ id: "stefa", name: "♞♞" });
+
+        const taken = playerFolder();
+        ensureProfile(taken, "stefa");
+        // A folder made by hand, with no profile.md: a profile all the same.
+        mkdirSync(profileFolder(taken, "anna"));
+        activateProfile(taken, "stefa");
+
+        expect(createProfile(taken, { name: "Anna" }).id).toBe("anna-2");
+        expect(listProfiles(taken).map(({ id }) => id)).toEqual(["anna", "anna-2"]);
+    });
+
+    it("move the folder back when the profile renamed cannot be put in use, and keep it new (D-71)", () => {
+        const root = playerFolder();
+        ensureProfile(root, "stefa");
+        // The file active.json is written through a folder: the profile is renamed, and cannot be put in use.
+        mkdirSync(join(root, "profiles", `active.json.${process.pid}.tmp`));
+
+        expect(() => createProfile(root, { name: "Anna" })).toThrow();
+        expect(existsSync(profileFolder(root, "anna"))).toBe(false);
+        expect(listProfiles(root).find(({ id }) => id === "stefa")).toEqual({ id: "stefa", name: "stefa", new: true });
     });
 
     it("leave nothing half made behind when one cannot be put in use, and keep the others", () => {
@@ -198,12 +239,23 @@ describe("the profiles' commands", () => {
         expect(await run(context, "profiles")).toBe("* player: Player");
         expect(await run(context, "status")).toContain(`Folder: ${profileFolder(context.folder, "player")}\nNo game.`);
         expect(await run(context, "new_profile", { name: "Anna", level: "regular", rating: 1450, site: "lichess" })).toBe(
-            "Profile player made, and in use: Anna, plays often, Lichess 1450.",
+            "Profile anna made, and in use: Anna, plays often, Lichess 1450.",
         );
-        expect(await run(context, "status")).toContain(`Folder: ${profileFolder(context.folder, "player")}\nPlayer: Anna, plays often, Lichess 1450.\nNo game.`);
+        expect(await run(context, "status")).toContain(`Folder: ${profileFolder(context.folder, "anna")}\nPlayer: Anna, plays often, Lichess 1450.\nNo game.`);
         expect(await run(context, "new_game", { ai_colour: "black" })).toMatch(/^New game: you play Black, the player White, at the club level \(board and tactical facts: no position\)\.\nPlayer: Anna, plays often, Lichess 1450\.\n/);
-        expect(existsSync(join(profileFolder(context.folder, "player"), "game.json"))).toBe(true);
+        expect(existsSync(join(profileFolder(context.folder, "anna"), "game.json"))).toBe(true);
         await expect(run(context, "new_profile", { name: "Bruno", rating: 1450 })).rejects.toThrow("Give the rating and its site together");
+    });
+
+    it("let a chat play on when the wizard renames the folder under the game it saw (D-71)", async () => {
+        const context = contextIn(playerFolder());
+        await run(context, "new_game", { ai_colour: "black" });
+        const chat: Context = { ...context, positionSeen: positionIn(gameFolder(context.folder)) };
+        await run(context, "new_profile", { name: "Anna" });
+
+        expect(gameFolder(context.folder)).toBe(profileFolder(context.folder, "anna"));
+        expect(() => refuseUnseenPosition(chat, gameFolder(context.folder))).not.toThrow();
+        expect(() => refuseOtherGame(chat, gameFolder(context.folder))).not.toThrow();
     });
 
     it("refuse to change profile while a game goes on in the one in use, but complete the one Chesspal made with its game", async () => {
@@ -218,9 +270,9 @@ describe("the profiles' commands", () => {
         await run(context, "new_profile", { name: "Bruno" });
         await run(context, "new_game", { ai_colour: "white" });
 
-        await expect(run(context, "use_profile", { profile: "player" })).rejects.toThrow("A game is going on in this profile");
+        await expect(run(context, "use_profile", { profile: "anna" })).rejects.toThrow("A game is going on in this profile");
         expect(await run(context, "use_profile", { profile: "bruno" })).toBe("Profile bruno in use: Bruno.");
-        expect(await run(context, "profiles")).toBe("* bruno: Bruno\n  player: Anna");
+        expect(await run(context, "profiles")).toBe("  anna: Anna\n* bruno: Bruno");
     });
 
     it("set the picture: a drawn avatar in place of the player's image, or their image from a file", async () => {
@@ -228,12 +280,12 @@ describe("the profiles' commands", () => {
         await run(context, "new_profile", { name: "Anna" });
         writeFileSync(join(context.folder, "me.png"), png);
 
-        expect(await run(context, "set_avatar", { avatar: "me.png" })).toBe("The picture of player is me.png.");
-        expect(ownImage(context.folder, "player")?.type).toBe("png");
+        expect(await run(context, "set_avatar", { avatar: "me.png" })).toBe("The picture of anna is me.png.");
+        expect(ownImage(context.folder, "anna")?.type).toBe("png");
 
         await run(context, "set_avatar", { avatar: "owl" });
 
-        expect(ownImage(context.folder, "player")).toBeUndefined();
+        expect(ownImage(context.folder, "anna")).toBeUndefined();
         expect(activeProfile(context.folder).avatar).toBe("owl");
         await expect(run(context, "set_avatar", { avatar: "missing.png" })).rejects.toThrow("cannot be read");
     });

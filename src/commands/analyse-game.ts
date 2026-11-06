@@ -28,7 +28,7 @@ import { activeProfile, gameFolder } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 import { bookOpening, bookReaches } from "./opening-book.ts";
 import { defineCommand } from "./registry.ts";
-import { folderOf, gameToStudy, knownTag, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
+import { gameToStudy, knownTag, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
 import { balanceText, colourName, riskLine } from "./view.ts";
 
 // The analyst's instructions, read at the first analysis.
@@ -103,7 +103,7 @@ export const analyseGame = defineCommand({
     description: "Gives a game that is over move by move, to comment it with the player: each move with what it took and the time it took, the material "
         + "when it changes, the pieces at risk and the mates in one after it, where the game left the opening book, and your comments and plans. Facts "
         + "only: the judgment is yours. Without game or pgn, the game just over, or else the last one played; game: a name as past_games or study_games "
-        + "writes it; pgn: a game the player brings from elsewhere, kept to study for every profile. Never while a game goes on. The first time in a chat "
+        + "writes it; pgn: a game the player brings from elsewhere, kept to study in the profile. Never while a game goes on. The first time in a chat "
         + "it also says how to analyse. annotate_game then keeps your badges and notes for the board page. Example: analyse_game {}.",
     input: z.object({
         game: z.string().optional().describe("a game's name, as past_games, study_games or analyse_game writes it"),
@@ -165,7 +165,7 @@ function importedGame(context: Context, pgn: string): Studied
         : withGameReview(brought, { ...(summary === undefined ? {} : { summary }), ...(closing === undefined ? {} : { closing }) });
 
     // A game brought again is the one already kept, with the review written on it since.
-    return namedGame(context, keepToStudy(context.home(), record, context.now()));
+    return namedGame(context, keepToStudy(gameFolder(context.home()), record, context.now()));
 }
 
 /**
@@ -186,7 +186,7 @@ function markBook(context: Context, { record, name }: Required<Studied>, moves: 
         return ply < inBook && review?.badge === undefined ? reviewed(move, { ...review, badge: "book" }) : move;
     });
 
-    rewriteGame(folderOf(context, name), name, { ...record, moves: marked });
+    rewriteGame(gameFolder(context.home()), name, { ...record, moves: marked });
 }
 
 /** How many plies from the start the opening book knows: to the move before the first out of it; none from another position. */

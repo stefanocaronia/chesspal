@@ -14,6 +14,7 @@ import { position } from "../src/commands/position.ts";
 import { newProfile } from "../src/commands/profiles.ts";
 import { studyGames } from "../src/commands/study-games.ts";
 import { saveChatStart } from "../src/games/index.ts";
+import { gameFolder } from "../src/profiles/index.ts";
 import { createMcpServer } from "../src/server/mcp.ts";
 import { testContext } from "./commands.ts";
 
@@ -74,20 +75,26 @@ describe("the analysis of a game (D-68)", () => {
             "1...e5: 3:00 left",
             "2.Nf3: spent 0:05, 2:55 left; at risk: undefended Black Pe5",
         ].join("\n"));
-        expect(readFileSync(join(context.folder, imported), "utf8")).toMatch(/2\.\s+Nf3 \{\[%clk 0:02:55\] \[%badge book\]\} \*/);
+        expect(readFileSync(join(gameFolder(context.folder), imported), "utf8")).toMatch(/2\.\s+Nf3 \{\[%clk 0:02:55\] \[%badge book\]\} \*/);
     });
 
-    it("keeps a game brought as a PGN to study for every profile, listed by study_games and not among the games played", async () => {
+    it("keeps a game brought as a PGN to study in the profile that brought it, listed by study_games and not among the games played", async () => {
         const context = playerFolder();
+        const none = "No game kept to study yet: analyse_game with the PGN of a game played elsewhere keeps it here.";
         await newProfile.run(newProfile.input.parse({ name: "Ann" }), context);
-        expect(await listStudy(context)).toBe("No game kept to study yet: analyse_game with the PGN of a game played elsewhere keeps it here.");
+        expect(await listStudy(context)).toBe(none);
 
         await analyse(context, { pgn });
-        await newProfile.run(newProfile.input.parse({ name: "Carla" }), context);
 
         expect(await listStudy(context)).toBe(`Ann vs Bob, 2026.10.01: 1-0, C23 Bishop's Opening, 4 moves. ${imported}`);
         expect(await lookAt(context, { game: imported, move: "1." })).toMatch(/^After 1\.e4 in /);
         expect(pastGames.format(await pastGames.run(pastGames.input.parse({}), context))).toBe("No game played yet.");
+
+        // Another profile has studies of its own.
+        await newProfile.run(newProfile.input.parse({ name: "Carla" }), context);
+
+        expect(await listStudy(context)).toBe(none);
+        await expect(async () => lookAt(context, { game: imported })).rejects.toThrow(/There is no/);
     });
 
     it("numbers the moves of a game from a position, and tells an en passant capture and a promotion", async () => {

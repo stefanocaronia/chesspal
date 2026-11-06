@@ -85,7 +85,7 @@ describe("annotate_game (D-69)", () => {
         expect(analysis).toContain("\nYour review: Black missed the threat on f7. A quick win.\n");
         expect(analysis).toMatch(/\n3\.\.\.Nf6: .*; you marked mistake\n/);
         expect(analysis).toMatch(/\n4\.Qxf7#: .*; you marked best\n?$/);
-        expect(readFileSync(join(context.folder, kept), "utf8").replace(/\s+/g, " ")).toContain(
+        expect(readFileSync(join(gameFolder(context.folder), kept), "utf8").replace(/\s+/g, " ")).toContain(
             "{[%review Black missed the threat on f7.] [%closing A quick win.]} 1. e4 {[%badge book]} 1... e5 {[%badge book]} 2. Bc4 {[%badge book] [%review the bishop eyes f7]} 2... Nc6 {[%badge book]} 3. Qh5 {[%badge book]} 3... Nf6? {[%badge mistake]}",
         );
     });
@@ -93,11 +93,11 @@ describe("annotate_game (D-69)", () => {
     it("writes who reviewed the game as its Annotator, with the effort only when the host gives it (D-81)", async () => {
         const context = playerFolder();
         await analyse(context, { pgn });
-        const tags = (): Readonly<Record<string, string>> => readPgn(readFileSync(join(context.folder, kept), "utf8"))[0]!.tags;
+        const tags = (): Readonly<Record<string, string>> => readPgn(readFileSync(join(gameFolder(context.folder), kept), "utf8"))[0]!.tags;
 
         await annotate({ ...context, caller: () => Promise.resolve({ annotator: "claude-opus-5-5", effort: "xhigh" }) }, { summary: "A short game." });
         expect(tags()).toMatchObject({ White: "Ann", Annotator: "claude-opus-5-5", AnnotatorEffort: "xhigh" });
-        expect(annotatorOf(readPgn(readFileSync(join(context.folder, kept), "utf8"))[0]!)).toEqual({ annotator: "claude-opus-5-5", effort: "xhigh" });
+        expect(annotatorOf(readPgn(readFileSync(join(gameFolder(context.folder), kept), "utf8"))[0]!)).toEqual({ annotator: "claude-opus-5-5", effort: "xhigh" });
 
         await annotate({ ...context, caller: () => Promise.resolve({ annotator: "gpt-6-luna" }) }, { closing: "A quick win." });
         expect(tags().Annotator).toBe("gpt-6-luna");
@@ -114,7 +114,7 @@ describe("annotate_game (D-69)", () => {
         await analyse(context, { pgn });
 
         await annotate(context, { notes: [{ move: "3...", badge: "blunder", note: "f7 falls", arrows: ["Rh5f7", "Gf6h5"], squares: ["Rf7"] }] });
-        const [read] = readPgn(readFileSync(join(context.folder, kept), "utf8"));
+        const [read] = readPgn(readFileSync(join(gameFolder(context.folder), kept), "utf8"));
         expect(read!.moves[5]!.comment).toBe("[%badge blunder] [%review f7 falls] [%cal Rh5f7,Gf6h5] [%csl Rf7]");
         expect(reviewOf(read!.moves[5]!.comment)).toEqual({
             badge: "blunder",
@@ -124,7 +124,7 @@ describe("annotate_game (D-69)", () => {
         });
 
         await annotate(context, { notes: [{ move: "3...", badge: "mistake" }] });
-        expect(reviewOf(readPgn(readFileSync(join(context.folder, kept), "utf8"))[0]!.moves[5]!.comment)).toEqual({ badge: "mistake" });
+        expect(reviewOf(readPgn(readFileSync(join(gameFolder(context.folder), kept), "utf8"))[0]!.moves[5]!.comment)).toEqual({ badge: "mistake" });
         await expect(async () => annotate(context, { notes: [{ move: "3...", note: "x", arrows: ["Xh5f7"] }] })).rejects.toThrow();
         await expect(async () => annotate(context, { notes: [{ move: "3...", arrows: ["Rh5f7"] }] })).rejects.toThrow("Give 3... a badge, a note, or both");
     });
@@ -133,10 +133,10 @@ describe("annotate_game (D-69)", () => {
         const context = playerFolder();
         await analyse(context, { pgn });
         await annotate(context, { notes: [{ move: "3...", badge: "blunder" }], summary: "Black missed the threat on f7." });
-        const before = readFileSync(join(context.folder, kept), "utf8");
+        const before = readFileSync(join(gameFolder(context.folder), kept), "utf8");
 
         const again = await analyse(context, { pgn });
-        expect(readFileSync(join(context.folder, kept), "utf8")).toBe(before);
+        expect(readFileSync(join(gameFolder(context.folder), kept), "utf8")).toBe(before);
         expect(again).toContain("\nYour review: Black missed the threat on f7.\n");
         expect(again).toMatch(/\n3\.\.\.Nf6: .*; you marked blunder\n/);
     });
@@ -146,11 +146,11 @@ describe("annotate_game (D-69)", () => {
         await expect(async () => annotate(context, { summary: "Fine." })).rejects.toThrow(/^No game is in analysis: call analyse_game first/);
 
         await analyse(context, { pgn });
-        const before = readFileSync(join(context.folder, kept), "utf8");
+        const before = readFileSync(join(gameFolder(context.folder), kept), "utf8");
         await expect(async () => annotate(context, { notes: [{ move: "1.", badge: "book" }, { move: "9.", badge: "best" }] })).rejects.toThrow("There is no 9. in this game");
         await expect(async () => annotate(context, {})).rejects.toThrow(/^Give notes on the moves that matter/);
         await expect(async () => annotate(context, { notes: [{ move: "1.", badge: "superb" }] })).rejects.toThrow();
-        expect(readFileSync(join(context.folder, kept), "utf8")).toBe(before);
+        expect(readFileSync(join(gameFolder(context.folder), kept), "utf8")).toBe(before);
 
         await newGame.run(newGame.input.parse({ ai_colour: "black", level: "beginner" }), context);
         expect(gameInAnalysis(gameFolder(context.folder))).toBeUndefined();
@@ -171,7 +171,7 @@ describe("annotate_game (D-69)", () => {
             );
         expect(gameInAnalysis(gameFolder(context.folder))?.game).toBe("games/2026-11-02-153012.pgn");
         expect(await analyse(context, {})).toMatch(/in the book to the end: those moves have the book badge[^\n]*\n[\s\S]*\n1\.\.\.d5: at risk: undefended White Pe4; your plan: open the centre$/);
-        expect(existsSync(join(context.folder, kept))).toBe(false);
+        expect(existsSync(join(gameFolder(context.folder), kept))).toBe(false);
     });
 
     it("gives one next step in status when the player brings a game on the board page just after one is over", async () => {

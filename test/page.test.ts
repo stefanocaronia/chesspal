@@ -405,14 +405,14 @@ describe("the profiles on the page (D-23, D-45)", () => {
 
         // Who plays is read at the chat's next call: no turn of its own (D-66).
         const waiting = waitForBell(JSON.stringify({ cwd: folder }), [port]);
-        expect(await post(page, "/api/profile/new", { name: "Anna", level: "regular" })).toMatchObject({ status: 200, body: '{"profile":"player"}' });
+        expect(await post(page, "/api/profile/new", { name: "Anna", level: "regular" })).toMatchObject({ status: 200, body: '{"profile":"anna"}' });
         expect(await shortly(waiting)).toBe("waiting");
 
         const served = JSON.parse((await get(page, "/api/game")).body) as { game: object | null; profile: object; profiles: object[]; };
         expect(served.game).not.toBeNull();
-        expect(served.profile).toEqual({ id: "player", name: "Anna", level: "regular" });
+        expect(served.profile).toEqual({ id: "anna", name: "Anna", level: "regular" });
         expect(served.profiles).toEqual([served.profile]);
-        expect(await post(page, "/api/profile/use", { profile: "player" })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/profile/use", { profile: "anna" })).toMatchObject({ status: 200 });
         expect(await post(page, "/api/profile/new", { name: "Bruno" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"profile-game"') });
     });
 
@@ -421,7 +421,7 @@ describe("the profiles on the page (D-23, D-45)", () => {
         const page = await open(folder);
         const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
         const served = async (): Promise<{ profile: { avatar?: string; image?: string; }; settings?: object; }> => JSON.parse((await get(page, "/api/game")).body);
-        const image = (body: string | Buffer, type = "image/png"): ReturnType<typeof get> => get(page, "/api/profile/image?profile=player", { "content-type": type }, "POST", body);
+        const image = (body: string | Buffer, type = "image/png"): ReturnType<typeof get> => get(page, "/api/profile/image?profile=anna", { "content-type": type }, "POST", body);
 
         expect((await get(page, "/api/profile/image?profile=anna", { "content-type": "image/png" }, "POST", png)).status).toBe(409);
         await post(page, "/api/profile/new", { name: "Anna" });
@@ -430,22 +430,22 @@ describe("the profiles on the page (D-23, D-45)", () => {
         expect(sent.status).toBe(200);
         expect((await served()).profile.image).toBe(JSON.parse(sent.body).image);
 
-        expect(await get(page, "/api/profile/image?profile=player")).toMatchObject({ status: 200, headers: { "content-type": "image/png" } });
-        expect((await get(page, "/api/profile/image?profile=..%2Fplayer")).status).toBe(404);
+        expect(await get(page, "/api/profile/image?profile=anna")).toMatchObject({ status: 200, headers: { "content-type": "image/png" } });
+        expect((await get(page, "/api/profile/image?profile=..%2Fanna")).status).toBe(404);
         expect((await image("<svg/>", "text/plain")).status).toBe(415);
         expect((await image("<svg/>")).status).toBe(400);
 
-        expect(await post(page, "/api/profile/avatar?profile=player", { avatar: "owl" })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/profile/avatar?profile=anna", { avatar: "owl" })).toMatchObject({ status: 200 });
         expect((await served()).profile).toMatchObject({ avatar: "owl" });
         expect((await served()).profile.image).toBeUndefined();
-        expect((await post(page, "/api/profile/avatar?profile=player", { avatar: "dragon" })).status).toBe(400);
+        expect((await post(page, "/api/profile/avatar?profile=anna", { avatar: "dragon" })).status).toBe(400);
 
-        expect(await post(page, "/api/settings?profile=player", { theme: "dark", dots: false })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/settings?profile=anna", { theme: "dark", dots: false })).toMatchObject({ status: 200 });
         expect((await served()).settings).toEqual({ theme: "dark", dots: false });
-        expect((await post(page, "/api/settings?profile=player", [1])).status).toBe(400);
+        expect((await post(page, "/api/settings?profile=anna", [1])).status).toBe(400);
 
         // A page that has not yet heard of another profile put in use elsewhere never writes in it.
-        expect(await post(page, "/api/settings?profile=bruno", { theme: "light" })).toMatchObject({ status: 409, body: expect.stringContaining("player is in use now") });
+        expect(await post(page, "/api/settings?profile=bruno", { theme: "light" })).toMatchObject({ status: 409, body: expect.stringContaining("anna is in use now") });
         expect((await post(page, "/api/profile/avatar", { avatar: "cat" })).status).toBe(409);
         expect((await served()).settings).toEqual({ theme: "dark", dots: false });
     });
@@ -488,9 +488,9 @@ describe("the profiles on the page (D-23, D-45)", () => {
         const folder = playerFolder();
         const page = await open(folder);
         await post(page, "/api/profile/new", { name: "Anna" });
-        mkdirSync(join(folder, "profiles", "player", "settings.json"));
+        mkdirSync(join(folder, "profiles", "anna", "settings.json"));
 
-        expect((await post(page, "/api/settings?profile=player", { theme: "dark" })).status).toBe(500);
+        expect((await post(page, "/api/settings?profile=anna", { theme: "dark" })).status).toBe(500);
         expect((await get(page, "/api/game")).status).toBe(200);
     });
 
@@ -505,7 +505,7 @@ describe("the profiles on the page (D-23, D-45)", () => {
         await run(folder, "new_profile", { name: "Bruno" }, context);
 
         const waiting = waitForBell(JSON.stringify({ cwd: folder }), [port]);
-        expect(await post(page, "/api/profile/use", { profile: "player" })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/profile/use", { profile: "anna" })).toMatchObject({ status: 200 });
         expect(await shortly(waiting)).toBe("waiting");
 
         expect(await post(page, "/api/new", {})).toMatchObject({ status: 200 });

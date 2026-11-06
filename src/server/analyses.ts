@@ -17,11 +17,12 @@ export interface AnalysisItem
     readonly reviewed: boolean;
 }
 
-/** The games to analyse in the data folder, the latest 20: the games kept to study and those played in the profile, reviewed or not. */
-export function analysesOf(folder: string): AnalysisItem[]
+/** The games to analyse in the profile in use, the latest 20: those kept to study and those played, reviewed or not. */
+export function analysesOf(home: string): AnalysisItem[]
 {
-    const names = [...keptGames(folder), ...archivedGames(gameFolder(folder))].sort((one, other) => stampOf(other).localeCompare(stampOf(one))).slice(0, shown);
-    return names.flatMap((name) => itemOf(name, () => name.startsWith("study/") ? keptGame(folder, name) : archivedGame(gameFolder(folder), name)));
+    const folder = gameFolder(home);
+    const names = [...keptGames(folder), ...archivedGames(folder)].sort((one, other) => stampOf(other).localeCompare(stampOf(one))).slice(0, shown);
+    return names.flatMap((name) => itemOf(name, () => name.startsWith("study/") ? keptGame(folder, name) : archivedGame(folder, name)));
 }
 
 // Enough for now; a longer list would load more as it scrolls.

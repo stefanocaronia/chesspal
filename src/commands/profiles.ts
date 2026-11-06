@@ -51,7 +51,7 @@ export const profiles = defineCommand({
 export const newProfile = defineCommand({
     name: "new_profile",
     description: "Makes a player's profile and puts it in use: their games, picture and page settings go in profiles/<id>/ of Chesspal's data folder; the "
-        + "profile Chesspal made at the first start becomes this one while nobody has completed it. Example: chesspal new_profile Anna --level regular "
+        + "profile Chesspal made at the first start becomes this one, its folder renamed, while nobody has completed it. Example: chesspal new_profile Anna --level regular "
         + "--rating 1450 --site lichess.",
     input: z.object({
         name: z.string().trim().min(1).max(nameLimit).regex(/^[^\p{Cc}]+$/u, "one line of text").describe("the player's name"),

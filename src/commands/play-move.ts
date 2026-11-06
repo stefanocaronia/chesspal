@@ -89,10 +89,12 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
     return result;
 }
 
-/** Where the game a chat sees stands: the profile's folder, the game by its start, none when there is none, and how many plies it has. */
+/**
+ * Where the game a chat sees stands: the game by its start, none when there is none, and how many plies it has. Not by its folder, which a profile
+ * completed renames (D-71); a game in another profile started at another time.
+ */
 export interface Position
 {
-    readonly folder: string;
     readonly started?: string;
     readonly plies: number;
 }
@@ -110,7 +112,7 @@ export class PositionChanged extends Error
 export function positionIn(folder: string): Position
 {
     const current = loadGame(folder);
-    return current === undefined ? { folder, plies: 0 } : { folder, started: current.started, plies: current.game.record.moves.length };
+    return current === undefined ? { plies: 0 } : { started: current.started, plies: current.game.record.moves.length };
 }
 
 /**
@@ -132,14 +134,14 @@ export function refuseOtherGame(context: Context, folder: string): void
     const seen = context.positionSeen;
     const now = positionIn(folder);
 
-    if (now.started !== undefined && (seen === null || (seen !== undefined && (seen.folder !== now.folder || seen.started !== now.started)))) {
+    if (now.started !== undefined && (seen === null || (seen !== undefined && seen.started !== now.started))) {
         throw new PositionChanged();
     }
 }
 
 function samePosition(one: Position, other: Position): boolean
 {
-    return one.folder === other.folder && one.started === other.started && one.plies === other.plies;
+    return one.started === other.started && one.plies === other.plies;
 }
 
 function gameToMove(folder: string, mover: Mover, now: Date): CurrentGame
