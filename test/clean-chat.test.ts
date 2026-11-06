@@ -65,10 +65,10 @@ describe("a new game after one played in the chat (D-57)", () => {
         expect(() => startAgain(context)).toThrow(/\/clear/);
     });
 
-    it("notes how the chat started from the hook's input, and its session", async () => {
+    it("notes how the chat started from the hook's input, its session and its transcript", async () => {
         const context = chatWith(longGame);
-        await recordChatStart(Readable.from([JSON.stringify({ source: "clear", session_id: "abc", cwd: context.folder })]), context.folder, after);
-        expect(JSON.parse(readFileSync(join(context.folder, "chat.json"), "utf8"))).toEqual({ source: "clear", at: after.toISOString(), session: "abc" });
+        await recordChatStart(Readable.from([JSON.stringify({ source: "clear", session_id: "abc", transcript_path: "abc.jsonl", cwd: context.folder })]), context.folder, after);
+        expect(JSON.parse(readFileSync(join(context.folder, "chat.json"), "utf8"))).toEqual({ source: "clear", at: after.toISOString(), session: "abc", transcript: "abc.jsonl" });
     });
 });
 

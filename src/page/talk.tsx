@@ -3,6 +3,7 @@ import { type ComponentChildren, createContext, type RefObject } from "preact";
 import { useContext, useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { Mood, MoveReview, Opening, Side } from "../core/index.ts";
 import { BadgeIcon, NoteIcon } from "./badges.tsx";
+import { modelName } from "./model-name.ts";
 import { Figurines } from "./move-list.tsx";
 import { type Ply, talkLimits, type TalkLine } from "./plies.ts";
 import type { Text } from "./text.ts";
@@ -45,12 +46,14 @@ export function AiWords({ words, newestFirst, voice, judged, text }: { words: re
  * The AI's word on the move shown of a game in analysis (D-69), in a bubble that points down at the Torretta beside the AI's name: the move, its badge by name,
  * and its note when it wrote one; read out as the player steps through the game. The Torretta and the name stay when the move has no word.
  */
-export function AiNote({ ply, opening, closing, summary, name, mood, voice, text }: {
+export function AiNote({ ply, opening, closing, summary, name, by, mood, voice, text }: {
     ply?: Ply;
     opening?: Opening;
     closing?: string;
     summary?: string;
     name: string;
+    /** Who made the analysis, signed under the Torretta (D-81); none in a game no host signed. */
+    by?: { annotator: string; effort?: string; } | undefined;
     /** The AI's mood on the move shown, which the Torretta that speaks shows too (D-70). */
     mood: Mood;
     /** The language to read the note aloud in, when the player wants it. */
@@ -105,7 +108,10 @@ export function AiNote({ ply, opening, closing, summary, name, mood, voice, text
             )}
             <p class="who">
                 <Torretta size={36} mood={mood} />
-                {name}
+                <span class="signed">
+                    {name}
+                    {by === undefined ? null : <small>{text.madeWith(modelName(by.annotator), by.effort)}</small>}
+                </span>
             </p>
         </div>
     );

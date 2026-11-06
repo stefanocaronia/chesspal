@@ -23,7 +23,7 @@ export interface Context
     host?: () => string | undefined;
     /** The player's words on the board page given to the AI in this process, by line: each comes once (T-65). */
     readonly given: Set<string>;
-    /** Told when the AI is given words it had not had: the board page shows them read (D-53). */
+    /** Told when the board page has news that no file holds: words the AI was given, which it shows read (D-53), and the AI's model (D-82). */
     heard?: () => void;
     /** Told when the chat calls a tool, before it runs: the board page hears the chat listens, and the AI's clock, held while nobody did, starts. */
     calls?: () => void;
@@ -31,6 +31,17 @@ export interface Context
     seen?: string | undefined;
     /** The instructions the MCP server gave in this chat, by their name and the chat's start: each comes once a chat (D-68); none on the command line. */
     told?: Set<string>;
+    /** Who makes this tool call, as far as the host ties it to the call (D-81); none on the command line. */
+    caller?: () => Promise<Caller | undefined>;
+}
+
+/** Who made a tool call: the model, else the host's name, never what the AI says of itself; the effort only when the host gives it (T-113). */
+export interface Caller
+{
+    readonly annotator: string;
+    readonly effort?: string;
+    /** The annotator is the host's name: the model is not known. */
+    readonly hostOnly?: boolean;
 }
 
 /** The context of a process started in the player's folder. */

@@ -17,7 +17,7 @@ import { playMove } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
 import { gameToStudy, namedGame } from "../commands/study.ts";
 import { clockStarted, type GameRecord, writePgn } from "../core/index.ts";
-import { type CurrentGame, drawOfferOf, endOf, gameInAnalysis, gameStamp, heardLines, loadGame, loadTableTalk, playerPgn, saveGame, startAnalysis, talkLimits, wakesTheChat, WordsRefused } from "../games/index.ts";
+import { aiModelOf, type CurrentGame, drawOfferOf, endOf, gameInAnalysis, gameStamp, heardLines, loadGame, loadTableTalk, playerPgn, saveGame, startAnalysis, talkLimits, wakesTheChat, WordsRefused } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { analysesOf, isReviewed } from "./analyses.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
@@ -651,7 +651,8 @@ const watched = /^(?:game\.json|talk\.json|analysis\.json|active\.json|profile\.
 
 /**
  * The game in progress or just ended, as the player may see it: its PGN without the AI's plans while it goes on, the AI's side, when it started, and the
- * talk on the page, each line of the player's with how far it got (D-53), and the draw offer that stands (D-65); the AI's name; and the profiles.
+ * talk on the page, each line of the player's with how far it got (D-53), and the draw offer that stands (D-65); the AI's name and model (D-82); and the
+ * profiles.
  */
 function sendGame(response: ServerResponse, served: Served): void
 {
@@ -673,7 +674,16 @@ function sendGame(response: ServerResponse, served: Served): void
             ...(offer === undefined ? {} : { drawOffer: offer }),
         };
         const analysis = current === undefined || endOf(current.game) !== undefined ? analysisShown(served) : undefined;
-        const body = { game, ...(game === null && talk.length > 0 ? { talk } : {}), ...(analysis === undefined ? {} : { analysis }), opponent: served.opponent(), listening: served.bell.listening, ...profilesShown(served.folder) };
+        const aiModel = aiModelOf(gameFolder(served.folder));
+        const body = {
+            game,
+            ...(game === null && talk.length > 0 ? { talk } : {}),
+            ...(analysis === undefined ? {} : { analysis }),
+            opponent: served.opponent(),
+            ...(aiModel === undefined ? {} : { aiModel }),
+            listening: served.bell.listening,
+            ...profilesShown(served.folder),
+        };
         send(response, 200, json, JSON.stringify(body));
     } catch (error) {
         send(response, 500, json, JSON.stringify({ error: (error as Error).message }));

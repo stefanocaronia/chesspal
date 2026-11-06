@@ -587,11 +587,13 @@ button {
     left: -4px;
 }
 
+/* A long name or model goes to its ellipsis instead of widening the page on a phone (Zoe, round of T-118) */
 .ai-block,
 .you-block {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    min-width: 0;
 }
 
 /* Each side's talk has half the column at most: past it, its words scroll; the box and the cards never give way. */
@@ -1520,6 +1522,15 @@ button {
     text-overflow: ellipsis;
 }
 
+/* Under the AI's name, the model it plays with (D-82): one line, whole in its tooltip */
+.player .signed {
+    color: var(--soft);
+    font-size: 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
 .turn {
     color: var(--accent);
     font-weight: 600;
@@ -2263,6 +2274,19 @@ button {
     gap: 8px;
     color: var(--soft);
     font-size: 13px;
+}
+
+/* Who made the analysis, signed under the Torretta's name in the Torretta's height (D-81, Zoe's sketch A) */
+.ai-note .signed {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.ai-note .signed small {
+    font-size: 12px;
+    overflow-wrap: anywhere;
 }
 
 /* Only the note's last bubble has a tail, pointing down at the Torretta beside the AI's name, the board turned round or not */

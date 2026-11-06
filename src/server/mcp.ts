@@ -2,11 +2,15 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { type Context, defaultContext } from "../commands/context.ts";
+import { aiMove } from "../commands/ai-move.ts";
+import { type Caller, type Context, defaultContext } from "../commands/context.ts";
 import { commands } from "../commands/index.ts";
 import { type AnyCommand, inputProblems, isBoolean } from "../commands/registry.ts";
+import { noteAiModel } from "../games/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { pagePorts } from "./bell.ts";
+import { callerOf } from "./caller.ts";
 import { chatHasRead, startPage } from "./page.ts";
 
 /** What the host reads as the server starts, before any tool: where to begin, and the rule of every move (D-27). Short, since hosts may cut it. */
@@ -23,7 +27,17 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
     const forOneHost: { host: string; tool: { enable(): void; }; }[] = [];
 
     for (const command of list.filter((each) => each.cliOnly !== true)) {
-        const tool = server.registerTool(command.name, toolConfig(command), (input: unknown) => track(runTool(command, input, context)));
+        const tool = server.registerTool(command.name, toolConfig(command), async (input: unknown, extra) => {
+            // Each call knows who makes it, for the commands that write it down (D-81).
+            const caller = () => callerOf(extra._meta, server.server.getClientVersion(), context.folder);
+            const result = await track(runTool(command, input, context, caller));
+
+            if (command === aiMove && result.isError !== true) {
+                noteTheAi(context, caller);
+            }
+
+            return result;
+        });
 
         if (command.host !== undefined) {
             tool.disable();
@@ -93,6 +107,27 @@ async function pageOf(context: Context, opponent: () => string | undefined): Pro
     }
 }
 
+/**
+ * Who played the AI's move, read once the move has gone back to the chat, and kept in memory (D-82): the AI's card on the page shows it, and the game's
+ * PGN once it ends; a change shows from the next move. A host that ties no model to the call leaves the last one known.
+ */
+function noteTheAi(context: Context, caller: () => Promise<Caller | undefined>): void
+{
+    // Claude Code writes the call's line a few milliseconds late: read after the answer, it costs the AI's clock nothing (D-13).
+    setImmediate(() => {
+        // Nothing that fails here may stop the server: the move is played and answered.
+        caller().then((found) => {
+            if (found === undefined || found.hostOnly === true) {
+                return;
+            }
+
+            if (noteAiModel(gameFolder(context.folder), { model: found.annotator, ...(found.effort === undefined ? {} : { effort: found.effort }) })) {
+                context.heard?.();
+            }
+        }).catch(() => undefined);
+    });
+}
+
 // The tool calls still running, which the server waits for before it leaves.
 const running = new Set<Promise<CallToolResult>>();
 
@@ -113,14 +148,14 @@ function toolConfig(command: AnyCommand)
     return { description: command.description, inputSchema: z.looseObject({}).meta({ ...shownInput(command), $schema: undefined }), annotations, _meta: meta };
 }
 
-async function runTool(command: AnyCommand, input: unknown, context: Context): Promise<CallToolResult>
+async function runTool(command: AnyCommand, input: unknown, context: Context, caller: NonNullable<Context["caller"]>): Promise<CallToolResult>
 {
     try {
         if (command.byAgent !== true) {
             context.calls?.();
         }
 
-        const result: unknown = await command.run(checkedInput(command, input), context);
+        const result: unknown = await command.run(checkedInput(command, input), { ...context, caller });
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {
         return { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], isError: true };

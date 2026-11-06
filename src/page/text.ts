@@ -56,6 +56,8 @@ export interface Text
     readonly analysing: string;
     readonly badges: Readonly<Record<Badge, string>>;
     reviewBy(name: string): string;
+    /** Who made the analysis (D-81), or plays as the AI (D-82): the model or the host as the host writes it, and the effort in its word. */
+    madeWith(model: string, effort?: string): string;
     /** What the colours the AI draws with a note mean (D-69). */
     readonly drawn: Readonly<Record<DrawColour, string>>;
     reviewing(name: string): string;
@@ -348,6 +350,7 @@ const english: Text = {
         blunder: "Blunder",
     },
     reviewBy: (name) => `${name}'s review`,
+    madeWith: (model, effort) => `with ${model}${effort === undefined ? "" : ` · effort ${effort}`}`,
     drawn: { green: "better", red: "threat", yellow: "another way", blue: "plan" },
     reviewing: (name) => `${name} is going over the game…`,
     you: "You",
@@ -604,6 +607,7 @@ const italian: Text = {
         blunder: "Errore grave",
     },
     reviewBy: (name) => `Il giudizio di ${name}`,
+    madeWith: (model, effort) => `con ${model}${effort === undefined ? "" : ` · effort ${effort}`}`,
     drawn: { green: "meglio", red: "minaccia", yellow: "altra via", blue: "piano" },
     reviewing: (name) => `${name} sta analizzando la partita…`,
     you: "Tu",

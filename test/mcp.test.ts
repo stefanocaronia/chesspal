@@ -3,11 +3,13 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { type AnyCommand, commands, version } from "chesspal";
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { aiModelOf, saveChatStart } from "../src/games/index.ts";
+import { gameFolder } from "../src/profiles/index.ts";
 import { createMcpServer, opponentOf, serverInstructions } from "../src/server/mcp.ts";
 import { play, testContext } from "./commands.ts";
 
@@ -78,6 +80,61 @@ describe("the MCP server", () => {
         await client.callTool({ name: "play", arguments: { san: "e4" } });
 
         expect(context.seen).toBeDefined();
+        rmSync(context.folder, { recursive: true, force: true });
+    });
+
+    it("notes the AI's model after its move has gone back, keeps the last one known, and writes it into the game's PGN at the end (D-82)", async () => {
+        const context = testContext(mkdtempSync(join(tmpdir(), "chesspal-")));
+        const heard = vi.fn();
+        context.heard = heard;
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await createMcpServer(context).connect(serverTransport);
+        client = new Client({ name: "test", version: "1.0.0" });
+        await client.connect(clientTransport);
+        const codex = (model: string, effort: string) => ({ "x-codex-turn-metadata": { model, reasoning_effort: effort } });
+        const folder = gameFolder(context.folder);
+
+        await client.callTool({ name: "new_game", arguments: { ai_colour: "white" } });
+        await client.callTool({ name: "ai_move", arguments: { move: "e4", plan: "Take the centre." }, _meta: codex("gpt-6-luna", "low") });
+        await vi.waitFor(() => expect(aiModelOf(folder)).toEqual({ model: "gpt-6-luna", effort: "low" }));
+
+        expect(heard).toHaveBeenCalledTimes(1);
+
+        await client.callTool({ name: "player_move", arguments: { move: "e5" } });
+        // A move refused, and a host that ties no model to the call, leave the model known.
+        await client.callTool({ name: "ai_move", arguments: { move: "Ke3", plan: "None." }, _meta: codex("gpt-6-sol", "high") });
+        await client.callTool({ name: "ai_move", arguments: { move: "Nf3", plan: "Develop." } });
+        await new Promise((done) => setTimeout(done, 20));
+
+        expect(aiModelOf(folder)).toEqual({ model: "gpt-6-luna", effort: "low" });
+
+        await client.callTool({ name: "end_game", arguments: { result: "player_resigns" } });
+        const [archived] = readdirSync(join(folder, "games"));
+
+        expect(readFileSync(join(folder, "games", archived!), "utf8")).toContain('[AIModel "gpt-6-luna"]\n[AIEffort "low"]');
+        rmSync(context.folder, { recursive: true, force: true });
+    });
+
+    it("answers the AI's move before Claude Code writes its line, and notes the model once it is there (D-82)", async () => {
+        const context = testContext(mkdtempSync(join(tmpdir(), "chesspal-")));
+        const transcript = join(context.folder, "session.jsonl");
+        writeFileSync(transcript, "");
+        saveChatStart(context.folder, { source: "startup", at: "2026-11-06T10:00:00.000Z", transcript });
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await createMcpServer(context).connect(serverTransport);
+        client = new Client({ name: "test", version: "1.0.0" });
+        await client.connect(clientTransport);
+        const folder = gameFolder(context.folder);
+
+        await client.callTool({ name: "new_game", arguments: { ai_colour: "white" } });
+        const played = await client.callTool({ name: "ai_move", arguments: { move: "e4", plan: "Take the centre." }, _meta: { "claudecode/toolUseId": "toolu_1" } });
+
+        expect(played.isError).not.toBe(true);
+        expect(aiModelOf(folder)).toBeUndefined();
+
+        const call = { type: "tool_use", id: "toolu_1", name: "mcp__chesspal__ai_move" };
+        appendFileSync(transcript, `${JSON.stringify({ type: "assistant", message: { model: "claude-opus-5-5", content: [call] }, effort: "xhigh" })}\n`);
+        await vi.waitFor(() => expect(aiModelOf(folder)).toEqual({ model: "claude-opus-5-5", effort: "xhigh" }));
         rmSync(context.folder, { recursive: true, force: true });
     });
 

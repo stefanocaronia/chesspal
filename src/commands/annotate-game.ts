@@ -1,7 +1,7 @@
 // The AI's review of a game over (D-69): a badge on each move that matters, as chess.com marks them, with a note when it needs one, and its word on the
 // whole game, kept in the game's PGN for the board page. The judgment is the AI's alone: Chesspal gives no criteria (D-6, D-43).
 import { z } from "zod";
-import { badges, type GameRecord, reviewed, reviewOf, withGameReview } from "../core/index.ts";
+import { annotatorOf, badges, type GameRecord, reviewed, reviewOf, withAnnotator, withGameReview } from "../core/index.ts";
 import { gameInAnalysis, rewriteGame, startAnalysis } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
@@ -42,7 +42,7 @@ export const annotateGame = defineCommand({
         summary: z.string().max(summaryLimit).optional().describe("your word on the whole game: a short paragraph, with a few points as lines starting with - if it helps; the moves have their own notes"),
         closing: z.string().max(closingLimit).optional().describe("your last word on how the game ended, its win or loss, in a sentence or two: the page shows it at the end"),
     }),
-    run: ({ game, notes = [], summary, closing }, context): Annotated => {
+    run: async ({ game, notes = [], summary, closing }, context): Promise<Annotated> => {
         noGameGoingOn(context);
 
         if (notes.length === 0 && summary === undefined && closing === undefined) {
@@ -64,7 +64,10 @@ export const annotateGame = defineCommand({
             moves[index] = reviewed(moves[index]!, { ...(kept === undefined ? {} : { badge: kept }), ...(note === undefined ? {} : { note }), ...drawingsOf(arrows, squares) });
         }
 
-        const marked: GameRecord = { ...studied.record, moves };
+        // Who reviewed it, as far as the host says it for certain (D-81): on the command line, or by a host that names no model over one that did, as it was.
+        const caller = await context.caller?.();
+        const kept = caller === undefined || (caller.hostOnly === true && annotatorOf(studied.record) !== undefined);
+        const marked: GameRecord = { ...(kept ? studied.record : withAnnotator(studied.record, caller)), moves };
         rewriteGame(
             folderOf(context, studied.name),
             studied.name,

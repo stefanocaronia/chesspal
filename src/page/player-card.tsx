@@ -8,11 +8,13 @@ import { Piece } from "./pieces.tsx";
 import type { Text } from "./text.ts";
 
 /** The card of one player: the AI's above its words, with its level; the player's below theirs, saying when it is their move. */
-export function PlayerCard({ place, picture, name, side, level, taken, ahead, turn = false, clock, badges, text }: {
+export function PlayerCard({ place, picture, name, signed, side, level, taken, ahead, turn = false, clock, badges, text }: {
     place: "ai" | "you";
     picture: ComponentChildren;
     /** The name, or the button that opens the profiles. */
     name: ComponentChildren;
+    /** Under the AI's name, its model and effort, once the host tied them to a move (D-82). */
+    signed?: string | undefined;
     /** The side played; none between games, with the table set for the next (D-77). */
     side?: Side;
     /** The AI's level in a game: its name, and what the AI sees there (D-61). */
@@ -34,6 +36,7 @@ export function PlayerCard({ place, picture, name, side, level, taken, ahead, tu
                 {picture}
                 <div class="who">
                     <div class="name" title={typeof name === "string" ? name : undefined}>{name}</div>
+                    {signed === undefined ? null : <div class="signed" title={signed}>{signed}</div>}
                     {side === undefined ? null : (
                         <div class="note">
                             {text.sides[side]}

@@ -1,7 +1,8 @@
 // The finished games, as PGN in games/ (D-9, D-41), with the AI's plans for the analyst (D-21); and the games played elsewhere, kept to study in study/ (D-68).
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { type GameRecord, pgnDate, readPgn, writePgn } from "../core/index.ts";
+import { type GameRecord, pgnDate, readPgn, withAiModel, writePgn } from "../core/index.ts";
+import { aiModelOf } from "./ai-model.ts";
 import { type CurrentGame, endOf } from "./current-game.ts";
 import { makeFolder, writeAtomically } from "./files.ts";
 import { withoutPlans } from "./plans.ts";
@@ -28,7 +29,10 @@ export function startOfNewGame(folder: string, now: Date, before?: CurrentGame):
     return start;
 }
 
-/** Writes the game to the archive, with the plans and how it ended, and gives its name; the same game again rewrites the same file. */
+/**
+ * Writes the game to the archive, with the plans, how it ended and the AI's model last noted (D-82), and gives its name; the same game again rewrites the
+ * same file.
+ */
 export function archiveGame(folder: string, current: CurrentGame): string
 {
     const name = archiveName(current);
@@ -36,7 +40,7 @@ export function archiveGame(folder: string, current: CurrentGame): string
 
     try {
         makeFolder(dirname(path));
-        writeAtomically(path, writePgn(endedRecord(current)));
+        writeAtomically(path, writePgn(withAiModel(endedRecord(current), aiModelOf(folder))));
     } catch (error) {
         throw new Error(`Chesspal could not archive the game: ${(error as Error).message}`, { cause: error });
     }

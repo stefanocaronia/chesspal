@@ -3,12 +3,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomically } from "./files.ts";
 
-/** How a chat started, as the host's SessionStart hook says it: new, cleared, resumed or compacted; when, as an ISO date; and its session, for the logs. */
+/**
+ * How a chat started, as the host's SessionStart hook says it: new, cleared, resumed or compacted; when, as an ISO date; its session, for the logs; and the
+ * file where the host writes the chat, where Claude Code tells which model made each tool call (D-81).
+ */
 export interface ChatStart
 {
     readonly source: string;
     readonly at: string;
     readonly session?: string;
+    readonly transcript?: string;
 }
 
 /** Writes how the chat started, over the last one. */
@@ -22,7 +26,12 @@ export function lastChatStart(folder: string): ChatStart | undefined
 {
     try {
         const start = JSON.parse(readFileSync(join(folder, fileName), "utf8")) as Partial<ChatStart>;
-        return typeof start.source === "string" && typeof start.at === "string" ? { source: start.source, at: start.at } : undefined;
+
+        if (typeof start.source !== "string" || typeof start.at !== "string") {
+            return undefined;
+        }
+
+        return { source: start.source, at: start.at, ...(typeof start.transcript === "string" ? { transcript: start.transcript } : {}) };
     } catch {
         return undefined;
     }

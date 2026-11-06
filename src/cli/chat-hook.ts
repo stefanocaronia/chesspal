@@ -6,7 +6,12 @@ export async function recordChatStart(input: NodeJS.ReadableStream = process.std
 {
     try {
         const hook = parsed(await textOf(input));
-        saveChatStart(folder, { source: typeof hook.source === "string" ? hook.source : "startup", at: now.toISOString(), ...(typeof hook.session_id === "string" ? { session: hook.session_id } : {}) });
+        saveChatStart(folder, {
+            source: typeof hook.source === "string" ? hook.source : "startup",
+            at: now.toISOString(),
+            ...(typeof hook.session_id === "string" ? { session: hook.session_id } : {}),
+            ...(typeof hook.transcript_path === "string" ? { transcript: hook.transcript_path } : {}),
+        });
     } catch (error) {
         process.stderr.write(`Chesspal could not note how the chat started: ${(error as Error).message}\n`);
     }

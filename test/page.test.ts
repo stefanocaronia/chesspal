@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import { status } from "../src/commands/status.ts";
+import { noteAiModel } from "../src/games/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page.ts";
 import { testContext } from "./commands.ts";
@@ -62,13 +63,22 @@ describe("the page's server", () => {
         expect(game.pgn).not.toContain("secret");
     });
 
-    it("names the opponent as the host does, once it has connected", async () => {
+    it("names the opponent as the host does, once it has connected, and its model once noted (D-82)", async () => {
         let host: string | undefined;
-        const page = await open(playerFolder(), () => host);
+        const folder = playerFolder();
+        const page = await open(folder, () => host);
 
         expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, listening: false, profiles: [] });
         host = "Claude";
         expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, opponent: "Claude", listening: false, profiles: [] });
+        noteAiModel(folder, { model: "claude-opus-5-5", effort: "xhigh" });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({
+            game: null,
+            opponent: "Claude",
+            aiModel: { model: "claude-opus-5-5", effort: "xhigh" },
+            listening: false,
+            profiles: [],
+        });
     });
 
     it("gives the game in analysis, with the AI's review, once no game goes on (D-69)", async () => {

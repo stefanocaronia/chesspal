@@ -1,4 +1,5 @@
 // The player's games on disk: the current one in game.json, the finished ones in games/ (D-27, D-41), the games kept to study in study/ (D-68). Below the commands, above the core.
+export { aiModelOf, noteAiModel } from "./ai-model.ts";
 export { type Analysis, endAnalysis, gameInAnalysis, startAnalysis } from "./analysis.ts";
 export { archivedGame, archivedGames, archivedName, archivedWhen, archiveEnded, archiveGame, keepToStudy, keptGame, keptGames, playerPgn, rewriteGame, startOfNewGame } from "./archive.ts";
 export { type ChatStart, cleanSince, lastChatStart, saveChatStart } from "./chat-start.ts";

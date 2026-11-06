@@ -10,7 +10,7 @@ import { endGame } from "../src/commands/end-game.ts";
 import { newGame } from "../src/commands/new-game.ts";
 import { playerMove } from "../src/commands/player-move.ts";
 import { status } from "../src/commands/status.ts";
-import { closingOf, gameReviewOf, readPgn, reviewed, reviewOf, withGameReview, writePgn } from "../src/core/index.ts";
+import { annotatorOf, closingOf, gameReviewOf, readPgn, reviewed, reviewOf, withGameReview, writePgn } from "../src/core/index.ts";
 import { gameInAnalysis, startAnalysis } from "../src/games/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
@@ -88,6 +88,25 @@ describe("annotate_game (D-69)", () => {
         expect(readFileSync(join(context.folder, kept), "utf8").replace(/\s+/g, " ")).toContain(
             "{[%review Black missed the threat on f7.] [%closing A quick win.]} 1. e4 {[%badge book]} 1... e5 {[%badge book]} 2. Bc4 {[%badge book] [%review the bishop eyes f7]} 2... Nc6 {[%badge book]} 3. Qh5 {[%badge book]} 3... Nf6? {[%badge mistake]}",
         );
+    });
+
+    it("writes who reviewed the game as its Annotator, with the effort only when the host gives it (D-81)", async () => {
+        const context = playerFolder();
+        await analyse(context, { pgn });
+        const tags = (): Readonly<Record<string, string>> => readPgn(readFileSync(join(context.folder, kept), "utf8"))[0]!.tags;
+
+        await annotate({ ...context, caller: () => Promise.resolve({ annotator: "claude-opus-5-5", effort: "xhigh" }) }, { summary: "A short game." });
+        expect(tags()).toMatchObject({ White: "Ann", Annotator: "claude-opus-5-5", AnnotatorEffort: "xhigh" });
+        expect(annotatorOf(readPgn(readFileSync(join(context.folder, kept), "utf8"))[0]!)).toEqual({ annotator: "claude-opus-5-5", effort: "xhigh" });
+
+        await annotate({ ...context, caller: () => Promise.resolve({ annotator: "gpt-6-luna" }) }, { closing: "A quick win." });
+        expect(tags().Annotator).toBe("gpt-6-luna");
+        expect(tags().AnnotatorEffort).toBeUndefined();
+
+        // A host that names no model, or the command line, leaves a known model as it was.
+        await annotate({ ...context, caller: () => Promise.resolve({ annotator: "Codex", hostOnly: true }) }, { summary: "A short game." });
+        await annotate(context, { summary: "A shorter game." });
+        expect(tags().Annotator).toBe("gpt-6-luna");
     });
 
     it("keeps the arrows and squares a note draws as PGN's %cal and %csl, which a new review of the move replaces", async () => {

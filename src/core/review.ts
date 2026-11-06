@@ -105,6 +105,48 @@ export function drawingsText({ arrows = [], squares = [] }: Pick<MoveReview, "ar
     return [arrowList === "" ? "" : `[%cal ${arrowList}]`, squareList === "" ? "" : `[%csl ${squareList}]`].filter((part) => part !== "").join(" ");
 }
 
+/** The record with who reviewed it (D-81): the model, else the host, as PGN's Annotator, and the effort only when known; an effort no longer known goes. */
+export function withAnnotator(record: GameRecord, { annotator, effort }: { annotator: string; effort?: string; }): GameRecord
+{
+    return { ...record, tags: signed(record.tags, ["Annotator", effortTag], annotator, effort) };
+}
+
+/** The AI's model, as the host writes it, and its effort when the host gives it (D-82). */
+export interface AiModel
+{
+    readonly model: string;
+    readonly effort?: string;
+}
+
+/** The record with the model the AI played it with (D-82), and the effort only when known; with none known, as it is. */
+export function withAiModel(record: GameRecord, played: AiModel | undefined): GameRecord
+{
+    return played === undefined ? record : { ...record, tags: signed(record.tags, ["AIModel", "AIEffort"], played.model, played.effort) };
+}
+
+/** Who reviewed the game, as its tags say: the Annotator, and the effort when known; undefined without an Annotator. */
+export function annotatorOf(record: GameRecord): { annotator: string; effort?: string; } | undefined
+{
+    const annotator = record.tags.Annotator?.trim();
+    const effort = record.tags[effortTag]?.trim();
+
+    if (annotator === undefined || annotator === "") {
+        return undefined;
+    }
+
+    return effort === undefined || effort === "" ? { annotator } : { annotator, effort };
+}
+
+// The effort has no tag of its own in PGN: Chesspal's sits beside the Annotator.
+const effortTag = "AnnotatorEffort";
+
+/** The tags with a model and its effort, last: an effort no longer known goes. */
+function signed(tags: Record<string, string>, [modelTag, modelEffortTag]: [string, string], model: string, effort: string | undefined): Record<string, string>
+{
+    const others = Object.entries(tags).filter(([name]) => name !== modelTag && name !== modelEffortTag);
+    return { ...Object.fromEntries(others), [modelTag]: model, ...(effort === undefined ? {} : { [modelEffortTag]: effort }) };
+}
+
 /** The record with the AI's word on the whole game, or its last word on the ending, in place of the one it had: each only when given. */
 export function withGameReview(record: GameRecord, { summary, closing }: { summary?: string; closing?: string; }): GameRecord
 {

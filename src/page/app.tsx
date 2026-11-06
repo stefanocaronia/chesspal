@@ -2,7 +2,25 @@
 // words (T-65), in Zoe's three columns (D-53): the talk, the board, the game, the side ones folded as the player likes (T-84).
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { type Clock, closingOf, Game, gameReviewOf, materialOf, type Mood, moodAt, openingOf, type PieceLetter, type Promotion, readPgn, type Side, type Square, suggestedLevel, timeControlText } from "../core/index.ts";
+import {
+    type AiModel,
+    annotatorOf,
+    type Clock,
+    closingOf,
+    Game,
+    gameReviewOf,
+    materialOf,
+    type Mood,
+    moodAt,
+    openingOf,
+    type PieceLetter,
+    type Promotion,
+    readPgn,
+    type Side,
+    type Square,
+    suggestedLevel,
+    timeControlText,
+} from "../core/index.ts";
 import { PlayerPicture } from "./avatars.tsx";
 import { BadgeCounts } from "./badges.tsx";
 import { Board, type Notice, piecesOf } from "./board.tsx";
@@ -15,6 +33,7 @@ import { GameColumn } from "./game-column.tsx";
 import { type GameActions, Header } from "./header.tsx";
 import { helpsOf } from "./helps-view.ts";
 import { HelpsCard, MapButton } from "./helps.tsx";
+import { modelName } from "./model-name.ts";
 import { Steps } from "./move-list.tsx";
 import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
 import { useOpeningBook } from "./opening-book.ts";
@@ -128,6 +147,8 @@ export function App({ start }: { start: Settings; })
 
     // The AI as the host names it (Claude, Codex), also where the page sends the player to write; the last known while the page is offline.
     const name = served?.opponent ?? text.ai;
+    // Under it, the model and effort the AI played its last move with (D-82).
+    const signed = served?.aiModel === undefined ? undefined : text.madeWith(modelName(served.aiModel.model), served.aiModel.effort);
 
     // The game is replayed from its PGN once for each one the server sends, not at every click. Once no game goes on, the game in analysis shows in its place
     // (D-69), with the AI's badges and notes: replayed again only when its review changed.
@@ -316,6 +337,7 @@ export function App({ start }: { start: Settings; })
     const review = reviewed?.review;
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
     const closing = studied === undefined ? undefined : closingOf(live.record);
+    const annotator = studied === undefined ? undefined : annotatorOf(live.record);
     const talk = game?.talk ?? served.talk ?? [];
     const said = playerWords(talk);
     // The clocks only in a game going on: between games the player's card holds the next one in their place (D-77).
@@ -529,6 +551,7 @@ export function App({ start }: { start: Settings; })
                                             {...(at === total && closing !== undefined ? { closing } : {})}
                                             {...(at === 0 && summary !== undefined ? { summary } : {})}
                                             name={name}
+                                            by={annotator}
                                             mood={mood}
                                             {...(settings.voice ? { voice: text.language } : {})}
                                             text={text}
@@ -546,6 +569,7 @@ export function App({ start }: { start: Settings; })
                                             place="ai"
                                             picture={<Torretta size={48} mood={mood} />}
                                             name={name}
+                                            signed={signed}
                                             side={idle ? undefined : ai}
                                             {...(idle ? {} : { level: text.start.levels[level] })}
                                             taken={material.taken[ai]}
@@ -708,6 +732,8 @@ interface Served
     /** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review. */
     readonly analysis?: { readonly name: string; readonly pgn: string; readonly book: number; };
     readonly opponent?: string;
+    /** The model and effort the AI played its last move with, as the host tied them to it (D-82). */
+    readonly aiModel?: AiModel;
     /** Whether a chat hears the player: in a turn, or waiting for the doorbell. */
     readonly listening?: boolean;
     readonly profile?: Profile;

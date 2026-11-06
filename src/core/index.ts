@@ -16,4 +16,25 @@ export type { Opening, OpeningBook, OpeningIndex } from "./openings.ts";
 export { pgnDate, readPgn, writePgn } from "./pgn.ts";
 export type { BishopFacts, CentreSquare, KingFacts, Outpost, PawnFacts, PawnSquare, Phase, Profile, SideProfile } from "./profile.ts";
 export type { Annotation, GameRecord, RecordedMove } from "./record.ts";
-export { arrowOf, type Badge, badges, closingOf, type DrawColour, drawingsIn, drawingsText, type DrawnArrow, type DrawnSquare, gameReviewOf, isBadge, type MoveReview, reviewed, reviewOf, squareOf, withGameReview } from "./review.ts";
+export {
+    type AiModel,
+    annotatorOf,
+    arrowOf,
+    type Badge,
+    badges,
+    closingOf,
+    type DrawColour,
+    drawingsIn,
+    drawingsText,
+    type DrawnArrow,
+    type DrawnSquare,
+    gameReviewOf,
+    isBadge,
+    type MoveReview,
+    reviewed,
+    reviewOf,
+    squareOf,
+    withAiModel,
+    withAnnotator,
+    withGameReview,
+} from "./review.ts";
