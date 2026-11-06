@@ -3427,6 +3427,48 @@ button {
     cursor: default;
 }
 
+/* Where the games are (T-119), under the wizard's form and the players' menu, with the button that opens it */
+.data-folder {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+
+.data-folder .note {
+    flex: 1 1 220px;
+    margin: 0;
+}
+
+.data-folder b {
+    color: var(--ink);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.data-folder .command {
+    border-color: var(--line);
+    color: var(--ink);
+}
+
+.data-folder .command:disabled {
+    color: var(--soft);
+    cursor: default;
+}
+
+/* The account's name suggested in the wizard (T-120): Chrome's arrow, quieter than the selects' chevron, is the only sign of it */
+.profile-form input::-webkit-calendar-picker-indicator {
+    opacity: 0.45;
+}
+
+.data-folder .problem {
+    flex-basis: 100%;
+    margin: 0;
+}
+
 /* The new game (T-58): the colours and the clocks in a row, the levels two by two with what the AI sees under them */
 .new-game .row {
     display: grid;

@@ -2,9 +2,9 @@ import { EventEmitter } from "node:events";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Context } from "../src/commands/context.ts";
+import { type Context, withProfile } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import { PositionChanged } from "../src/commands/play-move.ts";
 import { status } from "../src/commands/status.ts";
@@ -12,6 +12,7 @@ import { noteAiModel } from "../src/games/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page.ts";
+import { profilesShown } from "../src/server/profile-routes.ts";
 import { testContext } from "./commands.ts";
 
 const opened: Page[] = [];
@@ -19,7 +20,7 @@ const folders: string[] = [];
 
 // The profile Chesspal makes at the first start, as the page reads it until the wizard completes it (D-71).
 const madeProfile = { id: "player", name: "Player", new: true };
-const firstProfile = { profile: madeProfile, profiles: [madeProfile] };
+const firstProfile = { profile: madeProfile, profiles: [madeProfile], dataFolder: expect.any(Array) };
 // What a chat is told when it would act on a game it was not shown (D-71).
 const changed = new PositionChanged().message;
 
@@ -447,6 +448,40 @@ describe("the profiles on the page (D-23, D-45)", () => {
         expect(await post(page, "/api/settings?profile=bruno", { theme: "light" })).toMatchObject({ status: 409, body: expect.stringContaining("player is in use now") });
         expect((await post(page, "/api/profile/avatar", { avatar: "cat" })).status).toBe(409);
         expect((await served()).settings).toEqual({ theme: "dark", dots: false });
+    });
+
+    it("says where the profiles are, as the file manager walks there from the player's own folder, and opens it there (T-119)", async () => {
+        const folder = playerFolder();
+        const opens: string[] = [];
+        const page = await open(folder, undefined, {
+            ...testContext(folder),
+            openFolder: (opened) => {
+                opens.push(opened);
+                return Promise.resolve(true);
+            },
+        });
+        const dotted = withProfile(join(folder, "..chesspal"), "Player");
+
+        expect(JSON.parse((await get(page, "/api/game")).body).dataFolder.at(-1)).toBe(basename(folder));
+        expect(profilesShown(folder, dirname(folder)).dataFolder).toEqual([basename(folder)]);
+        expect(profilesShown(folder, dirname(dirname(folder))).dataFolder).toEqual([basename(dirname(folder)), basename(folder)]);
+        expect(profilesShown(dotted, folder).dataFolder).toEqual(["..chesspal"]);
+        expect(profilesShown(folder, join(folder, "elsewhere")).dataFolder).toEqual(folder.split(/[\\/]+/).filter((name) => name !== ""));
+
+        expect(await post(page, "/api/data-folder/open", {})).toMatchObject({ status: 200 });
+        expect(opens).toEqual([folder]);
+        // Only as JSON, which another site cannot send without the browser asking first.
+        expect((await get(page, "/api/data-folder/open", { "content-type": "text/plain" }, "POST", "{}")).status).toBe(400);
+        expect(opens).toHaveLength(1);
+    });
+
+    it("opens no folder where nothing can, and says so", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const managerless = await open(folder, undefined, { ...testContext(folder), openFolder: () => Promise.resolve(false) });
+
+        expect(await post(page, "/api/data-folder/open", {})).toMatchObject({ status: 501, body: expect.stringContaining("shows its path") });
+        expect(await post(managerless, "/api/data-folder/open", {})).toMatchObject({ status: 500, body: expect.stringContaining("No file manager") });
     });
 
     it("tells the page of a file it cannot write, and goes on serving", async () => {

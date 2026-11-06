@@ -1,5 +1,5 @@
 import { userInfo } from "node:os";
-import { dataFolder } from "../home/index.ts";
+import { dataFolder, openFolder } from "../home/index.ts";
 import { ensureProfile } from "../profiles/index.ts";
 import type { Position } from "./play-move.ts";
 
@@ -24,6 +24,8 @@ export interface Context
     page?: string;
     /** Whether a browser has the board page open now, when the MCP server serves it. */
     pageOpen?: () => boolean;
+    /** Opens a folder in the system's file manager: the data folder, from the board page (T-119); whether it could; none in the tests. */
+    openFolder?: (folder: string) => Promise<boolean>;
     /** Opens the New game window on the board pages open now, where the player chooses the game: whether one was open. */
     askNewGame?: () => boolean;
     /** The AI host, as it names itself to the MCP server: claude-code, which notes how each chat starts (D-57); none on the command line. */
@@ -61,7 +63,16 @@ export function defaultContext(): Context
 {
     let found: string | undefined;
     const home = (): string => withProfile(found ??= dataFolder(), accountName());
-    return { folder: process.cwd(), home, random: Math.random, now: () => new Date(), platform: process.platform, language: systemLanguage(), given: new Set() };
+    return {
+        folder: process.cwd(),
+        home,
+        random: Math.random,
+        now: () => new Date(),
+        platform: process.platform,
+        language: systemLanguage(),
+        given: new Set(),
+        openFolder: (folder) => openFolder(folder, process.platform),
+    };
 }
 
 /** A data folder with a profile in it, the first made when there is none, named after the system's account (D-71). */

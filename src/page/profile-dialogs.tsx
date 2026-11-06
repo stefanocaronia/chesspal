@@ -2,12 +2,21 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { DrawnAvatar, PlayerPicture } from "./avatars.tsx";
 import { Dialog } from "./dialog.tsx";
-import { type AvatarId, avatarIds, chooseAvatar, imageAddress, type Level, levels, makeProfile, nameLimit, type Profile, ratingLimits, type RatingSite, ratingSites, type Refused, sendPhoto, useProfile } from "./profile.ts";
+import { type AvatarId, avatarIds, chooseAvatar, imageAddress, type Level, levels, makeProfile, nameLimit, openDataFolder, type Profile, ratingLimits, type RatingSite, ratingSites, type Refused, sendPhoto, useProfile } from "./profile.ts";
 import type { Text } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
 
-/** The page at the first start, while the profile Chesspal made is new: who plays, and the game comes after (D-23, D-71); a game played before stays in it. */
-export function Wizard({ text, hasGame, onMade }: { text: Text; hasGame: boolean; onMade: () => void; })
+/**
+ * The page at the first start, while the profile Chesspal made is new: who plays, and the game comes after (D-23, D-71); a game played before stays in it.
+ * The system's account is only a suggestion for the name (T-120), and the page says where the games go (T-119).
+ */
+export function Wizard({ text, hasGame, account, dataFolder, onMade }: {
+    text: Text;
+    hasGame: boolean;
+    account: string;
+    dataFolder: readonly string[];
+    onMade: () => void;
+})
 {
     return (
         <main class="wizard">
@@ -17,7 +26,8 @@ export function Wizard({ text, hasGame, onMade }: { text: Text; hasGame: boolean
                 {text.profile.lead}
                 {hasGame ? <span>{text.profile.gameMoves}</span> : null}
             </p>
-            <ProfileForm text={text} submit={text.profile.start} onMade={onMade} />
+            <ProfileForm text={text} submit={text.profile.start} suggestion={account} onMade={onMade} />
+            <DataFolder folders={dataFolder} text={text} />
         </main>
     );
 }
@@ -90,12 +100,14 @@ export function PictureDialog({ open, profile, onClose, text }: { open: boolean;
 }
 
 /** The menu of the players, open while `open`: another put in use, or a new one made, never while a game goes on. */
-export function ProfilesDialog({ open, profiles, active, playing, onClose, text }: {
+export function ProfilesDialog({ open, profiles, active, playing, dataFolder, onClose, text }: {
     open: boolean;
     profiles: readonly Profile[];
     active: Profile;
     /** A game goes on: the profile stays until it ends. */
     playing: boolean;
+    /** Where the profiles are, folder by folder (T-119). */
+    dataFolder: readonly string[];
     onClose: () => void;
     text: Text;
 })
@@ -148,14 +160,52 @@ export function ProfilesDialog({ open, profiles, active, playing, onClose, text 
                     {playing ? <p class="note">{text.profile.whilePlaying}</p> : null}
                     <button class="command new-profile" type="button" disabled={playing} onClick={() => setMaking(true)}>{text.profile.newProfile}</button>
                     {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
+                    <DataFolder folders={dataFolder} text={text} />
                 </>
             )}
         </Dialog>
     );
 }
 
-/** The form that makes a profile and puts it in use: the wizard's, and the menu's for another player. */
-function ProfileForm({ text, submit, onMade }: { text: Text; submit: string; onMade: () => void; })
+/** Where the games are, as the file manager walks there, and a button that opens it there (T-119). */
+function DataFolder({ folders, text }: { folders: readonly string[]; text: Text; })
+{
+    const words = text.profile;
+    const [problem, setProblem] = useState<string | undefined>(undefined);
+    // Opened a moment ago: Explorer may open behind the browser, and another click would open another window.
+    const [opened, setOpened] = useState(false);
+    useEffect(() => {
+        if (!opened) {
+            return undefined;
+        }
+
+        const timer = setTimeout(() => setOpened(false), 2000);
+        return () => clearTimeout(timer);
+    }, [opened]);
+
+    // A folder's name breaks only after its ›, never in its own spaces.
+    const shown = folders.map((name) => (name === "Documents" ? words.documents : name).replaceAll(" ", " ")).join(" › ");
+
+    const open = (): void => {
+        void openDataFolder().then((refused) => {
+            setProblem(refused === undefined ? undefined : words.noFolder);
+            setOpened(refused === undefined);
+        });
+    };
+
+    return (
+        <div class="data-folder">
+            <p class="note">
+                {words.gamesIn} <b>{shown}</b>
+            </p>
+            <button class="command" type="button" disabled={opened} onClick={open}>{opened ? words.opened : words.openFolder}</button>
+            {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
+        </div>
+    );
+}
+
+/** The form that makes a profile and puts it in use: the wizard's, with the system's account as a suggestion (T-120), and the menu's for another player. */
+function ProfileForm({ text, submit, suggestion, onMade }: { text: Text; submit: string; suggestion?: string; onMade: () => void; })
 {
     const words = text.profile;
     const [name, setName] = useState("");
@@ -191,9 +241,15 @@ function ProfileForm({ text, submit, onMade }: { text: Text; submit: string; onM
                     maxLength={nameLimit}
                     placeholder={words.namePlaceholder}
                     autocomplete="given-name"
+                    list={suggestion === undefined ? undefined : "name-suggestion"}
                     value={name}
                     onInput={(event) => setName(event.currentTarget.value)}
                 />
+                {suggestion === undefined ? null : (
+                    <datalist id="name-suggestion">
+                        <option value={suggestion} />
+                    </datalist>
+                )}
             </label>
             <fieldset>
                 <legend>{words.avatar}</legend>

@@ -30,9 +30,23 @@ with a local model.
 
 Chesspal is an MCP server, a command line, `chesspal`, and a board page, all made from the same commands. `chesspal init` sets up a folder to play in:
 the few files that tell the AI agent where Chesspal is, and its instructions as an opponent. Your profiles, games and analyses live in one folder for
-every folder you play in: `Documents\My Games\Chesspal` on Windows, `Chesspal` in your Documents folder elsewhere (as Linux names it in your
-language), or the folder `CHESSPAL_HOME` names. Only Chesspal's commands change them: they check every move with [chess.js](https://github.com/jhlywa/chess.js) and write atomically. In Codex, allow Chesspal's two
-hooks in `/hooks` the first time: small helpers that let it notice your moves on the board page.
+every folder you play in ([where your games are](#where-your-games-are)), or in the folder `CHESSPAL_HOME` names, for tests. Only Chesspal's commands
+change them: they check every move with [chess.js](https://github.com/jhlywa/chess.js) and write atomically. In Codex, allow Chesspal's two hooks in
+`/hooks` the first time: small helpers that let it notice your moves on the board page.
+
+## Where your games are
+
+Your players and their games are in one folder, the same whatever folder you open the chat in:
+
+- on Windows, `Documents › My Games › Chesspal`. Explorer may show Documents in your language, such as Documenti. With OneDrive, it is inside
+  OneDrive, which also keeps a copy online;
+- on macOS, `Documents › Chesspal`; on Linux, `Chesspal` in your Documents folder, whatever its name in your language.
+
+The board page says where it is, on its welcome page and in "Who's playing?", and its **Open the folder** button opens it.
+
+**A backup** is a copy of the whole `Chesspal` folder, on a USB stick for example. **To move to another computer**, install Chesspal there and put the
+copied `Chesspal` folder in the same place, replacing the one Chesspal may have made already: your players, their games and a game left unfinished all
+come with it. Copy it with the chat and the board page closed.
 
 ## Development
 

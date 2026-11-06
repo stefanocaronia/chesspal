@@ -212,6 +212,15 @@ export interface ProfileText
     readonly gameMoves: string;
     readonly name: string;
     readonly namePlaceholder: string;
+    /** Before the data folder's path (T-119). */
+    readonly gamesIn: string;
+    readonly openFolder: string;
+    /** On the button for a moment, once the file manager has opened it. */
+    readonly opened: string;
+    /** When the system's file manager could not open it. */
+    readonly noFolder: string;
+    /** Documents as the file manager names it in the player's language: the path on disk says Documents. */
+    readonly documents: string;
     readonly avatar: string;
     readonly ownImage: string;
     readonly level: string;
@@ -427,6 +436,11 @@ const english: Text = {
         gameMoves: "The game you started stays in your profile.",
         name: "What's your name?",
         namePlaceholder: "Your name",
+        gamesIn: "Your games are in",
+        openFolder: "Open the folder",
+        opened: "Opened",
+        noFolder: "It cannot be opened from here: look for it at the path above.",
+        documents: "Documents",
         avatar: "Choose a picture",
         ownImage: "Use a picture of yours",
         level: "How do you play?",
@@ -686,6 +700,11 @@ const italian: Text = {
         gameMoves: "La partita che hai iniziato resta nel tuo profilo.",
         name: "Come ti chiami?",
         namePlaceholder: "Il tuo nome",
+        gamesIn: "Le tue partite stanno in",
+        openFolder: "Apri la cartella",
+        opened: "Aperta",
+        noFolder: "Da qui non si apre: cercala nel percorso scritto qui sopra.",
+        documents: "Documenti",
         avatar: "Scegli un'immagine",
         ownImage: "Usa una tua immagine",
         level: "Come giochi?",

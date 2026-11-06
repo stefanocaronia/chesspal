@@ -317,7 +317,7 @@ export function App({ start }: { start: Settings; })
 
     // At the first start the page asks who plays (D-23), to complete the profile Chesspal made (D-71): the game comes after.
     if (served.profile.new === true) {
-        return <Wizard text={text} hasGame={served.game !== null} onMade={() => reload.current()} />;
+        return <Wizard text={text} hasGame={served.game !== null} account={served.profile.name} dataFolder={served.dataFolder} onMade={() => reload.current()} />;
     }
 
     const profile = served.profile;
@@ -499,6 +499,7 @@ export function App({ start }: { start: Settings; })
                     profiles={served.profiles}
                     active={profile}
                     playing={going}
+                    dataFolder={served.dataFolder}
                     onClose={() => setDialog(undefined)}
                     text={text}
                 />
@@ -739,6 +740,8 @@ interface Served
     readonly profile: Profile;
     readonly profiles: readonly Profile[];
     readonly settings?: object;
+    /** Where the profiles are, folder by folder from the player's own (T-119). */
+    readonly dataFolder: readonly string[];
 }
 
 /** The picture of a player of the game in analysis: the player's own, the AI's Torretta with its mood, or the plain face of someone else. */

@@ -85,6 +85,12 @@ export async function chooseAvatar(profile: string, avatar: AvatarId): Promise<R
     return refusalOf(await post(forProfile("/api/profile/avatar", profile), jsonOf({ avatar })));
 }
 
+/** Opens the data folder in the system's file manager, where the page runs (T-119): the server's refusal, or undefined. */
+export async function openDataFolder(): Promise<Refused | undefined>
+{
+    return refusalOf(await post("/api/data-folder/open", jsonOf({})));
+}
+
 /** Keeps the page's settings in the profile the page shows, so that they follow the player; the browser keeps them too. */
 export function keepSettings(profile: string, settings: object): void
 {

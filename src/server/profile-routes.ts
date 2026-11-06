@@ -1,5 +1,8 @@
-// The profiles on the board page (D-23, D-45, D-56): who plays and their picture, the first profile completed by the wizard (D-71), another put in use, the settings kept.
+// The profiles on the board page (D-23, D-45, D-56): who plays and their picture, the first profile completed by the wizard (D-71), another put in use, the settings kept,
+// and the data folder they are in, opened in the system's file manager (T-119).
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { homedir } from "node:os";
+import { isAbsolute, relative, sep } from "node:path";
 import { chooseDrawnAvatar, GameGoingOn, newProfile, useProfile } from "../commands/profiles.ts";
 import { inputProblems } from "../commands/registry.ts";
 import { activeProfile, drawnAvatars, imageTypes, listProfiles, ownImage, ownImageStamp, type PageSettings, type PlayerProfile, profileSettings, saveOwnImage, saveProfileSettings, sentImageLimit, settingsOf } from "../profiles/index.ts";
@@ -12,22 +15,25 @@ export interface ProfileShown extends PlayerProfile
     readonly image?: string;
 }
 
-/** The profiles as the page reads them with the game: the one in use and its settings, and all of them for the menu. */
+/** The profiles as the page reads them with the game: the one in use and its settings, all of them for the menu, and where they are. */
 export interface ProfilesShown
 {
     readonly profile: ProfileShown;
     readonly profiles: ProfileShown[];
     readonly settings?: PageSettings;
+    /** The data folder as the player finds it, folder by folder from their own (T-119): OneDrive, Documenti, My Games, Chesspal. */
+    readonly dataFolder: readonly string[];
 }
 
 /** The profiles of the data folder, as the page shows them. */
-export function profilesShown(root: string): ProfilesShown
+export function profilesShown(root: string, userFolder = homedir()): ProfilesShown
 {
     const active = activeProfile(root);
     const profiles = listProfiles(root).map((profile) => shown(root, profile));
     const settings = profileSettings(root, active.id);
     const profile = profiles.find(({ id }) => id === active.id)!;
-    return settings === undefined ? { profile, profiles } : { profile, profiles, settings };
+    const dataFolder = foldersOf(root, userFolder);
+    return settings === undefined ? { profile, profiles, dataFolder } : { profile, profiles, settings, dataFolder };
 }
 
 /** Answers the page's requests about profiles: true when the request was one. A file that cannot be written is told to the page, and the server goes on. */
@@ -58,6 +64,7 @@ const routes: Readonly<Record<string, Route>> = {
     "POST /api/profile/image": imageFromPage,
     "GET /api/profile/image": sendImage,
     "POST /api/settings": settingsFromPage,
+    "POST /api/data-folder/open": openDataFolder,
 };
 
 /** A new profile from the menu, put in use, or the first completed by the wizard: the chat reads who plays at its next call, never woken for it (D-66). */
@@ -188,6 +195,30 @@ async function settingsFromPage(request: IncomingMessage, response: ServerRespon
     sendJson(response, 200, { saved: true });
 }
 
+/** The data folder in the system's file manager (T-119): asked as JSON, which another site cannot send without the browser asking first. */
+async function openDataFolder(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
+{
+    const asked = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;
+    const open = served.context.openFolder;
+
+    if (asked === undefined) {
+        sendJson(response, 400, { error: "Send {} as JSON to open the data folder." });
+        return;
+    }
+
+    if (open === undefined) {
+        sendJson(response, 501, { error: "This server opens no folder: the page shows its path." });
+        return;
+    }
+
+    if (!(await open(served.context.home()))) {
+        sendJson(response, 500, { error: "No file manager could open the data folder: the page shows its path." });
+        return;
+    }
+
+    sendJson(response, 200, { opened: true });
+}
+
 /**
  * The profile in use, when it is the one the page shows (?profile=): a page that has not yet heard of another put in use elsewhere is refused, so that its
  * choices never go to the wrong player.
@@ -209,6 +240,15 @@ function shown(root: string, profile: PlayerProfile): ProfileShown
 {
     const image = ownImageStamp(root, profile.id);
     return image === undefined ? profile : { ...profile, image };
+}
+
+/** A folder's names from the user's own folder, as the file manager walks there; from its drive or root when it is elsewhere. */
+function foldersOf(folder: string, userFolder: string): string[]
+{
+    const inside = relative(userFolder, folder);
+    const outside = inside === "" || inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside);
+    const walked = outside ? folder : inside;
+    return walked.split(/[\\/]+/).filter((name) => name !== "");
 }
 
 function refusalOf(error: unknown): Refused
