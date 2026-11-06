@@ -19,7 +19,7 @@ interface Status
     page?: string;
     /** No browser has the board page open: the player needs its address first. */
     pageClosed?: true;
-    /** Who plays, from the profile in use (D-23). */
+    /** Who plays, from the profile in use (D-23), once the player has completed it (D-71). */
     player?: string;
     game?: GameSummary;
     /** Why the game on disk cannot be read, when it cannot. */
@@ -35,16 +35,18 @@ interface Status
 /** What Chesspal sees now, the first call of a chat: a dashboard under 150 tokens while the player is to move, with the next step. */
 export const status = defineCommand({
     name: "status",
-    description: "Shows what Chesspal sees now: its version, the player's folder and the game, with your next step. Call it at the start of every chat, "
+    description: "Shows what Chesspal sees now: its version, the profile's folder and the game, with your next step. Call it at the start of every chat, "
         + "before anything else.",
     input: z.object({}),
     // Read only for the host: a flag that has fallen is written, as the time already decided.
     readOnly: true,
     alwaysLoad: true,
+    showsGame: true,
     run: (_input, context): Status => {
-        // With profiles, the folder is the profile's: the names of its games are relative to it.
-        const folder = gameFolder(context.folder);
-        const status: Status = { version, folder };
+        // The folder is the profile's, in the data folder (D-71): the names of its games are relative to it.
+        const folder = gameFolder(context.home());
+        const player = playerLine(context);
+        const status: Status = { version, folder, ...(player === undefined ? {} : { player }) };
 
         if (context.page !== undefined) {
             status.page = context.page;
@@ -52,12 +54,6 @@ export const status = defineCommand({
 
         if (closedPage(context) !== undefined) {
             status.pageClosed = true;
-        }
-
-        const player = playerLine(context);
-
-        if (player !== undefined) {
-            status.player = player;
         }
 
         const first = firstInChat(context);

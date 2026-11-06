@@ -1,8 +1,12 @@
 import { version } from "chesspal";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import { defineCommand } from "../src/commands/registry.ts";
+import { profileFolder } from "../src/profiles/index.ts";
 import { play, testContext } from "./commands.ts";
 
 const context = testContext();
@@ -13,7 +17,7 @@ describe("the command line", () => {
 
         expect(exitCode).toBe(0);
         expect(output).toContain(`chesspal ${version}`);
-        expect(output).toMatch(/ {2}status +Shows what Chesspal sees now: its version, the player's folder and the game, with your next step\.\n/);
+        expect(output).toMatch(/ {2}status +Shows what Chesspal sees now: its version, the profile's folder and the game, with your next step\.\n/);
         expect(output).toMatch(/ {2}mcp +Start the MCP server for an AI host\.\n/);
         expect(output).toMatch(/ {2}listen +Wait for the player's move on the board page and wake the chat\.\n/);
     });
@@ -23,10 +27,17 @@ describe("the command line", () => {
     });
 
     it("runs a command and renders its result, as text or as JSON", async () => {
-        expect((await runCommandLine(["status"], context)).output).toBe(
-            `Chesspal ${version}. Folder: /the/player\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.`,
-        );
-        expect(JSON.parse((await runCommandLine(["status", "--json"], context)).output)).toEqual({ version, folder: "/the/player" });
+        const folder = mkdtempSync(join(tmpdir(), "chesspal-cli-"));
+        const games = profileFolder(folder, "player");
+
+        try {
+            expect((await runCommandLine(["status"], testContext(folder))).output).toBe(
+                `Chesspal ${version}. Folder: ${games}\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.`,
+            );
+            expect(JSON.parse((await runCommandLine(["status", "--json"], testContext(folder))).output)).toEqual({ version, folder: games });
+        } finally {
+            rmSync(folder, { recursive: true, force: true });
+        }
     });
 
     it("explains a command with --help", async () => {

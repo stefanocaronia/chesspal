@@ -115,11 +115,11 @@ export const analyseGame = defineCommand({
         }
 
         const studied = pgn === undefined ? gameToStudy(context, game) : importedGame(context, pgn);
-        const analysis = analysisOf(studied, activeProfile(context.folder)?.name);
+        const analysis = analysisOf(studied, activeProfile(context.home()).name);
 
         if (studied.name !== undefined) {
             markBook(context, { record: studied.record, name: studied.name }, analysis.moves);
-            startAnalysis(gameFolder(context.folder), studied.name, context.now());
+            startAnalysis(gameFolder(context.home()), studied.name, context.now());
         }
 
         const told = analystInstructions(context);
@@ -165,7 +165,7 @@ function importedGame(context: Context, pgn: string): Studied
         : withGameReview(brought, { ...(summary === undefined ? {} : { summary }), ...(closing === undefined ? {} : { closing }) });
 
     // A game brought again is the one already kept, with the review written on it since.
-    return namedGame(context, keepToStudy(context.folder, record, context.now()));
+    return namedGame(context, keepToStudy(context.home(), record, context.now()));
 }
 
 /**

@@ -1,8 +1,15 @@
+import { userInfo } from "node:os";
+import { dataFolder } from "../home/index.ts";
+import { ensureProfile } from "../profiles/index.ts";
+import type { Position } from "./play-move.ts";
+
 /** What a command runs with, besides its input: given by the command line or the MCP server, and by the tests. */
 export interface Context
 {
-    /** The folder Chesspal runs in: the player's, where the AI host started it. */
+    /** The folder Chesspal runs in: the player's, where the AI host started it, which keeps only the host's files (D-71). */
     folder: string;
+    /** The player's data folder (D-71), with a profile in it: the profiles, their games and the games kept to study, the same for every chat. */
+    home: () => string;
     /** A number from 0 to 1, as Math.random gives: the colour drawn for the AI. */
     random: () => number;
     /** The time now: when a game starts. */
@@ -29,6 +36,11 @@ export interface Context
     calls?: () => void;
     /** The game the chat saw when its last tool ended, its folder and its stamp: the doorbell wakes it only for a game changed since. */
     seen?: string | undefined;
+    /**
+     * The position the last tool that showed the game showed the chat: its moves are refused on a game changed since, by another chat or on the page
+     * (D-71); null in a chat no tool has shown the game yet, none outside a chat.
+     */
+    positionSeen?: Position | null | undefined;
     /** The instructions the MCP server gave in this chat, by their name and the chat's start: each comes once a chat (D-68); none on the command line. */
     told?: Set<string>;
     /** Who makes this tool call, as far as the host ties it to the call (D-81); none on the command line. */
@@ -44,10 +56,29 @@ export interface Caller
     readonly hostOnly?: boolean;
 }
 
-/** The context of a process started in the player's folder. */
+/** The context of a process started in the player's folder: the data folder is found at the first command that needs it, once. */
 export function defaultContext(): Context
 {
-    return { folder: process.cwd(), random: Math.random, now: () => new Date(), platform: process.platform, language: systemLanguage(), given: new Set() };
+    let found: string | undefined;
+    const home = (): string => withProfile(found ??= dataFolder(), accountName());
+    return { folder: process.cwd(), home, random: Math.random, now: () => new Date(), platform: process.platform, language: systemLanguage(), given: new Set() };
+}
+
+/** A data folder with a profile in it, the first made when there is none, named after the system's account (D-71). */
+export function withProfile(folder: string, account: string): string
+{
+    ensureProfile(folder, account);
+    return folder;
+}
+
+/** The name the system knows the user by, for the first profile: Player when it has none. */
+function accountName(): string
+{
+    try {
+        return userInfo().username.trim() || "Player";
+    } catch {
+        return "Player";
+    }
 }
 
 /** The system's language, as Node reads it: the user's locale on Windows, LANG and LC_ALL elsewhere. */

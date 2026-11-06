@@ -6,7 +6,7 @@ import { gameFolder, helpsIn } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
 import { closingLines, moveLines, type MovePlayed } from "./game-summary.ts";
-import { playMove } from "./play-move.ts";
+import { playMove, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand, sentence } from "./registry.ts";
 import { give, waitingWords } from "./say.ts";
 
@@ -45,9 +45,11 @@ export const aiMove = defineCommand({
         ),
     }),
     alwaysLoad: true,
+    showsGame: true,
     positionals: ["move"],
     run: ({ move, plan, comment, offer_draw: offerDraw = false, mood, badge, note, arrows, squares }, context): Played => {
-        const folder = gameFolder(context.folder);
+        const folder = gameFolder(context.home());
+        refuseUnseenPosition(context, folder);
         refuseWithoutHelps(folder, { comment, badge, note, arrows, squares });
         const drawings = drawingsOf(arrows, squares);
         // The player's words are read before the move, which would count as the answer to them; a move refused leaves them for the next call.

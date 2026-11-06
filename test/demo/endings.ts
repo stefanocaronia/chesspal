@@ -1,11 +1,11 @@
 // The ends of a game on the board, to watch their effects (T-77): npm run endings. Each button sets a game one move from its end with Chesspal's commands,
-// then plays that move or ends the game, so the page shows the end as it happens. The game lives in tmp/endings, emptied at each start. The board page,
+// then plays that move or ends the game, so the page shows the end as it happens. The game lives in tmp/endings, its data folder, emptied at each start. The board page,
 // which refuses to be framed by another site, comes through this server, as if it were its own.
 import { mkdirSync, rmSync } from "node:fs";
 import { createServer, request as forward, type Server } from "node:http";
 import { fileURLToPath } from "node:url";
 import { aiMove } from "../../src/commands/ai-move.ts";
-import { defaultContext } from "../../src/commands/context.ts";
+import { defaultContext, withProfile } from "../../src/commands/context.ts";
 import { endGame } from "../../src/commands/end-game.ts";
 import { newGame } from "../../src/commands/new-game.ts";
 import { playerMove } from "../../src/commands/player-move.ts";
@@ -23,8 +23,8 @@ interface Scene
 const folder = fileURLToPath(new URL("../../tmp/endings/", import.meta.url));
 rmSync(folder, { recursive: true, force: true });
 mkdirSync(folder, { recursive: true });
-const context = { ...defaultContext(), folder };
-newProfile.run(newProfile.input.parse({ name: "Demo", level: "regular" }), context); // without a profile the page asks for one first (D-66)
+const context = { ...defaultContext(), folder, home: () => withProfile(folder, "Demo") };
+newProfile.run(newProfile.input.parse({ name: "Demo", level: "regular" }), context); // the profile Chesspal made, completed: the page skips its wizard (D-71)
 const player = (move: string, offerDraw = false): unknown => playerMove.run(playerMove.input.parse({ move, offer_draw: offerDraw }), context);
 const ai = (move: string): unknown => aiMove.run(aiMove.input.parse({ move, plan: "End the game." }), context);
 const end = (result: string): unknown => endGame.run(endGame.input.parse({ result }), context);

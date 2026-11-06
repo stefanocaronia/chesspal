@@ -3,6 +3,7 @@ import { moods } from "../core/index.ts";
 import { talkLimits } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { type GameSummary, newGameStep, nextStep, summaryOf, wordLines } from "./game-summary.ts";
+import { refuseOtherGame } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
 import { give, say, waitingWords } from "./say.ts";
 
@@ -28,8 +29,10 @@ export const aiSay = defineCommand({
     }),
     run: ({ text, mood }, context): Said => {
         // The player's words are read before the AI's line is saved: those written while it thought would fall before it, unread.
+        const folder = gameFolder(context.home());
+        refuseOtherGame(context, folder);
         const waiting = waitingWords(context);
-        const current = say(gameFolder(context.folder), "ai", text, context.now(), mood);
+        const current = say(folder, "ai", text, context.now(), mood);
         const words = give(context, waiting);
         return "game" in current ? { game: summaryOf(current, context.now()), words } : { words };
     },

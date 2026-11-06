@@ -71,7 +71,7 @@ export function unansweredWords(context: Context): string[]
 export function waitingWords(context: Context, given: ReadonlySet<string> = context.given): Words[]
 {
     try {
-        const folder = gameFolder(context.folder);
+        const folder = gameFolder(context.home());
         return unheardWords(loadGame(folder) ?? loadTableTalk(folder), given);
     } catch {
         // A game.json that cannot be read: the tool says so in its own words.

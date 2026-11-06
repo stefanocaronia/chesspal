@@ -17,7 +17,7 @@ export const pastGames = defineCommand({
     readOnly: true,
     idempotent: true,
     run: ({ game }, context): Past => {
-        const folder = gameFolder(context.folder);
+        const folder = gameFolder(context.home());
         return game === undefined ? { games: pastGameLines(folder, listed) } : { pgn: writePgn(archivedGame(folder, game)) };
     },
     format: (past) => ("pgn" in past ? past.pgn : past.games.length === 0 ? "No game played yet." : past.games.join("\n")),

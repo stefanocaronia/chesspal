@@ -7,7 +7,7 @@ import type { Context } from "./context.ts";
 /** The level of a new game when the call names none: the game before's, else the one that suits the player in use, else the level before levels came. */
 export function levelToPlay(context: Context, before: CurrentGame | undefined): AiLevel
 {
-    return suggestedLevel(before?.game.record, before === undefined ? activeProfile(context.folder)?.level : undefined);
+    return suggestedLevel(before?.game.record, before === undefined ? activeProfile(context.home()).level : undefined);
 }
 
 /** The level and what the AI sees at it, in few words: at the club level (board and tactical facts: no position). */

@@ -208,7 +208,7 @@ export interface ProfileText
 {
     readonly welcome: string;
     readonly lead: string;
-    /** Under the lead, when a game was played before the first profile. */
+    /** Under the lead, when a game was played before the wizard. */
     readonly gameMoves: string;
     readonly name: string;
     readonly namePlaceholder: string;
@@ -424,7 +424,7 @@ const english: Text = {
     profile: {
         welcome: "Welcome to Chesspal",
         lead: "One minute, and we play. You can change it all whenever you like.",
-        gameMoves: "The game you started goes into your profile.",
+        gameMoves: "The game you started stays in your profile.",
         name: "What's your name?",
         namePlaceholder: "Your name",
         avatar: "Choose a picture",
@@ -683,7 +683,7 @@ const italian: Text = {
     profile: {
         welcome: "Ti diamo il benvenuto in Chesspal",
         lead: "Un minuto, e giochiamo. Puoi cambiare tutto quando vuoi.",
-        gameMoves: "La partita che avevi iniziato va nel tuo profilo.",
+        gameMoves: "La partita che hai iniziato resta nel tuo profilo.",
         name: "Come ti chiami?",
         namePlaceholder: "Il tuo nome",
         avatar: "Scegli un'immagine",

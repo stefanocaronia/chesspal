@@ -51,13 +51,14 @@ function ponderAgentChanges(folder: string): FileChange[]
     return ponderAgentFiles(folder).filter(({ path, text }) => textOf(path) !== text);
 }
 
-/** .mcp.json with the chesspal server, beside the servers already there. */
+/** .mcp.json with the chesspal server, beside the servers already there, keeping the environment the player gave it, as CHESSPAL_HOME in a playtest. */
 function mcpFile(folder: string, platform: string): FileChange | undefined
 {
     const path = join(folder, ".mcp.json");
     const config = jsonOf(path);
     const servers = isObject(config.mcpServers) ? config.mcpServers : {};
-    return changed(path, { ...config, mcpServers: { ...servers, chesspal: chesspalServer(platform) } });
+    const before = isObject(servers.chesspal) ? servers.chesspal : {};
+    return changed(path, { ...config, mcpServers: { ...servers, chesspal: { ...chesspalServer(platform), ...(isObject(before.env) ? { env: before.env } : {}) } } });
 }
 
 /** AGENTS.md with the opponent's instructions between Chesspal's marks: rewritten when they changed, put first in a file that has none. */
@@ -127,15 +128,19 @@ const bellHook = { type: "command", command: "chesspal listen", asyncRewake: tru
 // Claude Code's SessionStart hook (D-57): it notes how each chat starts, so that a new game waits for a clean one.
 const chatHook = { type: "command", command: "chesspal chat" };
 
-/** Codex's settings, read once the player trusts the folder: the chesspal server with its tools approved, a table of Chesspal's rewritten; the rest stays. */
+/**
+ * Codex's settings, read once the player trusts the folder: the chesspal server with its tools approved, a table of Chesspal's rewritten but for the
+ * environment the player gave it, as CHESSPAL_HOME in a playtest; the rest stays.
+ */
 function codexConfigFile(folder: string, platform: string): FileChange | undefined
 {
     const path = join(folder, ".codex", "config.toml");
     const before = textOf(path) ?? "";
     const { command, args } = chesspalServer(platform);
-    const table = `[mcp_servers.chesspal]\ncommand = ${JSON.stringify(command)}\nargs = [${args.map((arg) => JSON.stringify(arg)).join(", ")}]\ndefault_tools_approval_mode = "approve"\n`;
     // The table runs up to the next one, or to the end; a header with a comment after it is the same table.
     const ours = /^\s*\[mcp_servers\.chesspal\]\s*(#.*)?\r?\n[\s\S]*?(?=^\s*\[|(?![\s\S]))/m;
+    const environment = (ours.exec(before)?.[0].match(/^\s*env(?:_vars)?\s*=.*$/gm) ?? []).map((line) => `${line.trim()}\n`).join("");
+    const table = `[mcp_servers.chesspal]\ncommand = ${JSON.stringify(command)}\nargs = [${args.map((arg) => JSON.stringify(arg)).join(", ")}]\ndefault_tools_approval_mode = "approve"\n${environment}`;
     const rest = before.replace(ours, "").trim();
     const text = rest === "" ? table : `${rest}\n\n${table}`;
     return text === before ? undefined : { path, text };

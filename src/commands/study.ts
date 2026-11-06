@@ -31,7 +31,7 @@ export interface StudiedPosition
 /** The current game when it is over, or none; refused while it goes on, for every game: games are analysed once the one being played is over. */
 export function noGameGoingOn(context: Context): CurrentGame | undefined
 {
-    const current = gameAt(gameFolder(context.folder), context.now());
+    const current = gameAt(gameFolder(context.home()), context.now());
 
     if (current !== undefined && endOf(current.game) === undefined) {
         throw new Error(
@@ -47,7 +47,7 @@ export function noGameGoingOn(context: Context): CurrentGame | undefined
 export function gameToStudy(context: Context, name?: string): Studied
 {
     const current = noGameGoingOn(context);
-    const folder = gameFolder(context.folder);
+    const folder = gameFolder(context.home());
 
     if (name !== undefined) {
         return namedGame(context, name);
@@ -71,14 +71,14 @@ export function gameToStudy(context: Context, name?: string): Studied
 /** A game played or kept to study by its name as the lists write it, or without its folder or its .pgn; refused when it is not there. */
 export function namedGame(context: Context, name: string): Required<Studied>
 {
-    const full = fullName(context, gameFolder(context.folder), name);
-    return { record: full.startsWith("study/") ? keptGame(context.folder, full) : archivedGame(gameFolder(context.folder), full), name: full };
+    const full = fullName(context, gameFolder(context.home()), name);
+    return { record: full.startsWith("study/") ? keptGame(context.home(), full) : archivedGame(gameFolder(context.home()), full), name: full };
 }
 
-/** The folder a game's name is in: the player's for a game kept to study, the profile's for a game played. */
+/** The folder a game's name is in: the data folder for a game kept to study, the profile's for a game played. */
 export function folderOf(context: Context, name: string): string
 {
-    return name.startsWith("study/") ? context.folder : gameFolder(context.folder);
+    return name.startsWith("study/") ? context.home() : gameFolder(context.home());
 }
 
 /** The index of a move in the game's record, given as analyse_game numbers it: 12. for White's, 12... for Black's, 12...Kf8 too. */
@@ -147,7 +147,7 @@ function fullName(context: Context, folder: string, name: string): string
 
     const played = `games/${stem}.pgn`;
     const kept = `study/${stem}.pgn`;
-    return !archivedGames(folder).includes(played) && keptGames(context.folder).includes(kept) ? kept : played;
+    return !archivedGames(folder).includes(played) && keptGames(context.home()).includes(kept) ? kept : played;
 }
 
 function plyOf(record: GameRecord, numbers: readonly string[], move: string): number

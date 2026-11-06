@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import type { Context } from "../src/commands/context.ts";
 import { answerDraw, offerDraw } from "../src/commands/draw-offer.ts";
+import { gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -102,7 +103,7 @@ describe("a game in chat", () => {
 
     it("lets the AI teach and judge the player's moves only with the helps on, and tells it when they go off (D-78)", async () => {
         const context = playerFolder();
-        const helps = (on: boolean): void => writeFileSync(join(context.folder, "settings.json"), JSON.stringify({ helps: on }));
+        const helps = (on: boolean): void => writeFileSync(join(gameFolder(context.home()), "settings.json"), JSON.stringify({ helps: on }));
         await run(context, "ai_say", { text: "c".repeat(300) });
         await expect(run(context, "ai_say", { text: "c".repeat(301) })).rejects.toThrow("The player has the helps off: write at most 300 characters.");
         helps(true);
@@ -132,7 +133,7 @@ describe("a game in chat", () => {
 
     it("tells the AI the helps are on when it moves first in a new game (D-78)", async () => {
         const context = playerFolder();
-        writeFileSync(join(context.folder, "settings.json"), JSON.stringify({ helps: true }));
+        writeFileSync(join(gameFolder(context.home()), "settings.json"), JSON.stringify({ helps: true }));
         expect(await run(context, "new_game", { ai_colour: "white" })).toContain("Helps on");
     });
 
@@ -204,7 +205,7 @@ describe("a game in chat", () => {
 
     it("keeps a game over whose archive could not be written, and archives it with the next game", async () => {
         const context = playerFolder();
-        const games = join(context.folder, "games");
+        const games = join(gameFolder(context.home()), "games");
         writeFileSync(games, "a file where the folder goes");
         await run(context, "new_game", { ai_colour: "black" });
         await run(context, "player_move", { move: "f3" });
@@ -220,7 +221,9 @@ describe("a game in chat", () => {
 
         rmSync(games);
 
-        expect(await run(context, "new_game", { ai_colour: "white" })).toContain(`New game: you play White, the player Black, at the strong level (board, tactical and positional facts).\nThe game before is in ${archive}.\n`);
+        expect(await run(context, "new_game", { ai_colour: "white" })).toContain(
+            `New game: you play White, the player Black, at the strong level (board, tactical and positional facts).\nThe game before is in ${archive}.\n`,
+        );
         expect(readArchive(context)).toContain("[%plan Mate.]");
     });
 
@@ -240,7 +243,7 @@ describe("a game in chat", () => {
             // The clock set back an hour: 02:30:00 is taken in the archive, 02:30:01 by the game going on.
             expect(await run(at("2026-10-25T00:30:00Z"), "new_game", { ai_colour: "black", replace: true })).toContain("The game before is in games/2026-10-25-023001.pgn");
             expect(gameFile(context).started).toBe("2026-10-25T00:30:02.000Z");
-            expect(readdirSync(join(context.folder, "games"))).toEqual(["2026-10-25-023000.pgn", "2026-10-25-023001.pgn"]);
+            expect(readdirSync(join(gameFolder(context.home()), "games"))).toEqual(["2026-10-25-023000.pgn", "2026-10-25-023001.pgn"]);
         } finally {
             if (zone === undefined) {
                 delete process.env.TZ;
@@ -253,7 +256,7 @@ describe("a game in chat", () => {
     it.runIf(process.platform === "win32")("says so when another program holds game.json open, and saves once it lets it go", async () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "black" });
-        const held = openSync(join(context.folder, "game.json"), "r");
+        const held = openSync(join(gameFolder(context.home()), "game.json"), "r");
 
         try {
             await expect(run(context, "player_move", { move: "e4" })).rejects.toThrow(
@@ -264,7 +267,7 @@ describe("a game in chat", () => {
         }
 
         expect(await run(context, "player_move", { move: "e4" })).toContain("Player: 1.e4 (e2-e4).");
-        expect(existsSync(join(context.folder, `game.json.${process.pid}.tmp`))).toBe(false);
+        expect(existsSync(join(gameFolder(context.home()), `game.json.${process.pid}.tmp`))).toBe(false);
     });
 
     it("ends by checkmate, archives the game with its plans and how it ended, and refuses any move after it", async () => {
@@ -395,7 +398,7 @@ describe("a game in chat", () => {
 
     it("reads the game again when another process changed it, and never overwrites a game.json it cannot read", async () => {
         const context = playerFolder();
-        const path = join(context.folder, "game.json");
+        const path = join(gameFolder(context.home()), "game.json");
         await run(context, "new_game", { ai_colour: "black" });
         await run(context, "player_move", { move: "e4" });
         writeFileSync(path, JSON.stringify({ ...gameFile(context), pgn: '[Event "Elsewhere"]\n\n1. d4 *\n' }));
@@ -423,7 +426,7 @@ describe("a game in chat", () => {
         expect(await run(context, "status")).toContain("\nBoard page: http://127.0.0.1:5870/\n");
     });
 
-    it("keeps the position the AI decides on, with its facts, under 1,150 characters in player_move and 1,300 in status with the board page", async () => {
+    it("keeps the position the AI decides on, with its facts, under 1,150 characters in player_move and 1,400 in status with the board page", async () => {
         const context = { ...playerFolder(), page: "http://127.0.0.1:5870/" };
         await run(context, "new_game", { ai_colour: "white", from: "r3k2r/pppq1ppp/2npbn2/2b1p3/2B1P3/2NPBN2/PPPQ1PPP/R3K2R w KQkq - 0 8" });
         await run(context, "ai_move", { move: "h3", plan: "p".repeat(200), comment: "c".repeat(200) });
@@ -432,9 +435,10 @@ describe("a game in chat", () => {
         expect(Number(/Legal by piece \((\d+)\)/.exec(played)?.[1])).toBeGreaterThan(40);
         expect(played.match(/^(?:White|Black) [KQRBNP][a-h][1-8]: /gm)).toHaveLength(8);
         expect(played).toContain("\nWhite Ph3: Be6(+Qd7) / Pg2 Rh1\n");
-        // About 0.72 Claude tokens a character, as Priya measures them: within 800 and 900 tokens (D-26); the level in status costs about 60 more (D-61).
+        // About 0.72 Claude tokens a character, as Priya measures them: within 800 and 900 tokens (D-26); the level in status costs about 60 more (D-61), and
+        // who plays about 15, since there is always a profile (D-71).
         expect(played.length).toBeLessThan(1_150);
-        expect((await run(context, "status")).length).toBeLessThan(1_375);
+        expect((await run(context, "status")).length).toBeLessThan(1_400);
     });
 
     it("shows the positional profile, facts only, in few tokens", async () => {
@@ -569,10 +573,10 @@ describe("the talk on the board page", () => {
         expect(await run(context, "ai_say", { text: "Hi! Shall we play?" })).toContain("Next: when the player wants a game");
         expect(await run(context, "status")).not.toContain("Player wrote");
         await run(context, "player_say", { text: "Yes." });
-        expect(existsSync(join(context.folder, "talk.json"))).toBe(true);
+        expect(existsSync(join(gameFolder(context.home()), "talk.json"))).toBe(true);
         await run(context, "new_game", { ai_colour: "black" });
         expect(await run(context, "status")).not.toContain("Player wrote");
-        expect(existsSync(join(context.folder, "talk.json"))).toBe(false);
+        expect(existsSync(join(gameFolder(context.home()), "talk.json"))).toBe(false);
         await expect(run(context, "player_say", { text: "o".repeat(201) })).rejects.toThrow("write 200 characters at most");
 
         await run(context, "player_say", { text: "o".repeat(150) });
@@ -652,10 +656,10 @@ async function run(context: Context, name: string, input: Record<string, unknown
 
 function gameFile(context: Context): { format: number; ai: string; started: string; pgn: string; talk?: unknown[]; drawOffer?: string; }
 {
-    return JSON.parse(readFileSync(join(context.folder, "game.json"), "utf8")) as never;
+    return JSON.parse(readFileSync(join(gameFolder(context.home()), "game.json"), "utf8")) as never;
 }
 
 function readArchive(context: Context): string
 {
-    return readFileSync(join(context.folder, archive), "utf8");
+    return readFileSync(join(gameFolder(context.home()), archive), "utf8");
 }

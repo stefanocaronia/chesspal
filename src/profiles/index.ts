@@ -1,4 +1,5 @@
-// The player's profiles (D-23): who plays, their games, their picture and their page settings, each in profiles/<id>/. Below the commands, beside the games.
+// The player's profiles (D-23): who plays, their games, their picture and their page settings, each in profiles/<id>/ of the data folder (D-71). Below the
+// commands, beside the games.
 export { type ImageType, imageTypeOf, imageTypes, ownImage, ownImageStamp, removeOwnImage, saveOwnImage, sentImageLimit } from "./avatar.ts";
 export {
     activateProfile,
@@ -6,6 +7,7 @@ export {
     createProfile,
     type DrawnAvatar,
     drawnAvatars,
+    ensureProfile,
     gameFolder,
     gameFolders,
     type Level,

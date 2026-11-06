@@ -5,6 +5,7 @@ import { z } from "zod";
 import { aiMove } from "../commands/ai-move.ts";
 import { type Caller, type Context, defaultContext } from "../commands/context.ts";
 import { commands } from "../commands/index.ts";
+import { PositionChanged } from "../commands/play-move.ts";
 import { type AnyCommand, inputProblems, isBoolean } from "../commands/registry.ts";
 import { noteAiModel } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
@@ -21,8 +22,9 @@ export const serverInstructions = "Chesspal keeps the chess for you: the rules, 
 export function createMcpServer(context: Context = defaultContext(), list: AnyCommand[] = commands): McpServer
 {
     const server = new McpServer({ name: "chesspal", version }, { instructions: serverInstructions });
-    // The server keeps what it told the chat, the instructions a tool gives once.
+    // The server keeps what it told the chat, the instructions a tool gives once, and the position it showed: none yet (D-71).
     context.told ??= new Set();
+    context.positionSeen ??= null;
 
     const forOneHost: { host: string; tool: { enable(): void; }; }[] = [];
 
@@ -121,7 +123,7 @@ function noteTheAi(context: Context, caller: () => Promise<Caller | undefined>):
                 return;
             }
 
-            if (noteAiModel(gameFolder(context.folder), { model: found.annotator, ...(found.effort === undefined ? {} : { effort: found.effort }) })) {
+            if (noteAiModel(gameFolder(context.home()), { model: found.annotator, ...(found.effort === undefined ? {} : { effort: found.effort }) })) {
                 context.heard?.();
             }
         }).catch(() => undefined);
@@ -150,6 +152,8 @@ function toolConfig(command: AnyCommand)
 
 async function runTool(command: AnyCommand, input: unknown, context: Context, caller: NonNullable<Context["caller"]>): Promise<CallToolResult>
 {
+    let refused = false;
+
     try {
         if (command.byAgent !== true) {
             context.calls?.();
@@ -158,11 +162,13 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
         const result: unknown = await command.run(checkedInput(command, input), { ...context, caller });
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {
+        refused = error instanceof PositionChanged;
         return { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], isError: true };
     } finally {
-        // What the tool read or wrote, the chat has seen: the doorbell rings it only for what changes after. An agent's call is not the chat's.
+        // What the tool read or wrote, the chat has seen: the doorbell rings it only for what changes after, and it may move on the game a tool showed it,
+        // unless that tool was refused for a position it had not seen. An agent's call is not the chat's.
         if (command.byAgent !== true) {
-            chatHasRead(context);
+            chatHasRead(context, command.showsGame === true && !refused);
         }
     }
 }

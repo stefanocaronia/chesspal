@@ -7,6 +7,7 @@ import type { Context } from "../src/commands/context.ts";
 import { clockStarted } from "../src/core/index.ts";
 import { loadGame, saveGame } from "../src/games/index.ts";
 import { setUpHosts } from "../src/host-files/host-files.ts";
+import { gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -132,7 +133,7 @@ describe("the AI thinking on the player's time (D-72)", () => {
         expect(await run(context, "ponder", { position: 0, reply: "e4", move: "e5", why: "Open." })).toContain("Kept: your answers to d4, c4, Nf3, g3, b3, f4, Nc3, e4.");
         await expect(run(context, "ponder", { position: 0, reply: "a3", move: "e5", why: "Centre." })).rejects.toThrow("You have 8 thoughts for this position already");
 
-        writeFileSync(join(context.folder, "thoughts.json"), "{ broken");
+        writeFileSync(join(gameFolder(context.home()), "thoughts.json"), "{ broken");
 
         expect(await run(context, "player_move", { move: "e4" })).not.toContain("Thought on their time");
     });
@@ -142,8 +143,8 @@ describe("the AI thinking on the player's time (D-72)", () => {
         const start = time;
         const context = { ...playerFolder(), now: () => new Date(time) };
         await run(context, "new_game", { ai_colour: "black", clock: "1+0" });
-        const waiting = loadGame(context.folder)!;
-        saveGame(context.folder, { ...waiting, clock: clockStarted(waiting.clock!, new Date(start)) });
+        const waiting = loadGame(gameFolder(context.home()))!;
+        saveGame(gameFolder(context.home()), { ...waiting, clock: clockStarted(waiting.clock!, new Date(start)) });
 
         context.pause = (milliseconds) => {
             time += milliseconds;
@@ -153,7 +154,7 @@ describe("the AI thinking on the player's time (D-72)", () => {
         expect(await run(context, "ponder", { position: 0, done: true })).toMatch(/^Still the player's move/);
         expect(await run(context, "ponder", { position: 0, done: true })).toBe("Stop now: the player has moved, or the game is over. End with one word.");
         expect(time - start).toBe(60_000);
-        expect(loadGame(context.folder)?.game.record.tags.Termination).toBeUndefined();
+        expect(loadGame(gameFolder(context.home()))?.game.record.tags.Termination).toBeUndefined();
         expect(await run(context, "status")).toContain("lost on time");
     });
 
@@ -177,7 +178,7 @@ describe("the AI thinking on the player's time (D-72)", () => {
 
         expect(answers.at(-1)).toBe("Stop now: you have waited long enough, and your answers are kept. End with one word.");
         expect(time - start).toBe(600_000);
-        expect(JSON.parse(readFileSync(join(context.folder, "thoughts.json"), "utf8"))).toMatchObject({ thoughts: [{ reply: "e4", move: "e5" }] });
+        expect(JSON.parse(readFileSync(join(gameFolder(context.home()), "thoughts.json"), "utf8"))).toMatchObject({ thoughts: [{ reply: "e4", move: "e5" }] });
     });
 
     it("lets the agent speak first, of what happened, and leaves the chat its answer to the player (D-72)", async () => {

@@ -45,7 +45,7 @@ export const look = defineCommand({
             return studyLook(context, only, game, move);
         }
 
-        const current = gameAt(gameFolder(context.folder), context.now());
+        const current = gameAt(gameFolder(context.home()), context.now());
 
         if (current === undefined) {
             throw new Error("There is no game to look at: start one with new_game.");

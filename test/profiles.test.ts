@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, type PathLike, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { Context } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import * as page from "../src/page/profile.ts";
@@ -11,6 +11,7 @@ import {
     activeProfile,
     createProfile,
     drawnAvatars,
+    ensureProfile,
     gameFolder,
     imageTypeOf,
     levels,
@@ -32,25 +33,7 @@ import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
 
-// A rename that another program prevents, as on Windows when a file inside is open.
-const held = vi.hoisted(() => ({ from: (_path: string): boolean => false }));
-vi.mock("node:fs", async (original) => {
-    const fs = await original<typeof import("node:fs")>();
-
-    const renameSync = (from: PathLike, to: PathLike): void => {
-        if (held.from(String(from))) {
-            throw Object.assign(new Error(`EPERM: operation not permitted, rename '${String(from)}'`), { code: "EPERM" });
-        }
-
-        fs.renameSync(from, to);
-    };
-
-    return { ...fs, renameSync, default: { ...fs, renameSync } };
-});
-
 afterEach(() => {
-    held.from = () => false;
-
     for (const folder of folders.splice(0)) {
         rmSync(folder, { recursive: true, force: true });
     }
@@ -61,21 +44,22 @@ const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16]);
 const webp = new Uint8Array([0x52, 0x49, 0x46, 0x46, 4, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]);
 
 describe("the profiles (D-23)", () => {
-    it("keep the games in the player's folder while there is none, and the first takes them", () => {
+    it("are always there: the first made by Chesspal, named after the account, new until the player completes it, game and all (D-71)", () => {
         const root = playerFolder();
-        writeFileSync(join(root, "game.json"), "{}");
-        mkdirSync(join(root, "games"));
-        writeFileSync(join(root, "games", "2026-11-02-153012.pgn"), "*");
 
-        expect(gameFolder(root)).toBe(root);
-        expect(activeProfile(root)).toBeUndefined();
+        expect(() => gameFolder(root)).toThrow(`There is no profile in ${join(root, "profiles")}: run any Chesspal command, and it makes one.`);
 
-        const stefano = createProfile(root, { name: "Stéfano Caronia", level: "regular", rating: { value: 1450, site: "lichess" }, avatar: "owl" });
+        ensureProfile(root, "Stéfano Caronia");
+        ensureProfile(root, "Someone else");
 
-        expect(stefano).toEqual({ id: "stefano-caronia", name: "Stéfano Caronia", level: "regular", rating: { value: 1450, site: "lichess" }, avatar: "owl" });
-        expect(gameFolder(root)).toBe(profileFolder(root, "stefano-caronia"));
-        expect(existsSync(join(root, "game.json"))).toBe(false);
-        expect(readFileSync(join(gameFolder(root), "games", "2026-11-02-153012.pgn"), "utf8")).toBe("*");
+        expect(listProfiles(root)).toEqual([{ id: "stefano-caronia", name: "Stéfano Caronia", new: true }]);
+        expect(readFileSync(join(gameFolder(root), "profile.md"), "utf8")).toBe('---\nname: "Stéfano Caronia"\nnew: "true"\n---\n');
+
+        writeFileSync(join(gameFolder(root), "game.json"), "{}");
+        const stefano = createProfile(root, { name: "Stefano", level: "regular", rating: { value: 1450, site: "lichess" }, avatar: "owl" });
+
+        expect(stefano).toEqual({ id: "stefano-caronia", name: "Stefano", level: "regular", rating: { value: 1450, site: "lichess" }, avatar: "owl" });
+        expect(readFileSync(join(gameFolder(root), "game.json"), "utf8")).toBe("{}");
 
         // Another profile starts with no games, and is put in use.
         const anna = createProfile(root, { name: "Anna" });
@@ -85,23 +69,16 @@ describe("the profiles (D-23)", () => {
         expect(listProfiles(root).map(({ id }) => id)).toEqual(["anna", "stefano-caronia"]);
     });
 
-    it("never lose the games that cannot move to the first: what moved goes back, and what cannot stays where the error says", () => {
+    it("leave nothing half made behind when one cannot be put in use, and keep the others", () => {
         const root = playerFolder();
-        writeFileSync(join(root, "game.json"), "{}");
-        mkdirSync(join(root, "games"));
-        held.from = (path) => path === join(root, "games");
+        createProfile(root, { name: "Anna" });
+        // active.json a folder: the next profile is written, and cannot be put in use.
+        rmSync(join(root, "profiles", "active.json"));
+        mkdirSync(join(root, "profiles", "active.json"));
 
-        expect(() => createProfile(root, { name: "Anna" })).toThrow(/they are still in .*close the programs/i);
-        expect(readFileSync(join(root, "game.json"), "utf8")).toBe("{}");
-        expect(existsSync(profileFolder(root, "anna"))).toBe(false);
-
-        // The game moved, the archive could not, and the game cannot go back: it stays in the new folder, which is not removed.
-        held.from = (path) => path === join(root, "games") || path === join(profileFolder(root, "anna"), "game.json");
-
-        expect(() => createProfile(root, { name: "Anna" })).toThrow(/game\.json stayed in .*anna/);
-        expect(readFileSync(join(profileFolder(root, "anna"), "game.json"), "utf8")).toBe("{}");
-        expect(existsSync(join(profileFolder(root, "anna"), "profile.md"))).toBe(false);
-        expect(existsSync(join(root, "games"))).toBe(true);
+        expect(() => createProfile(root, { name: "Bruno" })).toThrow();
+        expect(existsSync(profileFolder(root, "bruno"))).toBe(false);
+        expect(readFileSync(join(profileFolder(root, "anna"), "profile.md"), "utf8")).toContain('name: "Anna"');
     });
 
     it("name their folders from the name: free, plain, never one Windows keeps", () => {
@@ -119,19 +96,19 @@ describe("the profiles (D-23)", () => {
         createProfile(root, { name: "Anna" });
         createProfile(root, { name: "Bruno" });
 
-        expect(activeProfile(root)?.id).toBe("bruno");
+        expect(activeProfile(root).id).toBe("bruno");
         expect(activateProfile(root, "anna").name).toBe("Anna");
         expect(() => activateProfile(root, "../anna")).toThrow("There is no profile ../anna: the profiles are anna, bruno.");
 
         rmSync(profileFolder(root, "anna"), { recursive: true });
 
-        expect(activeProfile(root)?.id).toBe("bruno");
+        expect(activeProfile(root).id).toBe("bruno");
 
         // A file is no profile, even when active.json names it.
         writeFileSync(profileFolder(root, "ghost"), "");
         writeFileSync(join(root, "profiles", "active.json"), '{"profile":"ghost"}');
 
-        expect(activeProfile(root)?.id).toBe("bruno");
+        expect(activeProfile(root).id).toBe("bruno");
     });
 
     it("read a profile.md written by hand, leaving out what they do not know, and keep its other fields and text when they change it", () => {
@@ -215,20 +192,21 @@ describe("the player's own image (D-45)", () => {
 });
 
 describe("the profiles' commands", () => {
-    it("make a profile, list it, and tell the AI who plays in status and new_game", async () => {
+    it("complete the profile Chesspal made, list it, and tell the AI who plays in status and new_game only once completed (D-71)", async () => {
         const context = contextIn(playerFolder());
 
-        expect(await run(context, "profiles")).toBe("No profile yet: make one with chesspal new_profile <name>, or on the board page.");
+        expect(await run(context, "profiles")).toBe("* player: Player");
+        expect(await run(context, "status")).toContain(`Folder: ${profileFolder(context.folder, "player")}\nNo game.`);
         expect(await run(context, "new_profile", { name: "Anna", level: "regular", rating: 1450, site: "lichess" })).toBe(
-            "Profile anna made, and in use: Anna, plays often, Lichess 1450.",
+            "Profile player made, and in use: Anna, plays often, Lichess 1450.",
         );
-        expect(await run(context, "status")).toContain(`Folder: ${profileFolder(context.folder, "anna")}\nPlayer: Anna, plays often, Lichess 1450.\nNo game.`);
+        expect(await run(context, "status")).toContain(`Folder: ${profileFolder(context.folder, "player")}\nPlayer: Anna, plays often, Lichess 1450.\nNo game.`);
         expect(await run(context, "new_game", { ai_colour: "black" })).toMatch(/^New game: you play Black, the player White, at the club level \(board and tactical facts: no position\)\.\nPlayer: Anna, plays often, Lichess 1450\.\n/);
-        expect(existsSync(join(profileFolder(context.folder, "anna"), "game.json"))).toBe(true);
+        expect(existsSync(join(profileFolder(context.folder, "player"), "game.json"))).toBe(true);
         await expect(run(context, "new_profile", { name: "Bruno", rating: 1450 })).rejects.toThrow("Give the rating and its site together");
     });
 
-    it("refuse to change profile while a game goes on in the one in use, but the first takes it", async () => {
+    it("refuse to change profile while a game goes on in the one in use, but complete the one Chesspal made with its game", async () => {
         const context = contextIn(playerFolder());
         await run(context, "new_game", { ai_colour: "black" });
         await run(context, "new_profile", { name: "Anna" });
@@ -240,9 +218,9 @@ describe("the profiles' commands", () => {
         await run(context, "new_profile", { name: "Bruno" });
         await run(context, "new_game", { ai_colour: "white" });
 
-        await expect(run(context, "use_profile", { profile: "anna" })).rejects.toThrow("A game is going on in this profile");
+        await expect(run(context, "use_profile", { profile: "player" })).rejects.toThrow("A game is going on in this profile");
         expect(await run(context, "use_profile", { profile: "bruno" })).toBe("Profile bruno in use: Bruno.");
-        expect(await run(context, "profiles")).toBe("  anna: Anna\n* bruno: Bruno");
+        expect(await run(context, "profiles")).toBe("* bruno: Bruno\n  player: Anna");
     });
 
     it("set the picture: a drawn avatar in place of the player's image, or their image from a file", async () => {
@@ -250,13 +228,13 @@ describe("the profiles' commands", () => {
         await run(context, "new_profile", { name: "Anna" });
         writeFileSync(join(context.folder, "me.png"), png);
 
-        expect(await run(context, "set_avatar", { avatar: "me.png" })).toBe("The picture of anna is me.png.");
-        expect(ownImage(context.folder, "anna")?.type).toBe("png");
+        expect(await run(context, "set_avatar", { avatar: "me.png" })).toBe("The picture of player is me.png.");
+        expect(ownImage(context.folder, "player")?.type).toBe("png");
 
         await run(context, "set_avatar", { avatar: "owl" });
 
-        expect(ownImage(context.folder, "anna")).toBeUndefined();
-        expect(activeProfile(context.folder)?.avatar).toBe("owl");
+        expect(ownImage(context.folder, "player")).toBeUndefined();
+        expect(activeProfile(context.folder).avatar).toBe("owl");
         await expect(run(context, "set_avatar", { avatar: "missing.png" })).rejects.toThrow("cannot be read");
     });
 });

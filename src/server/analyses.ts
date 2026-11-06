@@ -17,7 +17,7 @@ export interface AnalysisItem
     readonly reviewed: boolean;
 }
 
-/** The games to analyse of a player's folder, the latest 20: the games kept to study and those played in the profile, reviewed or not. */
+/** The games to analyse in the data folder, the latest 20: the games kept to study and those played in the profile, reviewed or not. */
 export function analysesOf(folder: string): AnalysisItem[]
 {
     const names = [...keptGames(folder), ...archivedGames(gameFolder(folder))].sort((one, other) => stampOf(other).localeCompare(stampOf(one))).slice(0, shown);

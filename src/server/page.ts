@@ -13,7 +13,7 @@ import { answerDraw, DrawRefused, offerDraw } from "../commands/draw-offer.ts";
 import { endGame } from "../commands/end-game.ts";
 import { ChatNotClear, newGame } from "../commands/new-game.ts";
 import { bookPlies } from "../commands/opening-book.ts";
-import { playMove } from "../commands/play-move.ts";
+import { playMove, positionIn } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
 import { gameToStudy, namedGame } from "../commands/study.ts";
 import { clockStarted, type GameRecord, writePgn } from "../core/index.ts";
@@ -71,6 +71,7 @@ export async function startPage(context: Context, opponent: () => string | undef
 /** What the server keeps of its folder: the doorbell, and the pages that wait to hear the game has changed. */
 export interface Served
 {
+    /** The host's folder, which gives the page its ports and the doorbell its chat; the game is in the context's data folder (D-71). */
     readonly folder: string;
     readonly context: Context;
     readonly opponent: () => string | undefined;
@@ -182,7 +183,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
     } else if (path === "/api/game") {
         sendGame(response, served);
     } else if (path === "/api/analyses") {
-        send(response, 200, json, JSON.stringify(analysesOf(served.folder)));
+        send(response, 200, json, JSON.stringify(analysesOf(served.context.home())));
     } else if (path === "/api/events") {
         keepPosted(request, response, served);
     } else if (path === "/api/bell") {
@@ -234,7 +235,7 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
             return problem;
         };
 
-        playMove(gameFolder(served.folder), now, "player", move, refuse, message === undefined ? {} : { said: { text: message, at: now } });
+        playMove(gameFolder(served.context.home()), now, "player", move, refuse, message === undefined ? {} : { said: { text: message, at: now } });
     } catch (error) {
         // The game may have changed since the page read it: the move refused, the AI's turn, a flag fallen.
         send(response, 409, json, JSON.stringify(refusalFrom(error, illegal ? "illegal" : refusalOf(served)?.refusal)));
@@ -264,7 +265,7 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
     let current;
 
     try {
-        current = say(gameFolder(served.folder), "player", text, served.context.now());
+        current = say(gameFolder(served.context.home()), "player", text, served.context.now());
     } catch (error) {
         const noGame = refusalOf(served)?.refusal === "no-game";
         send(response, 409, json, JSON.stringify(refusalFrom(error, noGame ? "no-game" : undefined)));
@@ -294,7 +295,7 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
     }
 
     try {
-        const before = loadGame(gameFolder(served.folder));
+        const before = loadGame(gameFolder(served.context.home()));
         const input = newGame.input.safeParse({ ai_colour: body.ai_colour ?? before?.ai ?? "black", level: body.level, clock: body.clock, replace: true });
 
         if (!input.success) {
@@ -356,7 +357,7 @@ function startFromPage(request: IncomingMessage, response: ServerResponse, serve
         return;
     }
 
-    const folder = gameFolder(served.folder);
+    const folder = gameFolder(served.context.home());
     const current = loadGame(folder);
 
     if (current?.clock?.waiting !== true || endOf(current.game) !== undefined) {
@@ -428,7 +429,7 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
         const opened = last ? lastPlayed(served.context) : game === undefined ? kept(served, pgn!) : namedGame(served.context, game);
         reviewed = isReviewed(opened.record);
         // A game not yet reviewed is marked as brought, for status to ask the AI to go over it (T-92); one reviewed is ready, and the chat sleeps on (T-106).
-        startAnalysis(gameFolder(served.folder), opened.name, served.context.now(), !reviewed);
+        startAnalysis(gameFolder(served.context.home()), opened.name, served.context.now(), !reviewed);
     } catch (error) {
         send(response, 400, json, JSON.stringify({ error: (error as Error).message, refusal: "pgn-unreadable" }));
         return;
@@ -457,7 +458,7 @@ function lastPlayed(context: Context): { name: string; record: GameRecord; }
 function kept(served: Served, pgn: string): { name: string; record: GameRecord; }
 {
     analyseGame.run({ pgn }, { ...served.context, told: undefined });
-    return namedGame(served.context, gameInAnalysis(gameFolder(served.folder))!.game);
+    return namedGame(served.context, gameInAnalysis(gameFolder(served.context.home()))!.game);
 }
 
 /** The longest PGN the page brings: a long game with its clocks, and the comments a site adds, which go. */
@@ -513,7 +514,7 @@ function refusalFrom(error: unknown, refusal?: Refused["refusal"]): Refused
 /** The game as the page reads it now: a flag that has fallen ends it (D-13), and the doorbell tells the chat, which hears how from status (T-37). */
 function gameNow(served: Served): CurrentGame | undefined
 {
-    const folder = gameFolder(served.folder);
+    const folder = gameFolder(served.context.home());
     const before = loadGame(folder);
 
     // The AI's clock is held while nobody hears the player: its flag cannot fall before the chat is there to move.
@@ -539,7 +540,7 @@ function aiHeld(served: Served, current: CurrentGame): boolean
 /** The chat calls a tool: when nobody heard the player before, the AI's clock, held since, starts now, with the time it was held given back. */
 function chatCalls(served: Served): void
 {
-    const folder = gameFolder(served.folder);
+    const folder = gameFolder(served.context.home());
     const current = loadGame(folder);
     const held = current !== undefined && aiHeld(served, current);
 
@@ -548,10 +549,23 @@ function chatCalls(served: Served): void
     }
 }
 
-/** The chat has read the game as it is now, at the end of a tool's call: the doorbell wakes it only for what changes it after. */
-export function chatHasRead(context: Context): void
+/**
+ * The chat has read the game as it is now, at the end of a tool's call: the doorbell wakes it only for what changes it after; and, when the tool `showed` it
+ * the game, it moves on that position and no other until a tool shows it another (D-71). A game that cannot be read shows none.
+ */
+export function chatHasRead(context: Context, showed: boolean): void
 {
     context.seen = gameSeen(context);
+
+    if (!showed) {
+        return;
+    }
+
+    try {
+        context.positionSeen = positionIn(gameFolder(context.home()));
+    } catch {
+        context.positionSeen = null;
+    }
 }
 
 /**
@@ -563,12 +577,16 @@ function hasNews(context: Context): boolean
     return gameSeen(context) !== context.seen;
 }
 
-// The game the chat sees: the profile's folder, and the stamp of its game.json.
+// The game the chat sees: the profile's folder, and the stamp of its game.json; none while the data folder cannot be made.
 function gameSeen(context: Context): string
 {
-    const folder = gameFolder(context.folder);
-    return `${folder}
+    try {
+        const folder = gameFolder(context.home());
+        return `${folder}
 ${gameStamp(folder) ?? ""}`;
+    } catch {
+        return "";
+    }
 }
 
 /** A page that waits to hear the game has changed: a stream of events, one "changed" for each change, after which the page reads the game again. */
@@ -598,9 +616,9 @@ function tellWatchers(served: Served): void
 }
 
 /**
- * Watches the player's folder, its profiles and the profile in use for changes to the game and the profiles, whoever makes them (the AI's tools, the CLI, a
- * hand edit): the pages hear of them. Each folder is watched on its own, never its whole tree, and watched again after each change, since the profile in
- * use may be another. It returns how to stop watching.
+ * Watches the data folder, its profiles and the profile in use for changes to the game and the profiles, whoever makes them (the AI's tools, another chat,
+ * the CLI, a hand edit): the pages hear of them. Each folder is watched on its own, never its whole tree, and watched again after each change, since the
+ * profile in use may be another. It returns how to stop watching.
  */
 function watchGame(served: Served): () => void
 {
@@ -609,8 +627,7 @@ function watchGame(served: Served): () => void
 
     const watchAll = (): void => {
         watching.forEach((watcher) => watcher.close());
-        const folders = new Set([served.folder, join(served.folder, "profiles"), gameFolder(served.folder)]);
-        watching = [...folders].flatMap((folder) => watchFolder(folder, heard));
+        watching = watchedFolders(served).flatMap((folder) => watchFolder(folder, heard));
     };
 
     // A save writes a new file and renames it: the events of one save come together, and the pages hear of it once.
@@ -630,6 +647,17 @@ function watchGame(served: Served): () => void
         clearTimeout(waiting);
         watching.forEach((watcher) => watcher.close());
     };
+}
+
+// None while the data folder cannot be made: each tool call tells the chat why, and the page reads the game as it loads.
+function watchedFolders(served: Served): string[]
+{
+    try {
+        const home = served.context.home();
+        return [home, join(home, "profiles"), gameFolder(home)];
+    } catch {
+        return [];
+    }
 }
 
 // A folder watched, without its subfolders; none when it cannot be, or is not there yet: the pages see its files only as they load them.
@@ -659,7 +687,7 @@ function sendGame(response: ServerResponse, served: Served): void
     try {
         const current = gameNow(served);
         // With no game the page still shows the talk before the first (D-77).
-        const spoken = current ?? loadTableTalk(gameFolder(served.folder));
+        const spoken = current ?? loadTableTalk(gameFolder(served.context.home()));
         const heard = heardLines(spoken, served.context.given);
         const talk = spoken.talk.map(({ who, text, ply }, index) => heard[index] === undefined ? { who, text, ply } : { who, text, ply, heard: heard[index] });
         const offer = current === undefined ? undefined : drawOfferOf(current);
@@ -674,7 +702,7 @@ function sendGame(response: ServerResponse, served: Served): void
             ...(offer === undefined ? {} : { drawOffer: offer }),
         };
         const analysis = current === undefined || endOf(current.game) !== undefined ? analysisShown(served) : undefined;
-        const aiModel = aiModelOf(gameFolder(served.folder));
+        const aiModel = aiModelOf(gameFolder(served.context.home()));
         const body = {
             game,
             ...(game === null && talk.length > 0 ? { talk } : {}),
@@ -682,7 +710,7 @@ function sendGame(response: ServerResponse, served: Served): void
             opponent: served.opponent(),
             ...(aiModel === undefined ? {} : { aiModel }),
             listening: served.bell.listening,
-            ...profilesShown(served.folder),
+            ...profilesShown(served.context.home()),
         };
         send(response, 200, json, JSON.stringify(body));
     } catch (error) {
@@ -693,7 +721,7 @@ function sendGame(response: ServerResponse, served: Served): void
 /** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review; none without one, or when it cannot be read. */
 function analysisShown(served: Served): { name: string; pgn: string; book: number; } | undefined
 {
-    const analysis = gameInAnalysis(gameFolder(served.folder));
+    const analysis = gameInAnalysis(gameFolder(served.context.home()));
 
     if (analysis === undefined) {
         return undefined;

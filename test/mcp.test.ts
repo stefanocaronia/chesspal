@@ -8,25 +8,26 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Context } from "../src/commands/context.ts";
 import { aiModelOf, saveChatStart } from "../src/games/index.ts";
-import { gameFolder } from "../src/profiles/index.ts";
+import { gameFolder, profileFolder } from "../src/profiles/index.ts";
 import { createMcpServer, opponentOf, serverInstructions } from "../src/server/mcp.ts";
 import { play, testContext } from "./commands.ts";
 
 let client: Client | undefined;
 
-async function connect(list: AnyCommand[] = commands): Promise<Client>
+async function connect(list: AnyCommand[] = commands, context = testContext()): Promise<Client>
 {
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await createMcpServer(testContext(), list).connect(serverTransport);
+    await createMcpServer(context, list).connect(serverTransport);
     client = new Client({ name: "test", version: "1.0.0" });
     await client.connect(clientTransport);
     return client;
 }
 
-async function call(name: string, args: Record<string, unknown>, list?: AnyCommand[]): Promise<{ text: string; isError: boolean; }>
+async function call(name: string, args: Record<string, unknown>, list?: AnyCommand[], context?: Context): Promise<{ text: string; isError: boolean; }>
 {
-    const result = await (await connect(list)).callTool({ name, arguments: args });
+    const result = await (await connect(list, context)).callTool({ name, arguments: args });
     return { text: (result.content as { text: string; }[])[0]?.text ?? "", isError: result.isError === true };
 }
 
@@ -92,7 +93,7 @@ describe("the MCP server", () => {
         client = new Client({ name: "test", version: "1.0.0" });
         await client.connect(clientTransport);
         const codex = (model: string, effort: string) => ({ "x-codex-turn-metadata": { model, reasoning_effort: effort } });
-        const folder = gameFolder(context.folder);
+        const folder = gameFolder(context.home());
 
         await client.callTool({ name: "new_game", arguments: { ai_colour: "white" } });
         await client.callTool({ name: "ai_move", arguments: { move: "e4", plan: "Take the centre." }, _meta: codex("gpt-6-luna", "low") });
@@ -124,7 +125,7 @@ describe("the MCP server", () => {
         await createMcpServer(context).connect(serverTransport);
         client = new Client({ name: "test", version: "1.0.0" });
         await client.connect(clientTransport);
-        const folder = gameFolder(context.folder);
+        const folder = gameFolder(context.home());
 
         await client.callTool({ name: "new_game", arguments: { ai_colour: "white" } });
         const played = await client.callTool({ name: "ai_move", arguments: { move: "e4", plan: "Take the centre." }, _meta: { "claudecode/toolUseId": "toolu_1" } });
@@ -153,9 +154,14 @@ describe("the MCP server", () => {
     });
 
     it("runs a tool and answers with its text", async () => {
-        expect(await call("status", {})).toEqual({
-            text:
-                `Chesspal ${version}. Folder: /the/player\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.`,
+        const context = testContext(mkdtempSync(join(tmpdir(), "chesspal-")));
+        const answer = await call("status", {}, undefined, context);
+        rmSync(context.folder, { recursive: true, force: true });
+
+        expect(answer).toEqual({
+            text: `Chesspal ${version}. Folder: ${
+                profileFolder(context.folder, "player")
+            }\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.`,
             isError: false,
         });
     });
@@ -182,7 +188,9 @@ describe("the MCP server", () => {
 function serve(script: string, args: string[] = [], folder?: string)
 {
     const file = fileURLToPath(new URL(script, import.meta.url));
-    const server = spawn(process.execPath, ["--experimental-strip-types", "--no-warnings", file, ...args], { stdio: ["pipe", "pipe", "pipe"], cwd: folder });
+    // Its data folder is its own folder, as for a playtest (D-71).
+    const env = folder === undefined ? process.env : { ...process.env, CHESSPAL_HOME: folder };
+    const server = spawn(process.execPath, ["--experimental-strip-types", "--no-warnings", file, ...args], { stdio: ["pipe", "pipe", "pipe"], cwd: folder, env });
     const output = { stdout: "", stderr: "" };
     let exitCode: number | null | undefined;
     const exited = new Promise<number | null>((done) => server.on("exit", (code) => done(exitCode = code)));
@@ -238,14 +246,17 @@ describe("chesspal mcp", () => {
         const tool = (id: number, name: string, args: object): object => ({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } });
         server.send(initialize);
         await server.answered();
-        server.send(tool(2, "new_game", { ai_colour: "black" }), tool(3, "player_move", { move: "e4" }));
+        server.send(tool(2, "new_game", { ai_colour: "black" }));
+        // A chat moves on a game a tool has shown it (D-71): the move comes once the new game has answered.
+        await vi.waitFor(() => expect(server.lines().some((line) => line.id === 2)).toBe(true), { timeout: 15_000 });
+        server.send(tool(3, "player_move", { move: "e4" }));
         server.close();
 
         try {
             expect(await server.exited, `stderr: ${server.output.stderr}`).toBe(0);
             expect(server.lines().find((line) => line.id === 3)?.result).toMatchObject({ content: [{ type: "text", text: expect.stringMatching(/^Player: 1\.e4 \(e2-e4\)\./) }] });
             expect(server.lines().find((line) => line.id === 3)?.result?.isError).toBeUndefined();
-            expect((JSON.parse(readFileSync(join(folder, "game.json"), "utf8")) as { pgn: string; }).pgn).toContain("1. e4 *");
+            expect((JSON.parse(readFileSync(join(gameFolder(folder), "game.json"), "utf8")) as { pgn: string; }).pgn).toContain("1. e4 *");
         } finally {
             rmSync(folder, { recursive: true, force: true });
         }

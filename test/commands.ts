@@ -1,11 +1,26 @@
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import { z } from "zod";
-import type { Context } from "../src/commands/context.ts";
+import { type Context, withProfile } from "../src/commands/context.ts";
 import { defineCommand } from "../src/commands/registry.ts";
 
-/** A context for the tests: a folder, a fixed draw, a fixed time (2 November 2026 at 15:30:12 where the tests run) and Linux. */
+/**
+ * A context for the tests: a folder, which is the data folder too, its first profile made by Chesspal for the account "Player" as it needs it, a fixed
+ * draw, a fixed time (2 November 2026 at 15:30:12 where the tests run) and Linux.
+ */
 export function testContext(folder = "/the/player", random = 0, now = new Date(2026, 10, 2, 15, 30, 12), platform = "linux"): Context
 {
-    return { folder, random: () => random, now: () => now, platform, given: new Set() };
+    return { folder, home: () => withProfile(temporary(folder), "Player"), random: () => random, now: () => now, platform, given: new Set() };
+}
+
+// A test writes its data only in a temporary folder of its own, never on the disk at large.
+function temporary(folder: string): string
+{
+    if (!resolve(folder).startsWith(resolve(tmpdir()))) {
+        throw new Error(`${folder} is no temporary folder: give testContext one made with mkdtemp, before a command that reads the data folder.`);
+    }
+
+    return folder;
 }
 
 /** A command with every kind of field, for the command line and the server: the real ones come with the chess (T-6). */

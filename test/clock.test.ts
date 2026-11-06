@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Context } from "../src/commands/context.ts";
 import { canMate, clockStarted, clockTag, clockText, timeControlOf, timeControlTag } from "../src/core/index.ts";
 import { loadGame, saveGame } from "../src/games/index.ts";
+import { gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -78,7 +79,7 @@ describe("a game with a clock (D-13)", () => {
         await run(game.at(5), "player_move", { move: "e4" });
         expect(await run(game.at(70), "status")).toMatch(/Game over: 1-0, Black lost on time\. Archived in games\//);
         await expect(run(game.at(71), "ai_move", { move: "e5", plan: "Too late." })).rejects.toThrow(/The game is over \(1-0, Black lost on time\)/);
-        expect(readdirSync(join(game.context.folder, "games"))).toHaveLength(1);
+        expect(readdirSync(join(gameFolder(game.context.home()), "games"))).toHaveLength(1);
     });
 
     it("is a draw on time when the other side could not mate", async () => {
@@ -133,7 +134,7 @@ describe("a game with a clock (D-13)", () => {
         const game = clockGame(undefined);
         await run(game.at(600), "player_move", { move: "e4" });
         expect(await run(game.at(6000), "status")).not.toMatch(/Clock/);
-        expect(existsSync(join(game.context.folder, "game.json")) && gameFile(game.context).clock).toBeUndefined();
+        expect(existsSync(join(gameFolder(game.context.home()), "game.json")) && gameFile(game.context).clock).toBeUndefined();
     });
 });
 
@@ -172,5 +173,5 @@ function command(name: string): (typeof commands)[number]
 
 function gameFile(context: Context): { pgn: string; clock?: Record<string, unknown>; }
 {
-    return JSON.parse(readFileSync(join(context.folder, "game.json"), "utf8")) as never;
+    return JSON.parse(readFileSync(join(gameFolder(context.home()), "game.json"), "utf8")) as never;
 }

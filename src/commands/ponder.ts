@@ -51,7 +51,7 @@ export const ponder = defineCommand({
     byAgent: true,
     host: "claude-code",
     run: async ({ position, reply, move, why, say, done = false }, context): Promise<Pondered> => {
-        const folder = gameFolder(context.folder);
+        const folder = gameFolder(context.home());
         const current = toPonder(folder, context.now(), position);
 
         if (current === undefined) {

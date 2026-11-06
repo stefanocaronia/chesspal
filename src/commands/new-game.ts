@@ -8,6 +8,7 @@ import { type GameSummary, nextStep, positionLines, sidesLine, summaryOf, withTh
 import { levelText, levelToPlay } from "./levels.ts";
 import { closedPage, pageLine } from "./page-link.ts";
 import { pastGameLines } from "./past-games.ts";
+import { refuseUnseenPosition } from "./play-move.ts";
 import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
 
@@ -18,7 +19,7 @@ interface NewGame
     archived?: { name: string; finished: boolean; };
     /** The last games played with this player, for a chat that starts clean (D-57). */
     past: string[];
-    /** Who plays, from the profile in use (D-23). */
+    /** Who plays, from the profile in use (D-23), once the player has completed it (D-71). */
     player?: string;
     /** The board page's address when no browser has it open: the player needs it first. */
     closedPage?: string;
@@ -48,6 +49,7 @@ export const newGame = defineCommand({
         replace: z.boolean().default(false).describe("start even though a game is going on: it goes to the archive unfinished"),
     }),
     alwaysLoad: true,
+    showsGame: true,
     positionals: ["ai_colour"],
     run: ({ ai_colour: colour, from, clock, level: chosen, replace }, context): NewGame | Asked => {
         if (colour === undefined && from === undefined && clock === undefined && chosen === undefined) {
@@ -60,13 +62,17 @@ export const newGame = defineCommand({
 
         const control = clock === undefined || /^\s*none\s*$/i.test(clock) ? undefined : timeControlFrom(clock);
         const now = context.now();
-        const folder = gameFolder(context.folder);
+        const folder = gameFolder(context.home());
         const before = gameAt(folder, now);
         const going = before !== undefined && endOf(before.game) === undefined ? before : undefined;
 
         if (going !== undefined && !replace) {
             const { moveNumber } = going.game.position;
             throw new Error(`A game is going on, at move ${moveNumber}: end it with end_game, or call new_game with replace: true, which archives it unfinished. Nothing changed.`);
+        }
+
+        if (going !== undefined) {
+            refuseUnseenPosition(context, folder);
         }
 
         if (chatToClear(context)) {
@@ -85,8 +91,8 @@ export const newGame = defineCommand({
         endAnalysis(folder);
         endTableTalk(folder);
         const past = pastGameLines(folder, remembered);
-        const player = playerLine(context);
         const closed = closedPage(context);
+        const player = playerLine(context);
         return {
             game: withThought(summaryOf(current, now), folder, current),
             ...(archived === undefined ? {} : { archived: { name: archived, finished: going === undefined } }),
@@ -167,7 +173,7 @@ const fenPattern = /^[pnbrqkPNBRQK1-8]+(?:\/[pnbrqkPNBRQK1-8]+){7}(?:\s|$)/;
 
 /**
  * Whether the chat must be cleared first: the last game begun, in any profile, was played in it at some length, and the host says how chats start (the hook
- * of Claude Code and Codex, T-85, T-104). Another profile does not clear the chat (D-66).
+ * of Claude Code and Codex, T-85, T-104). Another profile does not clear the chat (D-66), nor a game another chat played, which this one was never shown (D-71).
  */
 function chatToClear(context: Context): boolean
 {
@@ -177,8 +183,8 @@ function chatToClear(context: Context): boolean
         return false;
     }
 
-    const last = gameFolders(context.folder).flatMap((folder) => loadGame(folder) ?? []).sort((one, other) => Date.parse(other.started) - Date.parse(one.started))[0];
-    return last !== undefined && last.game.record.moves.length >= pliesBeforeClearing && !cleanSince(start, last.started);
+    const last = gameFolders(context.home()).flatMap((folder) => loadGame(folder) ?? []).sort((one, other) => Date.parse(other.started) - Date.parse(one.started))[0];
+    return last !== undefined && last.started === context.positionSeen?.started && last.game.record.moves.length >= pliesBeforeClearing && !cleanSince(start, last.started);
 }
 
 // The hosts whose SessionStart hook, written by init, notes how each chat starts: Claude Code and Codex, by the names they give the server.

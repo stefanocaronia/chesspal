@@ -23,6 +23,8 @@ export interface Profile
 {
     readonly id: string;
     readonly name: string;
+    /** Made by Chesspal at the first start, until the wizard completes it (D-71). */
+    readonly new?: true;
     readonly level?: Level;
     readonly rating?: { readonly value: number; readonly site: RatingSite; };
     readonly avatar?: AvatarId;

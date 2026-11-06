@@ -29,8 +29,9 @@ with a local model.
 ## How it works
 
 Chesspal is an MCP server, a command line, `chesspal`, and a board page, all made from the same commands. `chesspal init` sets up a folder to play in:
-the few files that tell the AI agent where Chesspal is, and its instructions as an opponent. The game lives in that folder, on disk, and only
-Chesspal's commands change it: they check every move with [chess.js](https://github.com/jhlywa/chess.js) and write atomically. In Codex, allow Chesspal's two
+the few files that tell the AI agent where Chesspal is, and its instructions as an opponent. Your profiles, games and analyses live in one folder for
+every folder you play in: `Documents\My Games\Chesspal` on Windows, `Chesspal` in your Documents folder elsewhere (as Linux names it in your
+language), or the folder `CHESSPAL_HOME` names. Only Chesspal's commands change them: they check every move with [chess.js](https://github.com/jhlywa/chess.js) and write atomically. In Codex, allow Chesspal's two
 hooks in `/hooks` the first time: small helpers that let it notice your moves on the board page.
 
 ## Development
@@ -46,7 +47,7 @@ npm test
 ```
 
 - `npm run lint` checks the formatting and the types, as CI does; `npm run format` formats the code.
-- `npm run page -- <folder>` serves the board page of a player's folder, to look at it while it is built.
+- `npm run page -- <folder>` serves the board page of a player's folder, with the data of `CHESSPAL_HOME` or Documents, to look at it while it is built.
 - `npm run endings` shows the ends of a game on the board: checkmate, resignation, a flag fallen, the draws.
 - `npm run bench` times the commands against their budgets.
 

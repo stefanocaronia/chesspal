@@ -38,26 +38,21 @@ export class GameGoingOn extends Error
 /** The profiles, the one in use first. */
 export const profiles = defineCommand({
     name: "profiles",
-    description: "Lists the players' profiles in this folder, the one in use marked with *. Example: chesspal profiles.",
+    description: "Lists the players' profiles, the one in use marked with *. Example: chesspal profiles.",
     input: z.object({}),
     cliOnly: true,
     readOnly: true,
     idempotent: true,
-    run: (_input, context): { profiles: PlayerProfile[]; active?: string; } => {
-        const active = activeProfile(context.folder)?.id;
-        return active === undefined ? { profiles: [] } : { profiles: listProfiles(context.folder), active };
-    },
-    format: ({ profiles, active }) =>
-        profiles.length === 0
-            ? "No profile yet: make one with chesspal new_profile <name>, or on the board page."
-            : profiles.map((profile) => `${profile.id === active ? "*" : " "} ${profile.id}: ${playerText(profile)}`).join("\n"),
+    run: (_input, context): { profiles: PlayerProfile[]; active: string; } => ({ profiles: listProfiles(context.home()), active: activeProfile(context.home()).id }),
+    format: ({ profiles, active }) => profiles.map((profile) => `${profile.id === active ? "*" : " "} ${profile.id}: ${playerText(profile)}`).join("\n"),
 });
 
-/** A new profile, put in use: the first takes the games played before; another waits for the game going on to end. */
+/** A new profile, put in use once the game going on has ended; the one Chesspal made at the first start, while new, becomes it, game and all (D-71). */
 export const newProfile = defineCommand({
     name: "new_profile",
-    description: "Makes a player's profile and puts it in use: their games, picture and page settings go in profiles/<id>/, and the first profile takes the "
-        + "games played before. Example: chesspal new_profile Anna --level regular --rating 1450 --site lichess.",
+    description: "Makes a player's profile and puts it in use: their games, picture and page settings go in profiles/<id>/ of Chesspal's data folder; the "
+        + "profile Chesspal made at the first start becomes this one while nobody has completed it. Example: chesspal new_profile Anna --level regular "
+        + "--rating 1450 --site lichess.",
     input: z.object({
         name: z.string().trim().min(1).max(nameLimit).regex(/^[^\p{Cc}]+$/u, "one line of text").describe("the player's name"),
         level: z.enum(levels).optional().describe("how they play: learning, casual, regular or tournament"),
@@ -72,11 +67,11 @@ export const newProfile = defineCommand({
             throw new Error("Give the rating and its site together, such as --rating 1450 --site lichess, or neither. Nothing changed.");
         }
 
-        if (activeProfile(context.folder) !== undefined) {
+        if (activeProfile(context.home()).new !== true) {
             refuseWhilePlaying(context);
         }
 
-        return createProfile(context.folder, {
+        return createProfile(context.home(), {
             name,
             ...(level === undefined ? {} : { level }),
             ...(rating === undefined || site === undefined ? {} : { rating: { value: rating, site } }),
@@ -95,14 +90,14 @@ export const useProfile = defineCommand({
     idempotent: true,
     positionals: ["profile"],
     run: ({ profile }, context): PlayerProfile => {
-        const active = activeProfile(context.folder);
+        const active = activeProfile(context.home());
 
-        if (active?.id === profile) {
+        if (active.id === profile) {
             return active;
         }
 
         refuseWhilePlaying(context);
-        return activateProfile(context.folder, profile);
+        return activateProfile(context.home(), profile);
     },
     format: (profile) => `Profile ${profile.id} in use: ${playerText(profile)}.`,
 });
@@ -117,16 +112,11 @@ export const setAvatar = defineCommand({
     idempotent: true,
     positionals: ["avatar"],
     run: ({ avatar }, context): { profile: string; avatar: string; } => {
-        const profile = activeProfile(context.folder);
-
-        if (profile === undefined) {
-            throw new Error("There is no profile yet: make one with chesspal new_profile <name>. Nothing changed.");
-        }
-
+        const profile = activeProfile(context.home());
         const drawn = drawnAvatars.find((one) => one === avatar);
 
         if (drawn === undefined) {
-            saveOwnImage(context.folder, profile.id, imageFile(resolve(context.folder, avatar)));
+            saveOwnImage(context.home(), profile.id, imageFile(resolve(context.folder, avatar)));
         } else {
             chooseDrawnAvatar(context, profile.id, drawn);
         }
@@ -139,21 +129,24 @@ export const setAvatar = defineCommand({
 /** A drawn avatar chosen for a profile: the player's own image goes, or it would still show. */
 export function chooseDrawnAvatar(context: Context, id: string, avatar: DrawnAvatar): void
 {
-    updateProfile(context.folder, id, { avatar });
-    removeOwnImage(context.folder, id);
+    updateProfile(context.home(), id, { avatar });
+    removeOwnImage(context.home(), id);
 }
 
-/** Who plays, as the AI reads it in status and new_game: their name, how they play and their rating; none without a profile. */
+/**
+ * Who plays, as the AI reads it in status and new_game: their name, how they play and their rating; nothing while the profile is new, named after the
+ * system's account until the player completes it (D-71).
+ */
 export function playerLine(context: Context): string | undefined
 {
-    const profile = activeProfile(context.folder);
-    return profile === undefined ? undefined : `Player: ${playerText(profile)}.`;
+    const profile = activeProfile(context.home());
+    return profile.new === true ? undefined : `Player: ${playerText(profile)}.`;
 }
 
 /** Throws while a game goes on in the profile in use. */
 export function refuseWhilePlaying(context: Context): void
 {
-    const current = gameAt(gameFolder(context.folder), context.now());
+    const current = gameAt(gameFolder(context.home()), context.now());
 
     if (current !== undefined && endOf(current.game) === undefined) {
         throw new GameGoingOn();

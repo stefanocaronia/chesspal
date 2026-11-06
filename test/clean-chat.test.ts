@@ -5,9 +5,11 @@ import { Readable } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { recordChatStart } from "../src/cli/chat-hook.ts";
 import type { Context } from "../src/commands/context.ts";
+import { endGame } from "../src/commands/end-game.ts";
 import { newGame } from "../src/commands/new-game.ts";
+import { positionIn } from "../src/commands/play-move.ts";
 import { status } from "../src/commands/status.ts";
-import { createProfile } from "../src/profiles/index.ts";
+import { createProfile, gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -54,6 +56,16 @@ describe("a new game after one played in the chat (D-57)", () => {
         expect(() => startAgain(other)).not.toThrow();
 
         expect(() => startAgain(chatWith(longGame))).not.toThrow();
+    });
+
+    it("starts at once after a game another chat played, which this one was never shown (D-71)", async () => {
+        const played = chatWith(longGame);
+        endGame.run(endGame.input.parse({ result: "player_resigns" }), played);
+        await chatStarted(played, "startup", before);
+        const idle: Context = { ...played, positionSeen: null };
+
+        expect(() => newGame.run(newGame.input.parse({ ai_colour: "black" }), played)).toThrow(/\/clear/);
+        expect(() => newGame.run(newGame.input.parse({ ai_colour: "black" }), idle)).not.toThrow();
     });
 
     it("waits for the chat to be cleared even when another profile starts the next game (D-66)", async () => {
@@ -119,6 +131,8 @@ function chatWith(pgn: string, host = "claude-code"): Context
     folders.push(folder);
     const context: Context = { ...testContext(folder, 0, new Date(2026, 10, 2, 15, 30, 12)), host: () => host };
     newGame.run(newGame.input.parse({ ai_colour: "black", from: pgn }), context);
+    // The chat was shown the game, as the MCP server notes it (D-71).
+    context.positionSeen = positionIn(gameFolder(context.home()));
     return context;
 }
 

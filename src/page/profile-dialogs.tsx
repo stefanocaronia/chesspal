@@ -1,4 +1,4 @@
-// The profiles on the page (D-23, D-45): the wizard that makes the first, the player's picture to change, and the menu that puts another in use or makes one.
+// The profiles on the page (D-23, D-45): the wizard that completes the first (D-71), the player's picture to change, and the menu that puts another in use or makes one.
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { DrawnAvatar, PlayerPicture } from "./avatars.tsx";
 import { Dialog } from "./dialog.tsx";
@@ -6,7 +6,7 @@ import { type AvatarId, avatarIds, chooseAvatar, imageAddress, type Level, level
 import type { Text } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
 
-/** The page at the first start, before any profile: who plays, and the game comes after (D-23); a game played before goes into the profile. */
+/** The page at the first start, while the profile Chesspal made is new: who plays, and the game comes after (D-23, D-71); a game played before stays in it. */
 export function Wizard({ text, hasGame, onMade }: { text: Text; hasGame: boolean; onMade: () => void; })
 {
     return (

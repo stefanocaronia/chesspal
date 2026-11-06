@@ -34,7 +34,7 @@ This file is about **developing** Chesspal. The instructions for **playing** are
 - `npm run format`: format the code (ESLint fixes, then dprint).
 - `npm run lint`: check the formatting, and the types of the tests too, as CI does.
 - `npm run bench`: time the commands against their budgets.
-- `npm run page -- <folder>`: serve the board page of a player's folder, to look at it while it is built.
+- `npm run page -- <folder>`: serve the board page of a player's folder, with the data of `CHESSPAL_HOME` or Documents, to look at it while it is built.
 - `npm run endings`: show the ends of a game on the board page.
 
 ## Development vs game

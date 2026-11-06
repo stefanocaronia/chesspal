@@ -20,7 +20,7 @@ export const exportGame = defineCommand({
     readOnly: true,
     positionals: ["format"],
     run: ({ format }, context): Exported => {
-        const current = gameAt(gameFolder(context.folder), context.now());
+        const current = gameAt(gameFolder(context.home()), context.now());
 
         if (current === undefined) {
             throw new Error("There is no game to export: start one with new_game.");

@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import type { Context } from "../../src/commands/context.ts";
 import { commands } from "../../src/commands/index.ts";
 import { Game, writePgn } from "../../src/core/index.ts";
+import { gameFolder } from "../../src/profiles/index.ts";
 import { testContext } from "../commands.ts";
 import { randomGame, report, timed } from "./bench.ts";
 
@@ -15,7 +16,7 @@ const folder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
 const context = testContext(folder);
 const long = new Game({ tags: {}, moves: randomGame(1, 120).map((san) => ({ san })) });
 const longFile = JSON.stringify({ format: 1, ai: "black", started: new Date().toISOString(), pgn: writePgn(long.record) });
-// A game over in the archive of a folder with no game going on, for the analysis.
+// A game over in the archive of a data folder with no game going on, for the analysis.
 const studyFolder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
 const cli = fileURLToPath(new URL("../../dist/cli/cli.js", import.meta.url));
 let seed = 2_000;
@@ -26,7 +27,7 @@ try {
         { name: "status in a game", budget: 0.5, run: () => timed(1, () => call(context, "status")) },
         { name: "status after another process changed a game of 120 plies", budget: 25, run: readAgain },
         { name: "analyse_game on a game of 120 plies over, its positions new", budget: 250, run: analyseLong },
-        { name: "chesspal status from the command line, a new process", budget: 500, run: () => timed(1, () => spawnSync(process.execPath, [cli, "status"], { cwd: folder })) },
+        { name: "chesspal status from the command line, a new process", budget: 500, run: () => timed(1, () => spawnSync(process.execPath, [cli, "status"], { cwd: folder, env: { ...process.env, CHESSPAL_HOME: folder } })) },
     ]);
 } finally {
     rmSync(folder, { recursive: true, force: true });
@@ -50,7 +51,7 @@ function movesOfANewGame(): number
 /** The time of a status when game.json was written by someone else: read, parsed and replayed. */
 function readAgain(): number
 {
-    writeFileSync(join(folder, "game.json"), longFile);
+    writeFileSync(join(gameFolder(context.home()), "game.json"), longFile);
     return timed(1, () => call(context, "status"));
 }
 
@@ -58,9 +59,10 @@ function readAgain(): number
 function analyseLong(): number
 {
     const game = new Game({ tags: { Result: "1/2-1/2" }, moves: randomGame(seed++, 120).map((san) => ({ san })) });
-    mkdirSync(join(studyFolder, "games"), { recursive: true });
-    writeFileSync(join(studyFolder, "games", "2026-11-02-153012.pgn"), writePgn(game.record));
-    return timed(1, () => call(testContext(studyFolder), "analyse_game", { game: "games/2026-11-02-153012.pgn" }));
+    const study = testContext(studyFolder);
+    mkdirSync(join(gameFolder(study.home()), "games"), { recursive: true });
+    writeFileSync(join(gameFolder(study.home()), "games", "2026-11-02-153012.pgn"), writePgn(game.record));
+    return timed(1, () => call(study, "analyse_game", { game: "games/2026-11-02-153012.pgn" }));
 }
 
 /** A command as the MCP server runs it: its input checked, its result as text. */

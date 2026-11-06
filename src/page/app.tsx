@@ -73,7 +73,7 @@ export function App({ start }: { start: Settings; })
     const change = (next: Settings): void => {
         apply(next);
 
-        if (served?.profile !== undefined) {
+        if (served !== undefined) {
             keepSettings(served.profile.id, next);
         }
     };
@@ -132,7 +132,7 @@ export function App({ start }: { start: Settings; })
     }, []);
 
     // The profile in use brings its settings, as it comes and each time another comes in its place; one without any takes this browser's.
-    const profileId = served?.profile?.id;
+    const profileId = served?.profile.id;
     useEffect(() => {
         if (served === undefined || profileId === undefined) {
             return;
@@ -315,8 +315,8 @@ export function App({ start }: { start: Settings; })
         );
     }
 
-    // At the first start the page asks who plays (D-23): the game comes after.
-    if (served.profile === undefined) {
+    // At the first start the page asks who plays (D-23), to complete the profile Chesspal made (D-71): the game comes after.
+    if (served.profile.new === true) {
         return <Wizard text={text} hasGame={served.game !== null} onMade={() => reload.current()} />;
     }
 
@@ -736,7 +736,7 @@ interface Served
     readonly aiModel?: AiModel;
     /** Whether a chat hears the player: in a turn, or waiting for the doorbell. */
     readonly listening?: boolean;
-    readonly profile?: Profile;
+    readonly profile: Profile;
     readonly profiles: readonly Profile[];
     readonly settings?: object;
 }

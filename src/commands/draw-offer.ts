@@ -20,7 +20,7 @@ export class DrawRefused extends Error
 /** The player offers a draw on their turn, once each side has moved: it stands until the AI accepts it or moves, and one stands at a time. */
 export function offerDraw(context: Context): void
 {
-    const folder = gameFolder(context.folder);
+    const folder = gameFolder(context.home());
     const current = gameGoingOn(folder, context.now());
     const offer = drawOfferOf(current);
 
@@ -42,7 +42,7 @@ export function offerDraw(context: Context): void
 /** The player's answer to the AI's draw offer: accepted, the game ends drawn by agreement; declined, it goes on. */
 export function answerDraw(context: Context, accept: boolean): void
 {
-    const folder = gameFolder(context.folder);
+    const folder = gameFolder(context.home());
     const current = gameGoingOn(folder, context.now());
 
     if (drawOfferOf(current) !== "ai") {

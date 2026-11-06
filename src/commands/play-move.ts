@@ -1,6 +1,7 @@
 // A move of the AI or of the player on the current game: played, timed by the clock, saved, and archived when it ends the game.
 import { clockAfterMove, clockTag, type MoveReview, reviewed } from "../core/index.ts";
-import { archiveEnded, type CurrentGame, endOf, saveGame, talkLine } from "../games/index.ts";
+import { archiveEnded, type CurrentGame, endOf, loadGame, saveGame, talkLine } from "../games/index.ts";
+import type { Context } from "./context.ts";
 import { gameGoingOn, type MovePlayed, summaryOf, withThought } from "./game-summary.ts";
 import { colourName } from "./view.ts";
 
@@ -86,6 +87,59 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
     }
 
     return result;
+}
+
+/** Where the game a chat sees stands: the profile's folder, the game by its start, none when there is none, and how many plies it has. */
+export interface Position
+{
+    readonly folder: string;
+    readonly started?: string;
+    readonly plies: number;
+}
+
+/** A chat's move, resignation or game replaced on a position it has not seen (D-71): it was decided on another. */
+export class PositionChanged extends Error
+{
+    constructor()
+    {
+        super("The game may have changed since you last saw it, in another chat or on the board page: call status to see it, then decide. Nothing changed.");
+    }
+}
+
+/** The position of the profile's game now. */
+export function positionIn(folder: string): Position
+{
+    const current = loadGame(folder);
+    return current === undefined ? { folder, plies: 0 } : { folder, started: current.started, plies: current.game.record.moves.length };
+}
+
+/**
+ * Refuses a chat's move or ending on a position it has not seen, changed by another chat or on the board page, or before any tool showed it the game
+ * (D-71). Words and the clock change no position; the command line and the page, which have no chat, are never refused.
+ */
+export function refuseUnseenPosition(context: Context, folder: string): void
+{
+    const seen = context.positionSeen;
+
+    if (seen === null || (seen !== undefined && !samePosition(seen, positionIn(folder)))) {
+        throw new PositionChanged();
+    }
+}
+
+/** Refuses a chat's words on a game it has not seen, which another chat or the page started: words on a later move of the same game do no harm. */
+export function refuseOtherGame(context: Context, folder: string): void
+{
+    const seen = context.positionSeen;
+    const now = positionIn(folder);
+
+    if (now.started !== undefined && (seen === null || (seen !== undefined && (seen.folder !== now.folder || seen.started !== now.started)))) {
+        throw new PositionChanged();
+    }
+}
+
+function samePosition(one: Position, other: Position): boolean
+{
+    return one.folder === other.folder && one.started === other.started && one.plies === other.plies;
 }
 
 function gameToMove(folder: string, mover: Mover, now: Date): CurrentGame

@@ -1,7 +1,8 @@
-// The player's profiles (D-23): profiles/<id>/ in the player's folder, each with its profile.md, its games and its page settings, and the one in use.
-import { existsSync, readdirSync, readFileSync, rmdirSync, rmSync } from "node:fs";
+// The player's profiles (D-23): profiles/<id>/ in the data folder (D-71), each with its profile.md, its games and its page settings, and the one in use;
+// there is always one, the first made by Chesspal.
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { makeFolder, moveGames, writeAtomically } from "../games/index.ts";
+import { makeFolder, writeAtomically } from "../games/index.ts";
 import { readFrontMatter, writeFrontMatter } from "./front-matter.ts";
 
 /** How the player says they play, from who has just learned to who plays tournaments. */
@@ -42,26 +43,39 @@ export interface ProfileFields
 export interface PlayerProfile extends ProfileFields
 {
     readonly id: string;
+    /** Made by Chesspal at the first start, until the player completes it: the board page's wizard does (D-71). */
+    readonly new?: true;
 }
 
-/** The profiles in the player's folder, by their folders' names. */
+/** The profiles in the data folder, by their folders' names. */
 export function listProfiles(root: string): PlayerProfile[]
 {
     return profileIds(root).map((id) => readProfile(root, id));
 }
 
-/** The profile in use: the one active.json names, else the first; none before the first is made. */
-export function activeProfile(root: string): PlayerProfile | undefined
+/**
+ * Makes the first profile when there is none, named after the system's account and new until the player completes it (D-71). Two processes starting
+ * together make one: the second finds its folder taken.
+ */
+export function ensureProfile(root: string, account: string): void
 {
-    const id = activeId(root);
-    return id === undefined ? undefined : readProfile(root, id);
+    const id = freeId(root, slugOf(account));
+
+    if (profileIds(root).length === 0 && claimed(root, id)) {
+        fillProfile(root, id, { name: account }, true);
+    }
 }
 
-/** Where the games are: the folder of the profile in use, or the player's folder itself while there is no profile. */
+/** The profile in use: the one active.json names, else the first. */
+export function activeProfile(root: string): PlayerProfile
+{
+    return readProfile(root, activeIdOf(root));
+}
+
+/** Where the games are: the folder of the profile in use. */
 export function gameFolder(root: string): string
 {
-    const id = activeId(root);
-    return id === undefined ? root : profileFolder(root, id);
+    return profileFolder(root, activeIdOf(root));
 }
 
 /** A profile's folder. */
@@ -70,33 +84,31 @@ export function profileFolder(root: string, id: string): string
     return join(root, folderName, id);
 }
 
-/** Makes a profile, named from the player's name, and puts it in use: the first takes the games played before there were profiles. */
+/** Makes a profile, named from the player's name, and puts it in use; the one Chesspal made, while new, becomes it instead, with its games. */
 export function createProfile(root: string, fields: ProfileFields): PlayerProfile
 {
-    const first = profileIds(root).length === 0;
-    const id = freeId(root, slugOf(fields.name));
-    const folder = profileFolder(root, id);
-    makeFolder(folder);
+    const id = activeId(root);
 
-    try {
-        writeProfile(root, id, fields);
-
-        if (first) {
-            moveGames(root, folder);
-        }
-    } catch (error) {
-        removeHalfMade(folder);
-        throw error;
+    if (id !== undefined && readProfile(root, id).new === true) {
+        const { level, rating, avatar } = fields;
+        writeProfile(root, id, { name: fields.name, level, rating, avatar, new: false });
+        return readProfile(root, id);
     }
 
-    writeActive(root, id);
-    return readProfile(root, id);
+    let made = freeId(root, slugOf(fields.name));
+
+    // Another process may take the same id between the look and the folder: the next free one, then.
+    while (!claimed(root, made)) {
+        made = freeId(root, slugOf(fields.name));
+    }
+
+    return fillProfile(root, made, fields, false);
 }
 
-/** Every folder that may hold games: the player's own, and each profile's. */
+/** Every profile's folder, where games may be. */
 export function gameFolders(root: string): string[]
 {
-    return [root, ...profileIds(root).map((id) => profileFolder(root, id))];
+    return profileIds(root).map((id) => profileFolder(root, id));
 }
 
 /** Puts a profile in use. */
@@ -142,6 +154,49 @@ function activeId(root: string): string | undefined
     return named !== undefined && ids.includes(named) ? named : ids[0];
 }
 
+function activeIdOf(root: string): string
+{
+    const id = activeId(root);
+
+    if (id === undefined) {
+        throw new Error(`There is no profile in ${join(root, folderName)}: run any Chesspal command, and it makes one.`);
+    }
+
+    return id;
+}
+
+/** Takes a profile's folder for this call alone: false when another process has made it already. */
+function claimed(root: string, id: string): boolean
+{
+    makeFolder(join(root, folderName));
+    const folder = profileFolder(root, id);
+
+    try {
+        mkdirSync(folder);
+        return true;
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+            return false;
+        }
+
+        throw new Error(`${folder} could not be made (${(error as Error).message}): check that it is a folder, and can be written.`, { cause: error });
+    }
+}
+
+/** Writes a profile in the folder this call claimed and puts it in use; on a failure the folder goes, which holds nothing of another's. */
+function fillProfile(root: string, id: string, fields: ProfileFields, made: boolean): PlayerProfile
+{
+    try {
+        writeProfile(root, id, made ? { ...fields, new: true } : fields);
+        writeActive(root, id);
+    } catch (error) {
+        rmSync(profileFolder(root, id), { recursive: true, force: true });
+        throw error;
+    }
+
+    return readProfile(root, id);
+}
+
 function activeNamed(root: string): string | undefined
 {
     try {
@@ -172,11 +227,12 @@ function readProfile(root: string, id: string): PlayerProfile
         ...(level === undefined ? {} : { level }),
         ...(rated ? { rating: { value, site } } : {}),
         ...(avatar === undefined ? {} : { avatar }),
+        ...(fields.new === "true" ? { new: true as const } : {}),
     };
 }
 
 // Writes the fields that change, and keeps the others as the file has them, even those this version does not read.
-function writeProfile(root: string, id: string, changes: Partial<ProfileFields>): void
+function writeProfile(root: string, id: string, changes: Partial<ProfileFields> & { readonly new?: boolean; }): void
 {
     const { fields, body } = readFrontMatter(profileText(root, id));
     const written: Record<string, string | number | undefined> = { ...fields };
@@ -198,19 +254,11 @@ function writeProfile(root: string, id: string, changes: Partial<ProfileFields>)
         written.avatar = changes.avatar;
     }
 
-    writeAtomically(join(profileFolder(root, id), profileFile), writeFrontMatter(written, body));
-}
-
-// A profile that could not be made: its profile.md goes, and its folder only when nothing else is in it, such as games that could not go back.
-function removeHalfMade(folder: string): void
-{
-    rmSync(join(folder, profileFile), { force: true });
-
-    try {
-        rmdirSync(folder);
-    } catch {
-        // Not empty: what it holds stays where the error says.
+    if ("new" in changes) {
+        written.new = changes.new === true ? "true" : undefined;
     }
+
+    writeAtomically(join(profileFolder(root, id), profileFile), writeFrontMatter(written, body));
 }
 
 function profileText(root: string, id: string): string

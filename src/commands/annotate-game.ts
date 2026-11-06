@@ -73,7 +73,7 @@ export const annotateGame = defineCommand({
             studied.name,
             summary === undefined && closing === undefined ? marked : withGameReview(marked, { ...(summary === undefined ? {} : { summary }), ...(closing === undefined ? {} : { closing }) }),
         );
-        startAnalysis(gameFolder(context.folder), studied.name, context.now());
+        startAnalysis(gameFolder(context.home()), studied.name, context.now());
         const numbers = moveNumbers(marked);
         const bookUnnoted = moves.flatMap((move, index) => {
             const review = reviewOf(move.comment);
@@ -95,7 +95,7 @@ export const annotateGame = defineCommand({
 
 function gameAnalysed(context: Context): Required<Studied>
 {
-    const analysis = gameInAnalysis(gameFolder(context.folder));
+    const analysis = gameInAnalysis(gameFolder(context.home()));
 
     if (analysis === undefined) {
         throw new Error("No game is in analysis: call analyse_game first, or give the game's name as game. Nothing changed.");

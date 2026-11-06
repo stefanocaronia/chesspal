@@ -6,14 +6,22 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
+import { PositionChanged } from "../src/commands/play-move.ts";
 import { status } from "../src/commands/status.ts";
 import { noteAiModel } from "../src/games/index.ts";
+import { gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page.ts";
 import { testContext } from "./commands.ts";
 
 const opened: Page[] = [];
 const folders: string[] = [];
+
+// The profile Chesspal makes at the first start, as the page reads it until the wizard completes it (D-71).
+const madeProfile = { id: "player", name: "Player", new: true };
+const firstProfile = { profile: madeProfile, profiles: [madeProfile] };
+// What a chat is told when it would act on a game it was not shown (D-71).
+const changed = new PositionChanged().message;
 
 afterEach(async () => {
     await Promise.all(opened.splice(0).map((page) => page.close()));
@@ -50,7 +58,7 @@ describe("the page's server", () => {
         const folder = playerFolder();
         const page = await open(folder);
 
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, listening: false, profiles: [] });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, listening: false, ...firstProfile });
         await run(folder, "new_game", { ai_colour: "black" });
         await run(folder, "player_move", { move: "e4" });
         await run(folder, "ai_move", { move: "e5", plan: "A secret plan.", comment: "The open game." });
@@ -68,16 +76,16 @@ describe("the page's server", () => {
         const folder = playerFolder();
         const page = await open(folder, () => host);
 
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, listening: false, profiles: [] });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, listening: false, ...firstProfile });
         host = "Claude";
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, opponent: "Claude", listening: false, profiles: [] });
-        noteAiModel(folder, { model: "claude-opus-5-5", effort: "xhigh" });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, opponent: "Claude", listening: false, ...firstProfile });
+        noteAiModel(gameFolder(folder), { model: "claude-opus-5-5", effort: "xhigh" });
         expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({
             game: null,
             opponent: "Claude",
             aiModel: { model: "claude-opus-5-5", effort: "xhigh" },
             listening: false,
-            profiles: [],
+            ...firstProfile,
         });
     });
 
@@ -191,6 +199,46 @@ describe("the player's moves on the page", () => {
         expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain("1. e4 e5 {Symmetry.} *");
     });
 
+    it("refuses a chat's move or resignation on a position another chat or the page changed since a tool showed it the game, never for words (D-71)", async () => {
+        const folder = playerFolder();
+        const [chat, other] = [testContext(folder), testContext(folder)];
+        const page = await open(folder, undefined, chat);
+        await run(folder, "new_game", { ai_colour: "black" }, chat);
+        await run(folder, "status", {}, other);
+        await post(page, "/api/move", { move: "e4" });
+
+        await expect(run(folder, "ai_move", { move: "e5", plan: "A plan." }, chat)).rejects.toThrow(changed);
+        // Neither the refusal nor a tool that shows no game shows the chat the position: it moves once one does, whatever words came since.
+        await run(folder, "past_games", {}, chat);
+        await expect(run(folder, "ai_move", { move: "e5", plan: "A plan." }, chat)).rejects.toThrow(changed);
+        await run(folder, "status", {}, chat);
+        await post(page, "/api/message", { text: "Your move." });
+        await run(folder, "ai_move", { move: "e5", plan: "A plan." }, chat);
+
+        await expect(run(folder, "player_move", { move: "Nf3" }, other)).rejects.toThrow(changed);
+        await expect(run(folder, "end_game", { result: "ai_resigns" }, other)).rejects.toThrow(changed);
+        // Words on a later move of the game it was shown do no harm.
+        await run(folder, "ai_say", { text: "Your turn." }, other);
+        expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain("1. e4 e5 *");
+    });
+
+    it("refuses a chat's words or game replaced on a game it was never shown, and its moves before any tool showed it the game (D-71)", async () => {
+        const folder = playerFolder();
+        const [chat, other] = [testContext(folder), testContext(folder)];
+        await run(folder, "new_game", { ai_colour: "white" }, chat);
+        await run(folder, "ai_move", { move: "e4", plan: "A plan." }, chat);
+        await run(folder, "status", {}, other);
+        await run(folder, "new_game", { ai_colour: "black", replace: true }, chat);
+
+        await expect(run(folder, "ai_say", { text: "Nice bishop." }, other)).rejects.toThrow(changed);
+        await expect(run(folder, "new_game", { ai_colour: "black", replace: true }, other)).rejects.toThrow(changed);
+        // A chat whose server has just started was shown no game: it reads one first, as a resumed chat must.
+        const fresh = { ...testContext(folder), positionSeen: null };
+        await expect(run(folder, "player_move", { move: "d4" }, fresh)).rejects.toThrow(changed);
+        await run(folder, "status", {}, fresh);
+        await run(folder, "player_move", { move: "d4" }, fresh);
+    });
+
     it("starts a new game with the sides of the game before, the one going on archived", async () => {
         const folder = playerFolder();
         const page = await open(folder);
@@ -281,7 +329,7 @@ describe("the player's moves on the page", () => {
             { who: "player", text: "Hi!", ply: 0, heard: "sent" },
             { who: "player", text: "Your turn.", ply: 1, heard: "sent" },
         ]);
-        expect(JSON.parse(readFileSync(join(folder, "game.json"), "utf8")).talk[0]).toEqual({ who: "player", text: "Hi!", ply: 0, at: new Date(2026, 10, 2, 15, 30, 12).toISOString() });
+        expect(JSON.parse(readFileSync(join(gameFolder(folder), "game.json"), "utf8")).talk[0]).toEqual({ who: "player", text: "Hi!", ply: 0, at: new Date(2026, 10, 2, 15, 30, 12).toISOString() });
 
         // The words written while the AI thinks count with those of the move, until the AI moves.
         expect(await post(page, "/api/message", { text: "x".repeat(201) })).toMatchObject({
@@ -345,25 +393,25 @@ describe("the player's moves on the page", () => {
 });
 
 describe("the profiles on the page (D-23, D-45)", () => {
-    it("makes the first profile from the wizard, with the game played before, without waking the chat, and keeps the profile while a game goes on", async () => {
+    it("completes the profile Chesspal made from the wizard, with the game played before, without waking the chat, and keeps the profile while a game goes on", async () => {
         const folder = playerFolder();
         const page = await open(folder);
         const port = Number(new URL(page.url).port);
         await run(folder, "new_game", { ai_colour: "black" });
 
-        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ profiles: [] });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ profile: madeProfile });
         expect(await post(page, "/api/profile/new", { name: " " })).toMatchObject({ status: 400 });
 
         // Who plays is read at the chat's next call: no turn of its own (D-66).
         const waiting = waitForBell(JSON.stringify({ cwd: folder }), [port]);
-        expect(await post(page, "/api/profile/new", { name: "Anna", level: "regular" })).toMatchObject({ status: 200, body: '{"profile":"anna"}' });
+        expect(await post(page, "/api/profile/new", { name: "Anna", level: "regular" })).toMatchObject({ status: 200, body: '{"profile":"player"}' });
         expect(await shortly(waiting)).toBe("waiting");
 
         const served = JSON.parse((await get(page, "/api/game")).body) as { game: object | null; profile: object; profiles: object[]; };
         expect(served.game).not.toBeNull();
-        expect(served.profile).toEqual({ id: "anna", name: "Anna", level: "regular" });
+        expect(served.profile).toEqual({ id: "player", name: "Anna", level: "regular" });
         expect(served.profiles).toEqual([served.profile]);
-        expect(await post(page, "/api/profile/use", { profile: "anna" })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/profile/use", { profile: "player" })).toMatchObject({ status: 200 });
         expect(await post(page, "/api/profile/new", { name: "Bruno" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"profile-game"') });
     });
 
@@ -372,31 +420,31 @@ describe("the profiles on the page (D-23, D-45)", () => {
         const page = await open(folder);
         const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
         const served = async (): Promise<{ profile: { avatar?: string; image?: string; }; settings?: object; }> => JSON.parse((await get(page, "/api/game")).body);
-        const image = (body: string | Buffer, type = "image/png"): ReturnType<typeof get> => get(page, "/api/profile/image?profile=anna", { "content-type": type }, "POST", body);
+        const image = (body: string | Buffer, type = "image/png"): ReturnType<typeof get> => get(page, "/api/profile/image?profile=player", { "content-type": type }, "POST", body);
 
-        expect((await image(png)).status).toBe(409);
+        expect((await get(page, "/api/profile/image?profile=anna", { "content-type": "image/png" }, "POST", png)).status).toBe(409);
         await post(page, "/api/profile/new", { name: "Anna" });
 
         const sent = await image(png);
         expect(sent.status).toBe(200);
         expect((await served()).profile.image).toBe(JSON.parse(sent.body).image);
 
-        expect(await get(page, "/api/profile/image?profile=anna")).toMatchObject({ status: 200, headers: { "content-type": "image/png" } });
-        expect((await get(page, "/api/profile/image?profile=..%2Fanna")).status).toBe(404);
+        expect(await get(page, "/api/profile/image?profile=player")).toMatchObject({ status: 200, headers: { "content-type": "image/png" } });
+        expect((await get(page, "/api/profile/image?profile=..%2Fplayer")).status).toBe(404);
         expect((await image("<svg/>", "text/plain")).status).toBe(415);
         expect((await image("<svg/>")).status).toBe(400);
 
-        expect(await post(page, "/api/profile/avatar?profile=anna", { avatar: "owl" })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/profile/avatar?profile=player", { avatar: "owl" })).toMatchObject({ status: 200 });
         expect((await served()).profile).toMatchObject({ avatar: "owl" });
         expect((await served()).profile.image).toBeUndefined();
-        expect((await post(page, "/api/profile/avatar?profile=anna", { avatar: "dragon" })).status).toBe(400);
+        expect((await post(page, "/api/profile/avatar?profile=player", { avatar: "dragon" })).status).toBe(400);
 
-        expect(await post(page, "/api/settings?profile=anna", { theme: "dark", dots: false })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/settings?profile=player", { theme: "dark", dots: false })).toMatchObject({ status: 200 });
         expect((await served()).settings).toEqual({ theme: "dark", dots: false });
-        expect((await post(page, "/api/settings?profile=anna", [1])).status).toBe(400);
+        expect((await post(page, "/api/settings?profile=player", [1])).status).toBe(400);
 
         // A page that has not yet heard of another profile put in use elsewhere never writes in it.
-        expect(await post(page, "/api/settings?profile=bruno", { theme: "light" })).toMatchObject({ status: 409, body: expect.stringContaining("anna is in use now") });
+        expect(await post(page, "/api/settings?profile=bruno", { theme: "light" })).toMatchObject({ status: 409, body: expect.stringContaining("player is in use now") });
         expect((await post(page, "/api/profile/avatar", { avatar: "cat" })).status).toBe(409);
         expect((await served()).settings).toEqual({ theme: "dark", dots: false });
     });
@@ -405,9 +453,9 @@ describe("the profiles on the page (D-23, D-45)", () => {
         const folder = playerFolder();
         const page = await open(folder);
         await post(page, "/api/profile/new", { name: "Anna" });
-        mkdirSync(join(folder, "profiles", "anna", "settings.json"));
+        mkdirSync(join(folder, "profiles", "player", "settings.json"));
 
-        expect((await post(page, "/api/settings?profile=anna", { theme: "dark" })).status).toBe(500);
+        expect((await post(page, "/api/settings?profile=player", { theme: "dark" })).status).toBe(500);
         expect((await get(page, "/api/game")).status).toBe(200);
     });
 
@@ -422,7 +470,7 @@ describe("the profiles on the page (D-23, D-45)", () => {
         await run(folder, "new_profile", { name: "Bruno" }, context);
 
         const waiting = waitForBell(JSON.stringify({ cwd: folder }), [port]);
-        expect(await post(page, "/api/profile/use", { profile: "anna" })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/profile/use", { profile: "player" })).toMatchObject({ status: 200 });
         expect(await shortly(waiting)).toBe("waiting");
 
         expect(await post(page, "/api/new", {})).toMatchObject({ status: 200 });
@@ -726,12 +774,16 @@ async function statusOf(folder: string): Promise<string>
 async function run(folder: string, name: string, input: Record<string, unknown>, context: Context = testContext(folder)): Promise<void>
 {
     const command = commands.find((each) => each.name === name)!;
+    let refused = false;
 
     try {
         await command.run(command.input.parse(input), context);
+    } catch (error) {
+        refused = error instanceof PositionChanged;
+        throw error;
     } finally {
         // As the MCP server does after each tool.
-        chatHasRead(context);
+        chatHasRead(context, command.showsGame === true && !refused);
     }
 }
 

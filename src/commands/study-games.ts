@@ -1,4 +1,4 @@
-// The games kept to study (D-68): played elsewhere and brought to analyse_game as a PGN, in the player's folder for every profile.
+// The games kept to study (D-68): played elsewhere and brought to analyse_game as a PGN, in the data folder for every profile.
 import { z } from "zod";
 import type { GameRecord } from "../core/index.ts";
 import { keptGame, keptGames } from "../games/index.ts";
@@ -15,7 +15,7 @@ export const studyGames = defineCommand({
     input: z.object({}),
     readOnly: true,
     idempotent: true,
-    run: (_input, context): { games: string[]; } => ({ games: keptGames(context.folder).flatMap((name) => studyLines(context.folder, name)) }),
+    run: (_input, context): { games: string[]; } => ({ games: keptGames(context.home()).flatMap((name) => studyLines(context.home(), name)) }),
     format: ({ games }) => (games.length === 0 ? "No game kept to study yet: analyse_game with the PGN of a game played elsewhere keeps it here." : games.join("\n")),
 });
 

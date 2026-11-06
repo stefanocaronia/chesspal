@@ -1,4 +1,4 @@
-// The profiles on the board page (D-23, D-45, D-56): who plays and their picture, the first profile made by the wizard, another put in use, the settings kept.
+// The profiles on the board page (D-23, D-45, D-56): who plays and their picture, the first profile completed by the wizard (D-71), another put in use, the settings kept.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { chooseDrawnAvatar, GameGoingOn, newProfile, useProfile } from "../commands/profiles.ts";
 import { inputProblems } from "../commands/registry.ts";
@@ -15,20 +15,15 @@ export interface ProfileShown extends PlayerProfile
 /** The profiles as the page reads them with the game: the one in use and its settings, and all of them for the menu. */
 export interface ProfilesShown
 {
-    readonly profile?: ProfileShown;
+    readonly profile: ProfileShown;
     readonly profiles: ProfileShown[];
     readonly settings?: PageSettings;
 }
 
-/** The profiles of the player's folder, as the page shows them. */
+/** The profiles of the data folder, as the page shows them. */
 export function profilesShown(root: string): ProfilesShown
 {
     const active = activeProfile(root);
-
-    if (active === undefined) {
-        return { profiles: [] };
-    }
-
     const profiles = listProfiles(root).map((profile) => shown(root, profile));
     const settings = profileSettings(root, active.id);
     const profile = profiles.find(({ id }) => id === active.id)!;
@@ -65,7 +60,7 @@ const routes: Readonly<Record<string, Route>> = {
     "POST /api/settings": settingsFromPage,
 };
 
-/** A new profile from the wizard or the menu, put in use: the chat reads who plays at its next call, never woken for it (D-66). */
+/** A new profile from the menu, put in use, or the first completed by the wizard: the chat reads who plays at its next call, never woken for it (D-66). */
 async function newProfileFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
     const body = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;
@@ -149,21 +144,21 @@ async function imageFromPage(request: IncomingMessage, response: ServerResponse,
     }
 
     try {
-        saveOwnImage(served.folder, profile.id, bytes);
+        saveOwnImage(served.context.home(), profile.id, bytes);
     } catch (error) {
         sendJson(response, 400, { error: (error as Error).message });
         return;
     }
 
-    sendJson(response, 200, { image: ownImageStamp(served.folder, profile.id) });
+    sendJson(response, 200, { image: ownImageStamp(served.context.home(), profile.id) });
 }
 
 /** A profile's own image, by its id: only a profile of this folder's, only an image. */
 function sendImage(_request: IncomingMessage, response: ServerResponse, served: Served, url: URL): void
 {
     const id = url.searchParams.get("profile");
-    const profile = listProfiles(served.folder).find((one) => one.id === id);
-    const image = profile === undefined ? undefined : ownImage(served.folder, profile.id);
+    const profile = listProfiles(served.context.home()).find((one) => one.id === id);
+    const image = profile === undefined ? undefined : ownImage(served.context.home(), profile.id);
 
     if (image === undefined) {
         send(response, 404, "text/plain; charset=utf-8", "No picture.");
@@ -189,7 +184,7 @@ async function settingsFromPage(request: IncomingMessage, response: ServerRespon
         return;
     }
 
-    saveProfileSettings(served.folder, profile.id, settings);
+    saveProfileSettings(served.context.home(), profile.id, settings);
     sendJson(response, 200, { saved: true });
 }
 
@@ -199,15 +194,14 @@ async function settingsFromPage(request: IncomingMessage, response: ServerRespon
  */
 function profileInUse(served: Served, url: URL, response: ServerResponse): PlayerProfile | undefined
 {
-    const active = activeProfile(served.folder);
+    const active = activeProfile(served.context.home());
     const shownId = url.searchParams.get("profile");
 
-    if (active !== undefined && active.id === shownId) {
+    if (active.id === shownId) {
         return active;
     }
 
-    const error = active === undefined ? "Make a profile first." : `The page shows the profile ${shownId ?? "of nobody"}, but ${active.id} is in use now: load the page again.`;
-    sendJson(response, 409, { error });
+    sendJson(response, 409, { error: `The page shows the profile ${shownId ?? "of nobody"}, but ${active.id} is in use now: load the page again.` });
     return undefined;
 }
 

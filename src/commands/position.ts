@@ -29,7 +29,7 @@ export const position = defineCommand({
             return { ...at.game.profile, where: positionLine(at, studied.name) };
         }
 
-        const current = gameAt(gameFolder(context.folder), context.now());
+        const current = gameAt(gameFolder(context.home()), context.now());
 
         if (current === undefined) {
             throw new Error("There is no game to describe: start one with new_game.");

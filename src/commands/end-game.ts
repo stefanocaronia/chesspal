@@ -3,6 +3,7 @@ import { canMate, endWithMood, Game, moods, type Side, timeLeft } from "../core/
 import { archiveEnded, bothSidesMoved, type CurrentGame, drawOfferOf, saveGame } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { gameGoingOn, type GameSummary, nextStep, positionLines, summaryOf } from "./game-summary.ts";
+import { refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
 import { colourName } from "./view.ts";
 
@@ -22,10 +23,12 @@ export const endGame = defineCommand({
         mood: z.enum(moods).optional().describe("how you feel as the game ends, which your face on the board page keeps"),
     }),
     idempotent: true,
+    showsGame: true,
     positionals: ["result"],
     run: ({ result, mood }, context): Ended => {
         const now = context.now();
-        const folder = gameFolder(context.folder);
+        const folder = gameFolder(context.home());
+        refuseUnseenPosition(context, folder);
         const current = gameGoingOn(folder, now);
 
         if (result === "draw_agreed") {
