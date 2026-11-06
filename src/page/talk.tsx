@@ -329,8 +329,9 @@ export function TalkFaces({ name, aiPicture, you, picture, ai, player, aiMoves, 
     /** The player's name and picture. */
     you: string;
     picture: ComponentChildren;
-    ai: Side;
-    player: Side;
+    /** The sides, none between games (T-110). */
+    ai?: Side;
+    player?: Side;
     aiMoves: boolean;
     playerMoves: boolean;
     unread: boolean;
@@ -339,8 +340,8 @@ export function TalkFaces({ name, aiPicture, you, picture, ai, player, aiMoves, 
 {
     return (
         <div class="faces">
-            <RailPlayer place="ai" picture={aiPicture ?? <Torretta size={40} />} name={name} side={text.sides[ai]} moves={aiMoves} unread={unread} />
-            <RailPlayer place="you" picture={picture} name={you} side={text.sides[player]} moves={playerMoves} />
+            <RailPlayer place="ai" picture={aiPicture ?? <Torretta size={40} />} name={name} {...(ai === undefined ? {} : { side: text.sides[ai] })} moves={aiMoves} unread={unread} />
+            <RailPlayer place="you" picture={picture} name={you} {...(player === undefined ? {} : { side: text.sides[player] })} moves={playerMoves} />
         </div>
     );
 }
@@ -349,7 +350,7 @@ function RailPlayer({ place, picture, name, side, moves, unread = false }: {
     place: "ai" | "you";
     picture: ComponentChildren;
     name: string;
-    side: string;
+    side?: string;
     moves: boolean;
     unread?: boolean;
 })
@@ -358,7 +359,7 @@ function RailPlayer({ place, picture, name, side, moves, unread = false }: {
         <div class={`rail-player ${place}${moves ? " moving" : ""}`}>
             <span class={`face${unread ? " unread" : ""}`}>{picture}</span>
             <span class="rail-name">
-                {name} <span class="note">· {side}</span>
+                {name} {side === undefined ? null : <span class="note">· {side}</span>}
             </span>
         </div>
     );

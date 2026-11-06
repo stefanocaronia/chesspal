@@ -492,8 +492,7 @@ export function App({ start }: { start: Settings; })
                                 aiPicture={<Torretta size={40} mood={mood} />}
                                 you={profile.name}
                                 picture={picture}
-                                ai={ai}
-                                player={player}
+                                {...(idle ? {} : { ai, player })}
                                 aiMoves={going && !playerToMove}
                                 playerMoves={playerToMove}
                                 unread={unread || asleep}
