@@ -166,10 +166,12 @@ export class Game
     {
         const written = normalized(text);
         const input = normalized(text, notation);
-        const move = this.apply(input, notation);
+        const doubt = this.kingOrRook(written, input);
+        const move = doubt ?? this.apply(input, notation);
 
         if ("refusal" in move) {
-            return { played: false, ...move, message: this.inNotation(written, input, move.message), legal: legalMovesOf(this.chess).map((legal) => legal.san) };
+            const message = doubt === undefined ? this.inNotation(written, input, move.message) : move.message;
+            return { played: false, ...move, message, legal: legalMovesOf(this.chess).map((legal) => legal.san) };
         }
 
         this.moves.push(recordedMove(move.san));
@@ -302,10 +304,28 @@ export class Game
         return `${written} is ${input} in SAN: ${message}${hint}`;
     }
 
+    /** An Italian R that the king and a rook can both play (D-84): refused, so that the player says which instead of losing castling unawares. */
+    private kingOrRook(written: string, input: string): Refused | undefined
+    {
+        if (!written.startsWith("R") || !input.startsWith("K")) {
+            return undefined;
+        }
+
+        const target = targetOf(written);
+        const king = legalMovesOf(this.chess).find((move) => move.to === target && move.san.startsWith("K"));
+        const rooks = this.rookMoves(written);
+
+        if (king === undefined || rooks.length === 0) {
+            return undefined;
+        }
+
+        return { refusal: "ambiguous", message: `${written} could be the king or a rook: in Italian R is the king (${king.san} in SAN) and T the rook (${rooks.join(" or ")}).` };
+    }
+
     /** The rooks' legal moves to the square a move names, in Italian letters. */
     private rookMoves(written: string): string[]
     {
-        const target = /([a-h][1-8])[+#]?[!?]*$/.exec(written)?.[1];
+        const target = targetOf(written);
         return legalMovesOf(this.chess).filter((move) => move.to === target && move.san.startsWith("R")).map((move) => writtenIn(move.san, "it")).sort();
     }
 
@@ -509,6 +529,12 @@ function unreadable(input: string, notation: Notation): Refused
     const examples = ["Nf3", "exd5", "O-O", "e8=Q"].map((san) => writtenIn(san, notation)).join(", ");
     const how = notation === "en" ? "in SAN" : "in the player's letters";
     return { refusal: "unreadable", message: `"${input}" is not a move: write it ${how} (${examples}) or as squares (g1f3, e7e8q).` };
+}
+
+/** The square a move goes to, as it is written: e1 in Re1+. */
+function targetOf(move: string): string | undefined
+{
+    return /([a-h][1-8])[+#]?[!?]*$/.exec(move)?.[1];
 }
 
 function sideToMove(chess: Chess): Side

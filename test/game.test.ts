@@ -123,6 +123,20 @@ describe("a game", () => {
         expect(from(standard).play("hello")).toMatchObject({ message: '"hello" is not a move: write it in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q).' });
     });
 
+    it("refuses an Italian R that the king and a rook can both play, naming both, and plays it when only one can (D-84)", () => {
+        // Anatolij's positions: the king would lose castling, or leave the rook's check unplayed.
+        expect(from("r3k2r/ppp2ppp/2n5/8/8/2N5/PPP2PPP/R3K2R b KQkq - 0 1").play("Rd8", "it")).toMatchObject({
+            played: false,
+            refusal: "ambiguous",
+            message: "Rd8 could be the king or a rook: in Italian R is the king (Kd8 in SAN) and T the rook (Td8).",
+        });
+        const rookAndKing = "8/8/4k3/8/8/8/3K4/R7 w - - 0 1";
+        expect(from(rookAndKing).play("Re1+", "it")).toMatchObject({ refusal: "ambiguous", message: expect.stringContaining("(Ke1 in SAN) and T the rook (Te1+).") });
+        expect(from(rookAndKing).play("Te1+", "it")).toMatchObject({ played: true, move: { san: "Re1+" } });
+        expect(from(rookAndKing).play("Re1", "en")).toMatchObject({ played: true, move: { san: "Re1+" } });
+        expect(from(rookAndKing).play("Rc2", "it")).toMatchObject({ played: true, move: { san: "Kc2" } });
+    });
+
     it("writes SAN's moves in the player's letters (D-83)", () => {
         const moves = ["Nxe4", "Ke1", "Qd8+", "Rh1", "Bb5", "O-O-O", "a4", "e8=Q#", "exd8=N", "b1=R"];
         expect(moves.map((san) => writtenIn(san, "it"))).toEqual(["Cxe4", "Re1", "Dd8+", "Th1", "Ab5", "O-O-O", "a4", "e8=D#", "exd8=C", "b1=T"]);
