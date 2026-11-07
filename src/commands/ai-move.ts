@@ -18,8 +18,8 @@ export const aiMove = defineCommand({
     name: "ai_move",
     description: "Plays your move, with your plan, hidden from the player, and a comment for them only when there is something to say: a capture, a move of theirs "
         + "worth a word, words of theirs to answer; as a player at a tournament, never revealing your plans or threats unless the helps are on, and never the "
-        + "player's best move. It answers with the board, for your message "
-        + 'when the player plays in the chat. Example: ai_move {move: "d5", plan: "After exd5 Na5, chase the bishop on c4.", comment: "An old favourite of mine."}.',
+        + "player's best move. When no board page is open, it answers with the board for your message. "
+        + 'Example: ai_move {move: "d5", plan: "After exd5 Na5, chase the bishop on c4.", comment: "An old favourite of mine."}.',
     input: z.object({
         move: z.string().min(1).describe("your move, in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q)"),
         plan: sentence(200).describe("your plan, in one sentence: kept for you, hidden from the player"),
@@ -61,7 +61,8 @@ export const aiMove = defineCommand({
             ...(badge === undefined && note === undefined ? {} : { judged: { ...(badge === undefined ? {} : { badge }), ...(note === undefined ? {} : { note }) } }),
         });
         const agent = ponderAgent(context, played);
-        return withWritten({ ...played, words: give(context, waiting), ...(agent === undefined ? {} : { ponder: agent }) }, notationIn(folder, context.language));
+        const board = context.pageOpen?.() === true ? {} : { board: true as const };
+        return withWritten({ ...played, words: give(context, waiting), ...(agent === undefined ? {} : { ponder: agent }), ...board }, notationIn(folder, context.language));
     },
     format: (result) => {
         // The mood the AI has just given is not told back: player_move and status tell it while it lasts (Priya, round of T-107).
@@ -71,8 +72,7 @@ export const aiMove = defineCommand({
         return [
             `Played ${moveText(result.move, result.written)}.`,
             ...moveLines({ ...result, game }),
-            "Board, for your message when the player plays in the chat:",
-            boardText(result.game.fen),
+            ...(result.board === true ? ["No board page is open: copy this board into your message.", boardText(result.game.fen)] : []),
             ...(result.ponder === undefined ? [] : [ponderLine(result.ponder)]),
             ...closingLines(result.game, result.words),
         ].join("\n");
@@ -93,8 +93,8 @@ function refuseWithoutHelps(folder: string, { comment, badge, note, arrows, squa
     }
 }
 
-/** The AI's move, and the agent that thinks on the player's time when the host runs one (D-72). */
-type Played = MovePlayed & { ponder?: string; };
+/** The AI's move, the agent that thinks on the player's time when the host runs one (D-72), and whether the player sees no board page, so the AI copies the board (D-85). */
+type Played = MovePlayed & { ponder?: string; board?: true; };
 
 /** The agent to start after the move: in Claude Code, in a folder init set up with it, while the game goes on (D-72). */
 function ponderAgent(context: Context, played: MovePlayed): string | undefined

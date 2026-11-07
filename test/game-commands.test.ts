@@ -23,7 +23,7 @@ describe("a game in chat", () => {
         const context = playerFolder();
 
         expect(await run(context, "status")).toContain(
-            "No game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.",
+            "No game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level; where there is no board page, it tells you to ask them in the chat.",
         );
         expect(await run(context, "new_game", { ai_colour: "black" })).toBe(
             "New game: you play Black, the player White, at the strong level (board, tactical and positional facts).\nPlayer (White) to move, move 1.\nNext: wait for the player's move, then call player_move with it.",
@@ -32,7 +32,7 @@ describe("a game in chat", () => {
             /^Player: 1\.e4 \(e2-e4\)\.\nYou \(Black\) to move, move 1\.\nOpening: B00 King's Pawn Game\nMaterial: even, nothing taken\nFEN: rnbqkbnr\/pppppppp\/8\/8\/4P3\/8\/PPPP1PPP\/RNBQKBNR b KQkq - 0 1\nAttacked pieces: none\n(?:.*\n){4}Legal by piece \(20\): Nb8 \(2\) Nc6 Na6; .* Ph7 \(2\) h6 h5; no moves: Ke8 Qd8 Ra8 Rh8 Bc8 Bf8\nNext: choose your move/,
         );
         expect(await run(context, "ai_move", { move: "e5", plan: "Develop the knights, then castle.", comment: "The open game." })).toBe(
-            "Played 1...e5.\nPlayer (White) to move, move 2.\nBoard, for your message when the player plays in the chat:\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n8 ♜ ♞ ♝ ♛ ♚ ♝ ♞ ♜ 8\n7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7\n6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6\n"
+            "Played 1...e5.\nPlayer (White) to move, move 2.\nNo board page is open: copy this board into your message.\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n8 ♜ ♞ ♝ ♛ ♚ ♝ ♞ ♜ 8\n7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7\n6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6\n"
                 + "5 ⊙ ⊙ ⊙ ⊙ ♟︎ ⊙ ⊙ ⊙ 5\n4 ⊙ ⊙ ⊙ ⊙ ♙ ⊙ ⊙ ⊙ 4\n3 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 3\n2 ♙ ♙ ♙ ♙ ⊙ ♙ ♙ ♙ 2\n1 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 1\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\nNext: wait for the player's move, then call player_move with it.",
         );
         expect(await run(context, "player_move", { move: "g1f3" })).toContain("\nPlan: Develop the knights, then castle.\n");
@@ -183,7 +183,7 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "e4" });
 
         expect(command("ai_move").input.safeParse({ move: "e5", plan: "p", mood: "furious" }).success).toBe(false);
-        expect(await run(context, "ai_move", { move: "e5", plan: "Hold the centre.", mood: "worried" })).toContain("Player (White) to move, move 2.\nBoard,");
+        expect(await run(context, "ai_move", { move: "e5", plan: "Hold the centre.", mood: "worried" })).toContain("Player (White) to move, move 2.\nNo board page is open");
         expect(await run(context, "status")).toContain("Your mood: worried, on your face for 2 more of your moves, then neutral by itself.");
         expect(gameFile(context).pgn).toContain("1. e4 e5 {[%plan Hold the centre.] [%mood worried]} *");
         expect(await run(context, "player_move", { move: "Nf3" })).toContain("\nPlan: Hold the centre.\nYour mood: worried, on your face for 2 more of your moves, then neutral by itself.");
@@ -253,7 +253,7 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "g4" });
 
         expect(await run(context, "ai_move", { move: "Qh4#", plan: "Mate.", comment: "c" })).toMatch(
-            /^Played 2\.\.\.Qh4#\.\nGame over: 0-1, checkmate\.\nChesspal could not archive the game: .*games could not be made \(.+\): check that it is a folder, and can be written\. The game is saved in game\.json: it goes to the archive when a new game starts\.\nBoard, for your message when the player plays in the chat:\n[\s\S]*\nNext: /,
+            /^Played 2\.\.\.Qh4#\.\nGame over: 0-1, checkmate\.\nChesspal could not archive the game: .*games could not be made \(.+\): check that it is a folder, and can be written\. The game is saved in game\.json: it goes to the archive when a new game starts\.\nNo board page is open: copy this board into your message\.\n[\s\S]*\nNext: /,
         );
         expect(await run(context, "status")).toContain("Game over: 0-1, checkmate.\nNext: ");
         await expect(run(context, "new_game", { ai_colour: "white" })).rejects.toThrow(/^Chesspal could not archive the game: .* Nothing changed\.$/);
@@ -319,10 +319,10 @@ describe("a game in chat", () => {
 
         expect(await run(context, "ai_move", { move: "Qh4+", plan: "Mate.", comment: "The fool's mate.", offer_draw: true })).toBe(
             `Played 2...Qh4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Archived in ${archive}.\n`
-                + "Board, for your message when the player plays in the chat:\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n8 ♜ ♞ ♝ ⊙ ♚ ♝ ♞ ♜ 8\n7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7\n6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6\n5 ⊙ ⊙ ⊙ ⊙ ♟︎ ⊙ ⊙ ⊙ 5\n"
+                + "No board page is open: copy this board into your message.\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n8 ♜ ♞ ♝ ⊙ ♚ ♝ ♞ ♜ 8\n7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7\n6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6\n5 ⊙ ⊙ ⊙ ⊙ ♟︎ ⊙ ⊙ ⊙ 5\n"
                 + "4 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ♛ 4\n3 ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ⊙ ⊙ 3\n2 ♙ ♙ ♙ ♙ ♙ ⊙ ⊙ ♙ 2\n1 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 1\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n"
                 + "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one "
-                + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.",
+                + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level; where there is no board page, it tells you to ask them in the chat.",
         );
         expect(readArchive(context)).toContain('[Result "0-1"]\n[AILevel "strong"]\n[Termination "checkmate"]');
         expect(readArchive(context)).toContain("[%plan Mate.]");
@@ -345,7 +345,7 @@ describe("a game in chat", () => {
 
         expect(await ended("player_resigns")).toBe(
             `Game over: 0-1, White resigns. Archived in ${archive}.\nNext: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one `
-                + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.",
+                + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level; where there is no board page, it tells you to ask them in the chat.",
         );
         expect(await ended("ai_resigns")).toContain("Game over: 1-0, Black resigns.");
         await expect(ended("draw_agreed")).rejects.toThrow("No draw offer stands: the player offers one with their move (player_move with offer_draw), you with yours");
@@ -453,8 +453,10 @@ describe("a game in chat", () => {
     });
 
     it("keeps status under 150 tokens while the player is to move, with the board page's address", async () => {
-        const context = { ...playerFolder(), page: "http://127.0.0.1:5870/" };
-        await run(context, "new_game", { ai_colour: "black" });
+        // The game starts in the chat without the page: with it, the page's window chooses it (D-85).
+        const chat = playerFolder();
+        await run(chat, "new_game", { ai_colour: "black" });
+        const context = { ...chat, page: "http://127.0.0.1:5870/" };
 
         for (const [player, ai] of [["e4", "e5"], ["Nf3", "Nc6"], ["Bb5", "a6"], ["Ba4", "Nf6"]] as const) {
             await run(context, "player_move", { move: player });

@@ -288,9 +288,9 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
     return words.length === 0 ? "Next: wait for the player's move, then call player_move with it." : "Next: answer the player with ai_say, then wait for their move.";
 }
 
-/** How a new game starts: the player chooses it in the board page's window, which new_game without choices opens; in the chat only without the page. */
+/** How a new game starts: the player chooses it in the board page's window, which new_game without choices opens; in the chat only where there is no page (D-85). */
 export const newGameStep = "call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the "
-    + "level. Ask them in the chat, and call new_game with them, only when the player plays without the page.";
+    + "level; where there is no board page, it tells you to ask them in the chat.";
 
 /** Who plays what, from the AI's side. */
 export function sidesLine(ai: Side): string

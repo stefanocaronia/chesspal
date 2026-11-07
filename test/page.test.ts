@@ -258,6 +258,17 @@ describe("the player's moves on the page", () => {
         expect((await post(page, "/api/new", {}, { "content-type": "text/plain" })).status).toBe(415);
     });
 
+    it("starts a new game from the page while the chat has not seen the last move made there, since only the page chooses one (D-85)", async () => {
+        const folder = playerFolder();
+        const chat = testContext(folder);
+        const page = await open(folder, undefined, chat);
+        await run(folder, "new_game", { ai_colour: "black" }, chat);
+        await post(page, "/api/move", { move: "e4" });
+
+        expect(await post(page, "/api/new", {})).toMatchObject({ status: 200, body: '{"started":true}' });
+        await expect(run(folder, "new_game", { ai_colour: "black", replace: true }, chat)).rejects.toThrow(changed);
+    });
+
     it("starts a new game with the colour, the level and the clock the player chose (T-58)", async () => {
         const folder = playerFolder();
         const page = await open(folder);

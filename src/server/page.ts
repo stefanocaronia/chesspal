@@ -11,7 +11,7 @@ import { gameAt } from "../commands/clock.ts";
 import type { Context } from "../commands/context.ts";
 import { answerDraw, DrawRefused, offerDraw } from "../commands/draw-offer.ts";
 import { endGame } from "../commands/end-game.ts";
-import { ChatNotClear, newGame } from "../commands/new-game.ts";
+import { ChatNotClear, newGame, startNewGame } from "../commands/new-game.ts";
 import { bookPlies } from "../commands/opening-book.ts";
 import { playMove, positionIn } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
@@ -304,7 +304,7 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
         }
 
         // The game starts from the page, open: its clocks wait for the player's Start there.
-        newGame.run(input.data, { ...served.context, pageOpen: () => true });
+        startNewGame(input.data, { ...served.context, pageOpen: () => true }, "page");
     } catch (error) {
         send(response, 409, json, JSON.stringify(refusalFrom(error)));
         return;

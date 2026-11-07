@@ -6,7 +6,7 @@ import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 import { closingLines, type GameSummary, newGameStep, positionLines, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought, wordLines } from "./game-summary.ts";
 import { levelText } from "./levels.ts";
-import { closedPage, pageLine } from "./page-link.ts";
+import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
 import { unansweredWords } from "./say.ts";
@@ -73,6 +73,10 @@ export const status = defineCommand({
 
             if (current !== undefined) {
                 status.game = withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current);
+
+                if (status.pageClosed === true) {
+                    pageGiven(context, current.started);
+                }
 
                 if (first && endOf(current.game) === undefined && fromBeforeChat(context, current.started)) {
                     status.fromBefore = true;

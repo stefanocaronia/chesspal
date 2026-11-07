@@ -6,7 +6,7 @@ import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 import { type GameSummary, nextStep, positionLines, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "./game-summary.ts";
 import { levelText, levelToPlay } from "./levels.ts";
-import { closedPage, pageLine } from "./page-link.ts";
+import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 import { pastGameLines } from "./past-games.ts";
 import { refuseUnseenPosition } from "./play-move.ts";
 import { playerLine } from "./profiles.ts";
@@ -34,79 +34,109 @@ interface Asked
     page?: string;
 }
 
+const newGameInput = z.object({
+    ai_colour: z.enum(["white", "black", "random"]).optional().describe("the colour you play: random draws it; left out with the rest, the page's window asks"),
+    from: z.string().optional().describe("a FEN or a PGN to go on from, instead of the standard position"),
+    clock: z.string().optional().describe("the time control, minutes each and seconds added after each move, such as 10+5 or 3+0; none, or left out, for a game without a clock"),
+    level: z.enum(aiLevels).optional().describe(
+        "the facts you, not the player, get: beginner the board and the legal moves, club also the tactical facts, strong also the positional ones, master "
+            + "also the opening book's moves; left out, the last game's, or for the first game the one that suits the player's profile",
+    ),
+    replace: z.boolean().default(false).describe("start even though a game is going on: it goes to the archive unfinished"),
+});
+
 /** A new game against the player, from the standard position or from a FEN or PGN; a game going on is never lost (D-41). */
 export const newGame = defineCommand({
     name: "new_game",
     description: "Starts a new game against the player. Without choices it opens the board page's New game window, where the player chooses the colour, the clock "
-        + "and the level: call it so whenever they play on the page. With choices, asked in the chat only of a player without the page, it starts the game, from "
-        + 'the standard position or from a FEN or PGN they give. Example: new_game {}; new_game {ai_colour: "black", clock: "10+5", level: "club"}.',
-    input: z.object({
-        ai_colour: z.enum(["white", "black", "random"]).optional().describe("the colour you play: random draws it; left out with the rest, the page's window asks"),
-        from: z.string().optional().describe("a FEN or a PGN to go on from, instead of the standard position"),
-        clock: z.string().optional().describe("the time control, minutes each and seconds added after each move, such as 10+5 or 3+0; none, or left out, for a game without a clock"),
-        level: z.enum(aiLevels).optional().describe(
-            "the facts you, not the player, get: beginner the board and the legal moves, club also the tactical facts, strong also the positional ones, master "
-                + "also the opening book's moves; left out, the last game's, or for the first game the one that suits the player's profile",
-        ),
-        replace: z.boolean().default(false).describe("start even though a game is going on: it goes to the archive unfinished"),
-    }),
+        + "and the level; where there is no board page, it tells you to ask them in the chat. With choices it starts the game: only where there is no board page, "
+        + 'or from a FEN or PGN the player gives. Example: new_game {}; new_game {ai_colour: "black", from: "<FEN or PGN>", level: "club"}.',
+    input: newGameInput,
     alwaysLoad: true,
     showsGame: true,
     positionals: ["ai_colour"],
-    run: ({ ai_colour: colour, from, clock, level: chosen, replace }, context): NewGame | Asked => {
-        if (colour === undefined && from === undefined && clock === undefined && chosen === undefined) {
+    run: (input, context): NewGame | Asked => {
+        const { ai_colour: colour, from, clock, level } = input;
+
+        if (colour === undefined && from === undefined && clock === undefined && level === undefined) {
             return askedOnPage(context);
         }
 
-        if (colour === undefined) {
-            throw new Error("ai_colour: say the colour you play, white, black or random, with the other choices; or leave them all out for the page's window. Nothing changed.");
+        // The game is played on the board page, and chosen in its window (D-85); a position to go on from is what the window cannot set.
+        if (context.page !== undefined && from === undefined) {
+            throw new Error(
+                "The player chooses a new game in the board page's New game window: call new_game without choices, which opens it, or gives you its address "
+                    + "when nobody has the page open. Nothing changed.",
+            );
         }
 
-        const control = clock === undefined || /^\s*none\s*$/i.test(clock) ? undefined : timeControlFrom(clock);
-        const now = context.now();
-        const folder = gameFolder(context.home());
-        const before = gameAt(folder, now);
-        const going = before !== undefined && endOf(before.game) === undefined ? before : undefined;
-
-        if (going !== undefined && !replace) {
-            const { moveNumber } = going.game.position;
-            throw new Error(`A game is going on, at move ${moveNumber}: end it with end_game, or call new_game with replace: true, which archives it unfinished. Nothing changed.`);
-        }
-
-        if (going !== undefined) {
-            refuseUnseenPosition(context, folder);
-        }
-
-        if (chatToClear(context)) {
-            throw new ChatNotClear();
-        }
-
-        const ai = colour === "random" ? (context.random() < 0.5 ? "white" : "black") : colour;
-        const level = chosen ?? levelToPlay(context, before);
-        const started = startOfNewGame(folder, now, before);
-        const game = startingGame(from, { ai, level }, started, control);
-        const current: CurrentGame = control === undefined
-            ? { game, ai, started: started.toISOString(), talk: [] }
-            : { game, ai, started: started.toISOString(), talk: [], clock: startClock(control, now, context.pageOpen?.() === true) };
-        const archived = before === undefined || (going === undefined && archivedName(folder, before) !== undefined) ? undefined : archiveBefore(folder, before);
-        saveGame(folder, current);
-        endAnalysis(folder);
-        endTableTalk(folder);
-        const past = pastGameLines(folder, remembered);
-        const closed = closedPage(context);
-        const player = playerLine(context);
-        const speech = speechOf(folder, context.language);
-        return {
-            game: withThought(summaryOf(current, now), folder, current),
-            ...(archived === undefined ? {} : { archived: { name: archived, finished: going === undefined } }),
-            past,
-            ...(player === undefined ? {} : { player }),
-            ...(speech === undefined ? {} : { speech }),
-            ...(closed === undefined ? {} : { closedPage: closed }),
-        };
+        return startNewGame(input, context, "chat");
     },
     format: (result) => "window" in result ? askedLine(result) : startedLines(result),
 });
+
+/**
+ * Starts the new game with the player's choices: those the AI asked in the chat, or the page's window gave (D-76). Only the chat's is refused on a game
+ * changed since it saw it (D-71): the player who presses New game on the page sees the game there (Federico, round of D-85).
+ */
+export function startNewGame({ ai_colour: colour, from, clock, level: chosen, replace }: z.output<typeof newGameInput>, context: Context, by: "chat" | "page"): NewGame
+{
+    if (colour === undefined) {
+        throw new Error(
+            from === undefined
+                ? "ai_colour: say the colour you play, white, black or random, with the other choices; or leave them all out for the page's window. Nothing changed."
+                : "ai_colour: say the colour you play from this position, white, black or random. Nothing changed.",
+        );
+    }
+
+    const control = clock === undefined || /^\s*none\s*$/i.test(clock) ? undefined : timeControlFrom(clock);
+    const now = context.now();
+    const folder = gameFolder(context.home());
+    const before = gameAt(folder, now);
+    const going = before !== undefined && endOf(before.game) === undefined ? before : undefined;
+
+    if (going !== undefined && !replace) {
+        const { moveNumber } = going.game.position;
+        throw new Error(`A game is going on, at move ${moveNumber}: end it with end_game, or call new_game with replace: true, which archives it unfinished. Nothing changed.`);
+    }
+
+    if (going !== undefined && by === "chat") {
+        refuseUnseenPosition(context, folder);
+    }
+
+    if (chatToClear(context)) {
+        throw new ChatNotClear();
+    }
+
+    const ai = colour === "random" ? (context.random() < 0.5 ? "white" : "black") : colour;
+    const level = chosen ?? levelToPlay(context, before);
+    const started = startOfNewGame(folder, now, before);
+    const game = startingGame(from, { ai, level }, started, control);
+    const current: CurrentGame = control === undefined
+        ? { game, ai, started: started.toISOString(), talk: [] }
+        : { game, ai, started: started.toISOString(), talk: [], clock: startClock(control, now, context.pageOpen?.() === true) };
+    const archived = before === undefined || (going === undefined && archivedName(folder, before) !== undefined) ? undefined : archiveBefore(folder, before);
+    saveGame(folder, current);
+    endAnalysis(folder);
+    endTableTalk(folder);
+    const past = pastGameLines(folder, remembered);
+    const closed = closedPage(context);
+    const player = playerLine(context);
+    const speech = speechOf(folder, context.language);
+
+    if (closed !== undefined) {
+        pageGiven(context, current.started);
+    }
+
+    return {
+        game: withThought(summaryOf(current, now), folder, current),
+        ...(archived === undefined ? {} : { archived: { name: archived, finished: going === undefined } }),
+        past,
+        ...(player === undefined ? {} : { player }),
+        ...(speech === undefined ? {} : { speech }),
+        ...(closed === undefined ? {} : { closedPage: closed }),
+    };
+}
 
 /** The new game's lines for the AI. */
 function startedLines({ game, archived, past, player, speech, closedPage: closed }: NewGame): string

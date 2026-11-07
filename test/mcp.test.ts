@@ -166,7 +166,7 @@ describe("the MCP server", () => {
         expect(answer).toEqual({
             text: `Chesspal ${version}. Folder: ${
                 profileFolder(context.folder, "player")
-            }\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.`,
+            }\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level; where there is no board page, it tells you to ask them in the chat.`,
             isError: false,
         });
     });
@@ -251,7 +251,8 @@ describe("chesspal mcp", () => {
         const tool = (id: number, name: string, args: object): object => ({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } });
         server.send(initialize);
         await server.answered();
-        server.send(tool(2, "new_game", { ai_colour: "black" }));
+        // The server serves the page, whose window chooses a new game: the chat starts one only from a position (D-85).
+        server.send(tool(2, "new_game", { ai_colour: "black", from: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" }));
         // A chat moves on a game a tool has shown it (D-71): the move comes once the new game has answered.
         await vi.waitFor(() => expect(server.lines().some((line) => line.id === 2)).toBe(true), { timeout: 15_000 });
         server.send(tool(3, "player_move", { move: "e4" }));

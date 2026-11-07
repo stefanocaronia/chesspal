@@ -12,7 +12,7 @@ the checks, the positional facts, the opening's name.
 
 ## What you can do
 
-- **Play against the AI** in the chat, or on the board page in your browser, with the AI answering in both.
+- **Play against the AI** on the board page in your browser, and talk with it there or in the chat.
 - **Choose its level**, from beginner to master: the higher, the more facts of the position the AI sees, and the master knows the opening book.
 - **Play with a clock**, with an AI that knows how much time it has left; offer a draw, resign, export the game as PGN.
 - **Keep a profile** for each player at the same computer, with their games.
@@ -61,9 +61,9 @@ Chesspal is not on npm yet ([Status](#status)): these steps are for its first re
 4. **Say hello**: the AI gives you the link to the board page, a page on your own computer; open it in your browser. No link? Ask the AI for the
    board. The first time, the page asks who you are: your name, a picture, how well you play.
 
-5. **Ask for a game**: the New game window opens on the page, where you choose your colour, the clock and the AI's level. Play on the board, or write
-   your moves in the chat as you like, `e4`, `Nf3`, with your language's letters (`Cf3` in Italian) or in words: the AI answers in both. The
-   page's settings can keep English letters in any language.
+5. **Ask for a game**: the New game window opens on the page, where you choose your colour, the clock and the AI's level. Play on the board: that is
+   where the game is. A move written in the chat counts too, `e4`, `Nf3`, with your language's letters (`Cf3` in Italian) or in words. The page's
+   settings can keep English letters in any language.
 
 6. **For the next game**, type `/clear` in the chat, or start a new chat: a long chat makes the AI slower and costs you more.
 
