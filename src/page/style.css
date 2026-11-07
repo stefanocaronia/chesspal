@@ -52,7 +52,7 @@
     --board-shadow: 0 0 0 1px color-mix(in oklab, var(--dark-square) 55%, transparent), 0 2px 4px rgba(29, 39, 51, 0.1), 0 10px 28px rgba(29, 39, 51, 0.12);
     --gap: 20px;
     --left: 300px;
-    --right: 264px;
+    --right: 300px;
     --tab: 16px;
     --rail: 56px;
     --coin: 40px;
@@ -2412,7 +2412,9 @@ button {
     position: relative;
     flex: 1;
     min-height: 90px;
-    overflow: auto;
+    /* It scrolls with no scrollbar, kept on the move shown */
+    overflow: hidden auto;
+    scrollbar-width: none;
     padding: 8px 10px;
     font-size: 14px;
 }
@@ -4147,7 +4149,9 @@ button {
     font-size: 13px;
     min-height: 0;
     flex: 0 1 auto;
-    overflow: auto;
+    /* No scrollbar in the page (Stefano): the card fits its column's width, and a column too short for it scrolls it under the wheel or the finger */
+    overflow: hidden auto;
+    scrollbar-width: none;
 }
 
 .helps-title {
