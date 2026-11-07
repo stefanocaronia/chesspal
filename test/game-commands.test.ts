@@ -32,8 +32,8 @@ describe("a game in chat", () => {
             /^Player: 1\.e4 \(e2-e4\)\.\nYou \(Black\) to move, move 1\.\nOpening: B00 King's Pawn Game\nMaterial: even, nothing taken\nFEN: rnbqkbnr\/pppppppp\/8\/8\/4P3\/8\/PPPP1PPP\/RNBQKBNR b KQkq - 0 1\nAttacked pieces: none\n(?:.*\n){4}Legal by piece \(20\): Nb8 \(2\) Nc6 Na6; .* Ph7 \(2\) h6 h5; no moves: Ke8 Qd8 Ra8 Rh8 Bc8 Bf8\nNext: choose your move/,
         );
         expect(await run(context, "ai_move", { move: "e5", plan: "Develop the knights, then castle.", comment: "The open game." })).toBe(
-            "Played 1...e5.\nPlayer (White) to move, move 2.\nBoard, for your message when the player plays in the chat:\n  a b c d e f g h\n8 r n b q k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n"
-                + "5 . . . . p . . . 5\n4 . . . . P . . . 4\n3 . . . . . . . . 3\n2 P P P P . P P P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\nNext: wait for the player's move, then call player_move with it.",
+            "Played 1...e5.\nPlayer (White) to move, move 2.\nBoard, for your message when the player plays in the chat:\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n8 ♜ ♞ ♝ ♛ ♚ ♝ ♞ ♜ 8\n7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7\n6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6\n"
+                + "5 ⊙ ⊙ ⊙ ⊙ ♟︎ ⊙ ⊙ ⊙ 5\n4 ⊙ ⊙ ⊙ ⊙ ♙ ⊙ ⊙ ⊙ 4\n3 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 3\n2 ♙ ♙ ♙ ♙ ⊙ ♙ ♙ ♙ 2\n1 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 1\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\nNext: wait for the player's move, then call player_move with it.",
         );
         expect(await run(context, "player_move", { move: "g1f3" })).toContain("\nPlan: Develop the knights, then castle.\n");
 
@@ -129,6 +129,44 @@ describe("a game in chat", () => {
         helps(false);
         await run(context, "player_move", { move: "Bb5" });
         expect(await run(context, "status")).toContain("Helps off now: play as at a tournament again");
+    });
+
+    it("reads the player's moves in their language's notation, the system's when the page follows the browser, or in English when they choose it (D-83)", async () => {
+        const context = { ...playerFolder(), language: "it-IT" };
+        const settings = (value: object): void => writeFileSync(join(gameFolder(context.home()), "settings.json"), JSON.stringify(value));
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "Cf3" });
+        await run(context, "ai_move", { move: "d5", plan: "p" });
+
+        settings({ language: "en" });
+        await expect(run(context, "player_move", { move: "Cc3" })).rejects.toThrow('"Cc3" is not a move: SAN writes the pieces K, Q, R, B and N');
+        settings({ language: "it", englishNotation: true });
+        await expect(run(context, "player_move", { move: "Cc3" })).rejects.toThrow('"Cc3" is not a move');
+        settings({ language: "it" });
+        await expect(run(context, "player_move", { move: "Rd4" })).rejects.toThrow("Rd4 is Kd4 in SAN: Kd4 is not legal here, with White to move. Ask the player for another move.");
+        await run(context, "player_move", { move: "Cc3" });
+        // The AI's moves are SAN, in every notation; with auto, the player's are the system's.
+        await run(context, "ai_move", { move: "Nc6", plan: "p" });
+        settings({ language: "auto" });
+        await run(context, "player_move", { move: "Tb1" });
+        await run(context, "ai_move", { move: "Rb8", plan: "p" });
+        expect(gameFile(context).pgn).toContain("1. Nf3 d5 {[%plan p]} 2. Nc3 Nc6 {[%plan p]} 3. Rb1 Rb8 {[%plan p]} *");
+    });
+
+    it("gives the AI the player's letters once a chat and each move as the player writes it, for the moves it writes to them (D-83)", async () => {
+        const context = { ...playerFolder(), language: "it-IT" };
+        const letters = "\nThe player writes and reads moves in Italian notation: R king, D queen, T rook, A bishop, C knight.\n";
+        expect(await run(context, "new_game", { ai_colour: "black" })).toContain(letters);
+        expect(await run(context, "status")).toContain(letters);
+        expect(await run(context, "player_move", { move: "Cf3" })).toMatch(/^Player: 1\.Nf3 \(g1-f3; Cf3 for the player\)\.\n/);
+        expect(await run(context, "ai_move", { move: "d5", plan: "p" })).toMatch(/^Played 1\.\.\.d5\.\n/);
+        expect(await run(context, "player_move", { move: "d4" })).toMatch(/^Player: 2\.d4 \(d2-d4\)\.\n/);
+        expect(await run(context, "ai_move", { move: "Nf6", plan: "p" })).toMatch(/^Played 2\.\.\.Nf6 \(Cf6 for the player\)\.\n/);
+
+        writeFileSync(join(gameFolder(context.home()), "settings.json"), JSON.stringify({ language: "it", englishNotation: true }));
+        expect(await run(context, "status")).not.toContain("Italian notation");
+        expect(await run(context, "player_move", { move: "Bf4" })).toMatch(/^Player: 3\.Bf4 \(c1-f4\)\.\n/);
+        expect(await run(context, "ai_move", { move: "Bf5", plan: "p" })).toMatch(/^Played 3\.\.\.Bf5\.\n/);
     });
 
     it("tells the AI the helps are on when it moves first in a new game (D-78)", async () => {
@@ -279,8 +317,8 @@ describe("a game in chat", () => {
 
         expect(await run(context, "ai_move", { move: "Qh4+", plan: "Mate.", comment: "The fool's mate.", offer_draw: true })).toBe(
             `Played 2...Qh4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Archived in ${archive}.\n`
-                + "Board, for your message when the player plays in the chat:\n  a b c d e f g h\n8 r n b . k b n r 8\n7 p p p p . p p p 7\n6 . . . . . . . . 6\n5 . . . . p . . . 5\n"
-                + "4 . . . . . . P q 4\n3 . . . . . P . . 3\n2 P P P P P . . P 2\n1 R N B Q K B N R 1\n  a b c d e f g h\n"
+                + "Board, for your message when the player plays in the chat:\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n8 ♜ ♞ ♝ ⊙ ♚ ♝ ♞ ♜ 8\n7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7\n6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6\n5 ⊙ ⊙ ⊙ ⊙ ♟︎ ⊙ ⊙ ⊙ 5\n"
+                + "4 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ♛ 4\n3 ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ⊙ ⊙ 3\n2 ♙ ♙ ♙ ♙ ♙ ⊙ ⊙ ♙ 2\n1 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 1\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n"
                 + "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one "
                 + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level. Ask them in the chat, and call new_game with them, only when the player plays without the page.",
         );
@@ -477,16 +515,16 @@ describe("a game in chat", () => {
         expect(view).not.toMatch(/^K[a-h][1-8]: /m);
         expect(await run(context, "look", { only: "board" })).toBe(
             [
-                "  a b c d e f g h",
-                "8 r n b q k b n r 8",
-                "7 p p p p p p p p 7",
-                "6 . . . . . . . . 6",
-                "5 . . . . . . . . 5",
-                "4 . . . . P . . . 4",
-                "3 . . . . . . . . 3",
-                "2 P P P P . P P P 2",
-                "1 R N B Q K B N R 1",
-                "  a b c d e f g h",
+                "  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ",
+                "8 ♜ ♞ ♝ ♛ ♚ ♝ ♞ ♜ 8",
+                "7 ♟︎ ♟︎ ♟︎ ♟︎ ♟︎ ♟︎ ♟︎ ♟︎ 7",
+                "6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6",
+                "5 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 5",
+                "4 ⊙ ⊙ ⊙ ⊙ ♙ ⊙ ⊙ ⊙ 4",
+                "3 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 3",
+                "2 ♙ ♙ ♙ ♙ ⊙ ♙ ♙ ♙ 2",
+                "1 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 1",
+                "  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ",
             ].join("\n"),
         );
     });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Game } from "../src/core/index.ts";
+import { Game, notationOf, writtenIn } from "../src/core/index.ts";
 
 const standard = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 // Morphy against Duke Karl and Count Isouard, Paris 1858.
@@ -91,12 +91,61 @@ describe("a game", () => {
         expect(game.record.moves).toEqual([]);
     });
 
+    it("reads the moves in the player's notation, R the Italian king, and says the SAN it read when it refuses one (D-83)", () => {
+        const italian = from(standard);
+
+        for (const move of ["e4", "e5", "Cf3", "Cc6", "Ac4", "Nf6", "Re2", "De7"]) {
+            expect(italian.play(move, "it"), move).toMatchObject({ played: true });
+        }
+
+        expect(italian.record.moves.map((move) => move.san)).toEqual(["e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6", "Ke2", "Qe7"]);
+        expect(from("4k3/1P6/8/8/8/8/8/4K3 w - - 0 1").play("b8=D", "it")).toMatchObject({ played: true, move: { san: "b8=Q+" } });
+        expect(from("4k3/1P6/8/8/8/8/8/4K3 w - - 0 1").play("b8=R", "it")).toMatchObject({ played: true, move: { san: "b8=R+" } });
+
+        const castled = played(standard, "e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6", "O-O", "Be7");
+        expect(castled.play("Re1", "it")).toMatchObject({
+            refusal: "illegal",
+            message: "Re1 is Ke1 in SAN: Ke1 is not legal here, with White to move. In Italian R is the king and T the rook: for the rook, Te1; the board page's settings switch to "
+                + "English notation.",
+        });
+        expect(castled.play("Te1", "it")).toMatchObject({ played: true, move: { san: "Re1" } });
+        expect(castled.play("Te8")).toMatchObject({ refusal: "unreadable", message: expect.stringMatching(/For a rook, Re8\./) });
+        expect([notationOf("it-IT"), notationOf("it"), notationOf("en-GB"), notationOf("fr-FR"), notationOf(undefined)]).toEqual(["it", "it", "en", "en", "en"]);
+    });
+
+    it("writes SAN's moves in the player's letters (D-83)", () => {
+        const moves = ["Nxe4", "Ke1", "Qd8+", "Rh1", "Bb5", "O-O-O", "a4", "e8=Q#", "exd8=N", "b1=R"];
+        expect(moves.map((san) => writtenIn(san, "it"))).toEqual(["Cxe4", "Re1", "Dd8+", "Th1", "Ab5", "O-O-O", "a4", "e8=D#", "exd8=C", "b1=T"]);
+        expect(moves.map((san) => writtenIn(san, "en"))).toEqual(moves);
+    });
+
+    it("reads the figurines as SAN's pieces and the small letters of the player's notation, and names every rook an Italian R could have meant (D-83)", () => {
+        expect(from("4k3/8/8/8/8/8/8/R3K3 w - - 0 1").play("♖d1", "it")).toMatchObject({ played: true, move: { san: "Rd1" } });
+        expect(from("4k3/8/8/8/8/8/8/R3K3 w - - 0 1").play("td1", "it")).toMatchObject({ played: true, move: { san: "Rd1" } });
+
+        for (const promotion of ["b8=d", "b8d", "b7b8d"]) {
+            expect(from("4k3/1P6/8/8/8/8/8/4K3 w - - 0 1").play(promotion, "it"), promotion).toMatchObject({ played: true, move: { san: "b8=Q+" } });
+        }
+
+        // The player's T was the rook: the king is never offered for it.
+        expect(from("4k3/8/8/8/8/8/5K2/RN6 w - - 0 1").play("Te1", "it")).toMatchObject({ refusal: "illegal", message: "Te1 is Re1 in SAN: Re1 is not legal here, with White to move." });
+        expect(from("r4rk1/ppp2ppp/2n2n2/8/8/2N2N2/PPP2PPP/R4RK1 w - - 0 1").play("Re1", "it")).toMatchObject({
+            refusal: "illegal",
+            message: "Re1 is Ke1 in SAN: Ke1 is not legal here, with White to move. In Italian R is the king and T the rook: for the rook, Tae1 or Tfe1; the board page's "
+                + "settings switch to English notation.",
+        });
+    });
+
     it("reads the notation of books, phones and word processors", () => {
         const game = played(standard, "e2–e4", "e7—e5", "♘f3", "nc6", "♗b5", "a7−a6", "B×c6", "♟dxc6", "0–0");
         const numbered = played(standard, "1. e4", "1...e5", "2.Nf3", "2… Nc6", "3 . Bb5", "3. ... a6");
 
         expect(game.record.moves.map((move) => move.san)).toEqual(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Bxc6", "dxc6", "O-O"]);
         expect(numbered.record.moves.map((move) => move.san)).toEqual(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6"]);
+        // The black pawn's figurine as Chesspal's chat board writes it, and the mate's ++; a file's capital is no piece's letter (D-42).
+        expect(played(standard, "e4").play("♟︎e5")).toMatchObject({ played: true, move: { san: "e5" } });
+        expect(new Game().play("D4", "it")).toMatchObject({ refusal: "unreadable", message: expect.stringMatching(/^"D4" is not a move/) });
+        expect(played(standard, "f3", "e5", "g4").play("Dh4++", "it")).toEqual({ played: true, move: { san: "Qh4#", from: "d8", to: "h4" } });
     });
 
     it("plays a move written with a check or a mate it does not give, and says so", () => {

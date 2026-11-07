@@ -200,7 +200,7 @@ describe("look and position on a game over (D-68)", () => {
         expect(await lookAt(context, { game: imported, move: "2.Nc6" })).toMatch(/^After 2\.\.\.Nc6 in /);
         expect(await lookAt(context, { game: imported, move: "2…" })).toMatch(/^After 2\.\.\.Nc6 in /);
         expect(await lookAt(context, { game: imported })).toMatch(/^After 4\.Qxf7# in .*: the board ends the game by checkmate\./);
-        expect(await lookAt(context, { game: imported, move: "2.", only: "board" })).toContain("4 . . B . P . . . 4");
+        expect(await lookAt(context, { game: imported, move: "2.", only: "board" })).toContain("4 ⊙ ⊙ ♗ ⊙ ♙ ⊙ ⊙ ⊙ 4");
 
         const profile = position.format(await position.run(position.input.parse({ game: imported, move: "1..." }), context));
         expect(profile).toMatch(new RegExp(`^After 1\\.\\.\\.e5 in ${imported}: White to move\\.\\nPhase: opening\\nMaterial: even`));

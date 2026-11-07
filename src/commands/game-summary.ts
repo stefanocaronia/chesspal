@@ -1,5 +1,5 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
-import { type AiLevel, type Facts, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, sees, type Side, type Square } from "../core/index.ts";
+import { type AiLevel, type Facts, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, type Notation, sees, type Side, type Square, writtenIn } from "../core/index.ts";
 import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, talkLimits, type Thought, thoughtForLastMove } from "../games/index.ts";
 import { onQuickModel } from "../host-files/index.ts";
 import { helpsIn } from "../profiles/index.ts";
@@ -55,6 +55,8 @@ export interface MovePlayed
 {
     /** The move, numbered as in the game: 4.Ng5, 4...d5. */
     move: string;
+    /** The move as the player writes it, when their notation's letters are not SAN's (D-83): Cg5. */
+    written?: string;
     /** A + or # the move was written with and does not give. */
     note?: string;
     game: GameSummary;
@@ -183,11 +185,29 @@ export function headLines(game: GameSummary, withLastMove = true): string[]
     ];
 }
 
-/** A move with its squares: 4.Ng5 (f3-g5). */
-export function lastMoveText({ move, from, to }: LastMove): string
+/** A move with its squares, and as the player writes it when their letters are not SAN's: 4.Ng5 (f3-g5; Cg5 for the player). */
+export function lastMoveText({ move, from, to }: LastMove, written?: string): string
 {
-    return `${move} (${from}-${to})`;
+    return `${move} (${from}-${to}${written === undefined ? "" : `; ${written} for the player`})`;
 }
+
+/** The move played, with how the player writes it when their notation's letters are not SAN's (D-83): the AI copies it into its message (Priya, round of T-54). */
+export function withWritten<Played extends MovePlayed>(played: Played, notation: Notation): Played
+{
+    const san = played.move.replace(/^\d+\.+/, "");
+    const written = writtenIn(san, notation);
+    return written === san ? played : { ...played, written };
+}
+
+/** What the AI is told of the player's notation when its letters are not SAN's (D-83). */
+export function notationLine(notation: Exclude<Notation, "en">): string
+{
+    return notationLines[notation];
+}
+
+const notationLines: Readonly<Record<Exclude<Notation, "en">, string>> = {
+    it: "The player writes and reads moves in Italian notation: R king, D queen, T rook, A bishop, C knight.",
+};
 
 /** The lines after a move, which the line before named: its note, where the game stands, a warning. closingLines end them. */
 export function moveLines({ note, game, warning }: MovePlayed): string[]

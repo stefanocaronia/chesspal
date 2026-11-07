@@ -103,16 +103,16 @@ describe("a game's last move and board", () => {
 
     it("writes the board as text for the player, White at the bottom", () => {
         expect(boardText(twoKnights).split("\n")).toEqual([
-            "  a b c d e f g h",
-            "8 r . b q k b . r 8",
-            "7 p p p p . p p p 7",
-            "6 . . n . . n . . 6",
-            "5 . . . . p . N . 5",
-            "4 . . B . P . . . 4",
-            "3 . . . . . . . . 3",
-            "2 P P P P . P P P 2",
-            "1 R N B Q K . . R 1",
-            "  a b c d e f g h",
+            "  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ",
+            "8 ♜ ⊙ ♝ ♛ ♚ ♝ ⊙ ♜ 8",
+            "7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7",
+            "6 ⊙ ⊙ ♞ ⊙ ⊙ ♞ ⊙ ⊙ 6",
+            "5 ⊙ ⊙ ⊙ ⊙ ♟︎ ⊙ ♘ ⊙ 5",
+            "4 ⊙ ⊙ ♗ ⊙ ♙ ⊙ ⊙ ⊙ 4",
+            "3 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 3",
+            "2 ♙ ♙ ♙ ♙ ⊙ ♙ ♙ ♙ 2",
+            "1 ♖ ♘ ♗ ♕ ♔ ⊙ ⊙ ♖ 1",
+            "  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ",
         ]);
     });
 });

@@ -1,6 +1,7 @@
 // The page's settings of a profile (D-56): settings.json in its folder, kept as the page sends them; the page checks each one as it reads them.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { type Notation, notationOf } from "../core/index.ts";
 import { writeAtomically } from "../games/index.ts";
 import { profileFolder } from "./profiles.ts";
 
@@ -20,11 +21,18 @@ export function profileSettings(root: string, id: string): PageSettings | undefi
 /** Whether the player has turned the helps on (D-78), in the settings of the profile whose games are in `folder`: off without them. */
 export function helpsIn(folder: string): boolean
 {
-    try {
-        return settingsOf(JSON.parse(readFileSync(join(folder, fileName), "utf8")))?.helps === true;
-    } catch {
-        return false;
-    }
+    return settingsIn(folder)?.helps === true;
+}
+
+/**
+ * The pieces' letters the player of the profile whose games are in `folder` writes moves with (D-83): English when chosen in the settings, else those of the
+ * page's language, or of the system's when the page follows the browser.
+ */
+export function notationIn(folder: string, systemLanguage: string | undefined): Notation
+{
+    const settings = settingsIn(folder);
+    const language = settings?.language;
+    return settings?.englishNotation === true ? "en" : notationOf(typeof language === "string" && language !== "auto" ? language : systemLanguage);
 }
 
 /** Saves a profile's settings, over the ones before. */
@@ -46,3 +54,13 @@ export function settingsOf(value: unknown): PageSettings | undefined
 }
 
 const fileName = "settings.json";
+
+/** The settings of the profile whose games are in `folder`; undefined without them. */
+function settingsIn(folder: string): PageSettings | undefined
+{
+    try {
+        return settingsOf(JSON.parse(readFileSync(join(folder, fileName), "utf8")));
+    } catch {
+        return undefined;
+    }
+}

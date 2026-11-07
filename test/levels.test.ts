@@ -89,7 +89,7 @@ describe("the AI's levels (D-60)", () => {
         expect(played).not.toContain("Book moves");
         await expect(run(context, "look")).rejects.toThrow('look without only: "board" is not yours in this game: you play at the beginner level');
         await expect(run(context, "position")).rejects.toThrow("position is not yours in this game: you play at the beginner level");
-        expect(await run(context, "look", { only: "board" })).toContain("a b c d e f g h");
+        expect(await run(context, "look", { only: "board" })).toContain("ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ");
     });
 
     it("give every layer of a game over to its analysis, whatever the level it was played at (D-81)", async () => {

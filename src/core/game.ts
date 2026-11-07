@@ -2,6 +2,7 @@
 import { Chess, type Move as ChessMove, type Square, validateFen } from "chess.js";
 import { type Facts, factsOf } from "./facts.ts";
 import { type Illegal, whyIllegal } from "./illegal.ts";
+import { type Notation, sanOf, writtenIn } from "./notation.ts";
 import { type Profile, profileOf } from "./profile.ts";
 import { type Annotation, cleanComment, type GameRecord, type RecordedMove, recordedMove } from "./record.ts";
 
@@ -145,8 +146,11 @@ export class Game
         return this.legalMoves(from).some((move) => move.to === to) ? undefined : whyIllegal(this.chess, from, to);
     }
 
-    /** Plays a move written in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q); a refused move changes nothing. */
-    play(text: string): Played
+    /**
+     * Plays a move written in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q), or with the pieces' letters of the player's notation (D-83): Te1 in
+     * Italian; a refused move changes nothing.
+     */
+    play(text: string, notation: Notation = "en"): Played
     {
         const { outcome } = this;
 
@@ -154,21 +158,22 @@ export class Game
             return { played: false, ...gameOver(outcome), legal: [] };
         }
 
-        return this.playRecorded(text);
+        return this.playRecorded(text, notation);
     }
 
     /** Plays a move of a game recorded elsewhere, as play does, but also past a draw that game played on from: insufficient material, repetition or fifty moves. */
-    playRecorded(text: string): Played
+    playRecorded(text: string, notation: Notation = "en"): Played
     {
-        const input = normalized(text);
-        const move = this.apply(input);
+        const written = normalized(text);
+        const input = normalized(text, notation);
+        const move = this.apply(input, notation);
 
         if ("refusal" in move) {
-            return { played: false, ...move, legal: legalMovesOf(this.chess).map((legal) => legal.san) };
+            return { played: false, ...move, message: this.inNotation(written, input, move.message), legal: legalMovesOf(this.chess).map((legal) => legal.san) };
         }
 
         this.moves.push(recordedMove(move.san));
-        const note = checkNote(input, move.san);
+        const note = checkNote(written, move.san);
         return note === undefined ? { played: true, move } : { played: true, move, note };
     }
 
@@ -186,7 +191,7 @@ export class Game
         this.keptRecord = undefined;
     }
 
-    private apply(input: string): Move | Refused
+    private apply(input: string, notation: Notation = "en"): Move | Refused
     {
         // chess.js plays "--" as a null move, which skips a turn.
         if (input.startsWith("--")) {
@@ -196,7 +201,7 @@ export class Game
         const mover = sideToMove(this.chess);
         // Proper SAN is the fast way; anything else is matched by hand, because chess.js guesses where we must ask.
         const exact = attempt(() => this.chess.move(input, { strict: true }));
-        const move = exact === undefined ? this.resolve(input) : toMove(exact);
+        const move = exact === undefined ? this.resolve(input, notation) : toMove(exact);
 
         if ("refusal" in move) {
             return move;
@@ -220,7 +225,7 @@ export class Game
     }
 
     /** A move written loosely (as squares, with a letter too many or too few) matched against the legal moves. */
-    private resolve(input: string): Move | Refused
+    private resolve(input: string, notation: Notation = "en"): Move | Refused
     {
         const legal = legalMovesOf(this.chess);
 
@@ -272,8 +277,8 @@ export class Game
             return { refusal: "illegal", message: `${input} takes, but there is nothing to take on ${target}.` };
         }
 
-        // An Italian, French or Spanish R is the king: said when the king could go there and no rook can.
-        if (candidates.length === 0 && piece === "R" && legal.some((move) => move.to === target && this.chess.get(move.from)?.type === "k")) {
+        // An Italian, French or Spanish R is the king: said when the king could go there and no rook can, unless the R was the player's T.
+        if (candidates.length === 0 && piece === "R" && notation === "en" && legal.some((move) => move.to === target && this.chess.get(move.from)?.type === "k")) {
             return { refusal: "illegal", message: `${input} is not legal here: R is the rook in SAN, and the king is K: K${target}.` };
         }
 
@@ -283,6 +288,25 @@ export class Game
     private illegal(input: string): Refused
     {
         return { refusal: "illegal", message: `${input} is not legal here, with ${this.chess.turn() === "w" ? "White" : "Black"} to move.` };
+    }
+
+    /** Why a move written in the player's notation was refused, with the SAN it was read as; an Italian R that a rook could play is said to be the king. */
+    private inNotation(written: string, input: string, message: string): string
+    {
+        if (written === input) {
+            return message;
+        }
+
+        const rooks = written.startsWith("R") ? this.rookMoves(written) : [];
+        const hint = rooks.length === 0 ? "" : ` In Italian R is the king and T the rook: for the rook, ${rooks.join(" or ")}; the board page's settings switch to English notation.`;
+        return `${written} is ${input} in SAN: ${message}${hint}`;
+    }
+
+    /** The rooks' legal moves to the square a move names, in Italian letters. */
+    private rookMoves(written: string): string[]
+    {
+        const target = /([a-h][1-8])[+#]?[!?]*$/.exec(written)?.[1];
+        return legalMovesOf(this.chess).filter((move) => move.to === target && move.san.startsWith("R")).map((move) => writtenIn(move.san, "it")).sort();
     }
 
     private snapshot(): GameRecord
@@ -378,13 +402,21 @@ function toMove({ san, from, to, promotion }: ChessMove): Move
     return Object.freeze(promotion === undefined ? { san, from, to } : { san, from, to, promotion: promotion as Promotion });
 }
 
-/** The move in SAN's own letters: trimmed, without a move number before it, its signs and figurines in ASCII, a piece's small letter in capital (not b, a file too), castling in capital O. */
-function normalized(text: string): string
+/**
+ * The move in SAN's own letters: trimmed, without a move number before it, its signs and figurines in ASCII, a piece's small letter in capital (not b, a
+ * file too), ++ as #, castling in capital O; the letters of the player's notation in SAN's.
+ */
+function normalized(text: string, notation: Notation = "en"): string
 {
-    return text.trim()
+    const signed = text.trim()
         .replace(/^\d+\s*(?:\.[\s.]*|…\s*)/, "")
-        .replace(/[–—−×♔-♟]/g, (sign) => asciiOf[sign] ?? sign)
-        .replace(/^[nrqk](?=[a-h1-8x:])/, (piece) => piece.toUpperCase())
+        .replace(/[︎️]/g, "")
+        .replace(/[–—−×]/g, (sign) => asciiOf[sign] ?? sign)
+        .replace(/^[nrqkt](?=[a-h1-8x:])/, (piece) => piece.toUpperCase())
+        .replace(/\+\+(?=[!?]*$)/, "#");
+    // The figurines are read after the player's letters: ♖ is the rook in every notation.
+    return sanOf(signed, notation)
+        .replace(/[♔-♟]/g, (figurine) => asciiOf[figurine] ?? figurine)
         .replace(/^[0Oo]-[0Oo](?:-[0Oo])?(?=[+#]?[!?]*$)/, (castling) => castling.replace(/[0o]/g, "O"));
 }
 

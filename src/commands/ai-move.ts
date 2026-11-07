@@ -2,10 +2,10 @@ import { z } from "zod";
 import { type Badge, badges, boardText, drawingsText, moods, moodTag } from "../core/index.ts";
 import { commentWithPlan, talkLimits } from "../games/index.ts";
 import { hasPonderAgent, ponderAgentFor } from "../host-files/index.ts";
-import { gameFolder, helpsIn } from "../profiles/index.ts";
+import { gameFolder, helpsIn, notationIn } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
-import { closingLines, moveLines, type MovePlayed } from "./game-summary.ts";
+import { closingLines, moveLines, type MovePlayed, withWritten } from "./game-summary.ts";
 import { playMove, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand, sentence } from "./registry.ts";
 import { give, waitingWords } from "./say.ts";
@@ -25,7 +25,7 @@ export const aiMove = defineCommand({
         plan: sentence(200).describe("your plan, in one sentence: kept for you, hidden from the player"),
         comment: sentence(talkLimits.aiHelps).optional().describe(
             `your words for the player, in one sentence of ${talkLimits.ai} characters at most, only when there is something to say: pieces and moves in words ("your `
-                + `knight takes on f6"), never in notation (Nxf6+); your plans and threats only with the helps on, and then as long as a note of ${talkLimits.aiHelps} `
+                + `knight takes on f6"), a move you write in the player's notation (in Italian Cxf6+ for Nxf6+); your plans and threats only with the helps on, and then as long as a note of ${talkLimits.aiHelps} `
                 + "characters, to teach; **two asterisks** put a word or two in bold on the page",
         ),
         badge: z.enum(judgments).optional().describe(
@@ -61,7 +61,7 @@ export const aiMove = defineCommand({
             ...(badge === undefined && note === undefined ? {} : { judged: { ...(badge === undefined ? {} : { badge }), ...(note === undefined ? {} : { note }) } }),
         });
         const agent = ponderAgent(context, played);
-        return { ...played, words: give(context, waiting), ...(agent === undefined ? {} : { ponder: agent }) };
+        return withWritten({ ...played, words: give(context, waiting), ...(agent === undefined ? {} : { ponder: agent }) }, notationIn(folder, context.language));
     },
     format: (result) => {
         // The mood the AI has just given is not told back: player_move and status tell it while it lasts (Priya, round of T-107).
@@ -69,7 +69,7 @@ export const aiMove = defineCommand({
         delete game.mood;
         // The board goes before the player's words and the next step, which stays the last line.
         return [
-            `Played ${result.move}.`,
+            `Played ${result.move}${result.written === undefined ? "" : ` (${result.written} for the player)`}.`,
             ...moveLines({ ...result, game }),
             "Board, for your message when the player plays in the chat:",
             boardText(result.game.fen),

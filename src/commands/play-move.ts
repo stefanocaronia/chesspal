@@ -1,5 +1,5 @@
 // A move of the AI or of the player on the current game: played, timed by the clock, saved, and archived when it ends the game.
-import { clockAfterMove, clockTag, type MoveReview, reviewed } from "../core/index.ts";
+import { clockAfterMove, clockTag, type MoveReview, type Notation, reviewed } from "../core/index.ts";
 import { archiveEnded, type CurrentGame, endOf, loadGame, saveGame, talkLine } from "../games/index.ts";
 import type { Context } from "./context.ts";
 import { gameGoingOn, type MovePlayed, summaryOf, withThought } from "./game-summary.ts";
@@ -18,13 +18,22 @@ export interface WithMove
     allowance?: number;
     /** The AI's badge and note on the player's last move, kept in its comment as the analyst keeps them (D-78). */
     judged?: MoveReview;
+    /** The pieces' letters the move is written with: the player's in the chat (D-83), English by default. */
+    notation?: Notation;
 }
 
 /**
  * Plays a move for one side `now` and saves the game, with the time it took and the clock after it in its comment ([%clk]). A refused move, or words refused
  * with it, change nothing: it throws the message `refused` writes from the core's.
  */
-export function playMove(folder: string, now: Date, mover: Mover, text: string, refused: (message: string, legal: readonly string[]) => string, { comment, said, offerDraw = false, allowance = 0, judged }: WithMove = {}): MovePlayed
+export function playMove(
+    folder: string,
+    now: Date,
+    mover: Mover,
+    text: string,
+    refused: (message: string, legal: readonly string[]) => string,
+    { comment, said, offerDraw = false, allowance = 0, judged, notation }: WithMove = {},
+): MovePlayed
 {
     // A flag falls only past the allowance.
     const before = gameToMove(folder, mover, new Date(now.getTime() - allowance));
@@ -45,7 +54,7 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
         throw new Error("The player has made no move yet: play without badge and note. Nothing changed.");
     }
 
-    const played = game.play(text);
+    const played = game.play(text, notation);
 
     if (!played.played) {
         throw new Error(refused(played.message, played.legal));
