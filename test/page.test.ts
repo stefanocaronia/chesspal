@@ -160,10 +160,12 @@ describe("the page's server", () => {
         await run(folder, "new_game", { ai_colour: "black" });
         await post(page, "/api/move", { move: "e4" });
         await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." });
+        noteAiModel(gameFolder(folder), { model: "claude-opus-5-5", effort: "xhigh" });
 
         expect(await post(page, "/api/study", { last: true })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"game-going"') });
         await post(page, "/api/resign", {});
-        expect(JSON.parse((await get(page, "/api/analyses")).body)).toMatchObject([{ white: "Player", moves: 1, reviewed: false }]);
+        // With the model the AI played it with, which the list names it by (D-82).
+        expect(JSON.parse((await get(page, "/api/analyses")).body)).toMatchObject([{ white: "Player", black: "AI", aiModel: { model: "claude-opus-5-5", effort: "xhigh" }, moves: 1, reviewed: false }]);
 
         expect(await post(page, "/api/study", { last: true })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
         expect(await statusOf(folder)).toContain("call analyse_game");

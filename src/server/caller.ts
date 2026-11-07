@@ -55,8 +55,9 @@ export async function lineOfCall(transcript: string, call: string, wait = 50): P
     return undefined;
 }
 
-// A third of a second at most, as the line comes 30 or 40 milliseconds after the call.
-const attempts = 6;
+// Three seconds at most: the line comes 30 or 40 milliseconds after a short call, but over 300 after annotate_game's long one. Nobody waits for it on the
+// AI's clock: annotate_game runs with no game going on, and the AI's move is read after its answer.
+const attempts = 60;
 // The line of a call just made is near the end of its file.
 const tailBytes = 512 * 1024;
 // A subagent's file is one written in the last minute.

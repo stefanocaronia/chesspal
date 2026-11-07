@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modelName } from "../src/page/model-name.ts";
+import { modelName, signature } from "../src/page/model-name.ts";
 
 describe("a model's name on the page (D-81, D-82)", () => {
     it("names a Claude model as people say it, however the host writes its id", () => {
@@ -16,5 +16,11 @@ describe("a model's name on the page (D-81, D-82)", () => {
     it("leaves the id of another model, or a host, as it is", () => {
         expect(modelName("gpt-5.1-codex-max")).toBe("gpt-5.1-codex-max");
         expect(modelName("Claude Code")).toBe("Claude Code");
+    });
+
+    it("signs with the model's name and the effort alone, no other words", () => {
+        expect(signature("claude-opus-5-5", "xhigh")).toBe("Opus 5.5 · xhigh");
+        expect(signature("gpt-5.1-codex-max", "low")).toBe("gpt-5.1-codex-max · low");
+        expect(signature("Claude Code")).toBe("Claude Code");
     });
 });

@@ -3,7 +3,7 @@ import { type ComponentChildren, createContext, type RefObject } from "preact";
 import { useContext, useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { Mood, MoveReview, Opening, Side } from "../core/index.ts";
 import { BadgeIcon, NoteIcon } from "./badges.tsx";
-import { modelName } from "./model-name.ts";
+import { signature } from "./model-name.ts";
 import { Figurines } from "./move-list.tsx";
 import { type Ply, talkLimits, type TalkLine } from "./plies.ts";
 import type { Text } from "./text.ts";
@@ -110,7 +110,7 @@ export function AiNote({ ply, opening, closing, summary, name, by, mood, voice, 
                 <Torretta size={36} mood={mood} />
                 <span class="signed">
                     {name}
-                    {by === undefined ? null : <small>{text.madeWith(modelName(by.annotator), by.effort)}</small>}
+                    {by === undefined ? null : <small>{signature(by.annotator, by.effort)}</small>}
                 </span>
             </p>
         </div>

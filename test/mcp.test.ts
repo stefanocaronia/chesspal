@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/commands/context.ts";
+import { aiModelIn, readPgn } from "../src/core/index.ts";
 import { aiModelOf, saveChatStart } from "../src/games/index.ts";
 import { gameFolder, profileFolder } from "../src/profiles/index.ts";
 import { createMcpServer, opponentOf, serverInstructions } from "../src/server/mcp.ts";
@@ -112,7 +113,11 @@ describe("the MCP server", () => {
         await client.callTool({ name: "end_game", arguments: { result: "player_resigns" } });
         const [archived] = readdirSync(join(folder, "games"));
 
-        expect(readFileSync(join(folder, "games", archived!), "utf8")).toContain('[AIModel "gpt-6-luna"]\n[AIEffort "low"]');
+        const pgn = readFileSync(join(folder, "games", archived!), "utf8");
+
+        expect(pgn).toContain('[AIModel "gpt-6-luna"]\n[AIEffort "low"]');
+        // The page's analysis reads it back, for the AI's card.
+        expect(aiModelIn(readPgn(pgn)[0]!)).toEqual({ model: "gpt-6-luna", effort: "low" });
         rmSync(context.folder, { recursive: true, force: true });
     });
 

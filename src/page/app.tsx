@@ -4,6 +4,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
     type AiModel,
+    aiModelIn,
     annotatorOf,
     type Clock,
     closingOf,
@@ -33,7 +34,7 @@ import { GameColumn } from "./game-column.tsx";
 import { type GameActions, Header } from "./header.tsx";
 import { helpsOf } from "./helps-view.ts";
 import { HelpsCard, MapButton } from "./helps.tsx";
-import { modelName } from "./model-name.ts";
+import { signature } from "./model-name.ts";
 import { Steps } from "./move-list.tsx";
 import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
 import { useOpeningBook } from "./opening-book.ts";
@@ -148,7 +149,7 @@ export function App({ start }: { start: Settings; })
     // The AI as the host names it (Claude, Codex), also where the page sends the player to write; the last known while the page is offline.
     const name = served?.opponent ?? text.ai;
     // Under it, the model and effort the AI played its last move with (D-82).
-    const signed = served?.aiModel === undefined ? undefined : text.madeWith(modelName(served.aiModel.model), served.aiModel.effort);
+    const signed = served?.aiModel === undefined ? undefined : signature(served.aiModel.model, served.aiModel.effort);
 
     // The game is replayed from its PGN once for each one the server sends, not at every click. Once no game goes on, the game in analysis shows in its place
     // (D-69), with the AI's badges and notes: replayed again only when its review changed.
@@ -338,6 +339,8 @@ export function App({ start }: { start: Settings; })
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
     const closing = studied === undefined ? undefined : closingOf(live.record);
     const annotator = studied === undefined ? undefined : annotatorOf(live.record);
+    // In analysis the AI's card says who played that game, as its PGN keeps it (D-82), not who plays now.
+    const playedBy = studied === undefined ? undefined : aiModelIn(live.record);
     const talk = game?.talk ?? served.talk ?? [];
     const said = playerWords(talk);
     // The clocks only in a game going on: between games the player's card holds the next one in their place (D-77).
@@ -470,6 +473,7 @@ export function App({ start }: { start: Settings; })
                 place={place}
                 picture={pictureOf(sides[side], profile, 48, mood)}
                 name={sides[side].name}
+                signed={sides[side].who === "ai" && playedBy !== undefined ? signature(playedBy.model, playedBy.effort) : undefined}
                 side={side}
                 taken={material.taken[side]}
                 ahead={ahead(side)}
@@ -504,7 +508,7 @@ export function App({ start }: { start: Settings; })
                     text={text}
                 />
                 <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
-                <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} text={text} />
+                <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} you={profile.name} ai={name} text={text} />
                 {offline ? <p class="offline" role="alert">{text.offline(name)}</p> : null}
                 <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`} inert={offline}>
                     {header}

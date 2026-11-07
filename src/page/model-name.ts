@@ -1,5 +1,11 @@
 // A model's name as the player says it, on the AI's card and under its analysis (D-81, D-82): the game's PGN keeps the id the host wrote.
 
+/** Who played or reviewed, as the page signs it: the model's name and the effort in the host's word, no other words (Stefano), «Opus 5.5 · xhigh». */
+export function signature(model: string, effort?: string): string
+{
+    return effort === undefined ? modelName(model) : `${modelName(model)} · ${effort}`;
+}
+
 /**
  * The name of a Claude model, from its id however the host writes it: claude-opus-5-5, us.anthropic.claude-opus-5-5-20261101-v1:0 and
  * claude-opus-5-5@20261101 are Opus 5.5, claude-3-5-sonnet-20241022 is Sonnet 3.5; an id of another model stays as it is.

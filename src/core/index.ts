@@ -18,6 +18,7 @@ export type { BishopFacts, CentreSquare, KingFacts, Outpost, PawnFacts, PawnSqua
 export type { Annotation, GameRecord, RecordedMove } from "./record.ts";
 export {
     type AiModel,
+    aiModelIn,
     annotatorOf,
     arrowOf,
     type Badge,

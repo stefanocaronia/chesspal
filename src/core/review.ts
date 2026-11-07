@@ -127,18 +127,31 @@ export function withAiModel(record: GameRecord, played: AiModel | undefined): Ga
 /** Who reviewed the game, as its tags say: the Annotator, and the effort when known; undefined without an Annotator. */
 export function annotatorOf(record: GameRecord): { annotator: string; effort?: string; } | undefined
 {
-    const annotator = record.tags.Annotator?.trim();
-    const effort = record.tags[effortTag]?.trim();
+    const found = signerOf(record.tags, ["Annotator", effortTag]);
+    return found === undefined ? undefined : { annotator: found.model, ...(found.effort === undefined ? {} : { effort: found.effort }) };
+}
 
-    if (annotator === undefined || annotator === "") {
-        return undefined;
-    }
-
-    return effort === undefined || effort === "" ? { annotator } : { annotator, effort };
+/** The model the AI played the game with, as its tags say (D-82), and the effort when known; undefined without one. */
+export function aiModelIn(record: GameRecord): AiModel | undefined
+{
+    return signerOf(record.tags, ["AIModel", "AIEffort"]);
 }
 
 // The effort has no tag of its own in PGN: Chesspal's sits beside the Annotator.
 const effortTag = "AnnotatorEffort";
+
+/** A model and its effort as the tags say, each only when not blank; undefined without the model. */
+function signerOf(tags: Record<string, string>, [modelTag, modelEffortTag]: [string, string]): AiModel | undefined
+{
+    const model = tags[modelTag]?.trim();
+    const effort = tags[modelEffortTag]?.trim();
+
+    if (model === undefined || model === "") {
+        return undefined;
+    }
+
+    return effort === undefined || effort === "" ? { model } : { model, effort };
+}
 
 /** The tags with a model and its effort, last: an effort no longer known goes. */
 function signed(tags: Record<string, string>, [modelTag, modelEffortTag]: [string, string], model: string, effort: string | undefined): Record<string, string>

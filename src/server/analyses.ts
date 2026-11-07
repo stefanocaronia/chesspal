@@ -1,15 +1,16 @@
 // The analyses the page lists (T-106): the games brought to study and those played here, to analyse or open again on the board page.
 import { bookOpening } from "../commands/opening-book.ts";
-import { closingOf, type GameRecord, gameReviewOf } from "../core/index.ts";
+import { type AiModel, aiModelIn, closingOf, type GameRecord, gameReviewOf } from "../core/index.ts";
 import { archivedGame, archivedGames, keptGame, keptGames } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 
-/** An analysis as the page lists it: who played, when, how it ended, its opening, how long, and whether the AI has reviewed it. */
+/** An analysis as the page lists it: who played, with the AI's model (D-82), when, how it ended, its opening, how long, and whether the AI has reviewed it. */
 export interface AnalysisItem
 {
     readonly name: string;
     readonly white: string;
     readonly black: string;
+    readonly aiModel?: AiModel;
     readonly date?: string;
     readonly result: string;
     readonly opening?: string;
@@ -48,11 +49,13 @@ function itemOf(name: string, read: () => GameRecord): AnalysisItem[]
     const { tags } = record;
     const date = tags.Date === undefined || tags.Date.includes("?") ? undefined : tags.Date;
     const opening = bookOpening(record)?.name;
+    const aiModel = aiModelIn(record);
 
     return [{
         name,
         white: tags.White ?? "?",
         black: tags.Black ?? "?",
+        ...(aiModel === undefined ? {} : { aiModel }),
         ...(date === undefined ? {} : { date }),
         result: tags.Result ?? "*",
         ...(opening === undefined ? {} : { opening }),

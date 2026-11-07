@@ -1,7 +1,10 @@
 // The dialog of the analyses (T-92, T-106): the games analysed or brought to study, to open again, and a game played elsewhere brought as a PGN, pasted or read
 // from a file, which the server keeps to study and puts in analysis.
 import { useEffect, useState } from "preact/hooks";
+import type { AiModel } from "../core/index.ts";
 import { Dialog } from "./dialog.tsx";
+import { signature } from "./model-name.ts";
+import { studiedSides } from "./studied.ts";
 import type { Text } from "./text.ts";
 
 /** An analysis as the server lists it (`GET /api/analyses`). */
@@ -10,6 +13,7 @@ export interface AnalysisItem
     readonly name: string;
     readonly white: string;
     readonly black: string;
+    readonly aiModel?: AiModel;
     readonly date?: string;
     readonly result: string;
     readonly opening?: string;
@@ -20,23 +24,28 @@ export interface AnalysisItem
 /** What the dialog sends: a PGN to bring, or the name of a game to open again. */
 export type Studied = { pgn: string; } | { game: string; } | { last: true; };
 
-/** The dialog the header's button opens; `onStudy` sends the choice and gives back why the server refused it, or undefined once it took it. */
-export function StudyDialog({ open, onStudy, onClose, text }: {
+/**
+ * The dialog the header's button opens; `onStudy` sends the choice and gives back why the server refused it, or undefined once it took it. The games played
+ * here name their sides as their analysis does: the player by `you`, the AI by its model when the game keeps it (D-82), else by `ai`.
+ */
+export function StudyDialog({ open, onStudy, onClose, you, ai, text }: {
     open: boolean;
     onStudy: (studied: Studied) => Promise<string | undefined>;
     onClose: () => void;
+    you: string;
+    ai: string;
     text: Text;
 })
 {
     return (
         <Dialog open={open} title={text.study.title} onClose={onClose} text={text}>
-            <StudyForm onStudy={onStudy} text={text} />
+            <StudyForm onStudy={onStudy} you={you} ai={ai} text={text} />
         </Dialog>
     );
 }
 
 /** The form, made again at each opening: the list read anew, empty, with no problem shown. */
-function StudyForm({ onStudy, text }: { onStudy: (studied: Studied) => Promise<string | undefined>; text: Text; })
+function StudyForm({ onStudy, you, ai, text }: { onStudy: (studied: Studied) => Promise<string | undefined>; you: string; ai: string; text: Text; })
 {
     const words = text.study;
     const [pgn, setPgn] = useState("");
@@ -74,7 +83,7 @@ function StudyForm({ onStudy, text }: { onStudy: (studied: Studied) => Promise<s
                         {analyses.map((item) => (
                             <li key={item.name}>
                                 <button type="button" disabled={sending} onClick={() => study({ game: item.name })}>
-                                    <b>{item.white} – {item.black}</b>
+                                    <b>{sidesNamed(item, you, ai, text)}</b>
                                     <span class="result">{item.result}</span>
                                     <span class="note">
                                         {[item.date, item.opening, words.moves(item.moves)].filter((part) => part !== undefined).join(" · ")}
@@ -110,6 +119,13 @@ function StudyForm({ onStudy, text }: { onStudy: (studied: Studied) => Promise<s
             <button class="start" type="submit" disabled={pgn.trim() === "" || sending}>{words.start}</button>
         </form>
     );
+}
+
+/** Who played a game listed, as its analysis names them: «Stefano – Opus 5.5 · xhigh». */
+function sidesNamed(item: AnalysisItem, you: string, ai: string, text: Text): string
+{
+    const { white, black } = studiedSides({ White: item.white, Black: item.black }, you, item.aiModel === undefined ? ai : signature(item.aiModel.model, item.aiModel.effort), text.sides);
+    return `${white.name} – ${black.name}`;
 }
 
 /** The analyses of the player's folder, read once the dialog opens; none while they come, or when the server cannot give them. */
