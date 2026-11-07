@@ -38,10 +38,10 @@ describe("chesspal init", () => {
         expect(output).toBe(
             `♜ Chesspal is ready in ${chess}\n\n  To play:\n`
                 + "  1. Open Claude Code or Codex in this folder.\n"
-                + "  2. Say hello: the AI opens the board for you.\n"
-                + "  3. The first time, it asks whether to trust the folder: say yes.\n"
-                + "     In Codex, also allow Chesspal's two hooks in /hooks:\n"
-                + "     small helpers that let it notice your moves on the board.\n\n"
+                + "  2. The first time, it asks whether to trust the folder: say yes.\n"
+                + "     In Codex, also type /hooks and allow Chesspal's two hooks:\n"
+                + "     small helpers that let it notice your moves on the board.\n"
+                + "  3. Say hello: the AI gives you the link to the board.\n\n"
                 + `  Updated: .mcp.json, AGENTS.md, CLAUDE.md, ${join(".claude", "settings.json")}, ${join(".claude", "agents", "chesspal-ponder-quick.md")}, `
                 + `${join(".claude", "agents", "chesspal-ponder.md")}, ${join(".codex", "config.toml")}, ${join(".codex", "hooks.json")}`,
         );

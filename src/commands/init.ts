@@ -54,8 +54,8 @@ const english: InitWords = {
     toPlay: "To play:",
     steps: [
         ["Open Claude Code or Codex in this folder."],
-        ["Say hello: the AI opens the board for you."],
-        ["The first time, it asks whether to trust the folder: say yes.", "In Codex, also allow Chesspal's two hooks in /hooks:", "small helpers that let it notice your moves on the board."],
+        ["The first time, it asks whether to trust the folder: say yes.", "In Codex, also type /hooks and allow Chesspal's two hooks:", "small helpers that let it notice your moves on the board."],
+        ["Say hello: the AI gives you the link to the board."],
     ],
     written: "Updated:",
 };
@@ -66,8 +66,8 @@ const italian: InitWords = {
     toPlay: "Per giocare:",
     steps: [
         ["Apri Claude Code o Codex in questa cartella."],
-        ["Saluta: l'AI ti apre la scacchiera."],
-        ["La prima volta ti chiede se fidarti della cartella: rispondi sì.", "In Codex consenti anche i due «hook» di Chesspal in /hooks:", "piccoli aiuti che gli fanno vedere le tue mosse sulla scacchiera."],
+        ["La prima volta ti chiede se fidarti della cartella: rispondi sì.", "In Codex scrivi anche /hooks e consenti i due «hook» di Chesspal:", "piccoli aiuti che gli fanno vedere le tue mosse sulla scacchiera."],
+        ["Saluta: l'AI ti dà il link della scacchiera."],
     ],
     written: "Aggiornati:",
 };
