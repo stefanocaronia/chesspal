@@ -195,7 +195,7 @@ export class Game
     {
         // chess.js plays "--" as a null move, which skips a turn.
         if (input.startsWith("--")) {
-            return unreadable(input);
+            return unreadable(input, notation);
         }
 
         const mover = sideToMove(this.chess);
@@ -243,7 +243,7 @@ export class Game
         const parts = loosePattern.exec(bare);
 
         if (parts === null) {
-            return foreignLetter(input, bare) ?? unreadable(input);
+            return foreignLetter(input, bare) ?? unreadable(input, notation);
         }
 
         const [, piece, file, rank, separator, target = "", promotion] = parts;
@@ -411,6 +411,8 @@ function normalized(text: string, notation: Notation = "en"): string
     const signed = text.trim()
         .replace(/^\d+\s*(?:\.[\s.]*|…\s*)/, "")
         .replace(/[︎️]/g, "")
+        // A space after the piece's letter, "C f3", as an AI may show the player how to write (Priya, retest of T-54).
+        .replace(/^([A-Z♔-♟])\s+(?=[a-h1-8x:])/, "$1")
         .replace(/[–—−×]/g, (sign) => asciiOf[sign] ?? sign)
         .replace(/^[nrqkt](?=[a-h1-8x:])/, (piece) => piece.toUpperCase())
         .replace(/\+\+(?=[!?]*$)/, "#");
@@ -501,9 +503,12 @@ function smallLetter(input: string, file: string, target: string): Refused
     return { refusal: "unreadable", message: `"${input}" is not a move: ${file} is a file. ${said.join(" ")}` };
 }
 
-function unreadable(input: string): Refused
+/** A move that reads as none, with examples in the player's letters (D-83): the AI passes them on, and SAN's would mislead an Italian player. */
+function unreadable(input: string, notation: Notation): Refused
 {
-    return { refusal: "unreadable", message: `"${input}" is not a move: write it in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q).` };
+    const examples = ["Nf3", "exd5", "O-O", "e8=Q"].map((san) => writtenIn(san, notation)).join(", ");
+    const how = notation === "en" ? "in SAN" : "in the player's letters";
+    return { refusal: "unreadable", message: `"${input}" is not a move: write it ${how} (${examples}) or as squares (g1f3, e7e8q).` };
 }
 
 function sideToMove(chess: Chess): Side

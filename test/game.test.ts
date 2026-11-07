@@ -113,6 +113,16 @@ describe("a game", () => {
         expect([notationOf("it-IT"), notationOf("it"), notationOf("en-GB"), notationOf("fr-FR"), notationOf(undefined)]).toEqual(["it", "it", "en", "en", "en"]);
     });
 
+    it("reads a space after the piece's letter, and gives the examples of a move it cannot read in the player's letters (D-83)", () => {
+        expect(from(standard).play("C f3", "it")).toMatchObject({ played: true, move: { san: "Nf3" } });
+        expect(from(standard).play("N  f3")).toMatchObject({ played: true, move: { san: "Nf3" } });
+        expect(from(standard).play("hello", "it")).toMatchObject({
+            refusal: "unreadable",
+            message: '"hello" is not a move: write it in the player\'s letters (Cf3, exd5, O-O, e8=D) or as squares (g1f3, e7e8q).',
+        });
+        expect(from(standard).play("hello")).toMatchObject({ message: '"hello" is not a move: write it in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q).' });
+    });
+
     it("writes SAN's moves in the player's letters (D-83)", () => {
         const moves = ["Nxe4", "Ke1", "Qd8+", "Rh1", "Bb5", "O-O-O", "a4", "e8=Q#", "exd8=N", "b1=R"];
         expect(moves.map((san) => writtenIn(san, "it"))).toEqual(["Cxe4", "Re1", "Dd8+", "Th1", "Ab5", "O-O-O", "a4", "e8=D#", "exd8=C", "b1=T"]);
