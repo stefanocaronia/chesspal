@@ -1,11 +1,10 @@
 import { z } from "zod";
-import type { Notation } from "../core/index.ts";
 import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "../games/index.ts";
-import { gameFolder, notationIn } from "../profiles/index.ts";
+import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
-import { closingLines, type GameSummary, newGameStep, notationLine, positionLines, sidesLine, summaryOf, withThought, wordLines } from "./game-summary.ts";
+import { closingLines, type GameSummary, newGameStep, positionLines, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought, wordLines } from "./game-summary.ts";
 import { levelText } from "./levels.ts";
 import { closedPage, pageLine } from "./page-link.ts";
 import { playerLine } from "./profiles.ts";
@@ -22,8 +21,8 @@ interface Status
     pageClosed?: true;
     /** Who plays, from the profile in use (D-23), once the player has completed it (D-71). */
     player?: string;
-    /** The player's notation, when its letters are not SAN's (D-83). */
-    notation?: Exclude<Notation, "en">;
+    /** The player's language when it is not English, and their notation when its letters are not SAN's (D-83). */
+    speech?: Speech;
     game?: GameSummary;
     /** Why the game on disk cannot be read, when it cannot. */
     problem?: string;
@@ -49,8 +48,8 @@ export const status = defineCommand({
         // The folder is the profile's, in the data folder (D-71): the names of its games are relative to it.
         const folder = gameFolder(context.home());
         const player = playerLine(context);
-        const notation = notationIn(folder, context.language);
-        const status: Status = { version, folder, ...(player === undefined ? {} : { player }), ...(notation === "en" ? {} : { notation }) };
+        const speech = speechOf(folder, context.language);
+        const status: Status = { version, folder, ...(player === undefined ? {} : { player }), ...(speech === undefined ? {} : { speech }) };
 
         if (context.page !== undefined) {
             status.page = context.page;
@@ -91,12 +90,12 @@ export const status = defineCommand({
 
         return status;
     },
-    format: ({ version, folder, page, pageClosed, player, notation, game, problem, words = [], analysis, fromBefore }) =>
+    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words = [], analysis, fromBefore }) =>
         [
             `Chesspal ${version}. Folder: ${folder}`,
             ...(page === undefined ? [] : [pageLine(page, pageClosed === true)]),
             ...(player === undefined ? [] : [player]),
-            ...(notation === undefined ? [] : [notationLine(notation)]),
+            ...(speech === undefined ? [] : [speechLine(speech)]),
             ...(fromBefore === true ? [fromBeforeLine] : []),
             ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true)),
             ...(analysis === undefined ? [] : [analysisLine(analysis)]),

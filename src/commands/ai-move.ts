@@ -5,7 +5,7 @@ import { hasPonderAgent, ponderAgentFor } from "../host-files/index.ts";
 import { gameFolder, helpsIn, notationIn } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
-import { closingLines, moveLines, type MovePlayed, withWritten } from "./game-summary.ts";
+import { closingLines, moveLines, type MovePlayed, moveText, withWritten } from "./game-summary.ts";
 import { playMove, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand, sentence } from "./registry.ts";
 import { give, waitingWords } from "./say.ts";
@@ -69,7 +69,7 @@ export const aiMove = defineCommand({
         delete game.mood;
         // The board goes before the player's words and the next step, which stays the last line.
         return [
-            `Played ${result.move}${result.written === undefined ? "" : ` (${result.written} for the player)`}.`,
+            `Played ${moveText(result.move, result.written)}.`,
             ...moveLines({ ...result, game }),
             "Board, for your message when the player plays in the chat:",
             boardText(result.game.fen),

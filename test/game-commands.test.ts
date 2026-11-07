@@ -153,18 +153,20 @@ describe("a game in chat", () => {
         expect(gameFile(context).pgn).toContain("1. Nf3 d5 {[%plan p]} 2. Nc3 Nc6 {[%plan p]} 3. Rb1 Rb8 {[%plan p]} *");
     });
 
-    it("gives the AI the player's letters once a chat and each move as the player writes it, for the moves it writes to them (D-83)", async () => {
+    it("gives the AI the player's language and letters once a chat, and each move in the player's letters first, for the moves it writes to them (D-83)", async () => {
         const context = { ...playerFolder(), language: "it-IT" };
-        const letters = "\nThe player writes and reads moves in Italian notation: R king, D queen, T rook, A bishop, C knight.\n";
+        const letters = "\nThe player speaks Italian, and writes and reads moves in Italian notation: R king, D queen, T rook, A bishop, C knight.\n";
         expect(await run(context, "new_game", { ai_colour: "black" })).toContain(letters);
         expect(await run(context, "status")).toContain(letters);
-        expect(await run(context, "player_move", { move: "Cf3" })).toMatch(/^Player: 1\.Nf3 \(g1-f3; Cf3 for the player\)\.\n/);
+        expect(await run(context, "player_move", { move: "Cf3" })).toMatch(/^Player: 1\.Cf3 for the player \(Nf3, g1-f3\)\.\n/);
         expect(await run(context, "ai_move", { move: "d5", plan: "p" })).toMatch(/^Played 1\.\.\.d5\.\n/);
         expect(await run(context, "player_move", { move: "d4" })).toMatch(/^Player: 2\.d4 \(d2-d4\)\.\n/);
-        expect(await run(context, "ai_move", { move: "Nf6", plan: "p" })).toMatch(/^Played 2\.\.\.Nf6 \(Cf6 for the player\)\.\n/);
+        expect(await run(context, "ai_move", { move: "Nf6", plan: "p" })).toMatch(/^Played 2\.\.\.Cf6 for the player \(Nf6\)\.\n/);
 
         writeFileSync(join(gameFolder(context.home()), "settings.json"), JSON.stringify({ language: "it", englishNotation: true }));
-        expect(await run(context, "status")).not.toContain("Italian notation");
+        expect(await run(context, "status")).toMatch(/\nThe player speaks Italian\.\n/);
+        expect(await run({ ...playerFolder(), language: "fr-FR" }, "status")).toMatch(/\nThe player speaks French\.\n/);
+        expect(await run({ ...playerFolder(), language: "en-GB" }, "status")).not.toContain("The player speaks");
         expect(await run(context, "player_move", { move: "Bf4" })).toMatch(/^Player: 3\.Bf4 \(c1-f4\)\.\n/);
         expect(await run(context, "ai_move", { move: "Bf5", plan: "p" })).toMatch(/^Played 3\.\.\.Bf5\.\n/);
     });

@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, type Notation, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../core/index.ts";
+import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../core/index.ts";
 import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../games/index.ts";
-import { gameFolder, gameFolders, notationIn } from "../profiles/index.ts";
+import { gameFolder, gameFolders } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
-import { type GameSummary, nextStep, notationLine, positionLines, sidesLine, summaryOf, withThought } from "./game-summary.ts";
+import { type GameSummary, nextStep, positionLines, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "./game-summary.ts";
 import { levelText, levelToPlay } from "./levels.ts";
 import { closedPage, pageLine } from "./page-link.ts";
 import { pastGameLines } from "./past-games.ts";
@@ -21,8 +21,8 @@ interface NewGame
     past: string[];
     /** Who plays, from the profile in use (D-23), once the player has completed it (D-71). */
     player?: string;
-    /** The player's notation, when its letters are not SAN's (D-83). */
-    notation?: Exclude<Notation, "en">;
+    /** The player's language when it is not English, and their notation when its letters are not SAN's (D-83). */
+    speech?: Speech;
     /** The board page's address when no browser has it open: the player needs it first. */
     closedPage?: string;
 }
@@ -95,13 +95,13 @@ export const newGame = defineCommand({
         const past = pastGameLines(folder, remembered);
         const closed = closedPage(context);
         const player = playerLine(context);
-        const notation = notationIn(folder, context.language);
+        const speech = speechOf(folder, context.language);
         return {
             game: withThought(summaryOf(current, now), folder, current),
             ...(archived === undefined ? {} : { archived: { name: archived, finished: going === undefined } }),
             past,
             ...(player === undefined ? {} : { player }),
-            ...(notation === "en" ? {} : { notation }),
+            ...(speech === undefined ? {} : { speech }),
             ...(closed === undefined ? {} : { closedPage: closed }),
         };
     },
@@ -109,12 +109,12 @@ export const newGame = defineCommand({
 });
 
 /** The new game's lines for the AI. */
-function startedLines({ game, archived, past, player, notation, closedPage: closed }: NewGame): string
+function startedLines({ game, archived, past, player, speech, closedPage: closed }: NewGame): string
 {
     return [
         `New game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`,
         ...(player === undefined ? [] : [player]),
-        ...(notation === undefined ? [] : [notationLine(notation)]),
+        ...(speech === undefined ? [] : [speechLine(speech)]),
         ...(archived === undefined ? [] : [`The game before is in ${archived.name}${archived.finished ? "" : ", unfinished"}.`]),
         ...(past.length === 0 ? [] : ["Last games with this player (past_games gives more, and their moves):", ...past]),
         ...positionLines(game),

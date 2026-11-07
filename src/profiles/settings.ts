@@ -30,9 +30,14 @@ export function helpsIn(folder: string): boolean
  */
 export function notationIn(folder: string, systemLanguage: string | undefined): Notation
 {
-    const settings = settingsIn(folder);
-    const language = settings?.language;
-    return settings?.englishNotation === true ? "en" : notationOf(typeof language === "string" && language !== "auto" ? language : systemLanguage);
+    return settingsIn(folder)?.englishNotation === true ? "en" : notationOf(languageIn(folder, systemLanguage));
+}
+
+/** The language of the player of the profile whose games are in `folder`: the page's, or the system's when the page follows the browser. */
+export function languageIn(folder: string, systemLanguage: string | undefined): string | undefined
+{
+    const language = settingsIn(folder)?.language;
+    return typeof language === "string" && language !== "auto" ? language : systemLanguage;
 }
 
 /** Saves a profile's settings, over the ones before. */

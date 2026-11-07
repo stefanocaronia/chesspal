@@ -2,7 +2,7 @@
 import { type AiLevel, type Facts, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, type Notation, sees, type Side, type Square, writtenIn } from "../core/index.ts";
 import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, talkLimits, type Thought, thoughtForLastMove } from "../games/index.ts";
 import { onQuickModel } from "../host-files/index.ts";
-import { helpsIn } from "../profiles/index.ts";
+import { helpsIn, languageIn, notationIn } from "../profiles/index.ts";
 import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
 import { boardView, colourName, compactView, materialText } from "./view.ts";
@@ -185,28 +185,57 @@ export function headLines(game: GameSummary, withLastMove = true): string[]
     ];
 }
 
-/** A move with its squares, and as the player writes it when their letters are not SAN's: 4.Ng5 (f3-g5; Cg5 for the player). */
+/** A move with its squares: 4.Ng5 (f3-g5); see moveText for the player's letters. */
 export function lastMoveText({ move, from, to }: LastMove, written?: string): string
 {
-    return `${move} (${from}-${to}${written === undefined ? "" : `; ${written} for the player`})`;
+    return moveText(move, written, `${from}-${to}`);
 }
 
-/** The move played, with how the player writes it when their notation's letters are not SAN's (D-83): the AI copies it into its message (Priya, round of T-54). */
+/**
+ * A numbered move, with its squares when given; in the player's letters first when they are not SAN's (D-83), since the AI copies the line's first form
+ * into its message (Priya, retest of T-54): 4.Cg5 for the player (Ng5, f3-g5).
+ */
+export function moveText(move: string, written?: string, squares?: string): string
+{
+    if (written === undefined) {
+        return squares === undefined ? move : `${move} (${squares})`;
+    }
+
+    const san = move.replace(/^\d+\.+/, "");
+    return `${written} for the player (${squares === undefined ? san : `${san}, ${squares}`})`;
+}
+
+/** The move played, with how the player writes it, numbered, when their notation's letters are not SAN's (D-83). */
 export function withWritten<Played extends MovePlayed>(played: Played, notation: Notation): Played
 {
-    const san = played.move.replace(/^\d+\.+/, "");
+    const [, number = "", san = played.move] = /^(\d+\.+)(.+)$/.exec(played.move) ?? [];
     const written = writtenIn(san, notation);
-    return written === san ? played : { ...played, written };
+    return written === san ? played : { ...played, written: `${number}${written}` };
 }
 
-/** What the AI is told of the player's notation when its letters are not SAN's (D-83). */
-export function notationLine(notation: Exclude<Notation, "en">): string
+/** The player's language by its English name when it is not English, and their notation when its letters are not SAN's (D-83). */
+export interface Speech
 {
-    return notationLines[notation];
+    language: string;
+    notation?: Exclude<Notation, "en">;
 }
 
-const notationLines: Readonly<Record<Exclude<Notation, "en">, string>> = {
-    it: "The player writes and reads moves in Italian notation: R king, D queen, T rook, A bishop, C knight.",
+/** The player's speech, from the page's settings or the system's language; undefined in English, which the AI speaks unless told. */
+export function speechOf(folder: string, systemLanguage: string | undefined): Speech | undefined
+{
+    const language = languageName(languageIn(folder, systemLanguage));
+    const notation = notationIn(folder, systemLanguage);
+    return language === undefined ? undefined : { language, ...(notation === "en" ? {} : { notation }) };
+}
+
+/** What the AI is told of the player's speech once a chat (Priya, retest of T-54): with the notation alone it answered a bare move in English. */
+export function speechLine({ language, notation }: Speech): string
+{
+    return notation === undefined ? `The player speaks ${language}.` : `The player speaks ${language}, and writes and reads moves in ${notationNames[notation]}.`;
+}
+
+const notationNames: Readonly<Record<Exclude<Notation, "en">, string>> = {
+    it: "Italian notation: R king, D queen, T rook, A bishop, C knight",
 };
 
 /** The lines after a move, which the line before named: its note, where the game stands, a warning. closingLines end them. */
@@ -359,4 +388,17 @@ function lastMoves(record: GameRecord, count: number): string
 
         return index === 0 ? `${moveNumber}...${move.san}` : move.san;
     }).join(" ");
+}
+
+/** A language by its English name when it is not English (Italian), from the way the system or the page names it (it-IT, it). */
+function languageName(language: string | undefined): string | undefined
+{
+    const code = language?.split(/[-_]/)[0]?.toLowerCase() ?? "";
+
+    if (!/^[a-z]{2,3}$/.test(code) || code === "en" || code === "und") {
+        return undefined;
+    }
+
+    const name = new Intl.DisplayNames(["en"], { type: "language" }).of(code);
+    return name === undefined || name === code ? undefined : name;
 }
