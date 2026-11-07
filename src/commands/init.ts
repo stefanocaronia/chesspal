@@ -1,8 +1,9 @@
+import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 // Colours only on a terminal that shows them: none in a file, a pipe or with NO_COLOR.
 import { styleText } from "node:util";
 import { z } from "zod";
-import { setUpHosts } from "../host-files/index.ts";
+import { codexHooksPath, setUpHosts } from "../host-files/index.ts";
 import { defineCommand } from "./registry.ts";
 
 /** The player's folder set up for the AI hosts (T-7): the folder, and the files written there. */
@@ -10,6 +11,10 @@ interface FolderSetUp
 {
     folder: string;
     written: string[];
+    /** The folder as the player goes into it from where init ran, when it is not that one (T-127): chess. */
+    enter?: string;
+    /** Codex's hooks changed in a folder that had them: Codex runs them only once allowed again in /hooks (T-125). */
+    hooksChanged?: true;
 }
 
 /** Makes a folder the player's chess table: the files through which Claude Code and Codex find Chesspal and the opponent's instructions (D-31). */
@@ -23,16 +28,27 @@ export const init = defineCommand({
     positionals: ["folder"],
     run: ({ folder }, context): FolderSetUp => {
         const root = resolve(context.folder, folder ?? ".");
-        return { folder: root, written: setUpHosts(root, context.platform).map((path) => relative(root, path)) };
+        const hooks = codexHooksPath(root);
+        const hadHooks = existsSync(hooks);
+        const written = setUpHosts(root, context.platform);
+        const enter = relative(context.folder, root);
+        return {
+            folder: root,
+            written: written.map((path) => relative(root, path)),
+            ...(enter === "" ? {} : { enter }),
+            ...(hadHooks && written.includes(hooks) ? { hooksChanged: true as const } : {}),
+        };
     },
-    format: ({ folder, written }, context) => {
+    format: ({ folder, written, enter, hooksChanged }, context) => {
         const words = wordsFor(context?.language);
+        const steps = [words.open(enter === undefined ? undefined : quoted(enter)), ...words.steps];
         return [
             styleText(["bold", "green"], `♜ ${written.length === 0 ? words.ready(folder) : words.set(folder)}`),
             "",
             `  ${words.toPlay}`,
-            ...words.steps.map((step, index) => `  ${styleText("cyan", `${index + 1}.`)} ${step.join("\n     ")}`),
-            ...(written.length === 0 ? [] : ["", styleText("gray", `  ${words.written} ${written.join(", ")}`)]),
+            ...steps.map((step, index) => `  ${styleText("cyan", `${index + 1}.`)} ${step.join("\n     ")}`),
+            ...(hooksChanged === true ? ["", `  ${styleText("yellow", words.hooksChanged)}`] : []),
+            ...(written.length === 0 ? [] : ["", styleText("gray", `  ${words.updated(written.length)}`)]),
         ].join("\n");
     },
 });
@@ -43,36 +59,47 @@ interface InitWords
     set: (folder: string) => string;
     ready: (folder: string) => string;
     toPlay: string;
-    /** Each step in lines short enough for a narrow terminal. */
+    /** The first step: open the agent in this folder, or go into it first. */
+    open: (enter: string | undefined) => string[];
+    /** The other steps, each in lines short enough for a narrow terminal. */
     steps: string[][];
-    written: string;
+    hooksChanged: string;
+    updated: (count: number) => string;
 }
 
 const english: InitWords = {
     set: (folder) => `Chesspal is ready in ${folder}`,
     ready: (folder) => `Chesspal is ready in ${folder}: nothing to change`,
     toPlay: "To play:",
+    open: (enter) => enter === undefined ? ["Open Claude Code or Codex in this folder."] : [`Go into the folder: cd ${enter}`, "then open Claude Code (claude) or Codex (codex)."],
     steps: [
-        ["Open Claude Code or Codex in this folder."],
         ["The first time, it asks whether to trust the folder: say yes.", "In Codex, also type /hooks and allow Chesspal's two hooks:", "small helpers that let it notice your moves on the board."],
         ["Say hello: the AI gives you the link to the board."],
     ],
-    written: "Updated:",
+    hooksChanged: "Chesspal's hooks for Codex have changed: in Codex, type /hooks and allow them again.",
+    updated: (count) => `Updated ${count} ${count === 1 ? "file" : "files"}.`,
 };
 
 const italian: InitWords = {
     set: (folder) => `Chesspal è pronto in ${folder}`,
     ready: (folder) => `Chesspal è già pronto in ${folder}: niente da cambiare`,
     toPlay: "Per giocare:",
+    open: (enter) => enter === undefined ? ["Apri Claude Code o Codex in questa cartella."] : [`Entra nella cartella: cd ${enter}`, "poi apri Claude Code (claude) o Codex (codex)."],
     steps: [
-        ["Apri Claude Code o Codex in questa cartella."],
         ["La prima volta ti chiede se fidarti della cartella: rispondi sì.", "In Codex scrivi anche /hooks e consenti i due «hook» di Chesspal:", "piccoli aiuti che gli fanno vedere le tue mosse sulla scacchiera."],
         ["Saluta: l'AI ti dà il link della scacchiera."],
     ],
-    written: "Aggiornati:",
+    hooksChanged: "Gli «hook» di Chesspal per Codex sono cambiati: in Codex scrivi /hooks e consentili di nuovo.",
+    updated: (count) => count === 1 ? "Aggiornato 1 file." : `Aggiornati ${count} file.`,
 };
 
 function wordsFor(language: string | undefined): InitWords
 {
     return language?.slice(0, 2).toLowerCase() === "it" ? italian : english;
+}
+
+/** A path as a shell reads it as one word: in quotes when it has spaces. */
+function quoted(path: string): string
+{
+    return /\s/.test(path) ? `"${path}"` : path;
 }

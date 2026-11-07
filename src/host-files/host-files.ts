@@ -22,6 +22,12 @@ export function setUpHosts(folder: string, platform: string): string[]
     return written.map(({ path }) => path);
 }
 
+/** Where Codex reads a folder's hooks, which it runs only once the player allows them in /hooks (T-125). */
+export function codexHooksPath(folder: string): string
+{
+    return join(folder, ".codex", "hooks.json");
+}
+
 /** The instructions of the AI opponent, read from the package wherever it is installed (T-8). */
 export function opponentInstructions(): string
 {
@@ -149,7 +155,7 @@ function codexConfigFile(folder: string, platform: string): FileChange | undefin
 /** Codex's hooks, read once the player has reviewed them in /hooks: the doorbell of the moves on the page (T-62) and how each chat starts (T-104), beside the player's own. */
 function codexHooksFile(folder: string): FileChange | undefined
 {
-    const path = join(folder, ".codex", "hooks.json");
+    const path = codexHooksPath(folder);
     const config = jsonOf(path);
     const hooks = isObject(config.hooks) ? config.hooks : {};
     return changed(path, { ...config, hooks: withHook(withHook(hooks, "Stop", codexBellHook), "SessionStart", codexChatHook) });

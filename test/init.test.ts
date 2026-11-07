@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 describe("chesspal init", () => {
-    it("sets up a folder for Claude Code and Codex, with the opponent's instructions", async () => {
+    it("sets up a folder for Claude Code and Codex, with the opponent's instructions, and says how to go into it (T-127)", async () => {
         const folder = playerFolder();
         const { output, exitCode } = await runCommandLine(["init", "chess"], testContext(folder));
         const chess = join(folder, "chess");
@@ -37,13 +37,13 @@ describe("chesspal init", () => {
         expect(exitCode).toBe(0);
         expect(output).toBe(
             `♜ Chesspal is ready in ${chess}\n\n  To play:\n`
-                + "  1. Open Claude Code or Codex in this folder.\n"
+                + "  1. Go into the folder: cd chess\n"
+                + "     then open Claude Code (claude) or Codex (codex).\n"
                 + "  2. The first time, it asks whether to trust the folder: say yes.\n"
                 + "     In Codex, also type /hooks and allow Chesspal's two hooks:\n"
                 + "     small helpers that let it notice your moves on the board.\n"
                 + "  3. Say hello: the AI gives you the link to the board.\n\n"
-                + `  Updated: .mcp.json, AGENTS.md, CLAUDE.md, ${join(".claude", "settings.json")}, ${join(".claude", "agents", "chesspal-ponder-quick.md")}, `
-                + `${join(".claude", "agents", "chesspal-ponder.md")}, ${join(".codex", "config.toml")}, ${join(".codex", "hooks.json")}`,
+                + "  Updated 8 files.",
         );
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${opponentInstructions()}\n<!-- chesspal: end -->\n`);
@@ -77,7 +77,10 @@ describe("chesspal init", () => {
         writeFileSync(join(folder, ".claude", "settings.json"), "﻿" + JSON.stringify({ model: "opus", permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [ownStop] } }));
         writeFileSync(join(folder, ".codex", "hooks.json"), JSON.stringify({ hooks: { Stop: [ownStop] } }));
         writeFileSync(join(folder, ".codex", "config.toml"), 'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\nenv = { CHESSPAL_HOME = "D:/runs" }\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n');
-        await runCommandLine(["init"], testContext(folder));
+        // Codex runs hooks that changed only once the player allows them again (T-125).
+        expect((await runCommandLine(["init"], testContext(folder))).output).toContain(
+            "\n\n  Chesspal's hooks for Codex have changed: in Codex, type /hooks and allow them again.\n\n  Updated 8 files.",
+        );
 
         expect(json(folder, ".mcp.json")).toEqual({ mcpServers: { other: { command: "other" }, chesspal: { command: "chesspal", args: ["mcp"], env: { CHESSPAL_HOME: "D:/runs" } } } });
         expect(text(folder, "AGENTS.md")).toMatch(/^<!-- chesspal: these lines [^\n]*\nThis folder is the player's chess table[\s\S]*<!-- chesspal: end -->\n\nMy own rules\.\n$/);
@@ -101,7 +104,11 @@ describe("chesspal init", () => {
         const output = (await runCommandLine(["init"], { ...testContext(folder), language: "it-IT" })).output;
 
         expect(output).toMatch(/^♜ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code o Codex in questa cartella\.\n/);
-        expect(output).toContain("  Aggiornati: .mcp.json");
+        expect(output).toMatch(/\n\n {2}Aggiornati 8 file\.$/);
+        expect(output).not.toContain("consentili di nuovo");
+        expect((await runCommandLine(["init", "la mia scacchiera"], { ...testContext(folder), language: "it-IT" })).output).toContain(
+            '  1. Entra nella cartella: cd "la mia scacchiera"\n     poi apri Claude Code (claude) o Codex (codex).\n',
+        );
         expect((await runCommandLine(["init"], { ...testContext(folder), language: "fr-FR" })).output).toMatch(/^♜ Chesspal is ready in .*: nothing to change\n/);
     });
 

@@ -37,7 +37,7 @@ Chesspal is not on npm yet ([Status](#status)): these steps are for its first re
   [Codex](https://developers.openai.com/codex). The AI runs on what you already pay for your agent, such as your Claude or ChatGPT subscription:
   Chesspal asks for no API key.
 - A terminal, opened after installing Node.js: on Windows, Command Prompt (press Start, type `cmd`, press Enter), since PowerShell refuses npm's
-  commands until its scripts are allowed; on a Mac, Terminal, in Applications › Utilities.
+  commands until its scripts are allowed (there, `npm.cmd` and `chesspal.cmd` work in their place); on a Mac, Terminal, in Applications › Utilities.
 
 **Your first game**
 
@@ -62,7 +62,8 @@ Chesspal is not on npm yet ([Status](#status)): these steps are for its first re
    board. The first time, the page asks who you are: your name, a picture, how well you play.
 
 5. **Ask for a game**: the New game window opens on the page, where you choose your colour, the clock and the AI's level. Play on the board, or write
-   your moves in the chat as you like, `e4`, `Nf3` or in words: the AI answers in both.
+   your moves in the chat as you like, `e4`, `Nf3`, with your language's letters (`Cf3` in Italian) or in words: the AI answers in both. The
+   page's settings can keep English letters in any language.
 
 6. **For the next game**, type `/clear` in the chat, or start a new chat: a long chat makes the AI slower and costs you more.
 
@@ -70,7 +71,7 @@ When a game is over, ask the AI to go over it with you: its notes show on the bo
 there too: download it from that site as a PGN file and open it in Analyses.
 
 **To update Chesspal**, close the chat, run `npm install -g chesspal` again, then `chesspal init` in your folder: it updates its own lines and keeps
-what you wrote there. In Codex, if it asks, allow Chesspal's hooks again in `/hooks`.
+what you wrote there. In Codex, when `chesspal init` says so, allow Chesspal's hooks again in `/hooks`.
 
 ## How it works
 

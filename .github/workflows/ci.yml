@@ -37,3 +37,17 @@ jobs:
       # The package as a player installs it: packed, installed elsewhere, run through npm's shim, and its MCP server started as .mcp.json starts it.
       - run: npm run smoke
         timeout-minutes: 5
+
+  # The oldest Node that package.json's engines allows (T-123): the package builds and runs there, which the newest 22 would not show.
+  oldest-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.13.0
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run smoke
+        timeout-minutes: 5
