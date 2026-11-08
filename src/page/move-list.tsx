@@ -5,6 +5,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Side } from "../core/index.ts";
 import { BadgeIcon, NoteIcon } from "./badges.tsx";
 import type { Step } from "./browse.ts";
+import { FoldButton, useCardFold } from "./card-fold.tsx";
 import { Figurine } from "./pieces.tsx";
 import type { Ply } from "./plies.ts";
 import type { Text } from "./text.ts";
@@ -16,6 +17,7 @@ import type { Text } from "./text.ts";
 export function MoveList({ plies, result, shown, onShow, text }: { plies: readonly Ply[]; result?: string; shown: number; onShow: (plies: number) => void; text: Text; })
 {
     const list = useRef<HTMLDivElement>(null);
+    const [folded, toggleFold] = useCardFold("moves");
     const rows = rowsOf(plies);
     const current = plies[shown - 1];
 
@@ -41,19 +43,31 @@ export function MoveList({ plies, result, shown, onShow, text }: { plies: readon
 
     const move = (ply: Ply | undefined): JSX.Element => <Move ply={ply} current={ply !== undefined && ply === current} onShow={() => onShow(plies.indexOf(ply!) + 1)} text={text} />;
 
+    // The card's title with its icon, a score sheet, as the other cards of the column, which folds the card to it (Stefano); only the list under it
+    // scrolls, and it stays in the page while folded, so that it keeps its move in sight.
     return (
-        <div ref={list} class="moves card" role="region" aria-label={text.moves}>
-            <ol>
-                {rows.map(({ number, white, black }) => (
-                    <li key={number}>
-                        <span class="number">{number}.</span>
-                        {move(white)}
-                        {move(black)}
-                    </li>
-                ))}
-            </ol>
-            {result === undefined ? null : <p class="result">{result}</p>}
-        </div>
+        <section class={`card moves-card${folded ? " folded" : ""}`} aria-label={text.moves}>
+            <h3 class="card-title">
+                <FoldButton folded={folded} onFold={toggleFold} text={text}>
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 3H15L19 7V21H6ZM15 3V7H19M9 11H16M9 14.5H16M9 18H13" />
+                    </svg>
+                    {text.moves}
+                </FoldButton>
+            </h3>
+            <div ref={list} class="moves" hidden={folded}>
+                <ol>
+                    {rows.map(({ number, white, black }) => (
+                        <li key={number}>
+                            <span class="number">{number}.</span>
+                            {move(white)}
+                            {move(black)}
+                        </li>
+                    ))}
+                </ol>
+                {result === undefined ? null : <p class="result">{result}</p>}
+            </div>
+        </section>
     );
 }
 

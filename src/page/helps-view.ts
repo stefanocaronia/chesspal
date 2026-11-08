@@ -66,6 +66,27 @@ export interface StrategyLine
 
 export type StrategyRow = keyof typeof cells;
 
+/** The groups the strategy's lines stand in on the card, each under its figure (Stefano). */
+export type StrategyGroup = "pawns" | "pieces" | "king";
+
+/** Which group each line of the strategy's table stands in. */
+export const groupOf: Readonly<Record<StrategyRow, StrategyGroup>> = {
+    isolated: "pawns",
+    doubled: "pawns",
+    backward: "pawns",
+    passed: "pawns",
+    islands: "pawns",
+    halfOpen: "pieces",
+    heavyOnFiles: "pieces",
+    onSeventh: "pieces",
+    outposts: "pieces",
+    bishopPair: "pieces",
+    space: "pieces",
+    undeveloped: "pieces",
+    castled: "king",
+    kingAttacks: "king",
+};
+
 /** Squares or files, a count, a yes or no, or how a side castled: "unknown" when the game began from a FEN and the side has no right left. */
 export type StrategyCell = readonly string[] | number | boolean | "O-O" | "O-O-O" | "not-yet" | "no-more" | "unknown";
 

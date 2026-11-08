@@ -1,8 +1,9 @@
-// The game's column on the right of the board (D-53): the game's card, its opening (D-16), the helps (D-78), the moves and the buttons that step through
-// them (T-88).
+// The game's column on the right of the board (D-53): the game's card, its opening (D-16), the helps (D-78), the moves, the saves and the buttons that step
+// through them (T-88).
 import type { ComponentChildren } from "preact";
 import { type Opening, outOfBookMove, type Side } from "../core/index.ts";
 import type { Step } from "./browse.ts";
+import { FoldButton, useCardFold } from "./card-fold.tsx";
 import type { HowEnded } from "./ending.ts";
 import { MoveList, Steps } from "./move-list.tsx";
 import { Piece } from "./pieces.tsx";
@@ -53,13 +54,6 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                         <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} text={text} />
                         {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
                         {helps}
-                        {onDownload === undefined && onSaveMoves === undefined ? null : (
-                            <div class="card analysis-actions">
-                                {onDownload === undefined ? null : <SaveButton label={text.study.download} onSave={onDownload} />}
-                                {onSaveMoves === undefined ? null : <SaveButton label={text.saveMoves} onSave={onSaveMoves} />}
-                            </div>
-                        )}
-                        {onAnalyse === undefined ? null : <AnalyseButton label={text.study.analyseIt} onAnalyse={onAnalyse} />}
                         {analysis === undefined || analysis.summary !== undefined ? null : (
                             <p class="card review waiting" role="status">
                                 <span class="spinner" aria-hidden="true" />
@@ -67,6 +61,14 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                             </p>
                         )}
                         <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} text={text} />
+                        {/* The saves and the analysis under the moves, over the buttons that step through them (Stefano). */}
+                        {onDownload === undefined && onSaveMoves === undefined ? null : (
+                            <div class="card analysis-actions">
+                                {onDownload === undefined ? null : <SaveButton label={text.study.download} hint={text.study.downloadHint} onSave={onDownload} />}
+                                {onSaveMoves === undefined ? null : <SaveButton label={text.saveMoves} hint={text.saveMovesHint} onSave={onSaveMoves} />}
+                            </div>
+                        )}
+                        {onAnalyse === undefined ? null : <AnalyseButton label={text.study.analyseIt} onAnalyse={onAnalyse} />}
                         <Steps shown={shownPlies} total={plies.length} onStep={onStep} text={text} />
                     </>
                 )}
@@ -74,11 +76,11 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     );
 }
 
-/** A button that saves the game as a file in the player's downloads. */
-function SaveButton({ label, onSave }: { label: string; onSave: () => void; })
+/** A button that saves the game as a file in the player's downloads, its tooltip saying what the file holds. */
+function SaveButton({ label, hint, onSave }: { label: string; hint: string; onSave: () => void; })
 {
     return (
-        <button type="button" onClick={onSave}>
+        <button type="button" title={hint} onClick={onSave}>
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 4V15M7 10L12 15L17 10M5 19H19" />
             </svg>
@@ -172,24 +174,30 @@ function GameCard({ plies, result, how, lit, started, move, toMove, text }: {
     );
 }
 
-/** The opening by Lichess's book: a book, crossed out once the game left it, and the family; the variation under them, and the move the game left the book at. */
+/**
+ * The opening by Lichess's book: a book, crossed out once the game left it, and the family, which fold the card to them (Stefano); the variation under them,
+ * and the move the game left the book at.
+ */
 function OpeningCard({ opening, text }: { opening: Opening; text: Text; })
 {
+    const [folded, toggleFold] = useCardFold("opening");
     const book = opening.inBook ? text.inBook : `${text.outOfBook} ${outOfBookMove(opening)}`;
 
     return (
-        <section class="card opening" aria-label={text.opening}>
-            <p class="family">
-                <span class={`book${opening.inBook ? "" : " out"}`} title={book} role="img" aria-label={book}>
-                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 6.5C10 5 7 4.5 4 5V18C7 17.5 10 18 12 19.5C14 18 17 17.5 20 18V5C17 4.5 14 5 12 6.5ZM12 6.5V19.5" />
-                        {opening.inBook ? null : <path d="M3.5 3.5L20.5 20.5" />}
-                    </svg>
-                </span>
-                <b>{opening.family}</b>
-            </p>
-            {opening.variation === undefined ? null : <p class="variation">{opening.variation}</p>}
-            {opening.inBook ? null : <p class="out">{text.outOfBook} {outOfBookMove(opening)}</p>}
+        <section class={`card opening${folded ? " folded" : ""}`} aria-label={text.opening}>
+            <h3 class="family">
+                <FoldButton folded={folded} onFold={toggleFold} text={text}>
+                    <span class={`book${opening.inBook ? "" : " out"}`} title={book} role="img" aria-label={book}>
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 6.5C10 5 7 4.5 4 5V18C7 17.5 10 18 12 19.5C14 18 17 17.5 20 18V5C17 4.5 14 5 12 6.5ZM12 6.5V19.5" />
+                            {opening.inBook ? null : <path d="M3.5 3.5L20.5 20.5" />}
+                        </svg>
+                    </span>
+                    <b>{opening.family}</b>
+                </FoldButton>
+            </h3>
+            {folded || opening.variation === undefined ? null : <p class="variation">{opening.variation}</p>}
+            {folded || opening.inBook ? null : <p class="out">{text.outOfBook} {outOfBookMove(opening)}</p>}
         </section>
     );
 }

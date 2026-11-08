@@ -25,7 +25,10 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
     helps?: HelpsView;
     /** The control map, while it is held (D-78): how many pieces of each side attack each square, [White, Black]. */
     control?: Profile["control"];
-    /** The board without the arrows and the squares drawn on it, the AI's, the coach's and the player's, while its button is held (Stefano, T-138). */
+    /**
+     * The board without the arrows and the squares drawn on it, the AI's, the coach's and the player's, and without the helps' corners and pins' lines, while
+     * its button is held (Stefano, T-138).
+     */
     bare?: boolean;
     /** The AI's badge on the last move, in a game in analysis (D-69): on the square it went to, by its name. */
     badge?: { badge: MoveBadge; name: string; };
@@ -346,6 +349,8 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
     // a piece to move it (Stefano, T-142).
     const aiArrows = bare === true || selected !== undefined || drag !== undefined ? [] : drawn?.arrows ?? [];
     const ownArrows = bare === true ? [] : drawing === undefined ? marks.arrows : [...marks.arrows, drawing];
+    // The bare board hides the helps' signs too, the corners on the pieces at risk and the pins' lines (Stefano).
+    const signsOfHelps = bare === true ? undefined : helps;
 
     return (
         <>
@@ -435,7 +440,7 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
                                 {control === undefined ? null : <span class={`control-ground ${controlOf(control[square as Square])}`} aria-hidden="true" />}
                                 {piece === undefined ? null : <Piece key={moving ? fen : "still"} letter={piece} />}
                                 {sign === undefined ? null : <Badge kind={sign.badge} />}
-                                {helps !== undefined && atRiskOn(helps, square) ? <Notch /> : null}
+                                {signsOfHelps !== undefined && atRiskOn(signsOfHelps, square) ? <Notch /> : null}
                                 {control === undefined ? null : <ControlCount counts={control[square as Square]} />}
                                 {badge === undefined || lastMove?.to !== square ? null : <BadgeIcon badge={badge.badge} title={badge.name} />}
                             </div>
@@ -443,7 +448,7 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
                     })
                 )}
                 {/* Inside the board, under the corners of the pieces at risk */}
-                {helps === undefined || helps.pins.length === 0 || control !== undefined ? null : <Pins pins={helps.pins} at={centreOf} />}
+                {signsOfHelps === undefined || signsOfHelps.pins.length === 0 || control !== undefined ? null : <Pins pins={signsOfHelps.pins} at={centreOf} />}
             </div>
             <Arrows arrows={aiArrows} at={centreOf} occupied={(square) => pieces.has(square)} />
             <Arrows arrows={ownArrows} at={centreOf} />

@@ -2201,6 +2201,9 @@ button {
     display: flex;
     align-items: center;
     gap: 7px;
+    margin: 0;
+    font-size: inherit;
+    font-weight: inherit;
 }
 
 .opening .book {
@@ -2456,15 +2459,28 @@ button {
     transition: visibility 0s 200ms;
 }
 
+/* The moves' card takes the column's room left: its title, then the list */
+.moves-card {
+    flex: 1;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+}
+
+.moves-card .card-title {
+    padding: 2px 4px 0;
+}
+
 /* Positioned, so that the moves' hidden names scroll with the list instead of stretching the page */
 .moves {
     position: relative;
     flex: 1;
-    min-height: 90px;
+    min-height: 0;
     /* It scrolls with no scrollbar, kept on the move shown */
     overflow: hidden auto;
     scrollbar-width: none;
-    padding: 8px 10px;
     font-size: 14px;
 }
 
@@ -4460,11 +4476,58 @@ h3 + .switch {
     padding: 3px 6px;
 }
 
-.helps-title {
+/* A card's title in the game's column, its icon in the accent as the opening's book: the helps' lifebuoy, the moves' score sheet (Stefano) */
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
     margin: 0;
     font-size: 13px;
     font-weight: 700;
     color: var(--ink);
+}
+
+.card-title .icon {
+    width: 19px;
+    height: 19px;
+    stroke-width: 2.1;
+    color: var(--accent);
+}
+
+/* A card's title is the button that folds the card to it and opens it again, a chevron after the name (Stefano) */
+.card-fold {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.card-fold .chevron {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: var(--soft);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.card-fold:hover .chevron,
+.card-fold:focus-visible .chevron {
+    stroke: var(--accent);
+}
+
+/* A folded card is its title alone: the moves' gives the column's room back to the cards above */
+.moves-card.folded {
+    flex: none;
+    min-height: 0;
 }
 
 /* The coach's words at the top of the card (D-88): its judgment of the player's last move, then its hint, folded until they open it */
@@ -4522,19 +4585,40 @@ h3 + .switch {
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
     color: var(--soft);
 }
 
+/* Each kind of fact in its colour, on its icon and as a light tint (Stefano): a piece at risk red, a pin orange, nothing at risk green, the checks blue, the
+   loose pieces grey */
 .help-rows li {
+    --row: var(--soft);
     position: relative;
     padding: 3px 6px 3px 26px;
     border-radius: 6px;
     line-height: 1.35;
+    background: color-mix(in srgb, var(--row) 10%, transparent);
+}
+
+.help-rows li.risk {
+    --row: var(--badge-blunder);
+}
+
+.help-rows li.pin {
+    --row: var(--badge-mistake);
+}
+
+.help-rows li.safe {
+    --row: var(--badge-best);
+    color: var(--ink);
+}
+
+.help-rows li.check {
+    --row: var(--accent);
 }
 
 .help-rows li.points:hover {
-    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    background: color-mix(in srgb, var(--row) 24%, transparent);
     color: var(--ink);
 }
 
@@ -4569,7 +4653,7 @@ h3 + .switch {
 }
 
 .help-rows .help-notch path {
-    fill: var(--ink);
+    fill: var(--row);
     stroke: none;
 }
 
@@ -4585,8 +4669,17 @@ h3 + .switch {
     height: 16px;
     display: grid;
     place-items: center;
-    color: var(--ink);
-    font-weight: 800;
+    color: var(--row);
+}
+
+.help-rows .row-icon svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .helps-card .tabs {
@@ -4699,8 +4792,129 @@ h3 + .switch {
     font-style: italic;
 }
 
-.profile-foot {
-    margin: 6px 0 0;
+/* The strategy (Stefano): the phase in a pill and the open files on top, then the bar of the squares controlled, the table in groups, the notes */
+.strategy {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.strategy-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    margin: 0;
     font-size: 12px;
     color: var(--soft);
+}
+
+.strategy .phase {
+    padding: 1px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    color: var(--ink);
+    font-weight: 700;
+}
+
+/* Squares and files in chips, a count in bold, a yes as a green tick, nothing as a faint dash */
+.strategy .chip {
+    display: inline-block;
+    margin: 1px 3px 1px 0;
+    padding: 0 5px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--ink) 10%, transparent);
+    color: var(--ink);
+    font-weight: 700;
+}
+
+.strategy .count {
+    color: var(--ink);
+}
+
+.strategy .none {
+    opacity: 0.5;
+}
+
+.strategy .yes {
+    display: inline-grid;
+    vertical-align: -3px;
+}
+
+.strategy .yes svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: var(--badge-best);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* The squares each side controls: White's in white, both in grey, Black's in black, each as long as its count */
+.control {
+    display: grid;
+    gap: 3px;
+    font-size: 11px;
+    color: var(--soft);
+}
+
+.control-title {
+    font-size: 12px;
+}
+
+.control-bar {
+    display: flex;
+    height: 18px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    overflow: hidden;
+    font-weight: 700;
+}
+
+.control-bar span {
+    flex-basis: 0;
+    display: grid;
+    place-items: center;
+    min-width: 20px;
+}
+
+.control-bar .white {
+    background: #f4f6f8;
+    color: #1d2733;
+}
+
+.control-bar .both {
+    background: #8d98a7;
+    color: #fff;
+}
+
+.control-bar .black {
+    background: #1d2733;
+    color: #f4f6f8;
+}
+
+.control-legend {
+    display: flex;
+    justify-content: space-between;
+}
+
+/* The table's groups under their figure, in the accent; the sides' heads with their pawn */
+.profile-table tr.group th {
+    padding-top: 7px;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.profile-table tbody tr.group + tr {
+    border-top: 0;
+}
+
+.profile-table .figurine {
+    margin-right: 3px;
+}
+
+.help-rows li.info {
+    --row: var(--accent);
 }

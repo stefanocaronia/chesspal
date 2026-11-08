@@ -2,7 +2,7 @@
 import type { AiLevel, Badge, DrawColour, IllegalReason, Phase, PieceLetter, Side } from "../core/index.ts";
 import type { Step } from "./browse.ts";
 import type { HowEnded } from "./ending.ts";
-import type { StrategyRow } from "./helps-view.ts";
+import type { StrategyGroup, StrategyRow } from "./helps-view.ts";
 import type { AvatarId, Level, RatingSite } from "./profile.ts";
 
 /** The words of the page in one language. */
@@ -52,8 +52,12 @@ export interface Text
     /** The buttons that step through the moves (T-88). */
     readonly steps: Readonly<Record<Step, string>>;
     readonly noGame: string;
-    /** The button that saves the moves alone as a PGN, for Lichess or chess.com (T-59). */
+    /** The tooltips of a card's title in the game's column, which folds the card and opens it again (Stefano). */
+    readonly foldCard: string;
+    readonly openCard: string;
+    /** The button that saves the moves alone as a PGN, for Lichess or chess.com (T-59), and its tooltip. */
     readonly saveMoves: string;
+    readonly saveMovesHint: string;
     /** The header's word between games, on the table set for the next (D-77). */
     readonly noGameNow: string;
     /** A game the AI goes over with the player (D-69): what the header says, the badges it puts on the moves, and its word on the whole game. */
@@ -159,11 +163,17 @@ export interface HelpsCardText
     readonly black: string;
     /** Each line of the strategy's table: its name, and what it means for whoever does not know the word (Rosa). */
     readonly rows: Readonly<Record<StrategyRow, readonly [name: string, meaning: string]>>;
+    /** The groups the lines stand in, each under its figure. */
+    readonly groups: Readonly<Record<StrategyGroup, string>>;
     readonly yes: string;
     readonly notYet: string;
     readonly noMore: string;
     readonly phases: Readonly<Record<Phase, string>>;
-    openFiles(files: string): string;
+    /** Before the open files, beside the phase. */
+    readonly openFiles: string;
+    /** The bar of the squares each side controls: its title, the word under its middle, and the sentence that says it whole. */
+    readonly control: string;
+    readonly both: string;
     controlled(white: number, black: number, both: number): string;
     readonly oppositeBishops: string;
     repetitions(times: number): string;
@@ -188,8 +198,9 @@ export interface StudyText
     readonly reviewed: string;
     readonly unreviewed: string;
     moves(count: number): string;
-    /** The column's button that saves the game in analysis with its review. */
+    /** The column's button that saves the game in analysis with its review, and its tooltip. */
     readonly download: string;
+    readonly downloadHint: string;
     /** The column's button under a game just over, which opens it in analysis. */
     readonly analyseIt: string;
     /** The same from the table set for the next game, where the last one no longer shows (D-77). */
@@ -355,7 +366,10 @@ const english: Text = {
     moves: "Moves",
     steps: { first: "Start", back: "Previous move", forward: "Next move", last: "Back to the game" },
     noGame: "No game yet: press + to start one, or ask for one in the chat.",
-    saveMoves: "Save the moves (PGN)",
+    foldCard: "Fold the card",
+    openCard: "Open the card",
+    saveMoves: "Moves-only PGN",
+    saveMovesHint: "The moves alone, to open on Lichess or chess.com",
     noGameNow: "No game in progress",
     analysing: "Analysis in progress",
     badges: {
@@ -507,7 +521,8 @@ const english: Text = {
         reviewed: "reviewed",
         unreviewed: "to review",
         moves: (count) => `${count} ${count === 1 ? "move" : "moves"}`,
-        download: "Save PGN",
+        download: "Annotated PGN",
+        downloadHint: "The game with the review's comments and judgments",
         analyseIt: "Analyse the game",
         analyseLast: "Analyse the last game",
     },
@@ -521,8 +536,8 @@ const english: Text = {
         strategy: "Strategy",
         map: "Map",
         mapHint: "Hold it, or the M key, to see who controls each square; on a phone, a touch turns it on and off",
-        bare: "Hide the arrows",
-        bareHint: "Hold it to see the board without the arrows and the marked squares; on a phone, a touch hides them and shows them again",
+        bare: "Hide the drawings",
+        bareHint: "Hold it to see the board without the arrows, the marked squares and the helps' signs; on a phone, a touch hides them and shows them again",
         attackers: "attackers",
         defenders: "defenders",
         undefended: "no defender",
@@ -551,11 +566,14 @@ const english: Text = {
             castled: ["Castling", "How it castled; not yet while it still can, no more once the king or the rooks have moved."],
             kingAttacks: ["Enemy attacks around the king", "How many enemy attacks fall on the squares next to the king."],
         },
+        groups: { pawns: "Pawns", pieces: "Pieces", king: "King" },
         yes: "yes",
         notYet: "not yet",
         noMore: "no more",
-        phases: { opening: "opening", middlegame: "middlegame", endgame: "endgame" },
-        openFiles: (files) => `Open files: ${files}`,
+        phases: { opening: "Opening", middlegame: "Middlegame", endgame: "Endgame" },
+        openFiles: "Open files",
+        control: "Squares controlled",
+        both: "both",
         controlled: (white, black, both) => `Squares only White's ${white}, only Black's ${black}, both ${both}`,
         oppositeBishops: "Bishops of opposite colours",
         repetitions: (times) => `This position has stood ${times} times`,
@@ -623,7 +641,10 @@ const italian: Text = {
     moves: "Mosse",
     steps: { first: "Inizio", back: "Mossa precedente", forward: "Mossa successiva", last: "Torna alla partita" },
     noGame: "Nessuna partita: premi + per iniziarne una, o chiedila nella chat.",
-    saveMoves: "Scarica le mosse (PGN)",
+    foldCard: "Chiudi la scheda",
+    openCard: "Apri la scheda",
+    saveMoves: "PGN solo mosse",
+    saveMovesHint: "Solo le mosse, da aprire su Lichess o chess.com",
     noGameNow: "Nessuna partita in corso",
     analysing: "Analisi in corso",
     badges: {
@@ -777,7 +798,8 @@ const italian: Text = {
         reviewed: "commentata",
         unreviewed: "da commentare",
         moves: (count) => `${count} ${count === 1 ? "mossa" : "mosse"}`,
-        download: "Scarica PGN",
+        download: "PGN annotato",
+        downloadHint: "La partita con i commenti e i giudizi della revisione",
         analyseIt: "Analizza la partita",
         analyseLast: "Analizza l'ultima partita",
     },
@@ -791,8 +813,8 @@ const italian: Text = {
         strategy: "Strategia",
         map: "Mappa",
         mapHint: "Tienilo premuto, o tieni premuto il tasto M, per vedere chi controlla ogni casa; sul telefono un tocco la accende e la spegne",
-        bare: "Nascondi le frecce",
-        bareHint: "Tienilo premuto per vedere la scacchiera senza frecce e case segnate; sul telefono un tocco le nasconde e le rimostra",
+        bare: "Nascondi i disegni",
+        bareHint: "Tienilo premuto per vedere la scacchiera senza frecce, case segnate e segni degli aiuti; sul telefono un tocco li nasconde e li rimostra",
         attackers: "attaccanti",
         defenders: "difensori",
         undefended: "nessun difensore",
@@ -821,11 +843,14 @@ const italian: Text = {
             castled: ["Arrocco", "Come ha arroccato; non ancora finché può farlo, non più quando il re o le torri si sono già mossi."],
             kingAttacks: ["Attacchi nemici attorno al re", "Quanti attacchi nemici cadono sulle case accanto al re."],
         },
+        groups: { pawns: "Pedoni", pieces: "Pezzi", king: "Re" },
         yes: "sì",
         notYet: "non ancora",
         noMore: "non più",
-        phases: { opening: "apertura", middlegame: "mediogioco", endgame: "finale" },
-        openFiles: (files) => `Colonne aperte: ${files}`,
+        phases: { opening: "Apertura", middlegame: "Mediogioco", endgame: "Finale" },
+        openFiles: "Colonne aperte",
+        control: "Case controllate",
+        both: "tutti e due",
         controlled: (white, black, both) => `Case solo del Bianco ${white}, solo del Nero ${black}, di tutti e due ${both}`,
         oppositeBishops: "Alfieri di colore contrario",
         repetitions: (times) => `Questa posizione si è vista ${times} volte`,
