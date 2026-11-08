@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Game, notationOf, writtenIn } from "../src/core/index.ts";
+import { figurinesOf, Game, notationOf, writtenIn } from "../src/core/index.ts";
 
 const standard = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 // Morphy against Duke Karl and Count Isouard, Paris 1858.
@@ -141,6 +141,11 @@ describe("a game", () => {
         const moves = ["Nxe4", "Ke1", "Qd8+", "Rh1", "Bb5", "O-O-O", "a4", "e8=Q#", "exd8=N", "b1=R"];
         expect(moves.map((san) => writtenIn(san, "it"))).toEqual(["Cxe4", "Re1", "Dd8+", "Th1", "Ab5", "O-O-O", "a4", "e8=D#", "exd8=C", "b1=T"]);
         expect(moves.map((san) => writtenIn(san, "en"))).toEqual(moves);
+    });
+
+    it("shows SAN's moves with the pieces' figurines, in every language (D-86)", () => {
+        const moves = ["Nxe4", "Ke1", "Qd8+", "Rh1", "Bb5", "O-O-O", "a4", "e8=Q#", "exd8=N", "b1=R"];
+        expect(moves.map(figurinesOf)).toEqual(["♘xe4", "♔e1", "♕d8+", "♖h1", "♗b5", "O-O-O", "a4", "e8=♕#", "exd8=♘", "b1=♖"]);
     });
 
     it("reads the figurines as SAN's pieces and the small letters of the player's notation, and names every rook an Italian R could have meant (D-83)", () => {

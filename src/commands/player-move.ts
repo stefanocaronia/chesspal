@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { gameFolder, notationIn } from "../profiles/index.ts";
-import { closingLines, lastMoveText, moveLines, type MovePlayed, withWritten } from "./game-summary.ts";
+import { closingLines, lastMoveText, moveLines, type MovePlayed, withShown } from "./game-summary.ts";
 import { inviteLine, pageInvite } from "./page-link.ts";
 import { playMove, positionIn, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
@@ -28,19 +28,18 @@ export const playerMove = defineCommand({
         }
 
         const started = context.positionSeen === null ? positionIn(folder).started : context.positionSeen?.started;
-        const notation = notationIn(folder, context.language);
         const played = playMove(folder, context.now(), "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`, {
             allowance: chatAllowance,
             offerDraw,
-            notation,
+            notation: notationIn(folder, context.language),
         });
         // A game over by this move has no more moves to play there: the next game's window gives the address (Federico, round of D-85).
         const invite = played.game.end === undefined ? pageInvite(context, started) : undefined;
-        return { ...withWritten({ ...played, words: newWords(context) }, notation), ...(invite === undefined ? {} : { invite }) };
+        return { ...withShown({ ...played, words: newWords(context) }), ...(invite === undefined ? {} : { invite }) };
     },
     format: (result) =>
         [
-            `Player: ${result.game.lastMove === undefined ? result.move : lastMoveText(result.game.lastMove, result.written)}.`,
+            `Player: ${result.game.lastMove === undefined ? result.move : lastMoveText(result.game.lastMove, result.shown)}.`,
             ...moveLines(result),
             ...(result.invite === undefined ? [] : [inviteLine(result.invite)]),
             ...closingLines(result.game, result.words),

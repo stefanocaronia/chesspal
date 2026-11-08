@@ -1,5 +1,5 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
-import { type AiLevel, type Facts, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, type Notation, sees, type Side, type Square, writtenIn } from "../core/index.ts";
+import { type AiLevel, type Facts, figurinesOf, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, type Notation, sees, type Side, type Square } from "../core/index.ts";
 import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, talkLimits, type Thought, thoughtForLastMove } from "../games/index.ts";
 import { onQuickModel } from "../host-files/index.ts";
 import { helpsIn, languageIn, notationIn } from "../profiles/index.ts";
@@ -55,8 +55,8 @@ export interface MovePlayed
 {
     /** The move, numbered as in the game: 4.Ng5, 4...d5. */
     move: string;
-    /** The move as the player writes it, when their notation's letters are not SAN's (D-83): Cg5. */
-    written?: string;
+    /** The move as the player is shown it, numbered, when it has a piece's figurine (D-86): 4.♘g5. */
+    shown?: string;
     /** A + or # the move was written with and does not give. */
     note?: string;
     game: GameSummary;
@@ -185,32 +185,32 @@ export function headLines(game: GameSummary, withLastMove = true): string[]
     ];
 }
 
-/** A move with its squares: 4.Ng5 (f3-g5); see moveText for the player's letters. */
-export function lastMoveText({ move, from, to }: LastMove, written?: string): string
+/** A move with its squares: 4.Ng5 (f3-g5); see moveText for the form shown to the player. */
+export function lastMoveText({ move, from, to }: LastMove, shown?: string): string
 {
-    return moveText(move, written, `${from}-${to}`);
+    return moveText(move, shown, `${from}-${to}`);
 }
 
 /**
- * A numbered move, with its squares when given; in the player's letters first when they are not SAN's (D-83), since the AI copies the line's first form
- * into its message (Priya, retest of T-54): 4.Cg5 for the player (Ng5, f3-g5).
+ * A numbered move, with its squares when given; with the pieces' figurines first when it moves a piece (D-86), since the AI copies the line's first form
+ * into its message (Priya, retest of T-54): 4.♘g5 for the player (Ng5, f3-g5).
  */
-export function moveText(move: string, written?: string, squares?: string): string
+export function moveText(move: string, shown?: string, squares?: string): string
 {
-    if (written === undefined) {
+    if (shown === undefined) {
         return squares === undefined ? move : `${move} (${squares})`;
     }
 
     const san = move.replace(/^\d+\.+/, "");
-    return `${written} for the player (${squares === undefined ? san : `${san}, ${squares}`})`;
+    return `${shown} for the player (${squares === undefined ? san : `${san}, ${squares}`})`;
 }
 
-/** The move played, with how the player writes it, numbered, when their notation's letters are not SAN's (D-83). */
-export function withWritten<Played extends MovePlayed>(played: Played, notation: Notation): Played
+/** The move played, with the form shown to the player, numbered, when it has a piece's figurine (D-86). */
+export function withShown<Played extends MovePlayed>(played: Played): Played
 {
     const [, number = "", san = played.move] = /^(\d+\.+)(.+)$/.exec(played.move) ?? [];
-    const written = writtenIn(san, notation);
-    return written === san ? played : { ...played, written: `${number}${written}` };
+    const shown = figurinesOf(san);
+    return shown === san ? played : { ...played, shown: `${number}${shown}` };
 }
 
 /** The player's language by its English name when it is not English, and their notation when its letters are not SAN's (D-83). */
@@ -231,7 +231,7 @@ export function speechOf(folder: string, systemLanguage: string | undefined): Sp
 /** What the AI is told of the player's speech once a chat (Priya, retest of T-54): with the notation alone it answered a bare move in English. */
 export function speechLine({ language, notation }: Speech): string
 {
-    return notation === undefined ? `The player speaks ${language}.` : `The player speaks ${language}, and writes and reads moves in ${notationNames[notation]}.`;
+    return notation === undefined ? `The player speaks ${language}.` : `The player speaks ${language}, and writes moves in ${notationNames[notation]}.`;
 }
 
 const notationNames: Readonly<Record<Exclude<Notation, "en">, string>> = {

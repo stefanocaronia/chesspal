@@ -1,4 +1,11 @@
-// The letters the player writes the pieces with (D-83): SAN's own in English, the language's in the others. What Chesspal shows has the pieces' figurines.
+// The letters the player writes the pieces with (D-83): SAN's own in English, the language's in the others. What Chesspal shows has the pieces' figurines (D-86).
+import { figurines } from "./board-text.ts";
+
+/** A move in SAN as the player is shown it, in every language, with the pieces' figurines for their letters (D-86): Nxe4 is ♘xe4 and e8=Q is e8=♕. */
+export function figurinesOf(san: string): string
+{
+    return san.replace(/^[KQRBN]|(?<==)[QRBN]/g, (letter) => figurines[letter] ?? letter);
+}
 
 /** A notation the player writes moves in: English is SAN's own. */
 export type Notation = "en" | "it";
