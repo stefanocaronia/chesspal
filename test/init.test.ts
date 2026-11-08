@@ -40,8 +40,8 @@ describe("chesspal init", () => {
                 + "  1. Go into the folder: cd chess\n"
                 + "     then open Claude Code (claude) or Codex (codex).\n"
                 + "  2. The first time, it asks whether to trust the folder: say yes.\n"
-                + "     In Codex, also type /hooks and allow Chesspal's two hooks:\n"
-                + "     small helpers that let it notice your moves on the board.\n"
+                + "     Codex also asks about Chesspal's two hooks: choose Trust all.\n"
+                + "     They are small helpers that let it notice your moves on the board.\n"
                 + "  3. Say hello: the AI gives you the link to the board.\n\n"
                 + "  Updated 8 files.",
         );
@@ -77,9 +77,9 @@ describe("chesspal init", () => {
         writeFileSync(join(folder, ".claude", "settings.json"), "﻿" + JSON.stringify({ model: "opus", permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [ownStop] } }));
         writeFileSync(join(folder, ".codex", "hooks.json"), JSON.stringify({ hooks: { Stop: [ownStop] } }));
         writeFileSync(join(folder, ".codex", "config.toml"), 'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\nenv = { CHESSPAL_HOME = "D:/runs" }\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n');
-        // Codex runs hooks that changed only once the player allows them again (T-125).
+        // Codex runs hooks that changed only once the player trusts them again (T-125).
         expect((await runCommandLine(["init"], testContext(folder))).output).toContain(
-            "\n\n  Chesspal's hooks for Codex have changed: in Codex, type /hooks and allow them again.\n\n  Updated 8 files.",
+            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 8 files.",
         );
 
         expect(json(folder, ".mcp.json")).toEqual({ mcpServers: { other: { command: "other" }, chesspal: { command: "chesspal", args: ["mcp"], env: { CHESSPAL_HOME: "D:/runs" } } } });

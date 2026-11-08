@@ -17,12 +17,12 @@ claude
 
 - `npm install -g` installs the `chesspal` command for the whole computer, where your agent finds it.
 - `chesspal init chess` makes the folder `chess` to play in. Any name will do; your games are kept [elsewhere](#where-your-games-are).
-- `claude` opens Claude Code in that folder; with Codex, type `codex`, then `/hooks`, and allow Chesspal's two hooks. In the Claude desktop app, choose the folder in the Code tab instead.
+- `claude` opens Claude Code in that folder (in the Claude desktop app, choose the folder in the Code tab). With Codex, type `codex`, and when it asks about Chesspal's two hooks, choose **Trust all and continue**.
 - The first time, your agent asks whether you trust the folder: say yes.
 
 Then **say hello**. The AI answers with the link to the board page: open it in your browser, tell it who you are, and ask for a game. You choose your colour, the clock and the AI's level, and play on the board.
 
-On Windows, use Command Prompt (press Start, type `cmd`, press Enter). PowerShell, on a new computer, refuses npm's commands with "running scripts is disabled on this system"; there, type `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and answer yes, or use Command Prompt.
+On Windows, use Command Prompt (press Start, type `cmd`, press Enter). PowerShell, on a new computer, refuses npm's commands with "running scripts is disabled on this system"; there, type `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and answer yes, or use Command Prompt. Codex on Windows also offers to set up its sandbox the first time: choose the first option, and answer yes when Windows asks for permission.
 
 ## What it does
 

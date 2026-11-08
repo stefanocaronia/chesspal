@@ -13,7 +13,7 @@ interface FolderSetUp
     written: string[];
     /** The folder as the player goes into it from where init ran, when it is not that one (T-127): chess. */
     enter?: string;
-    /** Codex's hooks changed in a folder that had them: Codex runs them only once allowed again in /hooks (T-125). */
+    /** Codex's hooks changed in a folder that had them: Codex runs them only once the player trusts them again (T-125). */
     hooksChanged?: true;
 }
 
@@ -73,10 +73,10 @@ const english: InitWords = {
     toPlay: "To play:",
     open: (enter) => enter === undefined ? ["Open Claude Code or Codex in this folder."] : [`Go into the folder: cd ${enter}`, "then open Claude Code (claude) or Codex (codex)."],
     steps: [
-        ["The first time, it asks whether to trust the folder: say yes.", "In Codex, also type /hooks and allow Chesspal's two hooks:", "small helpers that let it notice your moves on the board."],
+        ["The first time, it asks whether to trust the folder: say yes.", "Codex also asks about Chesspal's two hooks: choose Trust all.", "They are small helpers that let it notice your moves on the board."],
         ["Say hello: the AI gives you the link to the board."],
     ],
-    hooksChanged: "Chesspal's hooks for Codex have changed: in Codex, type /hooks and allow them again.",
+    hooksChanged: "Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.",
     updated: (count) => `Updated ${count} ${count === 1 ? "file" : "files"}.`,
 };
 
@@ -86,10 +86,10 @@ const italian: InitWords = {
     toPlay: "Per giocare:",
     open: (enter) => enter === undefined ? ["Apri Claude Code o Codex in questa cartella."] : [`Entra nella cartella: cd ${enter}`, "poi apri Claude Code (claude) o Codex (codex)."],
     steps: [
-        ["La prima volta ti chiede se fidarti della cartella: rispondi sì.", "In Codex scrivi anche /hooks e consenti i due «hook» di Chesspal:", "piccoli aiuti che gli fanno vedere le tue mosse sulla scacchiera."],
+        ["La prima volta ti chiede se fidarti della cartella: rispondi sì.", "Codex chiede anche dei due «hook» di Chesspal: scegli Trust all.", "Sono piccoli aiuti che gli fanno vedere le tue mosse sulla scacchiera."],
         ["Saluta: l'AI ti dà il link della scacchiera."],
     ],
-    hooksChanged: "Gli «hook» di Chesspal per Codex sono cambiati: in Codex scrivi /hooks e consentili di nuovo.",
+    hooksChanged: "Gli «hook» di Chesspal per Codex sono cambiati: quando Codex te lo chiede, scegli di nuovo Trust all.",
     updated: (count) => count === 1 ? "Aggiornato 1 file." : `Aggiornati ${count} file.`,
 };
 

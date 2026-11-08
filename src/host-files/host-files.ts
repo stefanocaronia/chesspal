@@ -22,7 +22,7 @@ export function setUpHosts(folder: string, platform: string): string[]
     return written.map(({ path }) => path);
 }
 
-/** Where Codex reads a folder's hooks, which it runs only once the player allows them in /hooks (T-125). */
+/** Where Codex reads a folder's hooks, which it runs only once the player trusts them (T-125). */
 export function codexHooksPath(folder: string): string
 {
     return join(folder, ".codex", "hooks.json");
@@ -152,7 +152,7 @@ function codexConfigFile(folder: string, platform: string): FileChange | undefin
     return text === before ? undefined : { path, text };
 }
 
-/** Codex's hooks, read once the player has reviewed them in /hooks: the doorbell of the moves on the page (T-62) and how each chat starts (T-104), beside the player's own. */
+/** Codex's hooks, read once the player has trusted them: the doorbell of the moves on the page (T-62) and how each chat starts (T-104), beside the player's own. */
 function codexHooksFile(folder: string): FileChange | undefined
 {
     const path = codexHooksPath(folder);
