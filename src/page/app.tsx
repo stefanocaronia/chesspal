@@ -24,6 +24,7 @@ import {
     timeControlText,
     writePgn,
 } from "../core/index.ts";
+import { anchorName, useAnchor } from "./anchor.ts";
 import { PlayerPicture } from "./avatars.tsx";
 import { BadgeCounts } from "./badges.tsx";
 import { Board, type Notice, piecesOf } from "./board.tsx";
@@ -264,6 +265,15 @@ export function App({ start }: { start: Settings; })
     const step = (to: Step): void => goTo(stepped(to, at, total));
     useBrowseKeys(step, () => setFlipped(!flipped));
     const wheel = useWheelSteps(step);
+    // The move shown stays in the page's address, for a reload and a link to it (T-155); after the reset on a new game, which would undo the move it goes to. A
+    // game a link opens is there to look at: the analyst starts on the player's yes alone (D-89; Zoe and Federico, review of T-155).
+    const playedName = game === undefined || game === null ? undefined : anchorName(game.name);
+    useAnchor(
+        { ready: served !== undefined, shown: studied !== undefined ? anchorName(studied.name) : idle ? undefined : playedName, played: playedName, going },
+        viewing,
+        (plies) => goTo(plies ?? total),
+        async (wanted) => await post("/api/study", { game: wanted, look: true }, text, name) === undefined,
+    );
 
     // The header's theme switch picks the other of the two the page shows, leaving the system's.
     const switchTheme = (): void => change({ ...settings, theme: document.documentElement.dataset.theme === "dark" ? "light" : "dark" });
@@ -764,6 +774,8 @@ interface Served
         readonly pgn: string;
         readonly ai: Side;
         readonly started: string;
+        /** Its name in the archive, games/2026-11-02-153012.pgn. */
+        readonly name: string;
         readonly talk: readonly TalkLine[];
         readonly clock?: Clock;
         readonly drawOffer?: "player" | "ai";

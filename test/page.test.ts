@@ -8,7 +8,8 @@ import { type Context, withProfile } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import { PositionChanged } from "../src/commands/play-move.ts";
 import { status } from "../src/commands/status.ts";
-import { noteAiModel } from "../src/games/index.ts";
+import { archivedGames, noteAiModel } from "../src/games/index.ts";
+import { anchorName } from "../src/page/anchor.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page.ts";
@@ -166,6 +167,12 @@ describe("the page's server", () => {
         await post(page, "/api/resign", {});
         // With the model the AI played it with, which the list names it by (D-82).
         expect(JSON.parse((await get(page, "/api/analyses")).body)).toMatchObject([{ white: "Player", black: "AI", aiModel: { model: "claude-opus-5-5", effort: "xhigh" }, moves: 1, reviewed: false }]);
+
+        // A link of the page opens it to look at, the chat not asked to go over it; the game named as the archive keeps it (T-155).
+        const { game } = JSON.parse((await get(page, "/api/game")).body) as { game: { name: string; }; };
+        expect(archivedGames(gameFolder(folder))).toEqual([game.name]);
+        expect(await post(page, "/api/study", { game: anchorName(game.name), look: true })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
+        expect(await statusOf(folder)).not.toContain("call analyse_game");
 
         expect(await post(page, "/api/study", { last: true })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
         expect(await statusOf(folder)).toContain("call analyse_game");

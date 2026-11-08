@@ -19,6 +19,7 @@ import { gameToStudy, namedGame } from "../commands/study.ts";
 import { clockStarted, type GameRecord, isReviewed, writePgn } from "../core/index.ts";
 import {
     aiModelOf,
+    archiveName,
     coachShown,
     type CoachWords,
     coachWords,
@@ -430,6 +431,8 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
     const pgn = textOf(body?.pgn);
     const game = textOf(body?.game);
     const last = body?.last === true;
+    // A game a link of the page opens is there to look at: the chat is not asked to go over it (T-155).
+    const look = body?.look === true;
 
     if (pgn === undefined && game === undefined && !last) {
         send(response, 400, json, JSON.stringify({ error: asked, refusal: "pgn-unreadable" }));
@@ -442,19 +445,21 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
     }
 
     let reviewed: boolean;
+    let brought: boolean;
 
     try {
         // Without what the chat was told: the analyst's instructions stay for the AI's own analyse_game.
         const opened = last ? lastPlayed(served.context) : game === undefined ? kept(served, pgn!) : namedGame(served.context, game);
         reviewed = isReviewed(opened.record);
+        brought = !reviewed && !look;
         // A game not yet reviewed is marked as brought, for status to ask the AI to go over it (T-92); one reviewed is ready, and the chat sleeps on (T-106).
-        startAnalysis(gameFolder(served.context.home()), opened.name, served.context.now(), !reviewed);
+        startAnalysis(gameFolder(served.context.home()), opened.name, served.context.now(), brought);
     } catch (error) {
         send(response, 400, json, JSON.stringify({ error: (error as Error).message, refusal: "pgn-unreadable" }));
         return;
     }
 
-    if (!reviewed) {
+    if (brought) {
         served.bell.ring();
     }
 
@@ -716,6 +721,8 @@ function sendGame(response: ServerResponse, served: Served): void
             pgn: playerPgn(folder, current),
             ai: current.ai,
             started: current.started,
+            // Its name in the archive, for the page's address (T-155).
+            name: archiveName(current),
             talk,
             // How many of its first moves are the book's: the page marks them while the game goes on, as the AI's review does after.
             book: bookPlies(current.game.record),
