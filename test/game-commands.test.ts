@@ -79,7 +79,7 @@ describe("a game in chat", () => {
         await expect(run(context, "ai_move", { move: "e5", plan: "p", comment: "c" })).rejects.toThrow(
             "It is the player's move (White): wait for it, then call player_move. Nothing changed.",
         );
-        await expect(run(context, "player_move", { move: "e5" })).rejects.toThrow("e5 is not legal here, with White to move. Ask the player for another move. Nothing changed.");
+        await expect(run(context, "player_move", { move: "e5" })).rejects.toThrow("e5 is not legal here, with White to move. Ask the player again. Nothing changed.");
         await run(context, "player_move", { move: "e4" });
         await expect(run(context, "player_move", { move: "d4" })).rejects.toThrow("It is your move (Black): call ai_move. Nothing changed.");
         await expect(run(context, "ai_move", { move: "e4", plan: "p", comment: "c" })).rejects.toThrow(/^e4 is not legal here, with Black to move\. Legal: Nc6 .* h5\. Nothing changed\.$/);

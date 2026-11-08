@@ -191,8 +191,8 @@ function squareIn(word: string): string | undefined
 // **a few words** the AI put in bold, as Markdown writes them.
 const boldWords = /\*\*(.+?)\*\*/;
 
-// A square or a move in English or Italian letters, with its number if it has one; the capture group keeps it in split's parts.
-const boardWords = /(?<![\p{L}\d])((?:\d+\.(?:\.\.)?\s?)?(?:O-O(?:-O)?|[KQRBNCADT]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBNDTAC])?)[+#]?[!?]{0,2})(?![\p{L}\d])/u;
+// A square or a move in SAN or with the pieces' figurines (D-86, D-87), with its number if it has one; the capture group keeps it in split's parts.
+const boardWords = /(?<![\p{L}\d])((?:\d+\.(?:\.\.)?\s?)?(?:O-O(?:-O)?|[KQRBN♔-♟]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN♔-♟])?)[+#]?[!?]{0,2})(?![\p{L}\d])/u;
 
 /** The AI's word on the whole game (D-69), in the Torretta's bubble at the start of the game: a paragraph, and its points as a list. */
 function GameReview({ by, summary, text }: { by: string; summary: string; text: Text; })

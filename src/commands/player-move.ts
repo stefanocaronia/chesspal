@@ -28,7 +28,7 @@ export const playerMove = defineCommand({
         }
 
         const started = context.positionSeen === null ? positionIn(folder).started : context.positionSeen?.started;
-        const played = playMove(folder, context.now(), "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`, { allowance: chatAllowance, offerDraw });
+        const played = playMove(folder, context.now(), "player", move, (message) => `${message} Ask the player again. Nothing changed.`, { allowance: chatAllowance, offerDraw });
         // A game over by this move has no more moves to play there: the next game's window gives the address (Federico, round of D-85).
         const invite = played.game.end === undefined ? pageInvite(context, started) : undefined;
         return { ...played, words: newWords(context), ...(invite === undefined ? {} : { invite }) };

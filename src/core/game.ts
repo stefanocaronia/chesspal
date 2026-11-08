@@ -244,8 +244,8 @@ export class Game
         const [, piece, file, rank, separator, target = "", promotion] = parts;
         const capture = separator === "x" || separator === ":";
 
-        // "bc4" is a bishop without its capital, or a pawn's capture without its x, as "bb4" is a bishop or a pawn: never guessed (T-11).
-        if (piece === undefined && file !== undefined && rank === undefined && !capture && (file !== target[0] || file === "b")) {
+        // "bc4" is a bishop without its capital, or a pawn's capture without its x, as "bb4" or "cc6" is a piece or a pawn: never guessed (T-11, Anatolij, round of D-87).
+        if (piece === undefined && file !== undefined && rank === undefined && !capture) {
             return smallLetter(input, file, target);
         }
 
@@ -390,7 +390,8 @@ function normalized(text: string): string
         // A space after the piece's letter, "N f3", as an AI may show the player how to write (Priya, retest of T-54).
         .replace(/^([A-Z♔-♟])\s+(?=[a-h1-8x:])/, "$1")
         .replace(/[–—−×♔-♟]/g, (sign) => asciiOf[sign] ?? sign)
-        .replace(/^[nrqk](?=[a-h1-8x:])/, (piece) => piece.toUpperCase())
+        // A small t too, so that "tf1" is told the rook's R as "Tf1" is.
+        .replace(/^[nrqkt](?=[a-h1-8x:])/, (piece) => piece.toUpperCase())
         .replace(/\+\+(?=[!?]*$)/, "#")
         .replace(/^[0Oo]-[0Oo](?:-[0Oo])?(?=[+#]?[!?]*$)/, (castling) => castling.replace(/[0o]/g, "O"));
 }

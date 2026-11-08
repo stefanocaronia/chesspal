@@ -1,4 +1,4 @@
-// The board and the moves as text for the player in the chat (D-36), with the pieces' figurines (D-83, D-86); never the AI's view (D-26).
+// The board and the moves as text for the player in the chat (D-36), with the pieces' figurines (D-86): the moves for the AI to copy, never its view of the board (D-26).
 
 /**
  * The board of a FEN as text: White at the bottom, the pieces as Unicode figurines, the empty squares and the files as signs a browser draws as wide as the

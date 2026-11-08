@@ -76,6 +76,9 @@ describe("a game", () => {
         expect(game.play("bb4")).toMatchObject({ message: '"bb4" is not a move: b is a file. The pawn\'s move is b4. For a bishop, Bb4.' });
         expect(game.play("cf3")).toMatchObject({ message: '"cf3" is not a move: c is a file. For a knight, Nf3.' });
         expect(game.play("hd4")).toMatchObject({ message: '"hd4" is not a move: h is a file. A piece is a capital letter: K, Q, R, B or N.' });
+        // A small letter on its own file is no pawn's move either (Anatolij, round of D-87).
+        expect(played(standard, "e4", "e5", "Nf3").play("cc6")).toMatchObject({ refusal: "unreadable", message: '"cc6" is not a move: c is a file. The pawn\'s move is c6. For a knight, Nc6.' });
+        expect(played(standard, "e4", "e5").play("dd3")).toMatchObject({ message: '"dd3" is not a move: d is a file. The pawn\'s move is d3. For a queen, Qd3.' });
         expect(game.play("Tf3")).toMatchObject({ message: expect.stringMatching(/For a rook, Rf3\. In SAN R is the rook, and K the king\.$/) });
         expect(from("4k3/1P6/8/8/8/8/8/4K3 w - - 0 1").play("b8=D")).toMatchObject({
             refusal: "unreadable",
@@ -104,8 +107,14 @@ describe("a game", () => {
 
     it("reads SAN alone in every language (D-87): an Italian letter is refused, with the move in SAN", () => {
         expect(from("4k3/8/8/8/8/8/8/R3K3 w - - 0 1").play("♜d1")).toMatchObject({ played: true, move: { san: "Rd1" } });
-        expect(from("4k3/8/8/8/8/8/8/R3K3 w - - 0 1").play("Td1")).toMatchObject({ refusal: "unreadable", message: expect.stringMatching(/For a rook, Rd1\./) });
+        expect(from(standard).play("♞f3")).toMatchObject({ played: true, move: { san: "Nf3" } });
+
+        for (const rook of ["Td1", "td1"]) {
+            expect(from("4k3/8/8/8/8/8/8/R3K3 w - - 0 1").play(rook), rook).toMatchObject({ refusal: "unreadable", message: expect.stringMatching(/For a rook, Rd1\./) });
+        }
+
         expect(from("4k3/1P6/8/8/8/8/8/4K3 w - - 0 1").play("b8=D")).toMatchObject({ refusal: "unreadable", message: expect.stringMatching(/For a queen, b8=Q\.$/) });
+        expect(from("4k3/1P6/8/8/8/8/8/4K3 w - - 0 1").play("b8=♛")).toMatchObject({ played: true, move: { san: "b8=Q+" } });
         expect(from("8/8/4k3/8/8/8/3K4/R7 w - - 0 1").play("Re1")).toMatchObject({ played: true, move: { san: "Re1+" } });
     });
 
@@ -117,6 +126,7 @@ describe("a game", () => {
         expect(numbered.record.moves.map((move) => move.san)).toEqual(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6"]);
         // The black pawn's figurine as Chesspal's chat board writes it, and the mate's ++; a file's capital is no piece's letter (D-42).
         expect(played(standard, "e4").play("♟︎e5")).toMatchObject({ played: true, move: { san: "e5" } });
+        expect(played(standard, "e4").play("♟\u{FE0F}e5")).toMatchObject({ played: true, move: { san: "e5" } });
         expect(new Game().play("D4")).toMatchObject({ refusal: "unreadable", message: expect.stringMatching(/^"D4" is not a move/) });
         expect(played(standard, "f3", "e5", "g4").play("Qh4++")).toEqual({ played: true, move: { san: "Qh4#", from: "d8", to: "h4" } });
     });
