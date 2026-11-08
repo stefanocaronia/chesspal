@@ -1,6 +1,6 @@
 // The analyses the page lists (T-106): the games brought to study and those played here, to analyse or open again on the board page.
 import { bookOpening } from "../commands/opening-book.ts";
-import { type AiModel, aiModelIn, closingOf, type GameRecord, gameReviewOf } from "../core/index.ts";
+import { type AiModel, aiModelIn, type GameRecord, isReviewed } from "../core/index.ts";
 import { archivedGame, archivedGames, keptGame, keptGames } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 
@@ -28,12 +28,6 @@ export function analysesOf(home: string): AnalysisItem[]
 
 // Enough for now; a longer list would load more as it scrolls.
 const shown = 20;
-
-/** Whether the analyst has reviewed a game: its word on the whole game or on how it ended. The opponent's badges, given during the game with the helps on, are not a review (D-78). */
-export function isReviewed(record: GameRecord): boolean
-{
-    return gameReviewOf(record) !== undefined || closingOf(record) !== undefined;
-}
 
 function itemOf(name: string, read: () => GameRecord): AnalysisItem[]
 {

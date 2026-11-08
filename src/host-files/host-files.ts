@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { makeFolder, writeAtomically } from "../games/index.ts";
-import { agentFiles } from "./agents.ts";
+import { agentFiles, instructions } from "./agents.ts";
 
 /**
  * Sets up the player's folder for Claude Code and Codex (D-31): .mcp.json with the chesspal server, AGENTS.md with the opponent's instructions between
@@ -31,7 +31,7 @@ export function codexHooksPath(folder: string): string
 /** The instructions of the AI opponent, read from the package wherever it is installed (T-8). */
 export function opponentInstructions(): string
 {
-    return readFileSync(new URL("../../instructions/opponent.md", import.meta.url), "utf8").trim();
+    return instructions("opponent");
 }
 
 interface FileChange

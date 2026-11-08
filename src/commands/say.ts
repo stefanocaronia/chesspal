@@ -55,10 +55,10 @@ function aiMost(folder: string, who: Sayer, text: string): number
     return talkLimits.ai;
 }
 
-/** What the player wrote on the board page that the AI has not been given in this chat, given now: each game tool gives it once. */
+/** What the player wrote on the board page that the AI has not been given in this chat, given now: each game tool gives it once; never to an agent (D-89). */
 export function newWords(context: Context): string[]
 {
-    return give(context, waitingWords(context));
+    return context.agent === undefined ? give(context, waitingWords(context)) : [];
 }
 
 /** Every word of the player's the AI has not answered, given again: status gives them all, for a chat that lost them in a summary. */

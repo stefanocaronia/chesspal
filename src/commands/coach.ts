@@ -1,20 +1,20 @@
 import { z } from "zod";
-import { type Badge, badges, Game, levelOf, materialOf, type Move, type Side, withSanLetters } from "../core/index.ts";
-import { archiveCoached, coachWaitingSince, coachWords, type CurrentGame, endOf, keepHint, keepJudgment, loadGame } from "../games/index.ts";
+import { type Badge, badges, Game, type GameRecord, levelOf, materialOf, type Move, type Side, withSanLetters } from "../core/index.ts";
+import { archiveCoached, coachWaitingSince, coachWords, type CurrentGame, endOf, keepHint, keepJudgment, loadGame, startCoach } from "../games/index.ts";
 import { coachAgent } from "../host-files/index.ts";
 import { activeProfile, gameFolder, helpsIn } from "../profiles/index.ts";
 import { clockLine, clockSummaryOf } from "./clock.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
 import { lastMoves, speechLine, speechOf } from "./game-summary.ts";
-import { knownMoves } from "./opening-book.ts";
+import { knownMoves, openingLine } from "./opening-book.ts";
 import { waitForPlayer, wordsOf } from "./ponder.ts";
 import { defineCommand } from "./registry.ts";
 import { colourName, compactView, materialText, riskLine } from "./view.ts";
 
 /** What coach answers: stop, the moves to work on, the words kept and what comes next, or still the player's move; with the game's key and the position. */
 type Coached =
-    | { stop: "moved" | "waited" | "helps"; }
+    | { stop: "moved" | "waited" | "helps" | "started"; }
     | { start: string[]; }
     | { kept: Place; then: "wait" | "moved" | "over"; }
     | { waiting: Place; };
@@ -73,7 +73,13 @@ export const coach = defineCommand({
             }
 
             const start = current === undefined ? undefined : startOf(current, folder, context);
-            return start === undefined ? { stop: "moved" } : { start };
+
+            if (start === undefined || current === undefined) {
+                return { stop: "moved" };
+            }
+
+            // The chat may start a second coach on the same position, told again before the first called: one judges it (Priya, playtest of T-112).
+            return startCoach(folder, current) ? { start } : { stop: "started" };
         }
 
         // A new game may have started while the coach thought on the last one: its words never go to another game (Federico, review of T-112).
@@ -99,6 +105,8 @@ export const coach = defineCommand({
         if ("stop" in coached) {
             return coached.stop === "helps"
                 ? "Stop now: the player has turned the helps off. End with one word."
+                : coached.stop === "started"
+                ? "Stop now: another coach works on this position. End with one word."
                 : coached.stop === "moved"
                 ? "Stop now: the player has moved, or the game is over. End with one word."
                 : "Stop now: you have waited long enough. End with one word.";
@@ -179,11 +187,22 @@ function startOf(current: CurrentGame, folder: string, context: Context): string
         head,
         speech === undefined ? "The player speaks English." : speechLine(speech),
         ...playerLines(context),
-        `Moves: ${lastMoves(record, pliesShown)}`,
+        ...movesLines(record),
         ...(clock === undefined ? [] : [clockLine(clock, ai)]),
         ...(judged === undefined ? [] : judgedLines(current, judged, player)),
         ...(over === undefined ? nowLines(current, folder, player) : []),
         keepLine,
+    ];
+}
+
+/** The game's moves as the coach reads them, with the position a game set up began in, the last ones of a long game, and its opening by the book (Anatolij, T-112). */
+function movesLines(record: GameRecord): string[]
+{
+    const opening = openingLine(record);
+    return [
+        ...(record.tags.FEN === undefined ? [] : [`The game began from a set position: ${record.tags.FEN}`]),
+        `${record.moves.length > pliesShown ? `Moves (the last ${pliesShown} plies)` : "Moves"}: ${lastMoves(record, pliesShown)}`,
+        ...(opening === undefined ? [] : [`Opening: ${opening}`]),
     ];
 }
 

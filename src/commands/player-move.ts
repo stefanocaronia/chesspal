@@ -2,7 +2,7 @@ import { z } from "zod";
 import { loadGame } from "../games/index.ts";
 import { coachAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
-import { agentsLine, closingLines, coachOnEnd, coachRuns, lastMoveText, moveLines, type MovePlayed, shownMove } from "./game-summary.ts";
+import { agentsLine, closingLines, coachOnEnd, coachRuns, lastMoveText, moveLines, type MovePlayed, shownMove, withAnalyst } from "./game-summary.ts";
 import { inviteLine, pageInvite } from "./page-link.ts";
 import { playMove, positionIn, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
@@ -35,7 +35,7 @@ export const playerMove = defineCommand({
         const invite = played.game.end === undefined ? pageInvite(context, started) : undefined;
         const ended = played.game.end === undefined ? undefined : loadGame(folder);
         const coach = ended !== undefined && coachOnEnd(context, folder, ended);
-        return { ...played, words: newWords(context), ...(invite === undefined ? {} : { invite }), ...(coach ? { coach } : {}) };
+        return { ...played, game: withAnalyst(played.game, context), words: newWords(context), ...(invite === undefined ? {} : { invite }), ...(coach ? { coach } : {}) };
     },
     format: (result) =>
         [

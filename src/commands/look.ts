@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { boardText, type Facts, materialOf, type Side } from "../core/index.ts";
+import { analystAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
@@ -40,6 +41,7 @@ export const look = defineCommand({
     // Read only for the host: a flag that has fallen is written, as the time already decided.
     readOnly: true,
     idempotent: true,
+    sharedWith: [analystAgent],
     run: ({ only, game, move }, context): Look => {
         if (game !== undefined || move !== undefined) {
             return studyLook(context, only, game, move);

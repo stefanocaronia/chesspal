@@ -2,7 +2,7 @@ import { z } from "zod";
 import { canMate, endWithMood, Game, moods, type Side, timeLeft } from "../core/index.ts";
 import { archiveEnded, bothSidesMoved, type CurrentGame, drawOfferOf, saveGame } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
-import { gameGoingOn, type GameSummary, nextStep, positionLines, summaryOf } from "./game-summary.ts";
+import { gameGoingOn, type GameSummary, nextStep, positionLines, summaryOf, withAnalyst } from "./game-summary.ts";
 import { refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
 import { colourName } from "./view.ts";
@@ -49,7 +49,8 @@ export const endGame = defineCommand({
             : { ...current, game, clock: { ...current.clock, left: timeLeft(current.clock, current.game.position.turn, now), since: now.toISOString() } };
         saveGame(folder, ended);
         const { archive, warning } = archiveEnded(folder, ended);
-        return warning === undefined ? { game: summaryOf(ended, now, archive) } : { game: summaryOf(ended, now, archive), warning };
+        const summary = withAnalyst(summaryOf(ended, now, archive), context);
+        return warning === undefined ? { game: summary } : { game: summary, warning };
     },
     format: ({ game, warning }) => [...positionLines(game), ...(warning === undefined ? [] : [warning]), nextStep(game)].join("\n"),
 });

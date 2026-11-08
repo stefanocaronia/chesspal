@@ -3,7 +3,7 @@ export { aiModelOf, noteAiModel } from "./ai-model.ts";
 export { type Analysis, endAnalysis, gameInAnalysis, startAnalysis } from "./analysis.ts";
 export { archiveCoached, archivedGame, archivedGames, archivedName, archivedWhen, archiveEnded, archiveGame, keepToStudy, keptGame, keptGames, movesPgn, playerPgn, rewriteGame, startOfNewGame } from "./archive.ts";
 export { type ChatStart, cleanSince, lastChatStart, saveChatStart } from "./chat-start.ts";
-export { type CoachHint, type CoachJudgment, coachShown, coachWaitingSince, type CoachWords, coachWords, firstCoachCall, keepHint, keepJudgment, withCoach } from "./coach.ts";
+export { type CoachHint, type CoachJudgment, coachShown, coachStarted, coachWaitingSince, type CoachWords, coachWords, keepHint, keepJudgment, startCoach, withCoach } from "./coach.ts";
 export { bothSidesMoved, type CurrentGame, drawOfferOf, endOf, type GameEnd, gameStamp, loadGame, saveGame, type Speaker, type TalkLine } from "./current-game.ts";
 export { makeFolder, renameOver, writeAtomically } from "./files.ts";
 export { commentWithPlan, currentPlan, planOf, withoutPlans } from "./plans.ts";

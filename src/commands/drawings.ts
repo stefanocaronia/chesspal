@@ -12,9 +12,12 @@ const drawLimit = 6;
 /** A note of the AI's on a move, as its input reads it: on one line of commands, so without brackets or braces. */
 export const noteInput = z.string().trim().min(1).max(noteLimit).regex(/^[^[\]{}]*$/, "write it without [ ] { }");
 
+// A drawing as the AI may write it, spaced or with a dash, as PGN writes it: "R f2 e1" and "Rf2-e1" are Rf2e1 (Priya, playtest of T-112).
+const drawing = z.string().overwrite((text) => text.replace(/[\s-]+/g, ""));
+
 /** The arrows the AI draws, as their input reads them. */
 export const arrowsInput = z.array(
-    z.string().regex(/^[GRYB][a-h][1-8][a-h][1-8]$/, "an arrow is a colour's letter and two squares: Gf6e4; a single square goes in squares")
+    drawing.regex(/^[GRYB][a-h][1-8][a-h][1-8]$/, "an arrow is a colour's letter and two squares: Gf6e4; a single square goes in squares")
         .refine((arrow) => arrow.slice(1, 3) !== arrow.slice(3, 5), "an arrow goes from a square to another: a single square goes in squares"),
 ).max(drawLimit).optional()
     .describe(
@@ -22,7 +25,7 @@ export const arrowsInput = z.array(
     );
 
 /** The squares the AI marks, as their input reads them. */
-export const squaresInput = z.array(z.string().regex(/^[GRYB][a-h][1-8]$/, "a square is a colour's letter and the square: Rf2")).max(drawLimit).optional()
+export const squaresInput = z.array(drawing.regex(/^[GRYB][a-h][1-8]$/, "a square is a colour's letter and the square: Rf2")).max(drawLimit).optional()
     .describe("squares to mark, as PGN's %csl writes them: Rf2; colours as for arrows");
 
 /** The arrows and squares drawn, those that read; none of either left out. */

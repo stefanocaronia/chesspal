@@ -7,7 +7,8 @@ import { type Caller, type Context, defaultContext } from "../commands/context.t
 import { commands } from "../commands/index.ts";
 import { PositionChanged } from "../commands/play-move.ts";
 import { type AnyCommand, inputProblems, isBoolean } from "../commands/registry.ts";
-import { noteAiModel } from "../games/index.ts";
+import { endOf, loadGame, noteAiModel } from "../games/index.ts";
+import { hasAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { pagePorts } from "./bell.ts";
@@ -38,7 +39,7 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
 
             // Each call knows who makes it, for the commands that write it down (D-81).
             const caller = () => callerOf(extra._meta, server.server.getClientVersion(), context.folder);
-            const result = await track(runTool(command, input, context, caller));
+            const result = await track(runTool(command, input, context, caller, extra._meta));
 
             if (command === aiMove && result.isError !== true) {
                 noteTheAi(context, caller);
@@ -156,16 +157,18 @@ function toolConfig(command: AnyCommand)
     return { description: command.description, inputSchema: z.looseObject({}).meta({ ...shownInput(command), $schema: undefined }), annotations, _meta: meta };
 }
 
-async function runTool(command: AnyCommand, input: unknown, context: Context, caller: NonNullable<Context["caller"]>): Promise<CallToolResult>
+async function runTool(command: AnyCommand, input: unknown, context: Context, caller: NonNullable<Context["caller"]>, meta: Record<string, unknown> | undefined): Promise<CallToolResult>
 {
+    const agent = await sharingAgent(command, meta, context);
+    const chat = command.byAgents === undefined && agent === undefined;
     let refused = false;
 
     try {
-        if (command.byAgents === undefined) {
+        if (chat) {
             context.calls?.();
         }
 
-        const result: unknown = await command.run(checkedInput(command, input), { ...context, caller });
+        const result: unknown = await command.run(checkedInput(command, input), { ...context, caller, ...(agent === undefined ? {} : { agent }) });
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {
         refused = error instanceof PositionChanged;
@@ -173,9 +176,36 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
     } finally {
         // What the tool read or wrote, the chat has seen: the doorbell rings it only for what changes after, and it may move on the game a tool showed it,
         // unless that tool was refused for a position it had not seen. An agent's call is not the chat's.
-        if (command.byAgents === undefined) {
+        if (chat) {
             chatHasRead(context, command.showsGame === true && !refused);
         }
+    }
+}
+
+/**
+ * The agent that calls a tool it shares with the chat, as the analyst (D-89), by its type: looked up only in a folder where one may run and while no game
+ * goes on, so that no call of the chat's waits for it while it plays; none for the chat, or when it cannot be told.
+ */
+async function sharingAgent(command: AnyCommand, meta: Record<string, unknown> | undefined, context: Context): Promise<string | undefined>
+{
+    const agents = command.sharedWith?.filter((agent) => hasAgent(context.folder, agent)) ?? [];
+
+    if (agents.length === 0 || gameGoingOn(context)) {
+        return undefined;
+    }
+
+    const caller = await callingAgent(meta, context.folder);
+    return caller !== undefined && "agent" in caller && agents.includes(caller.agent) ? caller.agent : undefined;
+}
+
+/** Whether a game goes on, or may: a game that cannot be read is the command's to report, as the chat's call (Federico, T-133). */
+function gameGoingOn(context: Context): boolean
+{
+    try {
+        const current = loadGame(gameFolder(context.home()));
+        return current !== undefined && endOf(current.game) === undefined;
+    } catch {
+        return true;
     }
 }
 

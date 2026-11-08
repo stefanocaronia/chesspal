@@ -81,6 +81,12 @@ export function closingOf(record: GameRecord): string | undefined
     return closingPattern.exec(record.comment ?? "")?.[1]?.trim() || undefined;
 }
 
+/** Whether the analyst has reviewed a game: its word on the whole game or on how it ended. The badges given during the game with the helps on are not a review (D-78). */
+export function isReviewed(record: GameRecord): boolean
+{
+    return gameReviewOf(record) !== undefined || closingOf(record) !== undefined;
+}
+
 /** The move with the AI's review in place of the one it had: the NAG of its badge, and its badge and note in the comment, beside what the comment held. */
 export function reviewed(move: RecordedMove, review: MoveReview): RecordedMove
 {

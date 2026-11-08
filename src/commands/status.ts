@@ -5,7 +5,26 @@ import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
-import { agentsLine, closingLines, coachOnEnd, coachRuns, type GameSummary, newGameStep, positionLines, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought, wordLines } from "./game-summary.ts";
+import {
+    agentsLine,
+    analystLine,
+    analystRuns,
+    closingLines,
+    coachOnEnd,
+    coachRuns,
+    type GameSummary,
+    newGameStep,
+    positionLines,
+    reviewedLine,
+    sidesLine,
+    type Speech,
+    speechLine,
+    speechOf,
+    summaryOf,
+    withAnalyst,
+    withThought,
+    wordLines,
+} from "./game-summary.ts";
 import { levelText } from "./levels.ts";
 import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 import { playerLine } from "./profiles.ts";
@@ -30,7 +49,7 @@ interface Status
     /** What the player wrote on the board page that the AI has not answered yet, all of it (T-65). */
     words?: string[];
     /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there (T-92). */
-    analysis?: { game: string; brought?: true; };
+    analysis?: { game: string; brought?: true; analyst?: true; };
     /** A game going on from before this chat, told once a chat: the player says whether to go on with it. */
     fromBefore?: true;
     /** The coach to start, once, for the player's move that ended the game (D-88). */
@@ -75,7 +94,7 @@ export const status = defineCommand({
             }
 
             if (current !== undefined) {
-                status.game = withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current, coachRuns(context));
+                status.game = withAnalyst(withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current, coachRuns(context)), context, current);
 
                 if (status.pageClosed === true) {
                     pageGiven(context, current.started);
@@ -94,7 +113,8 @@ export const status = defineCommand({
             const analysis = current === undefined || status.game?.end !== undefined ? gameInAnalysis(folder) : undefined;
 
             if (analysis !== undefined) {
-                status.analysis = { game: analysis.game, ...(analysis.brought === true ? { brought: true } : {}) };
+                // The analyst agent goes over a game the player brought, where it runs, and the chat over what it reviewed (D-89).
+                status.analysis = { game: analysis.game, ...(analysis.brought === true ? { brought: true } : {}), ...(analystRuns(context) ? { analyst: true } : {}) };
             }
         } catch (error) {
             status.problem = (error as Error).message;
@@ -141,10 +161,16 @@ function fromBeforeChat(context: Context, started: string): boolean
 }
 
 /** The game in analysis; the next step when the player has just brought it on the board page (T-92). */
-function analysisLine({ game, brought }: NonNullable<Status["analysis"]>): string
+function analysisLine({ game, brought, analyst }: NonNullable<Status["analysis"]>): string
 {
-    return brought === true
-        ? `The player brought ${game} on the board page to analyse it. Next: call analyse_game {"game": "${game}"}, then keep your review on that page with annotate_game, and go over it with them.`
+    if (brought === true) {
+        return analyst === true
+            ? `The player brought ${game} on the board page to analyse it. Next: ${analystLine(game)}`
+            : `The player brought ${game} on the board page to analyse it. Next: call analyse_game {"game": "${game}"}, then keep your review on that page with annotate_game, and go over it with them.`;
+    }
+
+    return analyst === true
+        ? `In analysis on the board page: ${game}. ${reviewedLine(game)}`
         : `In analysis on the board page: ${game}; analyse_game {"game": "${game}"} goes over it with the player.`;
 }
 

@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { annotatorOf, badges, type GameRecord, reviewed, reviewOf, withAnnotator, withGameReview } from "../core/index.ts";
 import { gameInAnalysis, rewriteGame, startAnalysis } from "../games/index.ts";
+import { analystAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
@@ -42,6 +43,7 @@ export const annotateGame = defineCommand({
         summary: z.string().max(summaryLimit).optional().describe("your word on the whole game: a short paragraph, with a few points as lines starting with - if it helps; the moves have their own notes"),
         closing: z.string().max(closingLimit).optional().describe("your last word on how the game ended, its win or loss, in a sentence or two: the page shows it at the end"),
     }),
+    sharedWith: [analystAgent],
     run: async ({ game, notes = [], summary, closing }, context): Promise<Annotated> => {
         noGameGoingOn(context);
 
@@ -49,6 +51,9 @@ export const annotateGame = defineCommand({
             throw new Error("Give notes on the moves that matter, your word on the whole game as summary, your last word on the ending as closing, or all of them. Nothing changed.");
         }
 
+        // Who reviews it, before the game is read: no wait between reading and writing it, in which the coach's judgment or another review written meanwhile
+        // would be lost (Federico, review of T-133).
+        const caller = await context.caller?.();
         const studied = game === undefined ? gameAnalysed(context) : namedGame(context, game);
         // Every move is checked before the game is written: all or nothing.
         const moves = [...studied.record.moves];
@@ -65,7 +70,6 @@ export const annotateGame = defineCommand({
         }
 
         // Who reviewed it, as far as the host says it for certain (D-81): on the command line, or by a host that names no model over one that did, as it was.
-        const caller = await context.caller?.();
         const kept = caller === undefined || (caller.hostOnly === true && annotatorOf(studied.record) !== undefined);
         const marked: GameRecord = { ...(kept ? studied.record : withAnnotator(studied.record, caller)), moves };
         rewriteGame(
@@ -95,6 +99,11 @@ export const annotateGame = defineCommand({
 
 function gameAnalysed(context: Context): Required<Studied>
 {
+    // The game in analysis follows the board page, which the player may turn to another game while an agent works (Federico, T-133).
+    if (context.agent !== undefined) {
+        throw new Error("Give the game's name as game, as analyse_game named it: the board page may have opened another game since. Nothing changed.");
+    }
+
     const analysis = gameInAnalysis(gameFolder(context.home()));
 
     if (analysis === undefined) {

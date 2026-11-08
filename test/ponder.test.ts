@@ -108,7 +108,7 @@ describe("the AI thinking on the player's time (D-72)", () => {
         await run({ ...mated, host: () => "claude-code" }, "ai_move", { move: "e5", plan: "Centre." });
         await run(mated, "player_move", { move: "g4" });
 
-        expect(await run({ ...mated, host: () => "claude-code" }, "ai_move", { move: "Qh4", plan: "Mate." })).not.toContain("agent");
+        expect(await run({ ...mated, host: () => "claude-code" }, "ai_move", { move: "Qh4", plan: "Mate." })).not.toContain("chesspal-ponder");
     });
 
     it("is the agent's alone, offered to Claude Code alone, one thing a call", async () => {

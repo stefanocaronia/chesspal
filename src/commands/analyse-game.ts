@@ -1,5 +1,4 @@
 // The analyst's tool (D-21, D-68): a game over, move by move in one call, facts only and never a judgment, with the analyst's instructions once in a chat.
-import { readFileSync } from "node:fs";
 import { z } from "zod";
 import {
     type AiLevel,
@@ -10,6 +9,7 @@ import {
     Game,
     type GameRecord,
     gameReviewOf,
+    isReviewed,
     levelOf,
     materialOf,
     type MoveReview,
@@ -24,15 +24,20 @@ import {
     withGameReview,
 } from "../core/index.ts";
 import { keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis } from "../games/index.ts";
+import { analystAgent, instructions } from "../host-files/index.ts";
 import { activeProfile, gameFolder } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
+import { speechLine, speechOf } from "./game-summary.ts";
 import { bookOpening, bookReaches } from "./opening-book.ts";
 import { defineCommand } from "./registry.ts";
 import { gameToStudy, knownTag, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
 import { balanceText, colourName, riskLine } from "./view.ts";
 
 // The analyst's instructions, read at the first analysis.
-let instructions: string | undefined;
+let analystText: string | undefined;
+
+// A game's name as past_games, study_games and analyse_game write it: games/2026-11-02-153012.pgn.
+const gameName = /^\s*(games\/|study\/)?\d{4}-\d{2}-\d{2}-\d{6}\.pgn\s*$/i;
 
 /** A move as the analysis gives it: what happened, never how good it was (D-6). */
 interface MoveFacts
@@ -64,6 +69,8 @@ interface Analysis
 {
     /** How to analyse, the first time in a chat (D-68). */
     instructions?: string;
+    /** The player's language, for the analyst's agent, which talks with no one (D-89). */
+    speech?: string;
     white: string;
     black: string;
     /** In a game played here: the side the AI played, and its level. */
@@ -109,12 +116,21 @@ export const analyseGame = defineCommand({
         game: z.string().optional().describe("a game's name, as past_games, study_games or analyse_game writes it"),
         pgn: z.string().optional().describe("a game played elsewhere, in PGN: its tags and its moves, with their [%clk] and a review exported from the board page if it has them; other comments and evals can go"),
     }),
+    sharedWith: [analystAgent],
     run: ({ game, pgn }, context): Analysis => {
         if (game !== undefined && pgn !== undefined) {
             throw new Error("Give game or pgn, not both: game names a game of the archive, pgn brings one played elsewhere.");
         }
 
-        const studied = pgn === undefined ? gameToStudy(context, game) : importedGame(context, pgn);
+        // A game's name given as pgn, as an AI often gives it, is that game (Priya, retest of T-133).
+        const named = pgn !== undefined && gameName.test(pgn) ? pgn.trim() : game;
+        const studied = pgn === undefined || named !== game ? gameToStudy(context, named) : importedGame(context, pgn);
+
+        // One analyst a game: the chat goes over the review there is (Stefano, T-133).
+        if (context.agent === analystAgent && isReviewed(studied.record)) {
+            throw new Error("Stop now: this game has its review already. End with one line for the AI that started you: go over that review with the player.");
+        }
+
         const analysis = analysisOf(studied, activeProfile(context.home()).name);
 
         if (studied.name !== undefined) {
@@ -122,10 +138,22 @@ export const analyseGame = defineCommand({
             startAnalysis(gameFolder(context.home()), studied.name, context.now());
         }
 
+        // The analyst's agent has its instructions in its own file, and the player's language in its prompt or, when Chesspal knows it, here (D-89).
+        if (context.agent === analystAgent) {
+            const speech = speechOf(gameFolder(context.home()), context.language);
+            return speech === undefined ? analysis : { ...analysis, speech: speechLine(speech) };
+        }
+
         const told = analystInstructions(context);
         return told === undefined ? analysis : { instructions: told, ...analysis };
     },
-    format: (analysis) => [...(analysis.instructions === undefined ? [] : [analysis.instructions, ""]), ...headLines(analysis), ...analysis.moves.map(moveLine)].join("\n"),
+    format: (analysis) =>
+        [
+            ...(analysis.instructions === undefined ? [] : [analysis.instructions, ""]),
+            ...(analysis.speech === undefined ? [] : [analysis.speech]),
+            ...headLines(analysis),
+            ...analysis.moves.map(moveLine),
+        ].join("\n"),
 });
 
 /** A game the player brings as a PGN, checked move by move and kept to study with its clock and Chesspal's own review: no other comment, no engine's evaluation (D-6). */
@@ -341,8 +369,8 @@ function analystInstructions(context: Context): string | undefined
     }
 
     context.told.add(key);
-    instructions ??= readFileSync(new URL("../../instructions/analyst.md", import.meta.url), "utf8").trim();
-    return instructions;
+    analystText ??= `${instructions("analyst")}\n${instructions("analysis")}`;
+    return analystText;
 }
 
 /** The mates in one the side to move has; none when it has none. */

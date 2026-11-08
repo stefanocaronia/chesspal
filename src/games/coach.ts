@@ -69,17 +69,23 @@ export function coachWaitingSince(folder: string, current: CurrentGame, position
     return now;
 }
 
-/** Notes that the chat was told to start the coach on the game as it is now: true the first time, false after, so that it is told once. */
-export function firstCoachCall(folder: string, current: CurrentGame): boolean
+/** Whether a coach has started on the game as it is now: until one has, the chat is told again to start it (Priya, playtest of T-112). */
+export function coachStarted(folder: string, current: CurrentGame): boolean
+{
+    return keptFor(folder, current).begun === current.game.record.moves.length;
+}
+
+/** Notes that a coach starts on the game as it is now: true for the first, false for another the chat started on it too, which stops. */
+export function startCoach(folder: string, current: CurrentGame): boolean
 {
     const kept = keptFor(folder, current);
     const plies = current.game.record.moves.length;
 
-    if (kept.called === plies) {
+    if (kept.begun === plies) {
         return false;
     }
 
-    write(folder, { ...kept, called: plies });
+    write(folder, { ...kept, begun: plies });
     return true;
 }
 
@@ -102,7 +108,7 @@ export function coachShown({ judgments, hint }: CoachWords, { game, ai }: Curren
 
 /**
  * The record with the coach's judgments in the comments of the moves they judge, as the analyst writes its own: for the game over. A move the analyst has
- * reviewed already keeps its review (Federico, review of T-112).
+ * reviewed already keeps its review (Federico, review of T-112); the book's badge alone is no review, and stays under a note alone, as annotate_game keeps it.
  */
 export function withCoach(record: GameRecord, { judgments }: CoachWords): GameRecord
 {
@@ -112,9 +118,14 @@ export function withCoach(record: GameRecord, { judgments }: CoachWords): GameRe
 
     const moves = record.moves.map((move, index) => {
         const judgment = judgments.find((one) => one.ply === index + 1);
-        return judgment === undefined || reviewOf(move.comment) !== undefined
-            ? move
-            : reviewed(move, { ...(judgment.badge === undefined ? {} : { badge: judgment.badge }), ...(judgment.note === undefined ? {} : { note: judgment.note }) });
+        const review = reviewOf(move.comment);
+
+        if (judgment === undefined || (review !== undefined && (review.badge !== "book" || review.note !== undefined))) {
+            return move;
+        }
+
+        const badge = judgment.badge ?? review?.badge;
+        return reviewed(move, { ...(badge === undefined ? {} : { badge }), ...(judgment.note === undefined ? {} : { note: judgment.note }) });
     });
     return { ...record, moves };
 }
@@ -150,7 +161,7 @@ const coachFile = z.object({
         squares: z.array(z.object({ colour: z.enum(colours), square: z.string() })).optional(),
     }).optional(),
     waiting: z.object({ position: z.int().min(0), since: z.iso.datetime() }).optional(),
-    called: z.int().min(0).optional(),
+    begun: z.int().min(0).optional(),
 });
 
 type CoachFile = z.infer<typeof coachFile>;

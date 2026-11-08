@@ -16,7 +16,7 @@ import { bookPlies } from "../commands/opening-book.ts";
 import { playMove, positionIn } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
 import { gameToStudy, namedGame } from "../commands/study.ts";
-import { clockStarted, type GameRecord, writePgn } from "../core/index.ts";
+import { clockStarted, type GameRecord, isReviewed, writePgn } from "../core/index.ts";
 import {
     aiModelOf,
     coachShown,
@@ -38,7 +38,7 @@ import {
     WordsRefused,
 } from "../games/index.ts";
 import { gameFolder, helpsIn } from "../profiles/index.ts";
-import { analysesOf, isReviewed } from "./analyses.ts";
+import { analysesOf } from "./analyses.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, send, textOf } from "./http.ts";
 import { answerProfiles, profilesShown } from "./profile-routes.ts";

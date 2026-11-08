@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type PieceLetter, type Profile, type Side, type SideProfile } from "../core/index.ts";
+import { analystAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import { refuseUnseen } from "./levels.ts";
@@ -22,6 +23,7 @@ export const position = defineCommand({
     input: z.object(studyInput),
     readOnly: true,
     idempotent: true,
+    sharedWith: [analystAgent],
     run: ({ game, move }, context): Described => {
         if (game !== undefined || move !== undefined) {
             const studied = gameToStudy(context, game);

@@ -1,8 +1,8 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
-import { type AiLevel, type Facts, figurinesOf, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, sees, type Side, type Square } from "../core/index.ts";
-import { type CurrentGame, currentPlan, drawOfferOf, endOf, firstCoachCall, type Speaker, talkLimits, type Thought, thoughtForLastMove } from "../games/index.ts";
-import { coachAgent, hasAgent, onQuickModel } from "../host-files/index.ts";
-import { helpsIn, languageIn } from "../profiles/index.ts";
+import { type AiLevel, type Facts, figurinesOf, type GameRecord, isReviewed, levelOf, materialOf, moodAt, type MoodNow, sees, type Side, type Square } from "../core/index.ts";
+import { archivedGame, archivedName, coachStarted, type CurrentGame, currentPlan, drawOfferOf, endOf, gameInAnalysis, type Speaker, talkLimits, type Thought, thoughtForLastMove } from "../games/index.ts";
+import { analystAgent, coachAgent, hasAgent, onQuickModel } from "../host-files/index.ts";
+import { gameFolder, helpsIn, languageIn } from "../profiles/index.ts";
 import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
@@ -39,8 +39,11 @@ export interface GameSummary
     drawOffer?: Speaker;
     /** The AI's mood while it lasts, in a game going on (D-70). */
     mood?: MoodNow;
-    /** When the game is over: how it ended, and its name in the archive once it is there. */
-    end?: { result: string; termination?: string; archive?: string; };
+    /**
+     * When the game is over: how it ended, its name in the archive once it is there, and, where an analyst agent runs (D-89), whether the chat offers it or
+     * goes over the review it did.
+     */
+    end?: { result: string; termination?: string; archive?: string; analyst?: "offer" | "done"; };
 }
 
 /** A move numbered as in the game (4.Ng5, 4...d5), with the squares it went from and to. */
@@ -124,17 +127,55 @@ export function withThought(summary: GameSummary, folder: string, current: Curre
     return { ...summary, ...(thought === undefined ? {} : { thought }), ...(helps === undefined ? {} : { helps }) };
 }
 
+/** Whether an analyst agent goes over a game over when the player wants: in Claude Code, with its agent in the player's folder (D-89). */
+export function analystRuns(context: Context): boolean
+{
+    return context.host?.() === "claude-code" && hasAgent(context.folder, analystAgent);
+}
+
+/**
+ * The game over, with the analyst agent that goes over it when the player wants, where it runs (D-89); over, the game from status and ai_say, which come after
+ * its end: once it is in analysis, by the agent or the chat, or reviewed, the chat goes over that review and never starts the agent again (Stefano, T-133).
+ */
+export function withAnalyst(summary: GameSummary, context: Context, over?: CurrentGame): GameSummary
+{
+    const { end } = summary;
+
+    if (end === undefined || !analystRuns(context)) {
+        return summary;
+    }
+
+    return { ...summary, end: { ...end, analyst: over !== undefined && goneOver(context, over) ? "done" : "offer" } };
+}
+
+/** How the chat has a game over gone over by the analyst agent, on the player's yes or for the game they brought (D-89). */
+export function analystLine(game?: string): string
+{
+    return `start the chesspal-analyst agent in the background with the prompt "Analyse${game === undefined ? "" : ` ${game}`}. The player speaks <their language>.": it writes its review on the board `
+        + "page, which shows it at work; tell the player in a word, and when it ends go over the game with them from what it tells you.";
+}
+
+/** How the chat goes over a game the analyst agent has reviewed, or is reviewing: from that review, never with another agent (Stefano, T-133). */
+export function reviewedLine(game?: string): string
+{
+    return "The analyst agent has gone over this game, or is at it: never start it again. When the player wants it gone over, go over it with them from what "
+        + `it told you, or, in a chat without it, from its review on the board page, which analyse_game ${game === undefined ? "" : `{"game": "${game}"} `}gives.`;
+}
+
 /** Whether a coach judges the player's moves when the helps are on: in Claude Code, with its agent in the player's folder (D-80, D-88). */
 export function coachRuns(context: Context): boolean
 {
     return context.host?.() === "claude-code" && hasAgent(context.folder, coachAgent);
 }
 
-/** Whether to start the coach, once, after the player's own move has ended the game on the board, with the helps on: it judges that move too (D-88). */
+/**
+ * Whether to start the coach after the player's own move has ended the game on the board, with the helps on: it judges that move too (D-88). Told again
+ * until it starts, since a chat woken by the page may lose the line on its way to its words (Priya, playtest of T-112).
+ */
 export function coachOnEnd(context: Context, folder: string, current: CurrentGame): boolean
 {
     const { game, ai } = current;
-    return game.outcome.over && game.position.turn === ai && helpsIn(folder) && coachRuns(context) && firstCoachCall(folder, current);
+    return game.outcome.over && game.position.turn === ai && helpsIn(folder) && coachRuns(context) && !coachStarted(folder, current);
 }
 
 /**
@@ -291,11 +332,15 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
     }
 
     if (game.end !== undefined) {
+        const analysis = game.end.analyst === "offer"
+            ? ` To go over it, on their yes, ${analystLine(game.end.archive)}`
+            : game.end.analyst === "done"
+            ? ` ${reviewedLine(game.end.archive)}`
+            : "";
         return words.length === 0
             ? "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or "
-                + "to go over this one "
-                + `(analyse_game). For another, ${step}`
-            : `Next: answer the player with ai_say. When they want another game, ${step}`;
+                + `to go over this one${analysis === "" ? " (analyse_game)." : `.${analysis}`} For another, ${step}`
+            : `Next: answer the player with ai_say.${analysis} When they want another game, ${step}`;
     }
 
     if (game.turn === game.ai && game.clock?.waiting === true) {
@@ -431,4 +476,22 @@ function languageName(language: string | undefined): string | undefined
 
     const name = new Intl.DisplayNames(["en"], { type: "language" }).of(code);
     return name === undefined || name === code ? undefined : name;
+}
+
+/** Whether the game over is gone over already: in analysis now, by the analyst agent or the chat, or reviewed, whatever the page opened since (Federico, T-133). */
+function goneOver(context: Context, over: CurrentGame): boolean
+{
+    const folder = gameFolder(context.home());
+    const archived = archivedName(folder, over);
+
+    if (archived === undefined || gameInAnalysis(folder)?.game === archived) {
+        return archived !== undefined;
+    }
+
+    try {
+        return isReviewed(archivedGame(folder, archived));
+    } catch {
+        // A game the archive cannot read is offered as it would be: the analyst says what is wrong with it.
+        return false;
+    }
 }

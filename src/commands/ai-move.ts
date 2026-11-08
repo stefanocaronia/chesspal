@@ -5,7 +5,7 @@ import { coachAgent, hasAgent, ponderAgentFor } from "../host-files/index.ts";
 import { gameFolder, helpsIn } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, squaresInput } from "./drawings.ts";
-import { agentsLine, closingLines, coachRuns, moveLines, type MovePlayed, shownMove } from "./game-summary.ts";
+import { agentsLine, closingLines, coachRuns, moveLines, type MovePlayed, shownMove, withAnalyst } from "./game-summary.ts";
 import { playMove, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand, sentence } from "./registry.ts";
 import { give, waitingWords } from "./say.ts";
@@ -50,7 +50,7 @@ export const aiMove = defineCommand({
         const played = playMove(folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: words, offerDraw });
         const agents = agentsAfter(context, folder, played);
         const board = context.pageOpen?.() === true ? {} : { board: true as const };
-        return { ...played, words: give(context, waiting), ...(agents.length === 0 ? {} : { agents }), ...board };
+        return { ...played, game: withAnalyst(played.game, context), words: give(context, waiting), ...(agents.length === 0 ? {} : { agents }), ...board };
     },
     format: (result) => {
         // The mood the AI has just given is not told back: player_move and status tell it while it lasts (Priya, round of T-107).

@@ -32,6 +32,7 @@ export {
     type DrawnSquare,
     gameReviewOf,
     isBadge,
+    isReviewed,
     type MoveReview,
     reviewed,
     reviewOf,

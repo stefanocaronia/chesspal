@@ -62,6 +62,7 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         const start = await run(context, "coach");
         const game = keyOf(start);
         expect(start).toMatch(/^Game "\w+", position 18: the player \(White\) to move, move 10; the opponent plays Black at the strong level\.\nThe player speaks Italian\.\n/);
+        expect(start).toMatch(/\nMoves: 1\.e4 e5 2\.Nf3 .* 9\.d5 Bf6\nOpening: C5\d /);
         expect(start).toContain("\nTheir move to judge: 9.d5. The position they played it in:\nFEN: ");
         expect(start).toContain("\nMaterial: Black +4 (White took P, Black took N 2P)\n");
         expect(start).toMatch(/\nAfter their move: at risk .*; the opponent's checks: .*\.\nThe opponent answered 9\.\.\.Bf6 and said: «Ecco\.»\nNow, for your hint:\nFEN: /);
@@ -71,6 +72,27 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         expect(start).not.toMatch(/plan: p\b/);
         // Two positions with their facts, well within Priya's budget (review of T-112).
         expect(start.length).toBeLessThan(3_000);
+    });
+
+    it("tells the position a game set up began in, since its moves start there (Anatolij, review of T-112)", async () => {
+        const context = playerFolder();
+        helps(context, true);
+        const fen = "rnbqkbnr/pppp1ppp/8/4p3/8/5P2/PPPPP1PP/RNBQKBNR w KQkq - 0 2";
+        await run(context, "new_game", { ai_colour: "black", from: fen });
+        await run(context, "player_move", { move: "g4" });
+        await run(context, "ai_move", { move: "Nc6", plan: "Develop." });
+
+        expect(await run(context, "coach")).toContain(`\nThe game began from a set position: ${fen}\nMoves: 2.g4 Nc6\n`);
+
+        // A long game shows its last moves, and says so.
+        const long = playerFolder();
+        helps(long, true);
+        await run(long, "new_game", {
+            ai_colour: "black",
+            from: "1. Na3 b6 2. f3 Ba6 3. c4 e6 4. Kf2 Qh4+ 5. Ke3 Qf2+ 6. Kf4 Bb5 7. Qb3 Na6 8. c5 Qh4+ 9. Ke5 Qe4+ 10. Kxe4 Ke7 11. Qd5 Kf6 12. Qd6 Ne7 "
+                + "13. Nb1 Nb4 14. g3 Nxa2 15. Qd4+ e5 16. Qf2 Rc8 17. Nc3 Kg5 18. Qg2 Kg6 19. Rxa2 h5 20. f4 Bc6+ 21. Kd3 a6 *",
+        });
+        expect(await run(long, "coach")).toMatch(/\nMoves \(the last 40 plies\): 2\.f3 Ba6 3\.c4 .* 21\.Kd3 a6\n/);
     });
 
     it("keeps its judgment and hint out of the game the opponent reads, never lets a hint give the player's move, and holds a note that names one", async () => {
@@ -84,12 +106,13 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
 
         await expect(run(context, "coach", { ...at, hint: "Play Nf3, which attacks e5." })).rejects.toThrow("Your hint gives the player a move they may play now (Nf3)");
         await expect(run(context, "coach", { ...at, hint: "Il ♘️f3 attacca e5." })).rejects.toThrow("(Nf3)");
-        await expect(run(context, "coach", { ...at, hint: "Look at e5.", arrows: ["Gg1f3"] })).rejects.toThrow("(Nf3)");
+        // Spaced or with a dash, as PGN writes it, a drawing reads the same (Priya, playtest of T-112).
+        await expect(run(context, "coach", { ...at, hint: "Look at e5.", arrows: ["G g1-f3"] })).rejects.toThrow("(Nf3)");
         await expect(run(context, "coach", { ...at, arrows: ["Re5e4"] })).rejects.toThrow("Arrows and squares show your hint");
         await expect(run(context, "coach", { position: 2, badge: "good" })).rejects.toThrow("Give the game's key and the position's number");
         await expect(run(context, "coach", { game, position: 0, badge: "good" })).rejects.toThrow("There is no move of the player's to judge here");
 
-        expect(await run(context, "coach", { ...at, badge: "best", note: "Nf3 next attacks e5.", hint: "The e5 pawn has one defender.", squares: ["Re5"] })).toBe(
+        expect(await run(context, "coach", { ...at, badge: "best", note: "Nf3 next attacks e5.", hint: "The e5 pawn has one defender.", squares: ["R e5"] })).toBe(
             `Kept, on the board page. Now call coach {game: "${game}", position: 2, done: true} alone.`,
         );
 
@@ -171,7 +194,7 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         expect(coachWords(folder, loadGame(folder)!)).toEqual({ judgments: [] });
     });
 
-    it("judges the player's own move that ends the game, started once, from the chat's move or the board page's (Stefano, review of T-112)", async () => {
+    it("judges the player's own move that ends the game, told until it starts, from the chat's move or the board page's (Stefano and Priya, T-112)", async () => {
         const context = { ...playerFolder(), host: () => "claude-code" };
         setUpHosts(context.folder, "linux");
         helps(context, true);
@@ -182,17 +205,21 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         const coachLine = 'Coach the player: start the chesspal-coach agent in the background with the prompt "Coach."';
 
         expect(await run(context, "player_move", { move: "Qh4" })).toContain(coachLine);
-        expect(await run(context, "status")).not.toContain(coachLine);
+        expect(await run(context, "status")).toContain(coachLine);
 
         const start = await run(context, "coach");
         const at = { game: keyOf(start), position: 4 };
+        // Once it has started, the chat is told no more, and a second coach the chat started on it stops (Priya, playtest of T-112).
+        expect(await run(context, "status")).not.toContain(coachLine);
+        expect(await run(context, "coach")).toBe("Stop now: another coach works on this position. End with one word.");
         expect(start).toMatch(/^Game "\w+", position 4: the game is over, 0-1, checkmate, with the player's move\.\n/);
         expect(start).toContain("\nTheir move to judge: 2...Qh4#. The position they played it in:\n");
         expect(start).not.toMatch(/After their move|The opponent answered/);
         expect(await run(context, "coach", { ...at, badge: "best", note: "Mate." })).toBe("Kept: it goes into the game's record. Stop now: end with one word.");
         expect(await run(context, "export", { format: "pgn" })).toMatch(/2\.\.\. Qh4# \{\[%badge best\]\s+\[%review\s+Mate\.\]\}/);
 
-        // On the board page the player's move reaches the chat through status, which tells it once.
+        // On the board page the player's move reaches the chat through status, and its words through ai_say: both tell it, just before the next step, where
+        // the AI acts on it (Priya, review and playtest of T-112).
         const page = { ...playerFolder(), host: () => "claude-code" };
         setUpHosts(page.folder, "linux");
         helps(page, true);
@@ -201,9 +228,13 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         await run(page, "player_move", { move: "e5" });
         await run(page, "ai_move", { move: "g4", plan: "p" });
         await run({ ...page, host: undefined }, "player_move", { move: "Qh4" });
-        // Just before the next step, where the AI acts on it (Priya, review of T-112).
-        expect(await run(page, "status")).toMatch(new RegExp(`\\n${coachLine.replace(/[.()]/g, "\\$&")}[^\\n]*\\nNext: `));
+        const beforeNext = new RegExp(`\\n${coachLine.replace(/[.()]/g, "\\$&")}[^\\n]*\\nNext: `);
+        expect(await run(page, "status")).toMatch(beforeNext);
+        expect(await run(page, "ai_say", { text: "Well played.", mood: "sad" })).toMatch(beforeNext);
+
+        await run(page, "coach");
         expect(await run(page, "status")).not.toContain(coachLine);
+        expect(await run(page, "ai_say", { text: "Another?" })).not.toContain(coachLine);
     });
 
     it("holds a note while a move it names is legal on the player's turn, not only until their next move (Anatolij, review of T-112)", async () => {
@@ -269,6 +300,23 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         expect(pgn).toContain("Weakens the king.");
         expect(pgn).toMatch(/2\. g4\?\? \{\[%badge blunder\] \[%review It\s+opens\s+the\s+diagonal\s+to\s+the\s+king\.\]\}\s+2\.\.\. Qh4#/);
         expect(await run(context, "export", { format: "pgn" })).toContain("[%badge blunder]");
+    });
+
+    it("judges a move the analysis has marked only with the book's badge (Federico, retest of T-133)", async () => {
+        const context = playerFolder();
+        helps(context, true);
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "f3" });
+        await run(context, "ai_move", { move: "e5", plan: "Centre." });
+        await run(context, "player_move", { move: "g4" });
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+        const start = await run(context, "coach");
+        await run(context, "analyse_game");
+
+        await run(context, "coach", { game: keyOf(start), position: 4, badge: "blunder", note: "It opens the diagonal to the king." });
+        const folder = join(gameFolder(context.home()), "games");
+        const [archived] = readdirSync(folder);
+        expect(readFileSync(join(folder, archived!), "utf8")).toMatch(/2\. g4\?\? \{\[%badge\s+blunder\]\s+\[%review It\s+opens/);
     });
 });
 
