@@ -36,6 +36,8 @@ export interface Text
     readonly marksColour: string;
     readonly play: string;
     readonly dots: string;
+    /** The setting that shows a square's name under the pointer (T-76). */
+    readonly squareNames: string;
     readonly explain: string;
     /** The setting that marks the opening book's moves while the game goes on. */
     readonly bookBadges: string;
@@ -137,7 +139,9 @@ export interface HelpsCardText
     readonly strategy: string;
     readonly map: string;
     readonly mapHint: string;
-    readonly hold: string;
+    /** The button held to see the board without the arrows and the squares drawn on it (Stefano, T-138). */
+    readonly bare: string;
+    readonly bareHint: string;
     readonly attackers: string;
     readonly defenders: string;
     /** Why a piece is at risk, as a noun (Anatolij's words). */
@@ -320,6 +324,7 @@ const english: Text = {
     marksColour: "Arrows and marked squares",
     play: "Play",
     dots: "Dots on the legal moves",
+    squareNames: "The square's name under the pointer",
     explain: "Explain the moves refused",
     bookBadges: "Mark the book moves",
     helps: "The AI teaches as you play",
@@ -516,7 +521,8 @@ const english: Text = {
         strategy: "Strategy",
         map: "Map",
         mapHint: "Hold it, or the M key, to see who controls each square; on a phone, a touch turns it on and off",
-        hold: "hold",
+        bare: "Hide the arrows",
+        bareHint: "Hold it to see the board without the arrows and the marked squares; on a phone, a touch hides them and shows them again",
         attackers: "attackers",
         defenders: "defenders",
         undefended: "no defender",
@@ -586,6 +592,7 @@ const italian: Text = {
     marksColour: "Frecce e case segnate",
     play: "Gioco",
     dots: "Pallini sulle mosse legali",
+    squareNames: "Il nome della casa sotto il puntatore",
     explain: "Spiega le mosse vietate",
     bookBadges: "Segna le mosse da libro",
     helps: "L'AI ti insegna mentre giochi",
@@ -784,7 +791,8 @@ const italian: Text = {
         strategy: "Strategia",
         map: "Mappa",
         mapHint: "Tienilo premuto, o tieni premuto il tasto M, per vedere chi controlla ogni casa; sul telefono un tocco la accende e la spegne",
-        hold: "tieni premuto",
+        bare: "Nascondi le frecce",
+        bareHint: "Tienilo premuto per vedere la scacchiera senza frecce e case segnate; sul telefono un tocco le nasconde e le rimostra",
         attackers: "attaccanti",
         defenders: "difensori",
         undefended: "nessun difensore",

@@ -35,7 +35,7 @@ import { type Column, foldKeys, gameUnderBoard, nextFold, oneColumn, rememberFol
 import { GameColumn } from "./game-column.tsx";
 import { type GameActions, Header } from "./header.tsx";
 import { helpsOf } from "./helps-view.ts";
-import { HelpsCard, HintLine, MapButton } from "./helps.tsx";
+import { BareButton, HelpsCard, HintLine, MapButton } from "./helps.tsx";
 import { signature } from "./model-name.ts";
 import { Steps } from "./move-list.tsx";
 import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
@@ -198,6 +198,8 @@ export function App({ start }: { start: Settings; })
     const [pointed, setPointed] = useState<readonly string[]>(noSquares);
     const pointSquare = useMemo(() => (square: string | undefined) => setPointed(square === undefined ? noSquares : [square]), []);
     const [mapping, setMapping] = useState(false);
+    // The board without its drawings while their button is held (Stefano, T-138).
+    const [bare, setBare] = useState(false);
     const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
     const next = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove, [live, viewing]);
     const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
@@ -661,6 +663,7 @@ export function App({ start }: { start: Settings; })
                             pointed={pointed}
                             {...(helps === undefined ? {} : { helps })}
                             {...(mapping && helps !== undefined ? { control: helps.strategy.control } : {})}
+                            bare={bare && helps !== undefined}
                             {...(review?.badge === undefined ? {} : { badge: { badge: review.badge, name: text.badges[review.badge] } })}
                             {...(drawn === undefined ? {} : { drawn })}
                             nextMove={next}
@@ -671,6 +674,7 @@ export function App({ start }: { start: Settings; })
                             selected={selected}
                             targets={selected === undefined || viewing !== undefined ? [] : live.legalMoves(selected as Square)}
                             dots={settings.dots}
+                            names={settings.squareNames}
                             notice={viewing === undefined ? refusal : undefined}
                             promotion={promoting === undefined || viewing !== undefined || !playerToMove ? undefined : { ...promoting, side: player }}
                             onPromote={(piece) => piece === undefined ? setPromoting(undefined) : play(promoting!.from, promoting!.to, piece)}
@@ -698,7 +702,8 @@ export function App({ start }: { start: Settings; })
                     {/* On a phone the helps' map sits under the board too, turned on and off by a touch (D-78), and the coach's hint beside it, its drawings in sight (Zoe, playtest of T-112) */}
                     {helps === undefined ? null : (
                         <div class="board-map">
-                            <MapButton mapping={mapping} onMap={setMapping} held={false} text={text} />
+                            <BareButton bare={bare} onBare={setBare} text={text} />
+                            <MapButton mapping={mapping} onMap={setMapping} text={text} />
                             {hint === undefined || viewing !== undefined ? null : <HintLine hint={hint} open={hintOpen} onOpen={openTheHint} text={text} />}
                         </div>
                     )}
@@ -721,6 +726,8 @@ export function App({ start }: { start: Settings; })
                                 onPoint={setPointed}
                                 onMap={setMapping}
                                 mapping={mapping}
+                                onBare={setBare}
+                                bare={bare}
                                 text={text}
                             />
                         )}

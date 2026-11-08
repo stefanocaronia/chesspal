@@ -22,6 +22,8 @@ export interface Settings
     readonly pieces: string;
     readonly marks: string;
     readonly dots: boolean;
+    /** Whether a square's name shows in its corner under the pointer (T-76): off until the player turns it on (Stefano). */
+    readonly squareNames: boolean;
     /** Whether the board says why a move is refused (T-11, D-18). */
     readonly explain: boolean;
     /** Whether the moves of the opening book show its badge while the game goes on, as the AI's review shows it after. */
@@ -53,6 +55,7 @@ export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | 
         pieces: oneOf(stored.pieces, looks.pieces, looks.pieces[0]),
         marks: oneOf(stored.marks, looks.marks, looks.marks[0]),
         dots: typeof stored.dots === "boolean" ? stored.dots : true,
+        squareNames: typeof stored.squareNames === "boolean" ? stored.squareNames : false,
         explain: typeof stored.explain === "boolean" ? stored.explain : true,
         book: typeof stored.book === "boolean" ? stored.book : true,
         helps: typeof stored.helps === "boolean" ? stored.helps : false,

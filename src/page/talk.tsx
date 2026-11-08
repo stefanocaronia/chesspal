@@ -135,11 +135,21 @@ function OnBoard({ text }: { text: string; })
         <>
             {text.split(boardWords).map((part, index) =>
                 index % 2 === 1
-                    ? <b key={index} class="on-board" onPointerEnter={() => point(squareIn(part))} onPointerLeave={(event) => event.pointerType === "mouse" && point(undefined)}>{part}</b>
+                    ? (
+                        <b key={index} class="on-board" onPointerEnter={() => point(squareIn(part))} onPointerLeave={(event) => event.pointerType === "mouse" && point(undefined)}>
+                            <Takes move={part} />
+                        </b>
+                    )
                     : part
             )}
         </>
     );
+}
+
+/** A move with its capture's x light, as the move list writes it: the piece and the squares stand out (Stefano, for readers with ADHD). */
+function Takes({ move }: { move: string; })
+{
+    return <>{move.split("x").map((part, index) => index === 0 ? part : [<span key={index} class="takes">x</span>, part])}</>;
 }
 
 /** The square a word names: a square, or where a move goes, the last square in it; none for a castling. */

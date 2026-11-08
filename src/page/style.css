@@ -679,10 +679,22 @@ button {
     opacity: 0.7;
 }
 
+/* The helps' arrows, seen while the player plays, show the pieces through them more (Stefano, T-142) */
+.arrows.drawn {
+    opacity: 0.5;
+}
+
+/* The round cap closes a shaft round the square's centre, as on Lichess: arrows off one square meet in one round knot, at any angle (Stefano, T-142) */
 .arrows path {
     fill: none;
     stroke: var(--mark);
     stroke-width: 0.2;
+    stroke-linecap: round;
+}
+
+/* The helps' arrows, the AI's and the coach's, thinner than the player's own, on a thin edge: they read as the helps' (Stefano, T-142) */
+.arrows.drawn path {
+    stroke-width: 0.14;
 }
 
 .arrows polygon {
@@ -712,12 +724,12 @@ button {
 }
 
 .arrows path.edge {
-    stroke-width: 0.3;
+    stroke-width: 0.2;
 }
 
 .arrows polygon.edge {
     fill: #fff;
-    stroke-width: 0.1;
+    stroke-width: 0.06;
     stroke-linejoin: round;
 }
 
@@ -1201,7 +1213,8 @@ button {
     color: var(--light-square);
 }
 
-/* The square's name in the corner of the file, under the pointer or the piece dragged, in its place on the bottom rank (T-76); the help rows' names stay in line */
+/* The square's name in the corner of the file, under the pointer or the piece dragged, in its place on the bottom rank, when the player turns it on (T-76); the
+   help rows' names stay in line */
 .square .square-name {
     position: absolute;
     right: 4%;
@@ -1214,20 +1227,20 @@ button {
     pointer-events: none;
 }
 
-.square.over .square-name {
+.board.named .square.over .square-name {
     display: block;
 }
 
-.square.over .coordinate.file {
+.board.named .square.over .coordinate.file {
     visibility: hidden;
 }
 
 @media (hover: hover) {
-    .square:hover .square-name {
+    .board.named .square:hover .square-name {
         display: block;
     }
 
-    .square:hover .coordinate.file {
+    .board.named .square:hover .coordinate.file {
         visibility: hidden;
     }
 }
@@ -1337,8 +1350,10 @@ button {
     opacity: 0.78;
 }
 
+/* An explaining arrow starts off the culprit's piece, and its cap would carry it back onto it */
 .arrows.explain path {
     stroke: var(--explain-ink);
+    stroke-linecap: butt;
 }
 
 .arrows.explain polygon {
@@ -2474,29 +2489,42 @@ button {
     color: var(--soft);
 }
 
-/* A move is a button that shows it on the board (T-88) */
+/* A move is a button that shows it on the board (T-88); shown or not it keeps the same room, so stepping with the arrows never shifts the line (Stefano, T-140) */
 .moves .ply {
     justify-self: start;
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 0 3px;
-    margin-left: -3px;
+    padding: 1px 6px;
+    margin-left: -6px;
     background: none;
     border: 0;
-    border-radius: 3px;
+    border-radius: 5px;
     color: inherit;
     font: inherit;
     cursor: pointer;
 }
 
+/* The move under the pointer in a neutral grey, never the accent, so it never reads as the move shown (Stefano, T-140) */
 .moves .ply:hover {
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    background: color-mix(in oklab, var(--ink) 9%, transparent);
 }
 
-.moves .current {
-    font-weight: 700;
-    box-shadow: inset 0 -2px 0 var(--accent);
+/* The move shown in the board's gold of the last move, laid on the light square as there, with dark ink in both themes: the yellow move in the list is the yellow
+   move on the board, and it follows the skin (Stefano, T-140) */
+.moves .ply.current {
+    background: var(--light-square) linear-gradient(var(--last-move), var(--last-move));
+    color: #1d2733;
+}
+
+.moves .current .takes {
+    color: #4d5866;
+}
+
+/* A ring in the card's colour keeps a badge's disc whole on the gold */
+.moves .current .move-badge {
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px var(--card);
 }
 
 /* The buttons that step through the moves, under them as on Lichess and chess.com */
@@ -2805,9 +2833,9 @@ button {
     }
 }
 
-/* The settings (D-56): a dialog over the page; each choice shows at once */
+/* The settings (D-56): a dialog over the page; each choice shows at once. Its sections are cards in two columns, one under 600px (Stefano, T-141) */
 .settings {
-    width: min(440px, calc(100vw - 32px));
+    width: min(740px, calc(100vw - 32px));
     max-height: calc(100vh - 48px);
     padding: 0 20px 20px;
     border: 1px solid var(--line);
@@ -2824,6 +2852,7 @@ button {
 .settings header {
     position: sticky;
     top: 0;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2837,32 +2866,287 @@ button {
     font-weight: 600;
 }
 
-.settings h3 {
-    margin: 18px 0 8px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--soft);
+/* The look on the left; the play and the language on the right */
+.setting-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
 }
 
-.choices {
-    margin-bottom: 12px;
+.setting-column {
+    display: grid;
+    gap: 14px;
 }
 
-.choices .label {
-    display: block;
-    margin-bottom: 6px;
+/* A section: a card with its icon and a title stronger than the labels under it */
+.setting-card {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--page);
+}
+
+.setting-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font-size: 15px;
+    font-weight: 650;
+}
+
+.setting-card h3 .icon {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2;
+    color: var(--accent);
+}
+
+.setting-group {
+    margin: 0 0 14px;
+}
+
+.setting-group:last-child {
+    margin-bottom: 0;
+}
+
+/* A choice's label, and beside it the name of a skin, whose tiles have none */
+.setting-label {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    margin: 0 0 6px;
     font-size: 13px;
     color: var(--soft);
 }
 
-.options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+.setting-label b {
+    color: var(--ink);
+    font-weight: 600;
 }
 
+/* The pieces' colours and the arrows' side by side, one under the other where four dots would not fit */
+.setting-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
+    gap: 14px;
+}
+
+/* Three words in a segmented bar: the theme, the language */
+.segments {
+    display: flex;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+}
+
+.segments button {
+    flex: 1;
+    padding: 5px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--soft);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.segments button:hover {
+    color: var(--ink);
+}
+
+.segments button[aria-checked="true"] {
+    background: var(--card);
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* The colours as dots, the skins as tiles of four squares, the last one gold as the last move; their names in their titles */
+.swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.swatches.skins {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 36px));
+    gap: 7px;
+}
+
+.swatch {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--line);
+}
+
+.swatch[data-board] {
+    display: grid;
+    grid-template: 1fr 1fr / 1fr 1fr;
+    width: auto;
+    height: auto;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.swatch[data-board] i:first-child {
+    background: var(--light-square);
+}
+
+.swatch[data-board] i:nth-child(2),
+.swatch[data-board] i:nth-child(3) {
+    background: var(--dark-square);
+}
+
+.swatch[data-board] i:nth-child(4) {
+    background: var(--light-square) linear-gradient(var(--last-move), var(--last-move));
+}
+
+.swatch[data-pieces] {
+    background: linear-gradient(90deg, var(--white-piece) 50%, var(--black-piece) 50%);
+}
+
+.swatch[data-marks] {
+    background: var(--mark);
+}
+
+/* The piece sets: a white and a black knight over the set's name */
+.piece-sets {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.piece-sets button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 4px 5px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font-size: 13px;
+    box-shadow: 0 0 0 1px var(--line);
+}
+
+.sample {
+    display: inline-flex;
+}
+
+.sample .piece {
+    width: 26px;
+    height: 26px;
+}
+
+.swatch:hover,
+.piece-sets button:hover {
+    box-shadow: 0 0 0 1px var(--soft);
+}
+
+.swatch[aria-checked="true"],
+.piece-sets button[aria-checked="true"] {
+    box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent);
+}
+
+/* The keyboard's focus in ink, outside the chosen ring, so the two never read the same */
+.swatch:focus-visible,
+.piece-sets button:focus-visible {
+    outline-color: var(--ink);
+    outline-offset: 4px;
+}
+
+/* The switches, one per line, the label on the left */
+.switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-top: 1px solid var(--line);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+h3 + .switch {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.switch input {
+    appearance: none;
+    flex: none;
+    position: relative;
+    width: 34px;
+    height: 20px;
+    margin: 0;
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--soft) 45%, var(--card));
+    cursor: pointer;
+    transition: background 120ms;
+}
+
+.switch input::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: translate 120ms;
+}
+
+.switch input:checked {
+    background: var(--accent);
+}
+
+.switch input:checked::after {
+    translate: 14px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .switch input,
+    .switch input::after {
+        transition: none;
+    }
+}
+
+/* On a phone the cards go one under the other, and the skins in two rows of tiles big enough for a finger */
+@media (max-width: 600px) {
+    .setting-columns {
+        grid-template-columns: 1fr;
+    }
+
+    .swatches {
+        gap: 6px;
+    }
+
+    .swatches.skins {
+        grid-template-columns: repeat(5, minmax(0, 40px));
+        gap: 10px;
+    }
+}
+
+/* On the narrowest phones a segment's words may go on two lines */
+@media (max-width: 360px) {
+    .segments button {
+        white-space: normal;
+    }
+}
+
+/* A choice among a few words, in the profiles' list */
 .choice {
     display: inline-flex;
     align-items: center;
@@ -2881,66 +3165,6 @@ button {
 .choice[aria-checked="true"] {
     border-color: var(--accent);
     box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.sample {
-    display: inline-flex;
-}
-
-.sample .piece {
-    width: 26px;
-    height: 26px;
-}
-
-/* A swatch: the board's two squares and its highlight, the pieces' two colours, or the marks' one */
-.swatch {
-    display: inline-flex;
-    border-radius: 4px;
-    overflow: hidden;
-    box-shadow: 0 0 0 1px var(--line);
-}
-
-.swatch i {
-    width: 14px;
-    height: 20px;
-}
-
-.swatch[data-board] i:first-child {
-    background: var(--light-square);
-}
-
-.swatch[data-board] i:nth-child(2) {
-    background: var(--dark-square);
-}
-
-.swatch[data-board] i:nth-child(3) {
-    background: var(--dark-square) linear-gradient(var(--last-move), var(--last-move));
-}
-
-.swatch[data-pieces] i:first-child {
-    background: var(--white-piece);
-}
-
-.swatch[data-pieces] i:last-child {
-    background: var(--black-piece);
-}
-
-.swatch[data-marks] i {
-    background: var(--mark);
-}
-
-.toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 0;
-    font-size: 14px;
-}
-
-.toggle input {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--accent);
 }
 
 /* The profiles (D-23, D-45): the player's picture, which a click changes, their name, which opens the profiles, the wizard and the profiles' dialogs */
@@ -3968,12 +4192,12 @@ button {
         font-size: 14px;
     }
 
-    .board-map .map-button {
+    .board-map .hold-button {
         float: right;
         margin-left: 8px;
     }
 
-    .helps-card .map-button {
+    .helps-card .hold-button {
         display: none;
     }
 
@@ -4219,6 +4443,23 @@ button {
     scrollbar-width: none;
 }
 
+/* The card's title, and on its right the icons held: the map and the board without its drawings (T-138) */
+.helps-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.helps-tools {
+    display: flex;
+    gap: 4px;
+}
+
+.helps-head .hold-button {
+    padding: 3px 6px;
+}
+
 .helps-title {
     margin: 0;
     font-size: 13px;
@@ -4371,43 +4612,42 @@ button {
     border-bottom-color: var(--accent);
 }
 
-/* The map's button: in the card's tabs, or under the board on a phone */
-.map-button {
+/* The icons held, the map's and the one that hides the drawings: in the card's title, or under the board on a phone */
+.hold-button {
     display: flex;
     align-items: center;
-    gap: 5px;
     border: 1px solid var(--line);
     border-radius: 6px;
     padding: 2px 8px;
     background: var(--card);
     color: var(--soft);
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
     cursor: pointer;
     touch-action: none;
     user-select: none;
 }
 
-.tabs .map-button {
-    margin: 0 0 4px auto;
+.board-map .hold-button {
+    padding: 7px 12px;
 }
 
-.board-map .map-button {
-    padding: 6px 12px;
-}
-
-.map-button svg {
-    width: 13px;
-    height: 13px;
+.hold-button svg {
+    width: 14px;
+    height: 14px;
     fill: currentColor;
 }
 
-.map-button small {
-    font-weight: 400;
+/* The eye shut, drawn in lines */
+.hold-button.bare-button svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
-.map-button[aria-pressed="true"] {
+.hold-button[aria-pressed="true"] {
     background: var(--accent);
     color: var(--on-accent);
     border-color: var(--accent);

@@ -1,6 +1,6 @@
 // The helps on the page (D-78, Zoe's sketch B): the board says where, the card says what, the facts the AI sees at the game's level and only those; and
 // the coach's words (D-88).
-import { Fragment } from "preact";
+import { type ComponentChildren, Fragment } from "preact";
 import { useState } from "preact/hooks";
 import type { PieceFacts, Profile, Side } from "../core/index.ts";
 import { BadgeIcon, NoteIcon } from "./badges.tsx";
@@ -26,9 +26,9 @@ export function Notch()
 
 /**
  * The helps' card, between the opening and the moves: the coach's words, then the tactics in lines, the strategy in a table and the control map, seen while
- * its button or M is held. A line under the pointer lights its squares on the board.
+ * its button or M is held, and the board without its drawings while their button is. A line under the pointer lights its squares on the board.
  */
-export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMap, mapping, text }: {
+export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMap, mapping, onBare, bare, text }: {
     helps: HelpsView;
     /** The player's moves as the coach judged them: the last the AI has answered, and one a held note let go only now (D-88). */
     judged: readonly Ply[];
@@ -39,6 +39,8 @@ export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMa
     onPoint: (squares: readonly string[]) => void;
     onMap: (held: boolean) => void;
     mapping: boolean;
+    onBare: (held: boolean) => void;
+    bare: boolean;
     text: Text;
 })
 {
@@ -47,9 +49,15 @@ export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMa
 
     return (
         <section class="card helps-card" aria-label={words.title}>
-            <h3 class="helps-title">
-                {words.title}
-            </h3>
+            <div class="helps-head">
+                <h3 class="helps-title">
+                    {words.title}
+                </h3>
+                <span class="helps-tools">
+                    <MapButton mapping={mapping} onMap={onMap} text={text} />
+                    <BareButton bare={bare} onBare={onBare} text={text} />
+                </span>
+            </div>
             {judged.length === 0 && hint === undefined ? null : (
                 <section class={`coach${judged.length === 0 ? " hint-only" : ""}`} aria-label={words.coach}>
                     {judged.map((ply) => <Judged key={`${ply.number} ${ply.side}`} ply={ply} text={text} />)}
@@ -59,40 +67,36 @@ export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMa
             <div class="tabs" role="tablist">
                 <button type="button" role="tab" aria-selected={tab === "tactics"} onClick={() => setTab("tactics")}>{words.tactics}</button>
                 <button type="button" role="tab" aria-selected={tab === "strategy"} onClick={() => setTab("strategy")}>{words.strategy}</button>
-                <MapButton mapping={mapping} onMap={onMap} held text={text} />
             </div>
             {tab === "tactics" ? <Tactics helps={helps} onPoint={onPoint} text={text} /> : <Strategy profile={helps.strategy} text={text} />}
         </section>
     );
 }
 
-/**
- * The map's button (D-78): the mouse holds it to see the map; a finger, or the keyboard, turns it on and off. In the card's tabs it says it is held; on a
- * phone it sits under the board.
- */
-export function MapButton({ mapping, onMap, held, text }: { mapping: boolean; onMap: (on: boolean) => void; held: boolean; text: Text; })
+/** The map's button (D-78), held to see the map: an icon, its tooltip saying how (Stefano, T-138); in the card's title, and on a phone under the board. */
+export function MapButton({ mapping, onMap, text }: { mapping: boolean; onMap: (on: boolean) => void; text: Text; })
 {
-    // A click carries its pointer's type: none from the keyboard.
-    const mouse = (event: Event): boolean => event instanceof PointerEvent && event.pointerType === "mouse";
-
     return (
-        <button
-            type="button"
-            class="map-button"
-            aria-pressed={mapping}
-            title={text.helpsCard.mapHint}
-            onPointerDown={(event) => mouse(event) && onMap(true)}
-            onPointerUp={(event) => mouse(event) && onMap(false)}
-            onPointerLeave={(event) => mouse(event) && onMap(false)}
-            onClick={(event) => !mouse(event) && onMap(!mapping)}
-        >
+        <HoldButton on={mapping} onHold={onMap} title={text.helpsCard.mapHint} label={text.helpsCard.map}>
             <svg viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M2 2h5v5H2zM9 9h5v5H9z" />
                 <path d="M9 2h5v5H9zM2 9h5v5H2z" opacity=".35" />
             </svg>
-            {text.helpsCard.map}
-            {held ? <small>({text.helpsCard.hold})</small> : null}
-        </button>
+        </HoldButton>
+    );
+}
+
+/** The button held to see the board bare, without the arrows and the squares the AI, the coach and the player drew on it (Stefano, T-138): an eye shut. */
+export function BareButton({ bare, onBare, text }: { bare: boolean; onBare: (on: boolean) => void; text: Text; })
+{
+    return (
+        <HoldButton on={bare} onHold={onBare} title={text.helpsCard.bareHint} label={text.helpsCard.bare} kind="bare-button">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
+                <circle cx="8" cy="8" r="2" />
+                <path d="M2.5 2.5l11 11" />
+            </svg>
+        </HoldButton>
     );
 }
 
@@ -112,6 +116,36 @@ export function HintLine({ hint, open, onOpen, text }: { hint: CoachHint; open: 
             </span>
             {hint.arrows === undefined && hint.squares === undefined ? null : <Legend review={hint} words={words.drawn} />}
         </details>
+    );
+}
+
+/** An icon the mouse holds, while what it shows lasts; a finger, or the keyboard, turns it on and off (D-78). */
+function HoldButton({ on, onHold, title, label, kind, children }: {
+    on: boolean;
+    onHold: (on: boolean) => void;
+    title: string;
+    label: string;
+    kind?: string;
+    children: ComponentChildren;
+})
+{
+    // A click carries its pointer's type: none from the keyboard.
+    const mouse = (event: Event): boolean => event instanceof PointerEvent && event.pointerType === "mouse";
+
+    return (
+        <button
+            type="button"
+            class={kind === undefined ? "hold-button" : `hold-button ${kind}`}
+            aria-pressed={on}
+            aria-label={label}
+            title={title}
+            onPointerDown={(event) => mouse(event) && onHold(true)}
+            onPointerUp={(event) => mouse(event) && onHold(false)}
+            onPointerLeave={(event) => mouse(event) && onHold(false)}
+            onClick={(event) => !mouse(event) && onHold(!on)}
+        >
+            {children}
+        </button>
     );
 }
 

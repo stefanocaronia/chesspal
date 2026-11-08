@@ -15,7 +15,7 @@ import type { Text } from "./text.ts";
  * picks one, and the legal moves of the piece picked show as dots, rings on captures; a second press on one of them, or a drag there, plays it. At any time
  * the right button lights a square, or draws an arrow when dragged, until a left click.
  */
-export function Board({ fen, bottom, lastMove, pointed, helps, control, badge, drawn, nextMove, jumped, check, end, player, selected, targets, dots, notice, promotion, onSelect, onMove, onRefuse, onPromote, text }: {
+export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, badge, drawn, nextMove, jumped, check, end, player, selected, targets, dots, names, notice, promotion, onSelect, onMove, onRefuse, onPromote, text }: {
     fen: string;
     bottom: Side;
     lastMove?: Move;
@@ -25,6 +25,8 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, badge, d
     helps?: HelpsView;
     /** The control map, while it is held (D-78): how many pieces of each side attack each square, [White, Black]. */
     control?: Profile["control"];
+    /** The board without the arrows and the squares drawn on it, the AI's, the coach's and the player's, while its button is held (Stefano, T-138). */
+    bare?: boolean;
     /** The AI's badge on the last move, in a game in analysis (D-69): on the square it went to, by its name. */
     badge?: { badge: MoveBadge; name: string; };
     /** The arrows and squares the AI drew with its note on the move shown (D-69), under the player's own marks. */
@@ -40,6 +42,8 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, badge, d
     selected?: string;
     targets: readonly Move[];
     dots: boolean;
+    /** Whether a square's name shows in its corner under the pointer or the piece dragged (T-76), as the player chose. */
+    names: boolean;
     /** Why a move was refused (T-11): a bubble over the square it went to, and a ring on the piece that forbids it. */
     notice?: Notice;
     /** A pawn on its way to the last rank (T-11): the four pieces it may become, over the square, until the player picks one or none. */
@@ -338,11 +342,16 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, badge, d
         }
     };
 
+    // The arrows on the board, the AI's and the coach's under the player's, none while the board is bare; the helps' step aside while the player picks up
+    // a piece to move it (Stefano, T-142).
+    const aiArrows = bare === true || selected !== undefined || drag !== undefined ? [] : drawn?.arrows ?? [];
+    const ownArrows = bare === true ? [] : drawing === undefined ? marks.arrows : [...marks.arrows, drawing];
+
     return (
         <>
             <div
                 ref={board}
-                class={["board", player === undefined ? "" : "playable", end === undefined ? "" : endClasses(end), control === undefined ? "" : "mapping"].filter((name) => name !== "").join(" ")}
+                class={["board", player === undefined ? "" : "playable", end === undefined ? "" : endClasses(end), control === undefined ? "" : "mapping", names ? "named" : ""].filter((name) => name !== "").join(" ")}
                 role="group"
                 aria-label={text.boardLabel(fen.split(" ")[1] === "b" ? "black" : "white", lastMove?.san)}
                 onPointerDown={down}
@@ -364,7 +373,7 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, badge, d
                         const marked = lastMove !== undefined && (lastMove.from === square || lastMove.to === square);
                         const target = targets.find((move) => move.to === square);
                         const sign = signs.get(square);
-                        const tinted = drawn?.squares?.find((one) => one.square === square)?.colour;
+                        const tinted = bare === true ? undefined : drawn?.squares?.find((one) => one.square === square)?.colour;
                         const classes = [
                             "square",
                             dark ? "dark" : "light",
@@ -373,7 +382,7 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, badge, d
                             sign?.classes ?? "",
                             selected === square ? "selected" : "",
                             tinted === undefined ? "" : `noted ${tinted}`,
-                            marks.squares.includes(square) ? "marked" : "",
+                            bare !== true && marks.squares.includes(square) ? "marked" : "",
                             pointed?.includes(square) === true ? "pointed" : "",
                             notice?.explanation?.ring === square ? "culprit" : "",
                             own(square) ? "own" : "",
@@ -436,8 +445,8 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, badge, d
                 {/* Inside the board, under the corners of the pieces at risk */}
                 {helps === undefined || helps.pins.length === 0 || control !== undefined ? null : <Pins pins={helps.pins} at={centreOf} />}
             </div>
-            {drawn?.arrows === undefined ? null : <Arrows arrows={drawn.arrows} at={centreOf} occupied={(square) => pieces.has(square)} />}
-            <Arrows arrows={drawing === undefined ? marks.arrows : [...marks.arrows, drawing]} at={centreOf} />
+            <Arrows arrows={aiArrows} at={centreOf} occupied={(square) => pieces.has(square)} />
+            <Arrows arrows={ownArrows} at={centreOf} />
             {notice?.explanation?.arrow === undefined ? null : <Arrows arrows={[notice.explanation.arrow]} at={centreOf} explain={{ occupied: pieces.has(notice.explanation.arrow.to) }} />}
             {drag === undefined || !pieces.has(drag.from) ? null : <Lifted drag={drag} letter={pieces.get(drag.from)!} />}
             {promotion === undefined
@@ -741,43 +750,69 @@ function Arrows({ arrows, at, explain, occupied }: {
         return null;
     }
 
+    const point = occupied === undefined ? arrowHead : helpsHead;
+    const shapes = arrows.map(({ from, to, colour }) => {
+        const [startX, startY] = at(from);
+        const [pointX, pointY] = at(to);
+        const knight = Math.abs(pointX - startX) * Math.abs(pointY - startY) === 2;
+        const corner: [number, number] | undefined = !knight
+            ? undefined
+            : Math.abs(pointY - startY) > Math.abs(pointX - startX)
+            ? [startX, pointY]
+            : [pointX, startY];
+        const [x0, y0] = explain === undefined ? [startX, startY] : towards([startX, startY], corner ?? [pointX, pointY], explainTrim.start);
+        const [x1, y1] = explain?.occupied === true || occupied?.(to) === true ? towards([pointX, pointY], corner ?? [startX, startY], explainTrim.end) : [pointX, pointY];
+        const [fromX, fromY] = corner ?? [x0, y0];
+        const length = Math.hypot(x1 - fromX, y1 - fromY);
+        const [dx, dy] = [(x1 - fromX) / length, (y1 - fromY) / length];
+        const [endX, endY] = [x1 - dx * point.length, y1 - dy * point.length];
+        const side = (sign: number): string => `${endX - dy * point.width * sign},${endY + dx * point.width * sign}`;
+        // The shaft runs a quarter into the point, and its round cap a little further, so no seam shows and the cap stays inside the point.
+        const [shaftX, shaftY] = [x1 - dx * point.length * 0.75, y1 - dy * point.length * 0.75];
+        const shaft = `M${x0} ${y0}${corner === undefined ? "" : ` L${corner[0]} ${corner[1]}`} L${shaftX} ${shaftY}`;
+        const head = `${side(1)} ${x1},${y1} ${side(-1)}`;
+        return { key: `${from}${to}`, from, colour, shaft, head };
+    });
+
+    // Arrows off one square meet in one shape; an arrow from elsewhere keeps its own edge over them, so no shape is lost where points meet (Stefano, T-142).
+    const starts = [...new Set(shapes.map(({ from }) => from))];
     return (
         <svg class={explain !== undefined ? "arrows explain" : occupied !== undefined ? "arrows drawn" : "arrows"} viewBox="0 0 8 8" aria-hidden="true">
-            {arrows.map(({ from, to, colour }) => {
-                const [startX, startY] = at(from);
-                const [pointX, pointY] = at(to);
-                const knight = Math.abs(pointX - startX) * Math.abs(pointY - startY) === 2;
-                const corner: [number, number] | undefined = !knight
-                    ? undefined
-                    : Math.abs(pointY - startY) > Math.abs(pointX - startX)
-                    ? [startX, pointY]
-                    : [pointX, startY];
-                const [x0, y0] = explain === undefined ? [startX, startY] : towards([startX, startY], corner ?? [pointX, pointY], explainTrim.start);
-                const [x1, y1] = explain?.occupied === true || occupied?.(to) === true ? towards([pointX, pointY], corner ?? [startX, startY], explainTrim.end) : [pointX, pointY];
-                const [fromX, fromY] = corner ?? [x0, y0];
-                const length = Math.hypot(x1 - fromX, y1 - fromY);
-                const [dx, dy] = [(x1 - fromX) / length, (y1 - fromY) / length];
-                const [endX, endY] = [x1 - dx * arrowHead.length, y1 - dy * arrowHead.length];
-                const side = (sign: number): string => `${endX - dy * arrowHead.width * sign},${endY + dx * arrowHead.width * sign}`;
-                // The shaft runs halfway into the point, so no seam shows where they meet; the layer's opacity hides the overlap.
-                const [shaftX, shaftY] = [x1 - dx * arrowHead.length / 2, y1 - dy * arrowHead.length / 2];
-                const shaft = `M${x0} ${y0}${corner === undefined ? "" : ` L${corner[0]} ${corner[1]}`} L${shaftX} ${shaftY}`;
-                const head = `${side(1)} ${x1},${y1} ${side(-1)}`;
-                return (
-                    <g key={`${from}${to}`} class={colour}>
-                        {/* The AI's arrows on a white edge (D-78) */}
-                        {occupied === undefined ? null : (
-                            <>
-                                <path class="edge" d={shaft} />
-                                <polygon class="edge" points={head} />
-                            </>
-                        )}
-                        <path d={shaft} />
-                        <polygon points={head} />
-                    </g>
-                );
-            })}
+            {starts.map((start) => <ArrowGroup key={start} shapes={shapes.filter(({ from }) => from === start)} edged={occupied !== undefined} />)}
         </svg>
+    );
+}
+
+/** An arrow as drawn: its shaft's path and its point's corners. */
+interface ArrowShape
+{
+    readonly key: string;
+    readonly from: string;
+    readonly colour: Arrow["colour"];
+    readonly shaft: string;
+    readonly head: string;
+}
+
+/** Arrows off one square, the AI's on a white edge (D-78): every edge under every arrow, so one edge goes round them all where they meet. */
+function ArrowGroup({ shapes, edged }: { shapes: readonly ArrowShape[]; edged: boolean; })
+{
+    return (
+        <g>
+            {edged
+                ? shapes.map(({ key, shaft, head }) => (
+                    <g key={`edge${key}`}>
+                        <path class="edge" d={shaft} />
+                        <polygon class="edge" points={head} />
+                    </g>
+                ))
+                : null}
+            {shapes.map(({ key, colour, shaft, head }) => (
+                <g key={key} class={colour}>
+                    <path d={shaft} />
+                    <polygon points={head} />
+                </g>
+            ))}
+        </g>
     );
 }
 
@@ -937,6 +972,9 @@ const pinTrim = 0.35;
 
 // An arrow's head, in squares: how long, and how far each side of its line.
 const arrowHead = { length: 0.42, width: 0.3 };
+
+// The helps' point, smaller in step with their thinner shaft (Stefano, T-142).
+const helpsHead = { length: 0.3, width: 0.21 };
 
 /** The piece lifted off the board: it rises a frame after it appears, so it grows into the air. */
 function Lifted({ drag, letter }: { drag: Drag; letter: string; })
