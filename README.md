@@ -6,7 +6,7 @@ Play chess against an AI on a real board, or learn with one.
 
 ## Get started
 
-You need [Node.js](https://nodejs.org) 22.13 or newer and an AI agent on your computer, [Claude Code](https://code.claude.com/docs/en/setup) or [Codex](https://developers.openai.com/codex): see [what you need](#what-you-need). Open a terminal and type:
+You need [Node.js](https://nodejs.org) 22.13 or newer and an AI agent on your computer, [Claude Code](https://code.claude.com/docs/en/setup) or [Codex](https://developers.openai.com/codex): see [what you need](#what-you-need). Open a new terminal, after installing Node.js (one opened before does not find `npm`), and type:
 
 ```bash
 npm install -g chesspal
@@ -22,7 +22,7 @@ claude
 
 Then **say hello**. The AI answers with the link to the board page: open it in your browser, tell it who you are, and ask for a game. You choose your colour, the clock and the AI's level, and play on the board.
 
-On Windows, use Command Prompt (press Start, type `cmd`, press Enter): PowerShell refuses npm's commands until its scripts are allowed.
+On Windows, use Command Prompt (press Start, type `cmd`, press Enter). PowerShell, on a new computer, refuses npm's commands with "running scripts is disabled on this system"; there, type `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and answer yes, or use Command Prompt.
 
 ## What it does
 
