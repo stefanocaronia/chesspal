@@ -1,76 +1,71 @@
 # Chesspal
 
-Play chess against an AI, or learn with one.
+Play chess against an AI on a real board, or learn with one.
 
-You can already play chess with an AI in a chat, but it forgets the position, plays illegal moves, sees no board and remembers nothing of yesterday's game. Chesspal is what it lacks: it **keeps the rules, the board, the clock, the games and the memory**; the AI **plays, reasons, judges and talks**. A move is legal because Chesspal checked it, not because the AI says so.
+![The board page during a game: the AI's words on the left, the board in the middle, the opening's name and the moves on the right](https://raw.githubusercontent.com/stefanocaronia/chesspal/main/docs/screenshot.png)
 
-Chesspal does not use a chess engine such as Stockfish, in any way: every judgment of a move or a position is the AI's own. Chesspal hands it facts instead, which a program finds in microseconds and an AI only by reasoning at length: the legal moves, the pieces attacked and defended, the pins and the checks, the positional facts, the opening's name.
+## Get started
 
-## What you can do
+You need [Node.js](https://nodejs.org) 22.13 or newer and an AI agent on your computer, [Claude Code](https://code.claude.com/docs/en/setup) or [Codex](https://developers.openai.com/codex): see [what you need](#what-you-need). Open a terminal and type:
 
-- **Play against the AI** on the board page in your browser, and talk with it there or in the chat.
-- **Choose its level**, from beginner to master: the higher, the more facts of the position the AI sees, and the master knows the opening book.
-- **Play with a clock**, with an AI that knows how much time it has left; offer a draw, resign, export the game as PGN.
+```bash
+npm install -g chesspal
+chesspal init chess
+cd chess
+claude
+```
+
+- `npm install -g` installs the `chesspal` command for the whole computer, where your agent finds it.
+- `chesspal init chess` makes the folder `chess` to play in. Any name will do; your games are kept [elsewhere](#where-your-games-are).
+- `claude` opens Claude Code in that folder; with Codex, type `codex`, then `/hooks`, and allow Chesspal's two hooks. In the Claude desktop app, choose the folder in the Code tab instead.
+- The first time, your agent asks whether you trust the folder: say yes.
+
+Then **say hello**. The AI answers with the link to the board page: open it in your browser, tell it who you are, and ask for a game. You choose your colour, the clock and the AI's level, and play on the board.
+
+On Windows, use Command Prompt (press Start, type `cmd`, press Enter): PowerShell refuses npm's commands until its scripts are allowed.
+
+## What it does
+
+An AI in a plain chat forgets the position, plays illegal moves and sees no board. Chesspal is what it lacks: it **keeps the rules, the board, the clock and your games**; the AI **plays, reasons and talks**. Every move is checked by Chesspal, and no chess engine plays for the AI: every judgment is its own, made from the facts Chesspal hands it, such as the legal moves, the pieces attacked and defended, the pins and the opening's name.
+
+- **Play on a board** in your browser, and talk with the AI there or in the chat.
+- **Choose its level**, from beginner to master: the higher, the more of the position the AI sees.
+- **Play with a clock**, against an AI that knows how much time it has left; offer a draw, resign, save the game as PGN.
+- **Go over a game** with the AI when it is over: its notes show on the board page, in Analyses. Games from other sites come in as PGN files.
 - **Keep a profile** for each player at the same computer, with their games.
 
-Coming later: an AI coach that helps you grow, the discursive analysis of your games, exercises chosen on your weak points, a rating worked out from your games, and an opponent with a character and moods of its own.
+Coming later: an AI coach that helps you grow, exercises chosen on your weak points, a rating worked out from your games, an opponent with a character and moods of its own, and local models.
 
 ## What you need
 
-- [Node.js](https://nodejs.org) 22.13 or newer: download the version marked LTS and install it like any program.
-- An AI agent on your computer: [Claude Code](https://code.claude.com/docs/en/setup), in a terminal or in the Code tab of the Claude desktop app, or [Codex](https://developers.openai.com/codex).
-- A terminal, opened after installing Node.js: on Windows, Command Prompt (press Start, type `cmd`, press Enter), since PowerShell refuses npm's commands until its scripts are allowed (there, `npm.cmd` and `chesspal.cmd` work in their place); on a Mac, Terminal, in Applications › Utilities.
+- **Node.js 22.13** or newer: download the version marked LTS and install it like any program.
+- **An AI agent** with your own subscription: Claude Code, with a paid Claude plan, or Codex, with a ChatGPT account. Chesspal never uses an API key, which is paid by the call: sign your agent in with your account.
+- **A web browser**, for the board page.
 
-Chesspal works with any AI agent that uses MCP tools and can work with the files on your computer; we develop it with Claude Code, and Codex is connected too. It never uses an API key: the AI runs on what you already pay for your agent, such as your Claude or ChatGPT subscription, or on your computer with a local model.
+Chesspal works with any agent that supports MCP tools and can work with the files on your computer: we develop it with Claude Code, and Codex is connected too.
 
-## Your first game
+## Good to know
 
-1. **Install Chesspal**:
-
-   ```bash
-   npm install -g chesspal
-   ```
-
-2. **Make a folder to play in**: this makes the folder `chess`, with the few files that tell your agent where Chesspal is and how to play. Any name will do; your games are not kept there but in [one folder for all](#where-your-games-are).
-
-   ```bash
-   chesspal init chess
-   ```
-
-3. **Open your agent in that folder**: type `cd chess`, which takes the terminal into it, then `claude` or `codex`; in the Claude desktop app, choose the folder in the Code tab. The first time, it asks whether to trust the folder: say yes. In Codex, also type `/hooks` and allow Chesspal's two hooks: small helpers that let it notice your moves on the board page.
-
-4. **Say hello**: the AI gives you the link to the board page, a page on your own computer; open it in your browser. No link? Ask the AI for the board. The first time, the page asks who you are: your name, a picture, how well you play.
-
-5. **Ask for a game**: the New game window opens on the page, where you choose your colour, the clock and the AI's level. Play on the board: that is where the game is. A move written in the chat counts too, `e4`, `Nf3`, in the international notation (K Q R B N in every language), or in words.
-
-6. **For the next game**, type `/clear` in the chat, or start a new chat: a long chat makes the AI slower and costs you more.
-
-When a game is over, ask the AI to go over it with you: its notes show on the board page, in Analyses. A game you played on another site comes in there too: download it from that site as a PGN file and open it in Analyses.
-
-**To update Chesspal**, close the chat, run `npm install -g chesspal` again, then `chesspal init` in your folder: it updates its own lines and keeps what you wrote there. In Codex, when `chesspal init` says so, allow Chesspal's hooks again in `/hooks`.
+- **For the next game**, type `/clear` in the chat or start a new one: a long chat makes the AI slower and costs you more.
+- **A move written in the chat** counts too: `e4`, `Nf3`, in the international notation (K Q R B N in every language), or in words.
+- **To update**, close the chat, run `npm install -g chesspal` again, then `chesspal init` in your folder: it updates its own lines and keeps what you wrote there. In Codex, allow the hooks again when it says so.
 
 ## Where your games are
 
-Your players and their games are in one folder, the same whatever folder you open the chat in:
+In one folder for every folder you play in:
 
-- on Windows, `Documents › My Games › Chesspal`. Explorer may show Documents in your language, such as Documenti. With OneDrive, it is inside OneDrive, which also keeps a copy online;
-- on macOS, `Documents › Chesspal`; on Linux, `Chesspal` in your Documents folder, whatever its name in your language.
+- Windows: `Documents › My Games › Chesspal`, inside OneDrive if you use it;
+- macOS: `Documents › Chesspal`; Linux: `Chesspal` in your Documents folder.
 
-The board page says where it is, on its welcome page and in "Who's playing?", and its **Open the folder** button opens it.
-
-**A backup** is a copy of the whole `Chesspal` folder, on a USB stick for example. **To move to another computer**, install Chesspal there and put the copied `Chesspal` folder in the same place, replacing the one Chesspal may have made already: your players, their games and a game left unfinished all come with it. Copy it with the chat and the board page closed.
+The board page shows where, and its **Open the folder** button opens it. To back up your games, copy that whole folder; to move them to another computer, put the copy in the same place there. Do it with the chat and the board page closed.
 
 ## Try it, and tell us
 
 Chesspal is in early development: the version on npm is a first one to try, and it may change from one release to the next. When something breaks, confuses you or could work better, open an [issue on GitHub](https://github.com/stefanocaronia/chesspal/issues): what you did, what you expected, what happened.
 
-## How it works
-
-Chesspal is an MCP server, a command line, `chesspal`, and a board page, all made from the same commands. `chesspal init` sets up a folder to play in: the few files that tell the AI agent where Chesspal is, and its instructions as an opponent. Your profiles, games and analyses live in one folder for every folder you play in ([where your games are](#where-your-games-are)), or in the folder `CHESSPAL_HOME` names, for tests. Only Chesspal's commands change them: they check every move with [chess.js](https://github.com/jhlywa/chess.js) and write atomically.
-
 ## Development
 
-You need Node.js 22.13 or newer.
+Chesspal is an MCP server, a command line and a board page, all made from the same commands, which check every move with [chess.js](https://github.com/jhlywa/chess.js) and write the games atomically.
 
 ```bash
 git clone https://github.com/stefanocaronia/chesspal.git
@@ -80,13 +75,7 @@ npm run build
 npm test
 ```
 
-- `npm run lint` checks the formatting and the types, as CI does; `npm run format` formats the code.
-- `npm run page -- <folder>` serves the board page of a player's folder, with the data of `CHESSPAL_HOME` or Documents, to look at it while it is built.
-- `npm run endings` shows the ends of a game on the board: checkmate, resignation, a flag fallen, the draws.
-- `npm run bench` times the commands against their budgets.
-- `npm run smoke`, after the build, packs the package, installs it in a temporary folder and runs it as a player would: its version, `chesspal init` and its MCP server, as CI does.
-
-[The guide for development](https://github.com/stefanocaronia/chesspal/blob/main/AGENTS.md), written for AI coding agents and people alike, holds the layout, the architecture's rules, performance and the coding guidelines.
+[The guide for development](https://github.com/stefanocaronia/chesspal/blob/main/AGENTS.md), for people and AI coding agents alike, holds the other scripts, the layout, the architecture's rules and the coding guidelines.
 
 ## Credits
 
