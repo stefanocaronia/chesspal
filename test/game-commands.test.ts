@@ -23,7 +23,7 @@ describe("a game in chat", () => {
         const context = playerFolder();
 
         expect(await run(context, "status")).toContain(
-            "No game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level; where there is no board page, it tells you to ask them in the chat.",
+            "No game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.",
         );
         expect(await run(context, "new_game", { ai_colour: "black" })).toBe(
             "New game: you play Black, the player White, at the strong level (board, tactical and positional facts).\nPlayer (White) to move, move 1.\nNext: wait for the player's move, then call player_move with it.",
@@ -300,7 +300,7 @@ describe("a game in chat", () => {
                 + "No board page is open: copy this board into your message.\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n8 ♜ ♞ ♝ ⊙ ♚ ♝ ♞ ♜ 8\n7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7\n6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6\n5 ⊙ ⊙ ⊙ ⊙ ♟︎ ⊙ ⊙ ⊙ 5\n"
                 + "4 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ♛ 4\n3 ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ⊙ ⊙ 3\n2 ♙ ♙ ♙ ♙ ♙ ⊙ ⊙ ♙ 2\n1 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 1\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n"
                 + "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one "
-                + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level; where there is no board page, it tells you to ask them in the chat.",
+                + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.",
         );
         expect(readArchive(context)).toContain('[Result "0-1"]\n[AILevel "strong"]\n[Termination "checkmate"]');
         expect(readArchive(context)).toContain("[%plan Mate.]");
@@ -323,7 +323,7 @@ describe("a game in chat", () => {
 
         expect(await ended("player_resigns")).toBe(
             `Game over: 0-1, White resigns. Archived in ${archive}.\nNext: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one `
-                + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level; where there is no board page, it tells you to ask them in the chat.",
+                + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.",
         );
         expect(await ended("ai_resigns")).toContain("Game over: 1-0, Black resigns.");
         await expect(ended("draw_agreed")).rejects.toThrow("No draw offer stands: the player offers one with their move (player_move with offer_draw), you with yours");

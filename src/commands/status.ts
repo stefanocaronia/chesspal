@@ -101,7 +101,7 @@ export const status = defineCommand({
             ...(player === undefined ? [] : [player]),
             ...(speech === undefined ? [] : [speechLine(speech)]),
             ...(fromBefore === true ? [fromBeforeLine] : []),
-            ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true)),
+            ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true, pageClosed === true)),
             ...(analysis === undefined ? [] : [analysisLine(analysis)]),
         ].join("\n"),
 });
@@ -141,12 +141,12 @@ function analysisLine({ game, brought }: NonNullable<Status["analysis"]>): strin
 }
 
 /** The game's lines; a game the player brought to analyse takes the place of the next step (T-92). */
-function gameLines(game: GameSummary | undefined, words: readonly string[], brought: boolean): string[]
+function gameLines(game: GameSummary | undefined, words: readonly string[], brought: boolean, pageClosed: boolean): string[]
 {
     if (game === undefined) {
-        return ["No game.", ...(brought ? wordLines(words) : closingLines(game, words))];
+        return ["No game.", ...(brought ? wordLines(words) : closingLines(game, words, pageClosed))];
     }
 
     const moves = game.lastMoves === "" ? [] : [`Moves: ${game.lastMoves}`];
-    return [`Game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`, ...moves, ...positionLines(game), ...(brought ? wordLines(words) : closingLines(game, words))];
+    return [`Game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`, ...moves, ...positionLines(game), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed))];
 }

@@ -166,7 +166,7 @@ describe("the MCP server", () => {
         expect(answer).toEqual({
             text: `Chesspal ${version}. Folder: ${
                 profileFolder(context.folder, "player")
-            }\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level; where there is no board page, it tells you to ask them in the chat.`,
+            }\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.`,
             isError: false,
         });
     });

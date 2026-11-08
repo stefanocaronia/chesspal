@@ -32,7 +32,7 @@ describe("the command line", () => {
 
         try {
             expect((await runCommandLine(["status"], testContext(folder))).output).toBe(
-                `Chesspal ${version}. Folder: ${games}\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level; where there is no board page, it tells you to ask them in the chat.`,
+                `Chesspal ${version}. Folder: ${games}\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.`,
             );
             expect(JSON.parse((await runCommandLine(["status", "--json"], testContext(folder))).output)).toEqual({ version, folder: games });
         } finally {

@@ -225,9 +225,9 @@ export function moveLines({ note, game, warning }: MovePlayed): string[]
 }
 
 /** The last lines of a tool's answer: the player's words from the board page, then the next step, which stays the last line. */
-export function closingLines(game: GameSummary | undefined, words: readonly string[] = []): string[]
+export function closingLines(game: GameSummary | undefined, words: readonly string[] = [], pageClosed = false): string[]
 {
-    return [...wordLines(words), nextStep(game, words)];
+    return [...wordLines(words), nextStep(game, words, pageClosed)];
 }
 
 /** The player's words from the board page, one line each: lines they broke are joined, so no line of theirs reads as one of Chesspal's. */
@@ -236,19 +236,24 @@ export function wordLines(words: readonly string[]): string[]
     return words.map((text) => `Player wrote on the board page: «${text.replace(/\s+/g, " ")}»`);
 }
 
-/** What the AI does next: the one line every host reads, even where the server's instructions are not shown. Words of the player's ask for an answer. */
-export function nextStep(game: GameSummary | undefined, words: readonly string[] = []): string
+/**
+ * What the AI does next: the one line every host reads, even where the server's instructions are not shown. Words of the player's ask for an answer. With the
+ * board page open in no browser, a new game starts there, never in the chat (T-131).
+ */
+export function nextStep(game: GameSummary | undefined, words: readonly string[] = [], pageClosed = false): string
 {
+    const step = pageClosed ? closedPageGameStep : newGameStep;
+
     if (game === undefined) {
-        return words.length === 0 ? `Next: when the player wants a game, ${newGameStep}` : `Next: answer the player with ai_say. When they want a game, ${newGameStep}`;
+        return words.length === 0 ? `Next: when the player wants a game, ${step}` : `Next: answer the player with ai_say. When they want a game, ${step}`;
     }
 
     if (game.end !== undefined) {
         return words.length === 0
             ? "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or "
                 + "to go over this one "
-                + `(analyse_game). For another, ${newGameStep}`
-            : `Next: answer the player with ai_say. When they want another game, ${newGameStep}`;
+                + `(analyse_game). For another, ${step}`
+            : `Next: answer the player with ai_say. When they want another game, ${step}`;
     }
 
     if (game.turn === game.ai && game.clock?.waiting === true) {
@@ -268,9 +273,12 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
     return words.length === 0 ? "Next: wait for the player's move, then call player_move with it." : "Next: answer the player with ai_say, then wait for their move.";
 }
 
-/** How a new game starts: the player chooses it in the board page's window, which new_game without choices opens; in the chat only where there is no page (D-85). */
-export const newGameStep = "call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the "
-    + "level; where there is no board page, it tells you to ask them in the chat.";
+/** How a new game starts: the player chooses it in the board page's window, which new_game without choices opens (D-85). */
+export const newGameStep = "call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.";
+
+// With the page open in no browser the window cannot open: the player opens the page and presses New game (T-131).
+const closedPageGameStep = "they start it on the board page with its New game button, where they choose the colour, the clock and the level: tell them so with "
+    + "the page's address, and never offer to set it up in the chat.";
 
 /** Who plays what, from the AI's side. */
 export function sidesLine(ai: Side): string
