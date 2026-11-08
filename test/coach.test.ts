@@ -65,13 +65,18 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         expect(start).toMatch(/\nMoves: 1\.e4 e5 2\.Nf3 .* 9\.d5 Bf6\nOpening: C5\d /);
         expect(start).toContain("\nTheir move to judge: 9.d5. The position they played it in:\nFEN: ");
         expect(start).toContain("\nMaterial: Black +4 (White took P, Black took N 2P)\n");
-        expect(start).toMatch(/\nAfter their move: at risk .*; the opponent's checks: .*\.\nThe opponent answered 9\.\.\.Bf6 and said: «Ecco\.»\nNow, for your hint:\nFEN: /);
-        expect(start).toMatch(new RegExp(`\\nKeep your words: coach \\{game: "${game}", position: 18, badge, note, hint, arrows, squares\\}, .*; then coach \\{game: "${game}", position: 18, done: true\\}\\.$`));
+        expect(start).toMatch(/\nAfter their move: at risk .*; the opponent's checks: .*\.\nThe opponent answered 9\.\.\.Bf6 and said: «Ecco\.»\nNow, for who is ahead and your hint:\nFEN: /);
+        // Every fact of the position they are to move in, the positional ones too, for who is ahead (D-90).
+        expect(start).toMatch(/\nPhase: \w+\n[\s\S]*\nControl: only White \d+, only Black \d+, both \d+\n/);
+        expect(start).toMatch(
+            new RegExp(`\\nKeep your words: coach \\{game: "${game}", position: 18, ahead, badge, note, hint, arrows, squares\\}, who is ahead always, .*; then coach \\{game: "${game}", position: 18, done: true\\}\\.$`),
+        );
         // The opponent's plan is never the coach's (D-80).
         expect(start).not.toContain("[%plan");
         expect(start).not.toMatch(/plan: p\b/);
-        // Two positions with their facts, well within Priya's budget (review of T-112).
-        expect(start.length).toBeLessThan(3_000);
+        // Two positions with their facts, the positional ones of the position now for who is ahead (D-90), within Priya's budget (review of T-112): a full
+        // middlegame at move 26 took 3,716 characters (Priya, review of T-148).
+        expect(start.length).toBeLessThan(4_000);
     });
 
     it("tells the position a game set up began in, since its moves start there (Anatolij, review of T-112)", async () => {
@@ -113,7 +118,7 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         await expect(run(context, "coach", { game, position: 0, badge: "good" })).rejects.toThrow("There is no move of the player's to judge here");
 
         expect(await run(context, "coach", { ...at, badge: "best", note: "Nf3 next attacks e5.", hint: "The e5 pawn has one defender.", squares: ["R e5"] })).toBe(
-            `Kept, on the board page. Now call coach {game: "${game}", position: 2, done: true} alone.`,
+            `Kept on the board page: your judgment, your hint. Now call coach {game: "${game}", position: 2, done: true} alone.`,
         );
 
         const folder = gameFolder(context.home());
@@ -132,10 +137,42 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         expect(await run(context, "player_move", { move: "Nf3" })).not.toMatch(/Nf3 next|one defender/);
         expect(await run(context, "coach", { ...at, done: true })).toBe("Stop now: the player has moved, or the game is over. End with one word.");
         expect(await run(context, "coach", { ...at, note: "Late, still kept.", hint: "Late." })).toBe(
-            "Your judgment is kept; the player has moved, so no hint is kept. Stop now: end with one word.",
+            "Kept: your judgment; the player has moved, so your hint is not kept. Stop now: end with one word.",
         );
         expect(coachWords(folder, loadGame(folder)!).judgments).toEqual([{ ply: 1, note: "Late, still kept." }]);
         expect(coachShown(coachWords(folder, loadGame(folder)!), loadGame(folder)!).judgments).toEqual([{ ply: 1, note: "Late, still kept." }]);
+    });
+
+    it("keeps who it sees ahead out of the game the opponent reads, for the page while the game goes on and in its PGN once it is over (D-90)", async () => {
+        const context = playerFolder();
+        helps(context, true);
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "e4" });
+        await run(context, "ai_move", { move: "e5", plan: "Centre." });
+        const game = keyOf(await run(context, "coach"));
+
+        // Said back in words, so that the coach reads its own sign (Anatolij, review of T-148).
+        expect(await run(context, "coach", { game, position: 2, ahead: 0.4 })).toBe(
+            `Kept on the board page: who is ahead, White ahead by 0.4. Now call coach {game: "${game}", position: 2, done: true} alone.`,
+        );
+        await expect(run(context, "coach", { game, position: 2, ahead: "much" })).rejects.toThrow(/who is ahead is a number of pawns/);
+        const folder = gameFolder(context.home());
+        expect(coachWords(folder, loadGame(folder)!)).toEqual({ judgments: [], leads: [{ position: 2, lead: { pawns: 0.4 } }] });
+        expect(coachShown(coachWords(folder, loadGame(folder)!), loadGame(folder)!).leads).toEqual([{ position: 2, lead: { pawns: 0.4 } }]);
+        expect(readFileSync(join(folder, "game.json"), "utf8")).not.toContain("lead");
+
+        await run(context, "player_move", { move: "Nf3" });
+        // Only where the player is to move (Federico, review of T-148).
+        await expect(run(context, "coach", { game, position: 3, ahead: 1 })).rejects.toThrow("Who is ahead is for a position the player is to move in");
+        await run(context, "ai_move", { move: "Nc6", plan: "Develop." });
+        expect(await run(context, "coach")).toContain("\nWho you saw ahead on their turn before: +0.4, White ahead by 0.4\n");
+        await run(context, "coach", { game, position: 4, ahead: "-0.2", hint: "Look at what defends e5." });
+        await run(context, "end_game", { result: "player_resigns" });
+
+        const [archived] = readdirSync(join(folder, "games"));
+        const pgn = readFileSync(join(folder, "games", archived!), "utf8").replace(/\s+/g, " ");
+        expect(pgn).toMatch(/1\. e4 e5 \{[^}]*\[%lead \+0\.4\]\} 2\. Nf3 Nc6 \{[^}]*\[%lead -0\.2\]\}/);
+        expect(pgn).not.toContain("Look at what defends");
     });
 
     it("lets a hint name the opponent's pieces and moves, which are no move of the player's (Priya and Anatolij, review of T-112)", async () => {
@@ -215,7 +252,7 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         expect(start).toMatch(/^Game "\w+", position 4: the game is over, 0-1, checkmate, with the player's move\.\n/);
         expect(start).toContain("\nTheir move to judge: 2...Qh4#. The position they played it in:\n");
         expect(start).not.toMatch(/After their move|The opponent answered/);
-        expect(await run(context, "coach", { ...at, badge: "best", note: "Mate." })).toBe("Kept: it goes into the game's record. Stop now: end with one word.");
+        expect(await run(context, "coach", { ...at, badge: "best", note: "Mate." })).toBe("Kept for the game's record: your judgment; the game is over. Stop now: end with one word.");
         expect(await run(context, "export", { format: "pgn" })).toMatch(/2\.\.\. Qh4# \{\[%badge best\]\s+\[%review\s+Mate\.\]\}/);
 
         // On the board page the player's move reaches the chat through status, and its words through ai_say: both tell it, just before the next step, where
@@ -282,9 +319,10 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         expect(start).toMatch(/^Game "\w+", position 4: the game is over, 0-1.*, with the opponent's move\.\n/);
         expect(start).toContain("\nTheir move to judge: 2.g4. The position they played it in:\n");
         expect(start).toContain("\nAfter their move: at risk none; the opponent's checks: Qh4#.\n");
-        expect(start).not.toContain("Now, for your hint");
+        expect(start).not.toContain("Now, for who is ahead");
         expect(start).toMatch(/\nNo hint: the game is over\. .*coach \{game: "\w+", position: 4, badge, note\}; then end with one word\.$/);
-        await expect(run(context, "coach", { ...at, hint: "Look at h4." })).rejects.toThrow("The game is over: no hint.");
+        await expect(run(context, "coach", { ...at, hint: "Look at h4." })).rejects.toThrow("The game is over: no hint and no ahead.");
+        await expect(run(context, "coach", { ...at, ahead: "#-1" })).rejects.toThrow("The game is over: no hint and no ahead.");
 
         // The analyst reviewed the game before the coach's judgment came (Federico, review of T-112).
         const folder = gameFolder(context.home());
@@ -293,13 +331,33 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         writeFileSync(path, readFileSync(path, "utf8").replace("1. f3", "{[%review A short game.]} 1. f3 {[%review Weakens the king.]}"));
 
         expect(await run(context, "coach", { ...at, badge: "blunder", note: "It opens the diagonal to the king." })).toBe(
-            "Kept: it goes into the game's record. Stop now: end with one word.",
+            "Kept for the game's record: your judgment; the game is over. Stop now: end with one word.",
         );
         const pgn = readFileSync(path, "utf8");
         expect(pgn).toContain("A short game.");
         expect(pgn).toContain("Weakens the king.");
         expect(pgn).toMatch(/2\. g4\?\? \{\[%badge blunder\] \[%review It\s+opens\s+the\s+diagonal\s+to\s+the\s+king\.\]\}\s+2\.\.\. Qh4#/);
         expect(await run(context, "export", { format: "pgn" })).toContain("[%badge blunder]");
+    });
+
+    it("keeps who it saw ahead on the player's turn when the game ends while it thinks, without the hint that came too late (Federico, review of T-148)", async () => {
+        const context = playerFolder();
+        helps(context, true);
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "f3" });
+        await run(context, "ai_move", { move: "e5", plan: "Centre." });
+        const at = { game: keyOf(await run(context, "coach")), position: 2 };
+        await run(context, "player_move", { move: "g4" });
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+
+        expect(await run(context, "coach", { ...at, ahead: -0.5, badge: "mistake", note: "It weakens the king.", hint: "Look at h4." })).toBe(
+            "Kept for the game's record: your judgment, who is ahead, Black ahead by 0.5; the game is over, so your hint is not kept. Stop now: end with one word.",
+        );
+        const folder = gameFolder(context.home());
+        const [archived] = readdirSync(join(folder, "games"));
+        const pgn = readFileSync(join(folder, "games", archived!), "utf8").replace(/\s+/g, " ");
+        expect(pgn).toMatch(/1\. f3\? \{\[%badge mistake\] \[%review It weakens the king\.\]\} 1\.\.\. e5 \{[^}]*\[%lead -0\.5\]\}/);
+        expect(pgn).not.toContain("Look at h4");
     });
 
     it("judges a move the analysis has marked only with the book's badge (Federico, retest of T-133)", async () => {

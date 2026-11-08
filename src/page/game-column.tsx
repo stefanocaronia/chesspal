@@ -1,10 +1,12 @@
-// The game's column on the right of the board (D-53): the game's card, its opening (D-16), the helps (D-78), the moves, the saves and the buttons that step
-// through them (T-88).
+// The game's column on the right of the board (D-53): the game's card with who is ahead (D-90), the chart of the game in analysis, its opening (D-16), the
+// helps (D-78), the moves, the saves and the buttons that step through them (T-88).
 import type { ComponentChildren } from "preact";
 import { type Opening, outOfBookMove, type Side } from "../core/index.ts";
 import type { Step } from "./browse.ts";
 import { FoldButton, useCardFold } from "./card-fold.tsx";
 import type { HowEnded } from "./ending.ts";
+import { type Standing, standingAt } from "./lead-view.ts";
+import { LeadBar, LeadChart } from "./lead.tsx";
 import { MoveList, Steps } from "./move-list.tsx";
 import { Piece } from "./pieces.tsx";
 import type { Ply } from "./plies.ts";
@@ -14,7 +16,7 @@ import type { Text } from "./text.ts";
  * The column, which the player folds with its tab (T-84); under the board, where three columns would leave the board small, always open. A game in analysis
  * (D-69) says above the moves that the AI is going over it, until its word on the whole game comes, which the talk shows.
  */
-export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, helps, analysis, shownPlies, onShow, onStep, onDownload, onSaveMoves, onAnalyse, text }: {
+export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, helps, standings, analysis, shownPlies, onShow, onStep, onDownload, onSaveMoves, onAnalyse, text }: {
     plies: readonly Ply[];
     result?: string;
     how?: HowEnded;
@@ -26,6 +28,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     opening?: Opening;
     /** The helps' card, under the opening, while the helps are on (D-78). */
     helps?: ComponentChildren;
+    /** Who the AI saw ahead after the moves, with the helps on in a game and in analysis (D-90): the bar shows it, and in analysis the chart. */
+    standings?: readonly Standing[];
     /** The game in analysis: who reviews it, and their word on the whole game, once written. */
     analysis?: { by: string; summary?: string; };
     shownPlies: number;
@@ -40,6 +44,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     text: Text;
 })
 {
+    const bar = standings === undefined ? undefined : <LeadBar standing={standingAt(standings, shownPlies)} shown={shownPlies} text={text} />;
+
     return (
         <aside class="side" id="game" aria-label={text.game}>
             {started === undefined && analysis === undefined
@@ -51,7 +57,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                 )
                 : (
                     <>
-                        <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} text={text} />
+                        <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} bar={bar} text={text} />
+                        {analysis === undefined || standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={shownPlies} onShow={onShow} text={text} />}
                         {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
                         {helps}
                         {analysis === undefined || analysis.summary !== undefined ? null : (
@@ -109,7 +116,7 @@ function AnalyseButton({ label, onAnalyse }: { label: string; onAnalyse: () => v
  * square, the winner's king standing over the loser's, laid down, or both standing in a draw, how it ended and how many moves it lasted; lit up a moment when the
  * game ends under the player's eyes (T-77).
  */
-function GameCard({ plies, result, how, lit, started, move, toMove, text }: {
+function GameCard({ plies, result, how, lit, started, move, toMove, bar, text }: {
     plies: readonly Ply[];
     result?: string;
     how?: HowEnded;
@@ -118,6 +125,8 @@ function GameCard({ plies, result, how, lit, started, move, toMove, text }: {
     started?: string;
     move: number;
     toMove: Side;
+    /** The bar of who the AI saw ahead in the position shown (D-90). */
+    bar?: ComponentChildren;
     text: Text;
 })
 {
@@ -135,6 +144,7 @@ function GameCard({ plies, result, how, lit, started, move, toMove, text }: {
                         <span class="visually-hidden">, {text.toMove(toMove)}</span>
                     </p>
                     {when === undefined ? null : <p class="when">{text.started(when)}</p>}
+                    {bar}
                 </div>
             </section>
         );
@@ -169,6 +179,7 @@ function GameCard({ plies, result, how, lit, started, move, toMove, text }: {
                     <b class="big">{result === "1/2-1/2" ? "½–½" : result.replace("-", "–")}</b> · {winner === undefined ? text.draw : text.won(winner)}
                 </p>
                 <p class="when">{how === undefined ? "" : `${text.ended[how]} · `}{text.lasted(lasted)}</p>
+                {bar}
             </div>
         </section>
     );

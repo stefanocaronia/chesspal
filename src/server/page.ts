@@ -742,7 +742,8 @@ function sendGame(response: ServerResponse, served: Served): void
 
 /**
  * What the coach wrote that the player may see now, in a game going on with the helps on (D-88): its judgments, those whose note names a move they may still
- * play once they have moved, and its hint for the position it was given in; none without anything. Once the game is over its PGN has the judgments.
+ * play once they have moved, its hint for the position it was given in, and who it saw ahead (D-90); none without anything. Once the game is over its
+ * PGN has the judgments and the leads.
  */
 function coachOn(folder: string, current: CurrentGame | undefined): CoachWords | undefined
 {
@@ -751,7 +752,7 @@ function coachOn(folder: string, current: CurrentGame | undefined): CoachWords |
     }
 
     const shown = coachShown(coachWords(folder, current), current);
-    return shown.judgments.length === 0 && shown.hint === undefined ? undefined : shown;
+    return shown.judgments.length === 0 && shown.hint === undefined && shown.leads === undefined ? undefined : shown;
 }
 
 /** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review; none without one, or when it cannot be read. */

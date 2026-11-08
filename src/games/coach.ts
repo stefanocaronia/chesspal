@@ -1,9 +1,9 @@
-// What the coach writes during a game with the helps on (D-88): its judgments of the player's moves and its hint for their turn, in coach.json beside
-// game.json, where no command of the opponent's reads them; the judgments go into the game's PGN once it is over.
+// What the coach writes during a game with the helps on (D-88): its judgments of the player's moves, its hint for their turn and who it sees ahead (D-90),
+// in coach.json beside game.json, where no command of the opponent's reads them; the judgments and the leads go into the game's PGN once it is over.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { type Badge, badges, type DrawColour, type DrawnArrow, type DrawnSquare, Game, type GameRecord, reviewed, reviewOf } from "../core/index.ts";
+import { type Badge, badges, type DrawColour, type DrawnArrow, type DrawnSquare, Game, type GameRecord, type Lead, leadOf, leadText, readLead, type RecordedMove, reviewed, reviewOf, withLead } from "../core/index.ts";
 import type { CurrentGame } from "./current-game.ts";
 import { writeAtomically } from "./files.ts";
 
@@ -28,18 +28,30 @@ export interface CoachHint
     readonly squares?: DrawnSquare[];
 }
 
+/** Who the coach sees ahead in a position the player was to move in (D-90), by the plies up to it. */
+export interface CoachLead
+{
+    readonly position: number;
+    readonly lead: Lead;
+}
+
 /** What the coach wrote in a game. */
 export interface CoachWords
 {
     readonly judgments: readonly CoachJudgment[];
     readonly hint?: CoachHint;
+    readonly leads?: readonly CoachLead[];
 }
 
 /** What the coach wrote in the game going on: nothing when the file is another game's, or missing. */
 export function coachWords(folder: string, current: CurrentGame): CoachWords
 {
-    const { judgments, hint } = keptFor(folder, current);
-    return hint === undefined ? { judgments } : { judgments, hint };
+    const { judgments, hint, leads = [] } = keptFor(folder, current);
+    const read = leads.flatMap(({ position, lead }) => {
+        const known = readLead(lead);
+        return known === undefined ? [] : [{ position, lead: known }];
+    });
+    return { judgments, ...(hint === undefined ? {} : { hint }), ...(read.length === 0 ? {} : { leads: read }) };
 }
 
 /** Keeps the coach's word on a move of the player's, in place of one it wrote on the same move. */
@@ -54,6 +66,14 @@ export function keepJudgment(folder: string, current: CurrentGame, judgment: Coa
 export function keepHint(folder: string, current: CurrentGame, hint: CoachHint): void
 {
     write(folder, { ...keptFor(folder, current), hint });
+}
+
+/** Keeps who the coach sees ahead in a position, in place of what it said there before. */
+export function keepLead(folder: string, current: CurrentGame, { position, lead }: CoachLead): void
+{
+    const kept = keptFor(folder, current);
+    const leads = [...(kept.leads ?? []).filter((one) => one.position !== position), { position, lead: leadText(lead) }].sort((one, other) => one.position - other.position);
+    write(folder, { ...kept, leads });
 }
 
 /** Since when the coach has waited for the player's move in a position: the first time it asked, `now` then. */
@@ -94,7 +114,7 @@ export function startCoach(folder: string, current: CurrentGame): boolean
  * too (Anatolij, review of T-112), and the hint only in its own position. A held one that the last pair of moves let go is marked, for the card to show it
  * now, however far back its move (Zoe, playtest of T-112).
  */
-export function coachShown({ judgments, hint }: CoachWords, { game, ai }: CurrentGame): CoachWords
+export function coachShown({ judgments, hint, leads = [] }: CoachWords, { game, ai }: CurrentGame): CoachWords
 {
     const plies = game.record.moves.length;
     const legal = game.position.turn === ai ? undefined : legalMoves(game);
@@ -103,16 +123,16 @@ export function coachShown({ judgments, hint }: CoachWords, { game, ai }: Curren
         ? undefined
         : legalMoves(new Game({ tags: game.record.tags, moves: game.record.moves.slice(0, plies - 2) }));
     const marked = before === undefined ? shown : shown.map((judgment) => judgment.held !== undefined && names(judgment.held, before) ? { ...judgment, released: true as const } : judgment);
-    return hint === undefined || hint.position !== plies ? { judgments: marked } : { judgments: marked, hint };
+    return { judgments: marked, ...(hint === undefined || hint.position !== plies ? {} : { hint }), ...(leads.length === 0 ? {} : { leads }) };
 }
 
 /**
  * The record with the coach's judgments in the comments of the moves they judge, as the analyst writes its own: for the game over. A move the analyst has
  * reviewed already keeps its review (Federico, review of T-112); the book's badge alone is no review, and stays under a note alone, as annotate_game keeps it.
  */
-export function withCoach(record: GameRecord, { judgments }: CoachWords): GameRecord
+export function withCoach(record: GameRecord, { judgments, leads = [] }: CoachWords): GameRecord
 {
-    if (judgments.length === 0) {
+    if (judgments.length === 0 && leads.length === 0) {
         return record;
     }
 
@@ -127,7 +147,16 @@ export function withCoach(record: GameRecord, { judgments }: CoachWords): GameRe
         const badge = judgment.badge ?? review?.badge;
         return reviewed(move, { ...(badge === undefined ? {} : { badge }), ...(judgment.note === undefined ? {} : { note: judgment.note }) });
     });
-    return { ...record, moves };
+    return { ...record, moves: withLeads(moves, leads) };
+}
+
+/** The moves with who the coach saw ahead after each (D-90), where nobody has said it there since: on the move that led to the position it was given in. */
+function withLeads(moves: readonly RecordedMove[], leads: readonly CoachLead[]): RecordedMove[]
+{
+    return moves.map((move, index) => {
+        const lead = leads.find((one) => one.position === index + 1)?.lead;
+        return lead === undefined || leadOf(move.comment) !== undefined ? move : withLead(move, lead);
+    });
 }
 
 /** The legal moves in a position, without their checks. */
@@ -154,6 +183,7 @@ const colours: [DrawColour, ...DrawColour[]] = ["green", "red", "yellow", "blue"
 const coachFile = z.object({
     started: z.string(),
     judgments: z.array(z.object({ ply: z.int().min(1), badge: z.enum(badges).optional(), note: z.string().optional(), held: z.array(z.string()).optional() })),
+    leads: z.array(z.object({ position: z.int().min(0), lead: z.string() })).optional(),
     hint: z.object({
         position: z.int().min(0),
         text: z.string(),

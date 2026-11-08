@@ -6,6 +6,7 @@ export type { Facts, PieceFacts, PieceLetter, Pin } from "./facts.ts";
 export { Game, withSanLetters } from "./game.ts";
 export type { Ending, Move, Outcome, Played, Position, Promotion, Refusal, Side, Square } from "./game.ts";
 export type { Illegal, IllegalReason } from "./illegal.ts";
+export { type Lead, leadOf, leadText, readLead, withLead } from "./lead.ts";
 export { aiLevels, layersOf, levelForPlayer, levelOf, levelTag, sees, suggestedLevel } from "./levels.ts";
 export type { AiLevel, Layer } from "./levels.ts";
 export { materialOf } from "./material.ts";

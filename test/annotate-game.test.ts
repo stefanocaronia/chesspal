@@ -10,7 +10,7 @@ import { endGame } from "../src/commands/end-game.ts";
 import { newGame } from "../src/commands/new-game.ts";
 import { playerMove } from "../src/commands/player-move.ts";
 import { status } from "../src/commands/status.ts";
-import { annotatorOf, closingOf, gameReviewOf, readPgn, reviewed, reviewOf, withGameReview, writePgn } from "../src/core/index.ts";
+import { annotatorOf, closingOf, gameReviewOf, leadOf, readPgn, reviewed, reviewOf, withGameReview, writePgn } from "../src/core/index.ts";
 import { gameInAnalysis, startAnalysis } from "../src/games/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
@@ -129,6 +129,44 @@ describe("annotate_game (D-69)", () => {
         await expect(async () => annotate(context, { notes: [{ move: "3...", arrows: ["Rh5f7"] }] })).rejects.toThrow("Give 3... a badge, a note, or both");
     });
 
+    it("keeps who is ahead after each move under Chesspal's own [%lead], never [%eval], which analyse_game gives back and a new figure replaces (D-90)", async () => {
+        const context = playerFolder();
+        await analyse(context, { pgn });
+
+        // Once the review gives who is ahead, the answer names the moves still without it but the mate, which the board says; a review without it, as
+        // those before D-90, is not asked for it (Priya, review of T-148).
+        expect(await annotate(context, { notes: [{ move: "1.", badge: "book" }] })).not.toContain("Who is ahead");
+        expect(await annotate(context, { ahead: { "1.": 0.3 } })).toMatch(
+            /: who is ahead after 1 move\. [\s\S]*\nWho is ahead is still missing after 1\.\.\. 2\. 2\.\.\. 3\. 3\.\.\.: give it with ahead, for the page's bar and chart\.$/,
+        );
+        expect(await annotate(context, { ahead: { "1...": "-0.2", "2.": "+0.4", "2...": 0, "3.": 0.5, "3...": "#1" } }))
+            .toMatch(/^Kept in study\/2026-11-02-153012\.pgn: who is ahead after 5 moves\. The board page shows them\.\n/);
+        const [read] = readPgn(readFileSync(join(gameFolder(context.folder), kept), "utf8"));
+        expect(read!.moves.map((move) => leadOf(move.comment))).toEqual([{ pawns: 0.3 }, { pawns: -0.2 }, { pawns: 0.4 }, { pawns: 0 }, { pawns: 0.5 }, { mate: 1 }, undefined]);
+        expect(read!.moves[5]!.comment).toBe("[%lead #1]");
+        expect(await annotate(context, { notes: [{ move: "3...", badge: "blunder" }], ahead: { "3...": "+M1", "1.": "−0.25" } })).not.toContain("Who is ahead is still missing");
+
+        const analysis = await analyse(context, { game: kept });
+        expect(analysis).toMatch(/\n1\.e4: .*ahead -0\.3\n/);
+        expect(analysis).toMatch(/\n3\.\.\.Nf6: .*; you marked blunder; ahead #1\n/);
+        expect(analysis).not.toContain("[%lead");
+
+        // A figure that is no lead, or a move not in the game, changes nothing.
+        const before = readFileSync(join(gameFolder(context.folder), kept), "utf8");
+        await expect(async () => annotate(context, { ahead: { "1.": "a lot" } })).rejects.toThrow(/who is ahead is a number of pawns/);
+        await expect(async () => annotate(context, { ahead: { "1.": 120 } })).rejects.toThrow(/up to 99/);
+        await expect(async () => annotate(context, { ahead: { "2.": 1, "9.": 1 } })).rejects.toThrow(
+            "In ahead, there is no 9. in this game: its moves go from 1.e4 to 4.Qxf7#. Nothing changed.",
+        );
+        expect(readFileSync(join(gameFolder(context.folder), kept), "utf8")).toBe(before);
+
+        // A PGN from elsewhere keeps Chesspal's [%lead], never an engine's [%eval] (Federico, review of T-148).
+        const other = playerFolder();
+        expect(await analyse(other, { pgn: pgn.replace("1. e4 e5", "1. e4 {[%eval 1.2] [%lead +0.3]} e5 {[%eval -3.4]}") })).toContain("\n1.e4: ahead +0.3\n1...e5\n");
+        const [imported] = readPgn(readFileSync(join(gameFolder(other.folder), kept), "utf8"));
+        expect(imported!.moves.map((move) => move.comment ?? "").join(" ")).not.toContain("%eval");
+    });
+
     it("keeps the review when the same game is brought again as a PGN", async () => {
         const context = playerFolder();
         await analyse(context, { pgn });
@@ -147,7 +185,7 @@ describe("annotate_game (D-69)", () => {
 
         await analyse(context, { pgn });
         const before = readFileSync(join(gameFolder(context.folder), kept), "utf8");
-        await expect(async () => annotate(context, { notes: [{ move: "1.", badge: "book" }, { move: "9.", badge: "best" }] })).rejects.toThrow("There is no 9. in this game");
+        await expect(async () => annotate(context, { notes: [{ move: "1.", badge: "book" }, { move: "9.", badge: "best" }] })).rejects.toThrow("In notes, there is no 9. in this game");
         await expect(async () => annotate(context, {})).rejects.toThrow(/^Give notes on the moves that matter/);
         await expect(async () => annotate(context, { notes: [{ move: "1.", badge: "superb" }] })).rejects.toThrow();
         expect(readFileSync(join(gameFolder(context.folder), kept), "utf8")).toBe(before);

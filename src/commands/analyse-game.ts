@@ -10,6 +10,8 @@ import {
     type GameRecord,
     gameReviewOf,
     isReviewed,
+    leadOf,
+    leadText,
     levelOf,
     materialOf,
     type MoveReview,
@@ -22,6 +24,7 @@ import {
     timeControlOfTag,
     timeControlText,
     withGameReview,
+    withLead,
 } from "../core/index.ts";
 import { keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis } from "../games/index.ts";
 import { analystAgent, instructions } from "../host-files/index.ts";
@@ -62,6 +65,8 @@ interface MoveFacts
     plan?: string;
     /** The badge and note the AI gave it with annotate_game (D-69). */
     review?: MoveReview;
+    /** Who is ahead after it, as the AI estimated it (D-90). */
+    lead?: string;
 }
 
 /** A game as the analysis gives it. */
@@ -183,7 +188,9 @@ function importedGame(context: Context, pgn: string): Studied
             const clock = /\[%clk [^\]]*\]/.exec(comment ?? "")?.[0];
             const move = clock === undefined ? { san } : { san, comment: clock };
             const review = reviewOf(comment);
-            return review === undefined ? move : reviewed(move, review);
+            const lead = leadOf(comment);
+            const kept = review === undefined ? move : reviewed(move, review);
+            return lead === undefined ? kept : withLead(kept, lead);
         }),
     };
     const summary = gameReviewOf(records[0]!);
@@ -298,6 +305,7 @@ function movesOf(record: GameRecord, ai: Side | undefined): Replay
             said: side === ai ? saidIn(comment) : undefined,
             review: reviewOf(comment),
             plan: side === ai ? planOf(comment) : undefined,
+            lead: estimateOf(comment),
         };
 
         if (clock !== undefined) {
@@ -335,7 +343,7 @@ function headLines(analysis: Analysis): string[]
     return [head, ...opening, ...review, `${name}.`, ...start];
 }
 
-/** 12...Nxe5: took P; spent 0:12, 4:32 left; material White +1; at risk: undefended Black Nf6; mate in one: Qh7#; out of book; you said "…"; your plan: … */
+/** 12...Nxe5: took P; spent 0:12, 4:32 left; material White +1; at risk: undefended Black Nf6; mate in one: Qh7#; out of book; you said "…"; your plan: …; ahead -1.5 */
 function moveLine(move: MoveFacts): string
 {
     const left = move.left === undefined ? undefined : `${clockText(move.left)} left`;
@@ -351,6 +359,7 @@ function moveLine(move: MoveFacts): string
         move.plan === undefined ? undefined : `your plan: ${move.plan}`,
         // The book's badge alone is Chesspal's, not the AI's word: the line says the move left the book where it did.
         move.review === undefined || (move.review.badge === "book" && move.review.note === undefined) ? undefined : reviewLine(move.review),
+        move.lead === undefined ? undefined : `ahead ${move.lead}`,
     ].filter((part) => part !== undefined);
 
     return parts.length === 0 ? move.move : `${move.move}: ${parts.join("; ")}`;
@@ -371,6 +380,13 @@ function analystInstructions(context: Context): string | undefined
     context.told.add(key);
     analystText ??= `${instructions("analyst")}\n${instructions("analysis")}`;
     return analystText;
+}
+
+/** Who is ahead after a move, as the AI estimated it with annotate_game or the coach during the game (D-90). */
+function estimateOf(comment: string | undefined): string | undefined
+{
+    const lead = leadOf(comment);
+    return lead === undefined ? undefined : leadText(lead);
 }
 
 /** The mates in one the side to move has; none when it has none. */

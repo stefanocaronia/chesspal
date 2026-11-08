@@ -2151,6 +2151,7 @@ button {
 }
 
 .game-card .what {
+    flex: 1;
     min-width: 0;
     line-height: 1.25;
 }
@@ -2174,6 +2175,143 @@ button {
 
 .game-card .when {
     margin-top: 2px;
+}
+
+/* Who is ahead, as the AI estimates it (D-90): White's share from the left, Black's from the right, the figure on the side ahead, as chess.com's bar; an edge
+   and a mark of the even game in the middle keep it a bar of two sides in both themes, never one of progress (Zoe, review of T-148) */
+.lead-bar {
+    position: relative;
+    height: 14px;
+    margin-top: 6px;
+    border-radius: 7px;
+    background: #3b4048;
+    box-shadow: 0 0 0 1px rgb(138 144 153 / 0.6);
+    overflow: hidden;
+}
+
+.lead-bar::after {
+    content: "";
+    position: absolute;
+    inset: 3px auto 3px calc(50% - 0.5px);
+    width: 1px;
+    background: #8a9099;
+}
+
+/* On a position after the one the AI estimated: the player's move, until the coach speaks again */
+.lead-bar.earlier {
+    opacity: 0.55;
+}
+
+.lead-bar .white {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: #f5f5f2;
+    transition: width 400ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lead-bar .white {
+        transition: none;
+    }
+}
+
+.lead-bar .figure {
+    position: absolute;
+    top: 0;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+.lead-bar .figure.white,
+.lead-bar .figure.even {
+    left: 6px;
+    color: #2a2f36;
+}
+
+.lead-bar .figure.black {
+    right: 6px;
+    color: #f5f5f2;
+}
+
+/* The chart of the game in analysis: the white area is White's share, the line in the middle an even game; a dot on a move a badge marks, a line on the move
+   shown, gold as on the board and in the moves (Zoe, review of T-148) */
+.lead-card {
+    display: grid;
+    gap: 8px;
+}
+
+.lead-chart {
+    position: relative;
+    height: 72px;
+    border-radius: 6px;
+    background: #3b4048;
+    box-shadow: 0 0 0 1px rgb(138 144 153 / 0.6);
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.lead-chart svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.lead-chart .white-area {
+    fill: #f5f5f2;
+}
+
+.lead-chart .pending {
+    fill: #5a606a;
+}
+
+.lead-chart .even {
+    stroke: #8a9099;
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    fill: none;
+}
+
+.lead-chart .shown {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: #ffc450;
+    box-shadow: 0 0 0 1px rgb(20 23 27 / 0.6);
+    pointer-events: none;
+}
+
+.lead-chart .dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px #ffffff;
+    pointer-events: none;
+}
+
+.lead-chart .dot.brilliant {
+    background: var(--badge-brilliant);
+}
+
+.lead-chart .dot.great {
+    background: var(--badge-great);
+}
+
+.lead-chart .dot.miss {
+    background: var(--badge-miss);
+}
+
+.lead-chart .dot.mistake {
+    background: var(--badge-mistake);
+}
+
+.lead-chart .dot.blunder {
+    background: var(--badge-blunder);
 }
 
 /* The game ended under the player's eyes: once the board has shown it, with the kings' badges, the card lights up in the accent and fades back */
@@ -4528,6 +4666,11 @@ h3 + .switch {
 .moves-card.folded {
     flex: none;
     min-height: 0;
+}
+
+/* The saves and the steps stay at the foot of the column, with the moves folded too (Stefano) */
+.side > .moves-card + * {
+    margin-top: auto;
 }
 
 /* The coach's words at the top of the card (D-88): its judgment of the player's last move, then its hint, folded until they open it */

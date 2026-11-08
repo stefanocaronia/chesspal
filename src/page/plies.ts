@@ -1,6 +1,6 @@
 // The moves of a game as the page shows them: each with its side and number, the comment the player may read and the AI's review; and the words said on
 // the page.
-import { type Badge, drawingsIn, type DrawnArrow, type DrawnSquare, type GameRecord, type MoveReview, reviewOf, type Side } from "../core/index.ts";
+import { type Badge, drawingsIn, type DrawnArrow, type DrawnSquare, type GameRecord, type Lead, leadOf, type MoveReview, reviewOf, type Side } from "../core/index.ts";
 
 /** A move of a record with its side and number, as the record's start position counts them, its comment for the player, and the AI's badge on it (D-69). */
 export interface Ply
@@ -10,6 +10,8 @@ export interface Ply
     readonly side: Side;
     readonly number: number;
     readonly review?: MoveReview;
+    /** Who the AI saw ahead after it (D-90). */
+    readonly lead?: Lead;
 }
 
 /**
@@ -26,21 +28,27 @@ export function pliesOf(record: GameRecord): Ply[]
         // The AI's drawings with its own move, with the helps on, come without a badge or a note (D-78).
         const drawings = drawingsIn(move.comment);
         const review = reviewOf(move.comment) ?? (Object.keys(drawings).length === 0 ? undefined : drawings);
+        const lead = leadOf(move.comment);
         const ply = {
             san: move.san,
             side: (index + offset) % 2 === 0 ? "white" : "black",
             number: first + Math.floor((index + offset) / 2),
             ...(review === undefined ? {} : { review }),
+            ...(lead === undefined ? {} : { lead }),
         } as const;
         return comment === undefined || comment === "" ? ply : { ...ply, comment };
     });
 }
 
-/** What the coach wrote that the player may see now, with the helps on (D-88): its judgments of their moves, by the plies up to each, and its hint for their turn. */
+/**
+ * What the coach wrote that the player may see now, with the helps on (D-88): its judgments of their moves, by the plies up to each, its hint for their
+ * turn, and who it saw ahead in the positions they were to move in, by the plies up to each (D-90).
+ */
 export interface CoachShown
 {
     readonly judgments: readonly { readonly ply: number; readonly badge?: Badge; readonly note?: string; readonly released?: true; }[];
     readonly hint?: CoachHint;
+    readonly leads?: readonly { readonly position: number; readonly lead: Lead; }[];
 }
 
 /** The coach's hint for the player's turn, for the position after `position` plies, with what it draws on the board to show it. */
@@ -52,12 +60,16 @@ export interface CoachHint
     readonly squares?: readonly DrawnSquare[];
 }
 
-/** The moves with the coach's judgments on the player's, as the analyst's review shows on them (D-88). */
-export function withJudgments(plies: Ply[], { judgments }: CoachShown): Ply[]
+/** The moves with the coach's judgments on the player's, as the analyst's review shows on them (D-88), and who it saw ahead after the moves it was given (D-90). */
+export function withJudgments(plies: Ply[], { judgments, leads = [] }: CoachShown): Ply[]
 {
     return plies.map((ply, index) => {
         const judgment = judgments.find((one) => one.ply === index + 1);
-        return judgment === undefined ? ply : { ...ply, review: { ...(judgment.badge === undefined ? {} : { badge: judgment.badge }), ...(judgment.note === undefined ? {} : { note: judgment.note }) } };
+        const lead = leads.find((one) => one.position === index + 1)?.lead;
+        const judged = judgment === undefined
+            ? ply
+            : { ...ply, review: { ...(judgment.badge === undefined ? {} : { badge: judgment.badge }), ...(judgment.note === undefined ? {} : { note: judgment.note }) } };
+        return lead === undefined ? judged : { ...judged, lead };
     });
 }
 
@@ -68,10 +80,10 @@ export function withBook(plies: Ply[], book: number): Ply[]
     return book === 0 ? plies : plies.map((ply, index) => index < book && ply.review?.badge === undefined && ply.review?.note === undefined ? { ...ply, review: { ...ply.review, badge: "book" } } : ply);
 }
 
-/** The moves without the AI's review: during a game with the helps off the player sees neither its judgments nor its drawings (D-78). */
+/** The moves without the AI's review: during a game with the helps off the player sees neither its judgments nor its drawings (D-78), nor who is ahead (D-90). */
 export function withoutReviews(plies: Ply[]): Ply[]
 {
-    return plies.map(({ review, ...ply }) => ply);
+    return plies.map(({ review, lead, ...ply }) => ply);
 }
 
 /**

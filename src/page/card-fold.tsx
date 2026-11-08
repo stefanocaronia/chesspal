@@ -1,11 +1,11 @@
-// The cards of the game's column the player folds to their title (Stefano): the opening, the helps and the moves, each as this browser remembers it, as
-// the columns (T-84).
+// The cards of the game's column the player folds to their title (Stefano): the opening, the helps, the moves and the chart of the game, each as this
+// browser remembers it, as the columns (T-84).
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import type { Text } from "./text.ts";
 
 /** A card of the game's column that folds to its title. */
-export type FoldingCard = "opening" | "helps" | "moves";
+export type FoldingCard = "opening" | "helps" | "moves" | "chart";
 
 /** Whether the card is folded, as this browser left it, and what folds it or opens it again. */
 export function useCardFold(card: FoldingCard): [folded: boolean, toggle: () => void]

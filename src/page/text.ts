@@ -66,6 +66,21 @@ export interface Text
     reviewBy(name: string): string;
     /** What the colours the AI draws with a note mean (D-69). */
     readonly drawn: Readonly<Record<DrawColour, string>>;
+    /** Who is ahead as the AI estimates it (D-90): the bar in the game's card, the chart of the game in analysis, and what a screen reader says of them. */
+    readonly lead: {
+        readonly hint: string;
+        readonly chart: string;
+        readonly chartHint: string;
+        readonly even: string;
+        /** Before the AI's first estimate. */
+        readonly none: string;
+        /** On a position after the one the AI estimated. */
+        readonly earlier: string;
+        readonly drawn: string;
+        ahead(side: Side, pawns: string): string;
+        mate(side: Side, moves: number): string;
+        mated(side: Side): string;
+    };
     reviewing(name: string): string;
     readonly you: string;
     readonly ai: string;
@@ -386,6 +401,18 @@ const english: Text = {
     },
     reviewBy: (name) => `${name}'s review`,
     drawn: { green: "better", red: "threat", yellow: "another way", blue: "plan" },
+    lead: {
+        hint: "Who is ahead, in pawns, as the AI estimates it: Chesspal does not compute it",
+        chart: "How the game went",
+        chartHint: "Who was ahead move by move, as the AI estimated it: click to go to that move",
+        even: "Even",
+        none: "No estimate yet",
+        earlier: "Estimated before the last move",
+        drawn: "Drawn on the board",
+        ahead: (side, pawns) => `${side === "white" ? "White" : "Black"} ahead by ${pawns} pawns`,
+        mate: (side, moves) => `${side === "white" ? "White" : "Black"} mates in ${moves}`,
+        mated: (side) => `${side === "white" ? "White" : "Black"} is mated`,
+    },
     reviewing: (name) => `${name} is going over the game…`,
     you: "You",
     ai: "AI",
@@ -661,6 +688,18 @@ const italian: Text = {
     },
     reviewBy: (name) => `Il giudizio di ${name}`,
     drawn: { green: "meglio", red: "minaccia", yellow: "altra via", blue: "piano" },
+    lead: {
+        hint: "Chi è avanti, in pedoni, secondo la stima dell'AI: Chesspal non lo calcola",
+        chart: "Andamento della partita",
+        chartHint: "Chi era avanti mossa per mossa, secondo la stima dell'AI: clicca per andare a quella mossa",
+        even: "Pari",
+        none: "Ancora nessuna stima",
+        earlier: "Stimata prima dell'ultima mossa",
+        drawn: "Patta sulla scacchiera",
+        ahead: (side, pawns) => `Il ${side === "white" ? "Bianco" : "Nero"} è avanti di ${pawns} pedoni`,
+        mate: (side, moves) => `Il ${side === "white" ? "Bianco" : "Nero"} dà matto in ${moves}`,
+        mated: (side) => `Matto al ${side === "white" ? "Bianco" : "Nero"}`,
+    },
     reviewing: (name) => `${name} sta analizzando la partita…`,
     you: "Tu",
     ai: "AI",

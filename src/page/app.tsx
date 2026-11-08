@@ -36,6 +36,7 @@ import { GameColumn } from "./game-column.tsx";
 import { type GameActions, Header } from "./header.tsx";
 import { helpsOf } from "./helps-view.ts";
 import { BareButton, HelpsCard, HintLine, MapButton } from "./helps.tsx";
+import { standingsOf } from "./lead-view.ts";
 import { signature } from "./model-name.ts";
 import { Steps } from "./move-list.tsx";
 import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
@@ -208,6 +209,9 @@ export function App({ start }: { start: Settings; })
     // With the helps on, the player sees all of Chesspal's facts, whatever the AI's level (D-79), in a game and in the analysis of one (Stefano).
     const analysing = studied !== undefined;
     const helps = useMemo(() => (going || analysing) && settings.helps ? helpsOf(shown) : undefined, [shown, going, analysing, settings.helps]);
+    // Who the AI saw ahead, the coach's with the helps on in a game and the analyst's in analysis, for the bar and the chart (D-90).
+    const drawnOnBoard = live.outcome.over && live.outcome.result === "1/2-1/2";
+    const standings = useMemo(() => (going && settings.helps) || analysing ? standingsOf(plies, drawnOnBoard) : undefined, [plies, drawnOnBoard, going, analysing, settings.helps]);
     useMapKey(helps !== undefined, setMapping);
     // A new move or a new game ends what the player was doing on the one before: the move sent, the look back, the choice of a promotion. The same game
     // sent again, for the talk, the coach's words or the settings, leaves them where they are (Zoe, T-141); so does a review written on the game in analysis.
@@ -733,6 +737,7 @@ export function App({ start }: { start: Settings; })
                                 text={text}
                             />
                         )}
+                        {...(standings === undefined ? {} : { standings })}
                         {...(studied === undefined ? {} : { analysis: summary === undefined ? { by: name } : { by: name, summary } })}
                         shownPlies={at}
                         onShow={goTo}
