@@ -32,8 +32,6 @@ export interface Settings
     /** Whether the AI's words are read aloud, by the browser's local voices. */
     readonly voice: boolean;
     readonly language: "auto" | "it" | "en";
-    /** Whether the moves written in the chat are read in English notation whatever the language (D-83); the server reads it too. */
-    readonly englishNotation: boolean;
 }
 
 /** The settings this browser remembers, each one it does not know taking its default; the theme and the sounds chosen before the panel come along. */
@@ -61,7 +59,6 @@ export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | 
         sound: typeof stored.sound === "boolean" ? stored.sound : defaults.sound,
         voice: typeof stored.voice === "boolean" ? stored.voice : false,
         language: oneOf(stored.language, ["auto", "it", "en"], "auto"),
-        englishNotation: typeof stored.englishNotation === "boolean" ? stored.englishNotation : false,
     };
 }
 

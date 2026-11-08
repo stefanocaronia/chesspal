@@ -1,7 +1,4 @@
-// The board as text for the player in the chat (D-36), with the pieces' figurines (D-83); never the AI's view (D-26).
-
-/** The pieces' figurines by their FEN letters; the black pawn's asks for its text form, since alone it shows as an emoji. */
-export const figurines: Readonly<Record<string, string>> = { K: "♔", Q: "♕", R: "♖", B: "♗", N: "♘", P: "♙", k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟︎" };
+// The board and the moves as text for the player in the chat (D-36), with the pieces' figurines (D-83, D-86); never the AI's view (D-26).
 
 /**
  * The board of a FEN as text: White at the bottom, the pieces as Unicode figurines, the empty squares and the files as signs a browser draws as wide as the
@@ -14,5 +11,13 @@ export function boardText(fen: string): string
     return [files, ...ranks.map((rank, index) => `${8 - index} ${[...rank].map((square) => figurines[square] ?? emptySquare).join(" ")} ${8 - index}`), files].join("\n");
 }
 
+/** A move in SAN as the player is shown it, with the pieces' solid figurines for either side (D-86): Nxe4 is ♞xe4 and e8=Q is e8=♛. */
+export function figurinesOf(san: string): string
+{
+    return san.replace(/^[KQRBN]|(?<==)[QRBN]/g, (letter) => figurines[letter.toLowerCase()] ?? letter);
+}
+
+// The pieces' figurines by their FEN letters; the black pawn's asks for its text form, since alone it shows as an emoji.
+const figurines: Readonly<Record<string, string>> = { K: "♔", Q: "♕", R: "♖", B: "♗", N: "♘", P: "♙", k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟︎" };
 const emptySquare = "⊙";
 const fileSigns = [..."ⓐⓑⓒⓓⓔⓕⓖⓗ"];

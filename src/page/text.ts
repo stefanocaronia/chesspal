@@ -43,8 +43,6 @@ export interface Text
     readonly helps: string;
     readonly languageChoice: string;
     readonly languages: Readonly<Record<"auto" | "it" | "en", string>>;
-    /** The setting that reads the moves written in the chat in English notation, in a language with letters of its own (D-83). */
-    readonly englishNotation: string;
     /** The names of the settings' choices by their ids: the piece sets, the boards' skins, the pieces' colours, the marks' colours. */
     readonly names: Readonly<Record<string, string>>;
     readonly game: string;
@@ -321,7 +319,6 @@ const english: Text = {
     helps: "The AI teaches as you play",
     languageChoice: "Language",
     languages: { auto: "As the browser", it: "Italiano", en: "English" },
-    englishNotation: "Moves written in English notation (K Q R B N)",
     names: {
         nitida: "Nitida",
         torretta: "Torretta",
@@ -584,7 +581,6 @@ const italian: Text = {
     helps: "L'AI ti insegna mentre giochi",
     languageChoice: "Lingua",
     languages: { auto: "Come il browser", it: "Italiano", en: "English" },
-    englishNotation: "Scrivo le mosse in notazione inglese (K Q R B N)",
     names: {
         nitida: "Nitida",
         torretta: "Torretta",

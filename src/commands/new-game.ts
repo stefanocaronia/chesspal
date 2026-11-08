@@ -21,7 +21,7 @@ interface NewGame
     past: string[];
     /** Who plays, from the profile in use (D-23), once the player has completed it (D-71). */
     player?: string;
-    /** The player's language when it is not English, and their notation when its letters are not SAN's (D-83). */
+    /** The player's language when it is not English. */
     speech?: Speech;
     /** The board page's address when no browser has it open: the player needs it first. */
     closedPage?: string;

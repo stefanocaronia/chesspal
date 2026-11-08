@@ -1,7 +1,6 @@
 // The settings' panel (D-56): a dialog over the page, opened from the header's gear, which shows each choice at once and closes with Esc.
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { notationOf } from "../core/index.ts";
 import { Piece } from "./pieces.tsx";
 import { type Look, looks, pieceSets, type Settings } from "./settings.ts";
 import type { Text } from "./text.ts";
@@ -68,8 +67,6 @@ export function SettingsPanel({ open, settings, onChange, onClose, text }: {
             <Choices label={text.languageChoice}>
                 {(["auto", "it", "en"] as const).map((language) => <Choice key={language} on={settings.language === language} onPick={() => set("language", language)}>{text.languages[language]}</Choice>)}
             </Choices>
-            {/* Only a language with letters of its own has another notation to leave (D-83); with auto, the chat follows the system's, which may not be the browser's. */}
-            {settings.language !== "auto" && notationOf(settings.language) === "en" ? null : <Toggle on={settings.englishNotation} onSwitch={(on) => set("englishNotation", on)}>{text.englishNotation}</Toggle>}
         </dialog>
     );
 }

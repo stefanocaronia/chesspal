@@ -23,4 +23,4 @@ export {
     ratingSites,
     updateProfile,
 } from "./profiles.ts";
-export { helpsIn, languageIn, notationIn, type PageSettings, profileSettings, saveProfileSettings, settingsOf } from "./settings.ts";
+export { helpsIn, languageIn, type PageSettings, profileSettings, saveProfileSettings, settingsOf } from "./settings.ts";

@@ -1,8 +1,8 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
-import { type AiLevel, type Facts, figurinesOf, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, type Notation, sees, type Side, type Square } from "../core/index.ts";
+import { type AiLevel, type Facts, figurinesOf, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, sees, type Side, type Square } from "../core/index.ts";
 import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, talkLimits, type Thought, thoughtForLastMove } from "../games/index.ts";
 import { onQuickModel } from "../host-files/index.ts";
-import { helpsIn, languageIn, notationIn } from "../profiles/index.ts";
+import { helpsIn, languageIn } from "../profiles/index.ts";
 import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
 import { boardView, colourName, compactView, materialText } from "./view.ts";
@@ -55,8 +55,6 @@ export interface MovePlayed
 {
     /** The move, numbered as in the game: 4.Ng5, 4...d5. */
     move: string;
-    /** The move as the player is shown it, numbered, when it has a piece's figurine (D-86): 4.♘g5. */
-    shown?: string;
     /** A + or # the move was written with and does not give. */
     note?: string;
     game: GameSummary;
@@ -185,58 +183,40 @@ export function headLines(game: GameSummary, withLastMove = true): string[]
     ];
 }
 
-/** A move with its squares: 4.Ng5 (f3-g5); see moveText for the form shown to the player. */
-export function lastMoveText({ move, from, to }: LastMove, shown?: string): string
+/** The last move, as the player is shown it, with its squares: 4.♞g5 (f3-g5). */
+export function lastMoveText({ move, from, to }: LastMove): string
 {
-    return moveText(move, shown, `${from}-${to}`);
+    return `${shownMove(move)} (${from}-${to})`;
 }
 
 /**
- * A numbered move, with its squares when given; with the pieces' figurines first when it moves a piece (D-86), since the AI copies the line's first form
- * into its message (Priya, retest of T-54): 4.♘g5 for the player (Ng5, f3-g5).
+ * A numbered move as the player is shown it, with the pieces' figurines (D-86): the form alone, without the SAN, which the AI copied into its message
+ * (Priya, test of D-86): 4.Ng5 is 4.♞g5.
  */
-export function moveText(move: string, shown?: string, squares?: string): string
+export function shownMove(move: string): string
 {
-    if (shown === undefined) {
-        return squares === undefined ? move : `${move} (${squares})`;
-    }
-
-    const san = move.replace(/^\d+\.+/, "");
-    return `${shown} for the player (${squares === undefined ? san : `${san}, ${squares}`})`;
+    const [, number = "", san = move] = /^(\d+\.+)(.+)$/.exec(move) ?? [];
+    return `${number}${figurinesOf(san)}`;
 }
 
-/** The move played, with the form shown to the player, numbered, when it has a piece's figurine (D-86). */
-export function withShown<Played extends MovePlayed>(played: Played): Played
-{
-    const [, number = "", san = played.move] = /^(\d+\.+)(.+)$/.exec(played.move) ?? [];
-    const shown = figurinesOf(san);
-    return shown === san ? played : { ...played, shown: `${number}${shown}` };
-}
-
-/** The player's language by its English name when it is not English, and their notation when its letters are not SAN's (D-83). */
+/** The player's language by its English name when it is not English. */
 export interface Speech
 {
     language: string;
-    notation?: Exclude<Notation, "en">;
 }
 
 /** The player's speech, from the page's settings or the system's language; undefined in English, which the AI speaks unless told. */
 export function speechOf(folder: string, systemLanguage: string | undefined): Speech | undefined
 {
     const language = languageName(languageIn(folder, systemLanguage));
-    const notation = notationIn(folder, systemLanguage);
-    return language === undefined ? undefined : { language, ...(notation === "en" ? {} : { notation }) };
+    return language === undefined ? undefined : { language };
 }
 
-/** What the AI is told of the player's speech once a chat (Priya, retest of T-54): with the notation alone it answered a bare move in English. */
-export function speechLine({ language, notation }: Speech): string
+/** What the AI is told of the player's speech once a chat (Priya, retest of T-54); the moves are SAN in every language (D-87). */
+export function speechLine({ language }: Speech): string
 {
-    return notation === undefined ? `The player speaks ${language}.` : `The player speaks ${language}, and writes moves in ${notationNames[notation]}.`;
+    return `The player speaks ${language}.`;
 }
-
-const notationNames: Readonly<Record<Exclude<Notation, "en">, string>> = {
-    it: "Italian notation: R king, D queen, T rook, A bishop, C knight",
-};
 
 /** The lines after a move, which the line before named: its note, where the game stands, a warning. closingLines end them. */
 export function moveLines({ note, game, warning }: MovePlayed): string[]

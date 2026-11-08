@@ -1,5 +1,5 @@
 // The chess core: the game and its rules, the facts of a position, its record, PGN, the openings. It runs in the browser too (D-17, D-18).
-export { boardText } from "./board-text.ts";
+export { boardText, figurinesOf } from "./board-text.ts";
 export { canMate, clockAfterMove, clockOfComment, clockStarted, clockTag, clockText, startClock, timeControlOf, timeControlOfTag, timeControlTag, timeControlText, timeLeft } from "./clock.ts";
 export type { Clock, TimeControl } from "./clock.ts";
 export type { Facts, PieceFacts, PieceLetter, Pin } from "./facts.ts";
@@ -11,7 +11,6 @@ export type { AiLevel, Layer } from "./levels.ts";
 export { materialOf } from "./material.ts";
 export type { Material } from "./material.ts";
 export { endWithMood, type Mood, moodAt, moodMoves, type MoodNow, moodOf, moods, moodTag, withoutMoods } from "./moods.ts";
-export { figurinesOf, type Notation, notationOf, writtenIn } from "./notation.ts";
 export { bookDepth, bookMoves, indexBook, indexOpenings, inOpenings, openingOf, outOfBookMove } from "./openings.ts";
 export type { Opening, OpeningBook, OpeningIndex } from "./openings.ts";
 export { pgnDate, readPgn, writePgn } from "./pgn.ts";

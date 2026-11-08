@@ -57,7 +57,7 @@ describe("a game in chat", () => {
         const lichess = '[White "Morphy"]\n[Result "1-0"]\n[Termination "Unterminated"]\n\n1. e4 e5 {[%mood happy]} 2. Nf3 {[%plan Theirs.]} 1-0';
 
         expect(await run(context, "new_game", { ai_colour: "black", from: lichess })).toMatch(
-            /You \(Black\) to move, move 2\.\nLast move: 2\.Nf3 \(g1-f3\)\.\nOpening: C40 King's Knight Opening\nMaterial: even, nothing taken\nFEN: .*\nAttacked pieces \(attackers \/ defenders\):\nBlack Pe5: Nf3 \/ -\n(?:.*\n)*Legal by piece \(29\): [^\n]*\nNext: /,
+            /You \(Black\) to move, move 2\.\nLast move: 2\.♞f3 \(g1-f3\)\.\nOpening: C40 King's Knight Opening\nMaterial: even, nothing taken\nFEN: .*\nAttacked pieces \(attackers \/ defenders\):\nBlack Pe5: Nf3 \/ -\n(?:.*\n)*Legal by piece \(29\): [^\n]*\nNext: /,
         );
         expect(gameFile(context).pgn).toContain('[White "Player"]\n[Black "AI"]\n[Result "*"]\n[AILevel "strong"]\n\n1. e4 e5 2. Nf3 *');
     });
@@ -131,44 +131,22 @@ describe("a game in chat", () => {
         expect(await run(context, "status")).toContain("Helps off now: play as at a tournament again");
     });
 
-    it("reads the player's moves in their language's notation, the system's when the page follows the browser, or in English when they choose it (D-83)", async () => {
+    it("gives the AI the player's language once a chat, and each move with the pieces' figurines alone, in every language (D-86, D-87)", async () => {
         const context = { ...playerFolder(), language: "it-IT" };
-        const settings = (value: object): void => writeFileSync(join(gameFolder(context.home()), "settings.json"), JSON.stringify(value));
-        await run(context, "new_game", { ai_colour: "black" });
-        await run(context, "player_move", { move: "Cf3" });
-        await run(context, "ai_move", { move: "d5", plan: "p" });
-
-        settings({ language: "en" });
-        await expect(run(context, "player_move", { move: "Cc3" })).rejects.toThrow('"Cc3" is not a move: SAN writes the pieces K, Q, R, B and N');
-        settings({ language: "it", englishNotation: true });
-        await expect(run(context, "player_move", { move: "Cc3" })).rejects.toThrow('"Cc3" is not a move');
-        settings({ language: "it" });
-        await expect(run(context, "player_move", { move: "Rd4" })).rejects.toThrow("Rd4 is Kd4 in SAN: Kd4 is not legal here, with White to move. Ask the player for another move.");
-        await run(context, "player_move", { move: "Cc3" });
-        // The AI's moves are SAN, in every notation; with auto, the player's are the system's.
-        await run(context, "ai_move", { move: "Nc6", plan: "p" });
-        settings({ language: "auto" });
-        await run(context, "player_move", { move: "Tb1" });
-        await run(context, "ai_move", { move: "Rb8", plan: "p" });
-        expect(gameFile(context).pgn).toContain("1. Nf3 d5 {[%plan p]} 2. Nc3 Nc6 {[%plan p]} 3. Rb1 Rb8 {[%plan p]} *");
-    });
-
-    it("gives the AI the player's language and letters once a chat, and each move with the pieces' figurines first, in every language (D-83, D-86)", async () => {
-        const context = { ...playerFolder(), language: "it-IT" };
-        const letters = "\nThe player speaks Italian, and writes moves in Italian notation: R king, D queen, T rook, A bishop, C knight.\n";
-        expect(await run(context, "new_game", { ai_colour: "black" })).toContain(letters);
-        expect(await run(context, "status")).toContain(letters);
-        expect(await run(context, "player_move", { move: "Cf3" })).toMatch(/^Player: 1\.♘f3 for the player \(Nf3, g1-f3\)\.\n/);
+        const speech = "\nThe player speaks Italian.\n";
+        expect(await run(context, "new_game", { ai_colour: "black" })).toContain(speech);
+        expect(await run(context, "status")).toContain(speech);
+        await expect(run(context, "player_move", { move: "Cf3" })).rejects.toThrow('"Cf3" is not a move: SAN writes the pieces K, Q, R, B and N');
+        expect(await run(context, "player_move", { move: "Nf3" })).toMatch(/^Player: 1\.♞f3 \(g1-f3\)\.\n/);
         expect(await run(context, "ai_move", { move: "d5", plan: "p" })).toMatch(/^Played 1\.\.\.d5\.\n/);
         expect(await run(context, "player_move", { move: "d4" })).toMatch(/^Player: 2\.d4 \(d2-d4\)\.\n/);
-        expect(await run(context, "ai_move", { move: "Nf6", plan: "p" })).toMatch(/^Played 2\.\.\.♘f6 for the player \(Nf6\)\.\n/);
+        expect(await run(context, "ai_move", { move: "Nf6", plan: "p" })).toMatch(/^Played 2\.\.\.♞f6\.\n/);
 
-        writeFileSync(join(gameFolder(context.home()), "settings.json"), JSON.stringify({ language: "it", englishNotation: true }));
-        expect(await run(context, "status")).toMatch(/\nThe player speaks Italian\.\n/);
+        writeFileSync(join(gameFolder(context.home()), "settings.json"), JSON.stringify({ language: "it" }));
         expect(await run({ ...playerFolder(), language: "fr-FR" }, "status")).toMatch(/\nThe player speaks French\.\n/);
         expect(await run({ ...playerFolder(), language: "en-GB" }, "status")).not.toContain("The player speaks");
-        expect(await run(context, "player_move", { move: "Bf4" })).toMatch(/^Player: 3\.♗f4 for the player \(Bf4, c1-f4\)\.\n/);
-        expect(await run(context, "ai_move", { move: "Bf5", plan: "p" })).toMatch(/^Played 3\.\.\.♗f5 for the player \(Bf5\)\.\n/);
+        expect(await run(context, "player_move", { move: "Bf4" })).toMatch(/^Player: 3\.♝f4 \(c1-f4\)\.\n/);
+        expect(await run(context, "ai_move", { move: "Bf5", plan: "p" })).toMatch(/^Played 3\.\.\.♝f5\.\n/);
     });
 
     it("tells the AI the helps are on when it moves first in a new game (D-78)", async () => {
@@ -253,7 +231,7 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "g4" });
 
         expect(await run(context, "ai_move", { move: "Qh4#", plan: "Mate.", comment: "c" })).toMatch(
-            /^Played 2\.\.\.♕h4# for the player \(Qh4#\)\.\nGame over: 0-1, checkmate\.\nChesspal could not archive the game: .*games could not be made \(.+\): check that it is a folder, and can be written\. The game is saved in game\.json: it goes to the archive when a new game starts\.\nNo board page is open: copy this board into your message\.\n[\s\S]*\nNext: /,
+            /^Played 2\.\.\.♛h4#\.\nGame over: 0-1, checkmate\.\nChesspal could not archive the game: .*games could not be made \(.+\): check that it is a folder, and can be written\. The game is saved in game\.json: it goes to the archive when a new game starts\.\nNo board page is open: copy this board into your message\.\n[\s\S]*\nNext: /,
         );
         expect(await run(context, "status")).toContain("Game over: 0-1, checkmate.\nNext: ");
         await expect(run(context, "new_game", { ai_colour: "white" })).rejects.toThrow(/^Chesspal could not archive the game: .* Nothing changed\.$/);
@@ -318,7 +296,7 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "g4" });
 
         expect(await run(context, "ai_move", { move: "Qh4+", plan: "Mate.", comment: "The fool's mate.", offer_draw: true })).toBe(
-            `Played 2...♕h4# for the player (Qh4#).\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Archived in ${archive}.\n`
+            `Played 2...♛h4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Archived in ${archive}.\n`
                 + "No board page is open: copy this board into your message.\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n8 ♜ ♞ ♝ ⊙ ♚ ♝ ♞ ♜ 8\n7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7\n6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6\n5 ⊙ ⊙ ⊙ ⊙ ♟︎ ⊙ ⊙ ⊙ 5\n"
                 + "4 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ♛ 4\n3 ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ⊙ ⊙ 3\n2 ♙ ♙ ♙ ♙ ♙ ⊙ ⊙ ♙ 2\n1 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 1\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n"
                 + "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one "
@@ -555,7 +533,7 @@ describe("a game in chat", () => {
         await run(context, "ai_move", { move: "Qh4#", plan: "Mate.", comment: "Mate." });
         const view = await run(context, "look");
 
-        expect(view).toMatch(/^Game over: 0-1, .*\nLast move: 2\.\.\.Qh4# \(d8-h4\)\.\nOpening: A00 Barnes Opening: Fool's Mate\nMaterial: even, nothing taken\nFEN: .*\nWhite is in check from Qh4\.\nWhite pieces/);
+        expect(view).toMatch(/^Game over: 0-1, .*\nLast move: 2\.\.\.♛h4# \(d8-h4\)\.\nOpening: A00 Barnes Opening: Fool's Mate\nMaterial: even, nothing taken\nFEN: .*\nWhite is in check from Qh4\.\nWhite pieces/);
         expect(view).not.toContain("Legal by piece");
     });
 });

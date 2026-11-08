@@ -62,8 +62,7 @@ Chesspal is not on npm yet ([Status](#status)): these steps are for its first re
    board. The first time, the page asks who you are: your name, a picture, how well you play.
 
 5. **Ask for a game**: the New game window opens on the page, where you choose your colour, the clock and the AI's level. Play on the board: that is
-   where the game is. A move written in the chat counts too, `e4`, `Nf3`, with your language's letters (`Cf3` in Italian) or in words. The page's
-   settings can keep English letters in any language.
+   where the game is. A move written in the chat counts too, `e4`, `Nf3`, in the international notation (K Q R B N in every language), or in words.
 
 6. **For the next game**, type `/clear` in the chat, or start a new chat: a long chat makes the AI slower and costs you more.
 

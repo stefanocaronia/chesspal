@@ -23,7 +23,7 @@ export const aiSay = defineCommand({
     input: z.object({
         text: z.string().trim().min(1, "write what you say").max(talkLimits.aiHelps, `write ${talkLimits.aiHelps} characters at most`).describe(
             `your words for the player, one or two short sentences, ${talkLimits.ai} characters at most (${talkLimits.aiHelps} with the helps on): pieces and moves in `
-                + `words ("your knight takes on f6"), a move you write with the pieces' figurines (♘xf6+ for Nxf6+); your plans and threats only with the helps on; **two asterisks** put a word or two in bold on the page`,
+                + `words ("your knight takes on f6"), a move you write with the pieces' figurines, as the tools show it (♞xf6+ for Nxf6+); your plans and threats only with the helps on; **two asterisks** put a word or two in bold on the page`,
         ),
         mood: z.enum(moods).optional().describe("only after the game has ended: the face the board page keeps for its end"),
     }),

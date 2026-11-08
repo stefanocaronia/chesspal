@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { gameFolder, notationIn } from "../profiles/index.ts";
-import { closingLines, lastMoveText, moveLines, type MovePlayed, withShown } from "./game-summary.ts";
+import { gameFolder } from "../profiles/index.ts";
+import { closingLines, lastMoveText, moveLines, type MovePlayed, shownMove } from "./game-summary.ts";
 import { inviteLine, pageInvite } from "./page-link.ts";
 import { playMove, positionIn, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
@@ -10,10 +10,10 @@ import { newWords } from "./say.ts";
 export const playerMove = defineCommand({
     name: "player_move",
     description: "Plays the move the player wrote in the chat, and answers with the position for your reply: the FEN, your legal moves by piece and, from "
-        + "the club level up, the pieces attacked with their defenders, the pins and the checks; look gives the rest. Give the move as they wrote it, in the letters of "
-        + 'their language too (Te1 in Italian), or as squares, and never choose for them: if their words fit two moves, or it is refused, ask them again. Example: player_move {move: "Nf3"}.',
+        + "the club level up, the pieces attacked with their defenders, the pins and the checks; look gives the rest. Give the move in SAN or as squares, and never choose for "
+        + 'them: if their words fit two moves, or it is refused, ask them again. Example: player_move {move: "Nf3"}.',
     input: z.object({
-        move: z.string().min(1).describe("the player's move as they wrote it, in SAN (Nf3, exd5, O-O, e8=Q) or their language's letters (Cf3), or as squares (g1f3, e7e8q)"),
+        move: z.string().min(1).describe("the player's move, in SAN (Nf3, exd5, O-O, e8=Q) or as squares (g1f3, e7e8q)"),
         offer_draw: z.boolean().optional().describe("true when the player offers a draw with this move: it stands until your move"),
     }),
     alwaysLoad: true,
@@ -28,18 +28,14 @@ export const playerMove = defineCommand({
         }
 
         const started = context.positionSeen === null ? positionIn(folder).started : context.positionSeen?.started;
-        const played = playMove(folder, context.now(), "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`, {
-            allowance: chatAllowance,
-            offerDraw,
-            notation: notationIn(folder, context.language),
-        });
+        const played = playMove(folder, context.now(), "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`, { allowance: chatAllowance, offerDraw });
         // A game over by this move has no more moves to play there: the next game's window gives the address (Federico, round of D-85).
         const invite = played.game.end === undefined ? pageInvite(context, started) : undefined;
-        return { ...withShown({ ...played, words: newWords(context) }), ...(invite === undefined ? {} : { invite }) };
+        return { ...played, words: newWords(context), ...(invite === undefined ? {} : { invite }) };
     },
     format: (result) =>
         [
-            `Player: ${result.game.lastMove === undefined ? result.move : lastMoveText(result.game.lastMove, result.shown)}.`,
+            `Player: ${result.game.lastMove === undefined ? shownMove(result.move) : lastMoveText(result.game.lastMove)}.`,
             ...moveLines(result),
             ...(result.invite === undefined ? [] : [inviteLine(result.invite)]),
             ...closingLines(result.game, result.words),

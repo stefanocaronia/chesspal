@@ -21,7 +21,7 @@ interface Status
     pageClosed?: true;
     /** Who plays, from the profile in use (D-23), once the player has completed it (D-71). */
     player?: string;
-    /** The player's language when it is not English, and their notation when its letters are not SAN's (D-83). */
+    /** The player's language when it is not English. */
     speech?: Speech;
     game?: GameSummary;
     /** Why the game on disk cannot be read, when it cannot. */

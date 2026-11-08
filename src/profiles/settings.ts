@@ -1,7 +1,6 @@
 // The page's settings of a profile (D-56): settings.json in its folder, kept as the page sends them; the page checks each one as it reads them.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Notation, notationOf } from "../core/index.ts";
 import { writeAtomically } from "../games/index.ts";
 import { profileFolder } from "./profiles.ts";
 
@@ -22,15 +21,6 @@ export function profileSettings(root: string, id: string): PageSettings | undefi
 export function helpsIn(folder: string): boolean
 {
     return settingsIn(folder)?.helps === true;
-}
-
-/**
- * The pieces' letters the player of the profile whose games are in `folder` writes moves with (D-83): English when chosen in the settings, else those of the
- * page's language, or of the system's when the page follows the browser.
- */
-export function notationIn(folder: string, systemLanguage: string | undefined): Notation
-{
-    return settingsIn(folder)?.englishNotation === true ? "en" : notationOf(languageIn(folder, systemLanguage));
 }
 
 /** The language of the player of the profile whose games are in `folder`: the page's, or the system's when the page follows the browser. */
