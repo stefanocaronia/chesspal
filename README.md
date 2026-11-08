@@ -22,13 +22,11 @@ games, and an opponent with a character and moods of its own.
 
 ## Status
 
-Chesspal is in early development: the version on npm only holds its name. It works with any AI agent that uses MCP tools and can work with the files on your computer;
+Chesspal is in early development: the version on npm is a first one to try, and it may change from one release to the next. It works with any AI agent that uses MCP tools and can work with the files on your computer;
 we develop it with Claude Code, and Codex is connected too. Chesspal never uses an API key: the AI runs on your agent's own plan, or on your computer
 with a local model.
 
 ## Play
-
-Chesspal is not on npm yet ([Status](#status)): these steps are for its first release.
 
 **What you need**
 
