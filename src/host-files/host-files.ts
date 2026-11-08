@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { makeFolder, writeAtomically } from "../games/index.ts";
-import { ponderAgentFiles } from "./ponder-agents.ts";
+import { agentFiles } from "./agents.ts";
 
 /**
  * Sets up the player's folder for Claude Code and Codex (D-31): .mcp.json with the chesspal server, AGENTS.md with the opponent's instructions between
@@ -51,10 +51,10 @@ function chesspalServer(platform: string): { command: string; args: string[]; }
     return platform === "win32" ? { command: "cmd", args: ["/c", "chesspal", "mcp"] } : { command: "chesspal", args: ["mcp"] };
 }
 
-/** Claude Code's agents that think on the player's time, Chesspal's whole: written when they are missing or changed. */
+/** Claude Code's agents that work on the player's time, thinking for the opponent and coaching, Chesspal's whole: written when they are missing or changed. */
 function ponderAgentChanges(folder: string): FileChange[]
 {
-    return ponderAgentFiles(folder).filter(({ path, text }) => textOf(path) !== text);
+    return agentFiles(folder).filter(({ path, text }) => textOf(path) !== text);
 }
 
 /** .mcp.json with the chesspal server, beside the servers already there, keeping the environment the player gave it, as CHESSPAL_HOME in a playtest. */

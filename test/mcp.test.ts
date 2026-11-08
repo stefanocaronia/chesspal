@@ -69,7 +69,7 @@ describe("the MCP server", () => {
 
     it("records what the chat has read after its own calls, not after an agent's, so that the doorbell still rings the player's move (D-72)", async () => {
         const context = testContext(mkdtempSync(join(tmpdir(), "chesspal-")));
-        const agent = { ...play, name: "agent_play", byAgent: true };
+        const agent = { ...play, name: "agent_play", byAgents: ["chesspal-ponder"] };
         const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
         await createMcpServer(context, [play, agent]).connect(serverTransport);
         client = new Client({ name: "test", version: "1.0.0" });

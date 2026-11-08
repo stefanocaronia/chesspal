@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { saveChatStart } from "../src/games/index.ts";
-import { callerOf } from "../src/server/caller.ts";
+import { allowedCaller, callerOf, callingAgent } from "../src/server/caller.ts";
 
 const folders: string[] = [];
 
@@ -33,6 +33,31 @@ describe("who makes a tool call (D-81, T-113)", () => {
 
         expect(await callerOf({ "claudecode/toolUseId": "toolu_1" }, claude, folder, 0)).toEqual({ annotator: "claude-opus-5-5", effort: "xhigh" });
         expect(await callerOf({ "claudecode/toolUseId": "toolu_2" }, claude, folder, 0)).toEqual({ annotator: "claude-haiku-5-5", effort: "low" });
+    });
+
+    it("tells a call of the chat's from one of its agents', by the type Claude Code notes beside the agent's file, and nobody when it cannot tell (Priya, review of T-112)", async () => {
+        const folder = scratch();
+        const transcript = join(folder, "session.jsonl");
+        const agents = join(folder, "session", "subagents");
+        writeFileSync(transcript, line("toolu_1", "claude-opus-5-5", "xhigh") + "\n");
+        mkdirSync(agents, { recursive: true });
+        writeFileSync(join(agents, "agent-a.jsonl"), line("toolu_2", "claude-opus-5-5", "xhigh") + "\n");
+        writeFileSync(join(agents, "agent-a.meta.json"), JSON.stringify({ agentType: "chesspal-coach", requestShape: "background" }));
+        writeFileSync(join(agents, "agent-b.jsonl"), line("toolu_3", "claude-opus-5-5", "xhigh") + "\n");
+        const by = (call: string | undefined) => callingAgent(call === undefined ? undefined : { "claudecode/toolUseId": call }, folder, 0);
+
+        expect(await by("toolu_1")).toBeUndefined();
+        saveChatStart(folder, { source: "startup", at: "2026-11-08T10:00:00.000Z", transcript });
+        expect(await by("toolu_1")).toEqual({ chat: true });
+        expect(await by("toolu_2")).toEqual({ agent: "chesspal-coach" });
+        expect(await by("toolu_3")).toBeUndefined();
+        expect(await by("toolu_9")).toBeUndefined();
+        expect(await by(undefined)).toBeUndefined();
+
+        expect(allowedCaller({ agent: "chesspal-coach" }, ["chesspal-coach"])).toBe(true);
+        expect(allowedCaller({ agent: "general-purpose" }, ["chesspal-coach"])).toBe(false);
+        expect(allowedCaller({ chat: true }, ["chesspal-coach"])).toBe(false);
+        expect(allowedCaller(undefined, ["chesspal-coach"])).toBe(true);
     });
 
     it("names the host when nothing ties a model to the call, and nobody without a host", async () => {

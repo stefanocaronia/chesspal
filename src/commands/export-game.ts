@@ -22,13 +22,14 @@ export const exportGame = defineCommand({
     readOnly: true,
     positionals: ["format"],
     run: ({ format }, context): Exported => {
-        const current = gameAt(gameFolder(context.home()), context.now());
+        const folder = gameFolder(context.home());
+        const current = gameAt(folder, context.now());
 
         if (current === undefined) {
             throw new Error("There is no game to export: start one with new_game.");
         }
 
-        const text = format === "fen" ? current.game.position.fen : format === "moves" ? movesPgn(current) : playerPgn(current);
+        const text = format === "fen" ? current.game.position.fen : format === "moves" ? movesPgn(current) : playerPgn(folder, current);
         return { format, text };
     },
     format: (result) => result.text,

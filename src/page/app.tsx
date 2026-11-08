@@ -35,14 +35,14 @@ import { type Column, foldKeys, gameUnderBoard, nextFold, oneColumn, rememberFol
 import { GameColumn } from "./game-column.tsx";
 import { type GameActions, Header } from "./header.tsx";
 import { helpsOf } from "./helps-view.ts";
-import { HelpsCard, MapButton } from "./helps.tsx";
+import { HelpsCard, HintLine, MapButton } from "./helps.tsx";
 import { signature } from "./model-name.ts";
 import { Steps } from "./move-list.tsx";
 import { type NewGameChoice, NewGameDialog } from "./new-game-dialog.tsx";
 import { useOpeningBook } from "./opening-book.ts";
 import { ChosenSet } from "./pieces.tsx";
 import { ClockFace, PlayerCard } from "./player-card.tsx";
-import { aiSpoke, aiWords, judgmentOf, playerSpent, playerWords, pliesOf, type TalkLine, withBook, withoutReviews } from "./plies.ts";
+import { aiSpoke, aiWords, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, type TalkLine, withBook, withJudgments, withoutReviews } from "./plies.ts";
 import { NameButton, PictureButton, PictureDialog, ProfilesDialog, Wizard } from "./profile-dialogs.tsx";
 import { keepSettings, type Profile } from "./profile.ts";
 import { SettingsPanel } from "./settings-panel.tsx";
@@ -174,13 +174,24 @@ export function App({ start }: { start: Settings; })
     const pieces = useMemo(() => piecesOf(live.position.fen), [live]);
     // While the game goes on, the book's first moves carry its badge, when the player wants it, as the AI's review gives it after (D-69).
     const inBook = studied === undefined && settings.book ? game?.book ?? 0 : 0;
-    // The AI's judgments of the player's moves, and its drawings, show during a game only with the helps on, always once it is over (D-78).
+    // The judgments of the player's moves, and the AI's drawings, show during a game only with the helps on, always once it is over (D-78); during it the
+    // coach's come from its own file, never in the PGN the opponent may read (D-88).
     const judged = !going || settings.helps;
-    const plies = useMemo(() => withBook(judged ? pliesOf(replayed.record) : withoutReviews(pliesOf(replayed.record)), inBook), [replayed, inBook, judged]);
+    const coached = going ? game?.coach : undefined;
+    const plies = useMemo(() => {
+        const read = pliesOf(replayed.record);
+        return withBook(!judged ? withoutReviews(read) : coached === undefined ? read : withJudgments(read, coached), inBook);
+    }, [replayed, inBook, judged, coached]);
     const book = useOpeningBook(live.record.moves.length > 0);
     const opening = useMemo(() => book === undefined ? undefined : openingOf(live.record, book), [live, book]);
     // The player's move shows at once, before the server has it: the game it sends next takes its place (T-70).
     const [pending, setPending] = useState<string | undefined>(undefined);
+    // The coach's hint for the position on the board, none once the player has moved, folded until they open it; a new hint comes folded (Zoe, review of T-112).
+    const hint = pending === undefined && coached?.hint?.position === replayed.record.moves.length ? coached.hint : undefined;
+    const hintKey = hint === undefined ? undefined : `${hint.position} ${hint.text}`;
+    const [openHint, setOpenHint] = useState<string | undefined>(undefined);
+    const hintOpen = hintKey !== undefined && openHint === hintKey;
+    const openTheHint = (open: boolean): void => setOpenHint(open ? hintKey : undefined);
     // The player may look back through the moves played (T-88): `viewing` how many are shown, undefined for the game as it is; a new move brings it back.
     const [viewing, setViewing] = useState<number | undefined>(undefined);
     // The squares the player points at in the AI's words or the helps' card, lit on the board (T-111); the control map while it is held (D-78).
@@ -214,6 +225,11 @@ export function App({ start }: { start: Settings; })
         // The focus in what folds away goes to the column's tab.
         if (next !== "open" && document.getElementById(column)?.contains(document.activeElement) === true) {
             document.getElementById(`fold-${column}`)?.focus();
+        }
+
+        // The hint folds away with the game's column, so that its drawings never stay on the board without its words (Zoe, playtest of T-112).
+        if (column === "game" && next !== "open") {
+            setOpenHint(undefined);
         }
 
         setFolds({ ...folds, [column]: next });
@@ -335,9 +351,11 @@ export function App({ start }: { start: Settings; })
     const playerToMove = going && live.position.turn === player;
     const ahead = (side: Side): number => side === "white" ? material.balance : -material.balance;
     const reviewed = judged || at <= inBook ? plies[at - 1] : undefined;
-    // With the helps on, the AI's judgment of the player's last move, once it has answered it (D-78).
-    const judgment = going && settings.helps ? judgmentOf(plies, player) : undefined;
+    // With the helps on, the coach's judgments of the player's last move, once the AI has answered it, and of one a held note let go only now (D-78, D-88).
+    const judgments = going && settings.helps ? judgmentsOf(plies, player, coached ?? noCoach) : [];
     const review = reviewed?.review;
+    // An open hint draws on the board as it is, in place of the last move's drawings.
+    const drawn = hintOpen && hint !== undefined && viewing === undefined && (hint.arrows !== undefined || hint.squares !== undefined) ? hint : review;
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
     const closing = studied === undefined ? undefined : closingOf(live.record);
     const annotator = studied === undefined ? undefined : annotatorOf(live.record);
@@ -589,8 +607,6 @@ export function App({ start }: { start: Settings; })
                                             words={aiWords(plies, ai, talk)}
                                             newestFirst={!flipped}
                                             {...(settings.voice ? { voice: text.language } : {})}
-                                            {...(judgment === undefined ? {} : { judged: judgment })}
-                                            text={text}
                                         />
                                     </section>
                                     <section class="you-block" aria-label={profile.name}>
@@ -646,7 +662,7 @@ export function App({ start }: { start: Settings; })
                             {...(helps === undefined ? {} : { helps })}
                             {...(mapping && helps !== undefined ? { control: helps.strategy.control } : {})}
                             {...(review?.badge === undefined ? {} : { badge: { badge: review.badge, name: text.badges[review.badge] } })}
-                            {...(review === undefined ? {} : { drawn: review })}
+                            {...(drawn === undefined ? {} : { drawn })}
                             nextMove={next}
                             jumped={jumped}
                             check={shown.position.check}
@@ -679,10 +695,11 @@ export function App({ start }: { start: Settings; })
                             <Steps shown={at} total={total} onStep={step} text={text} />
                         </div>
                     )}
-                    {/* On a phone the helps' map sits under the board too, turned on and off by a touch (D-78) */}
+                    {/* On a phone the helps' map sits under the board too, turned on and off by a touch (D-78), and the coach's hint beside it, its drawings in sight (Zoe, playtest of T-112) */}
                     {helps === undefined ? null : (
                         <div class="board-map">
                             <MapButton mapping={mapping} onMap={setMapping} held={false} text={text} />
+                            {hint === undefined || viewing !== undefined ? null : <HintLine hint={hint} open={hintOpen} onOpen={openTheHint} text={text} />}
                         </div>
                     )}
                     <GameColumn
@@ -697,6 +714,10 @@ export function App({ start }: { start: Settings; })
                         helps={helps === undefined ? undefined : (
                             <HelpsCard
                                 helps={helps}
+                                judged={judgments}
+                                hint={viewing === undefined ? hint : undefined}
+                                hintOpen={hintOpen}
+                                onHint={openTheHint}
                                 onPoint={setPointed}
                                 onMap={setMapping}
                                 mapping={mapping}
@@ -734,6 +755,8 @@ interface Served
         readonly drawOffer?: "player" | "ai";
         /** How many of its first moves are the book's. */
         readonly book?: number;
+        /** What the coach wrote that the player may see now, with the helps on (D-88). */
+        readonly coach?: CoachShown;
     } | null;
     /** The talk before the first game (D-77), with no game. */
     readonly talk?: readonly TalkLine[];
@@ -933,6 +956,7 @@ function useWheelSteps(step: (to: Step) => void): (event: WheelEvent) => void
 const notch = 100;
 
 const noSquares: readonly string[] = [];
+const noCoach: CoachShown = { judgments: [] };
 
 /** Whether a key is the page's: not one the player types into a box or the settings, nor with a modifier, nor while a piece is in the air. */
 function forThePage(event: KeyboardEvent): boolean

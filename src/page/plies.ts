@@ -1,6 +1,6 @@
 // The moves of a game as the page shows them: each with its side and number, the comment the player may read and the AI's review; and the words said on
 // the page.
-import { drawingsIn, type GameRecord, type MoveReview, reviewOf, type Side } from "../core/index.ts";
+import { type Badge, drawingsIn, type DrawnArrow, type DrawnSquare, type GameRecord, type MoveReview, reviewOf, type Side } from "../core/index.ts";
 
 /** A move of a record with its side and number, as the record's start position counts them, its comment for the player, and the AI's badge on it (D-69). */
 export interface Ply
@@ -36,6 +36,31 @@ export function pliesOf(record: GameRecord): Ply[]
     });
 }
 
+/** What the coach wrote that the player may see now, with the helps on (D-88): its judgments of their moves, by the plies up to each, and its hint for their turn. */
+export interface CoachShown
+{
+    readonly judgments: readonly { readonly ply: number; readonly badge?: Badge; readonly note?: string; readonly released?: true; }[];
+    readonly hint?: CoachHint;
+}
+
+/** The coach's hint for the player's turn, for the position after `position` plies, with what it draws on the board to show it. */
+export interface CoachHint
+{
+    readonly position: number;
+    readonly text: string;
+    readonly arrows?: readonly DrawnArrow[];
+    readonly squares?: readonly DrawnSquare[];
+}
+
+/** The moves with the coach's judgments on the player's, as the analyst's review shows on them (D-88). */
+export function withJudgments(plies: Ply[], { judgments }: CoachShown): Ply[]
+{
+    return plies.map((ply, index) => {
+        const judgment = judgments.find((one) => one.ply === index + 1);
+        return judgment === undefined ? ply : { ...ply, review: { ...(judgment.badge === undefined ? {} : { badge: judgment.badge }), ...(judgment.note === undefined ? {} : { note: judgment.note }) } };
+    });
+}
+
 /** The moves with the book's badge on the first `book` of them that have no review of the AI's. */
 export function withBook(plies: Ply[], book: number): Ply[]
 {
@@ -49,13 +74,23 @@ export function withoutReviews(plies: Ply[]): Ply[]
     return plies.map(({ review, ...ply }) => ply);
 }
 
-/** The player's last move when the AI judged it, with a badge of its own or a note, and has moved since (D-78); none else. */
-export function judgmentOf(plies: readonly Ply[], player: Side): Ply | undefined
+/**
+ * The coach's judgments the card shows (D-78, D-88): first one whose note was held until the player's last move let it go, however far back its move (Zoe,
+ * playtest of T-112); then the latest, of the player's last move the AI has answered, else of the one before (Zoe and Federico, review of T-112). Only
+ * those with a badge of their own or a note.
+ */
+export function judgmentsOf(plies: readonly Ply[], player: Side, { judgments }: CoachShown): Ply[]
 {
-    const judged = plies.at(-2);
-    const review = judged?.review;
-    const answered = plies.at(-1)?.side !== player && judged?.side === player;
-    return answered && review !== undefined && (review.note !== undefined || (review.badge !== undefined && review.badge !== "book")) ? judged : undefined;
+    const answered = plies.at(-1)?.side === player ? plies.slice(0, -1) : plies;
+    const latest = answered.filter((ply) => ply.side === player).slice(-2).reverse().find(judged);
+    const released = judgments.filter((judgment) => judgment.released === true).map(({ ply }) => answered[ply - 1])
+        .filter((ply): ply is Ply => ply !== undefined && ply !== latest && judged(ply));
+    return [...released, ...(latest === undefined ? [] : [latest])];
+}
+
+function judged({ review }: Ply): boolean
+{
+    return review?.note !== undefined || (review?.badge !== undefined && review.badge !== "book");
 }
 
 /** How long a line of the player's may be: the server's limit (D-54), which a test keeps equal. */

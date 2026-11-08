@@ -321,6 +321,12 @@ const asciiOf: Readonly<Record<string, string>> = {
     "♟": "",
 };
 
+/** A text with SAN's letters and signs for the figurines and signs others write: ♘f3 as Nf3, × as x; a pawn's figurine says nothing. */
+export function withSanLetters(text: string): string
+{
+    return text.replace(/[︎️]/g, "").replace(/[–—−×♔-♟]/g, (sign) => asciiOf[sign] ?? sign);
+}
+
 // The pieces' letters of other languages that name one piece only: the Italian, French, Spanish and German ones; R is the rook in SAN.
 const foreignPieces: Readonly<Record<string, readonly [string, string]>> = {
     C: ["knight", "N"],

@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { type GameRecord, movesOnly, pgnDate, readPgn, withAiModel, writePgn } from "../core/index.ts";
 import { aiModelOf } from "./ai-model.ts";
+import { coachWords, withCoach } from "./coach.ts";
 import { type CurrentGame, endOf } from "./current-game.ts";
 import { makeFolder, writeAtomically } from "./files.ts";
 import { withoutPlans } from "./plans.ts";
@@ -40,7 +41,7 @@ export function archiveGame(folder: string, current: CurrentGame): string
 
     try {
         makeFolder(dirname(path));
-        writeAtomically(path, writePgn(withAiModel(endedRecord(current), aiModelOf(folder))));
+        writeAtomically(path, writePgn(withAiModel(endedRecord(folder, current), aiModelOf(folder))));
     } catch (error) {
         throw new Error(`Chesspal could not archive the game: ${(error as Error).message}`, { cause: error });
     }
@@ -55,6 +56,26 @@ export function archiveEnded(folder: string, current: CurrentGame): { archive?: 
         return { archive: archiveGame(folder, current) };
     } catch (error) {
         return { warning: `${(error as Error).message} The game is saved in game.json: it goes to the archive when a new game starts.` };
+    }
+}
+
+/**
+ * Writes the coach's judgments into a game over already in the archive, beside what the analyst may have written there since (Federico, review of T-112);
+ * archives the game when it is not there.
+ */
+export function archiveCoached(folder: string, current: CurrentGame): { archive?: string; warning?: string; }
+{
+    const name = archivedName(folder, current);
+
+    if (name === undefined) {
+        return archiveEnded(folder, current);
+    }
+
+    try {
+        writeAtomically(join(folder, name), writePgn(withCoach(archivedGame(folder, name), coachWords(folder, current))));
+        return { archive: name };
+    } catch (error) {
+        return { warning: `Chesspal could not write the coach's words into ${name}: ${(error as Error).message}` };
     }
 }
 
@@ -188,16 +209,17 @@ function gameNamed(folder: string, shelf: Shelf, name: string): GameRecord
     return record;
 }
 
-/** The game as PGN for the player: while it goes on, without the AI's plans (D-29). */
-export function playerPgn(current: CurrentGame): string
+/** The game as PGN for the player: while it goes on, without the AI's plans (D-29); once over, with the coach's judgments too (D-88). */
+export function playerPgn(folder: string, current: CurrentGame): string
 {
-    return writePgn(endOf(current.game) === undefined ? withoutPlans(current.game.record) : endedRecord(current));
+    return writePgn(endOf(current.game) === undefined ? withoutPlans(current.game.record) : endedRecord(folder, current));
 }
 
 /** The game as PGN with its moves alone, without comments or plans, for Lichess or chess.com (T-59). */
 export function movesPgn(current: CurrentGame): string
 {
-    return writePgn(movesOnly(endOf(current.game) === undefined ? current.game.record : endedRecord(current)));
+    const { record, outcome } = current.game;
+    return writePgn(movesOnly(endOf(current.game) === undefined ? record : withTermination(record, outcome)));
 }
 
 /** Whether two records are the same game: the same tags and the same moves, whatever their comments say. */
@@ -213,9 +235,14 @@ function nameAt(date: Date, shelf: Shelf = "games"): string
     return `${shelf}/${pgnDate(date).replaceAll(".", "-")}-${time}.pgn`;
 }
 
-/** The record with its Termination tag, when the board ended the game and the tag is missing. */
-function endedRecord({ game }: CurrentGame): GameRecord
+/** The record of a game over with the coach's judgments (D-88), and its Termination tag when the board ended the game and the tag is missing. */
+function endedRecord(folder: string, current: CurrentGame): GameRecord
 {
-    const { record, outcome } = game;
+    const { record, outcome } = current.game;
+    return withTermination(withCoach(record, coachWords(folder, current)), outcome);
+}
+
+function withTermination(record: GameRecord, outcome: CurrentGame["game"]["outcome"]): GameRecord
+{
     return outcome.over && record.tags.Termination === undefined ? { ...record, tags: { ...record.tags, Termination: outcome.ending } } : record;
 }

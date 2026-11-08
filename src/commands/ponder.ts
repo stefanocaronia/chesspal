@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Game, levelOf, moodAt, sees, timeLeft } from "../core/index.ts";
 import { type CurrentGame, currentPlan, endOf, keepThought, loadGame, talkLimits, type Thought, thoughtKey, waitingSince } from "../games/index.ts";
+import { ponderAgents } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { type GameSummary, positionLines, summaryOf } from "./game-summary.ts";
 import { levelText } from "./levels.ts";
@@ -48,7 +49,7 @@ export const ponder = defineCommand({
         ),
         done: z.boolean().optional().describe("true when you have no more replies to think on: it waits for the player's move"),
     }),
-    byAgent: true,
+    byAgents: ponderAgents,
     host: "claude-code",
     run: async ({ position, reply, move, why, say, done = false }, context): Promise<Pondered> => {
         const folder = gameFolder(context.home());
@@ -140,10 +141,38 @@ export const ponder = defineCommand({
 });
 
 /**
+ * Waits for the player's move, for an agent that works on their time (D-72, D-88): moved once `gone` says so, waited once the agent has waited long enough in
+ * all since `since`, else still waiting after a while.
+ */
+export async function waitForPlayer(context: { now: () => Date; pause?: (milliseconds: number) => Promise<void>; }, since: Date, gone: () => boolean): Promise<"moved" | "waited" | "waiting">
+{
+    const pause = context.pause ?? ((milliseconds: number) => new Promise<void>((done) => setTimeout(done, milliseconds)));
+    const start = context.now().getTime();
+    const end = Math.min(start + playerWait.most, since.getTime() + playerWait.inAll);
+
+    while (context.now().getTime() < end) {
+        await pause(playerWait.every);
+
+        if (gone()) {
+            return "moved";
+        }
+    }
+
+    return end < start + playerWait.most ? "waited" : "waiting";
+}
+
+/** The words of the AI's move for the player: its comment without the plan, the mood, the clock and the draw offer it carries. */
+export function wordsOf(comment: string | undefined): string | undefined
+{
+    const words = comment?.replace(/\[%[^\]]*\]/g, "").replace("(=)", "").replace(/\s+/g, " ").trim();
+    return words === undefined || words === "" ? undefined : words;
+}
+
+/**
  * How long one call waits for the player's move at most, under the minute a host may give a tool (Priya, T-109), how often it looks, and how long the agent
  * waits in all before it stops: a player who leaves the game open must not keep it asking (Priya, round of T-109).
  */
-const ponderWait = { most: 50_000, every: 500, inAll: 10 * 60_000 } as const;
+const playerWait = { most: 50_000, every: 500, inAll: 10 * 60_000 } as const;
 
 /** The game whose position the AI thinks on, read and never written: none once the player has moved, the game is over or their flag has fallen, or the position given is another. */
 function toPonder(folder: string, now: Date, position: number | undefined): CurrentGame | undefined
@@ -167,20 +196,9 @@ function toPonder(folder: string, now: Date, position: number | undefined): Curr
 /** Waits for the player's move: stop once they have moved or the agent has waited long enough in all, else still their move after a while. */
 async function waitForMove(folder: string, context: { now: () => Date; pause?: (milliseconds: number) => Promise<void>; }, current: CurrentGame): Promise<Pondered>
 {
-    const pause = context.pause ?? ((milliseconds: number) => new Promise<void>((done) => setTimeout(done, milliseconds)));
     const position = current.game.record.moves.length;
-    const start = context.now().getTime();
-    const end = Math.min(start + ponderWait.most, waitingSince(folder, thoughtKey(current), context.now()).getTime() + ponderWait.inAll);
-
-    while (context.now().getTime() < end) {
-        await pause(ponderWait.every);
-
-        if (toPonder(folder, context.now(), position) === undefined) {
-            return { stop: "moved" };
-        }
-    }
-
-    return end < start + ponderWait.most ? { stop: "waited" } : { waiting: position };
+    const waited = await waitForPlayer(context, waitingSince(folder, thoughtKey(current), context.now()), () => toPonder(folder, context.now(), position) === undefined);
+    return waited === "waiting" ? { waiting: position } : { stop: waited };
 }
 
 function startOf(current: CurrentGame): Start
@@ -218,11 +236,4 @@ function startLines({ position, line, plan, mood, comment, talk }: Start): strin
         `For each reply you think likely, ponder {position: ${position}, reply} shows the position after it, then ponder {position: ${position}, reply, move, why} keeps `
         + `your answer; ponder {position: ${position}, done: true} when you have no more.`,
     ];
-}
-
-/** The words of the AI's move for the player: its comment without the plan, the mood, the clock and the draw offer it carries. */
-function wordsOf(comment: string | undefined): string | undefined
-{
-    const words = comment?.replace(/\[%[^\]]*\]/g, "").replace("(=)", "").replace(/\s+/g, " ").trim();
-    return words === undefined || words === "" ? undefined : words;
 }

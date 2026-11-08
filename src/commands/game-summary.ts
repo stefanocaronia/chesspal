@@ -1,9 +1,10 @@
 // What the chess commands tell about the current game: plain data for the command line's JSON, and the lines an AI reads.
 import { type AiLevel, type Facts, figurinesOf, type GameRecord, levelOf, materialOf, moodAt, type MoodNow, sees, type Side, type Square } from "../core/index.ts";
-import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, talkLimits, type Thought, thoughtForLastMove } from "../games/index.ts";
-import { onQuickModel } from "../host-files/index.ts";
+import { type CurrentGame, currentPlan, drawOfferOf, endOf, firstCoachCall, type Speaker, talkLimits, type Thought, thoughtForLastMove } from "../games/index.ts";
+import { coachAgent, hasAgent, onQuickModel } from "../host-files/index.ts";
 import { helpsIn, languageIn } from "../profiles/index.ts";
 import { clockLine, type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
+import type { Context } from "./context.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
 import { boardView, colourName, compactView, materialText } from "./view.ts";
 
@@ -30,8 +31,8 @@ export interface GameSummary
     plan?: string;
     /** When the AI is to move: what it thought of the player's move on their time (D-72). */
     thought?: Thought;
-    /** When the AI is to move: the helps on, so it may teach (D-78), or turned off since it judged or drew on a move. */
-    helps?: "on" | "off now";
+    /** When the AI is to move: the helps on, so it may teach (D-78), with a coach that judges the player's moves (D-88), or turned off since it drew on a move. */
+    helps?: "on" | "coached" | "off now";
     /** In a game with a time control: the time each side had left when the command ran (D-13). */
     clock?: ClockSummary;
     /** Who offered a draw, while the offer stands (D-65). */
@@ -108,16 +109,51 @@ export function summaryOf(current: CurrentGame, now: Date, archive?: string): Ga
     return summary;
 }
 
-/** The summary with what the AI reads when it is to move: what it thought of the player's last move on their time (D-72), and whether the helps are on (D-78). */
-export function withThought(summary: GameSummary, folder: string, current: CurrentGame): GameSummary
+/**
+ * The summary with what the AI reads when it is to move: what it thought of the player's last move on their time (D-72), and whether the helps are on (D-78),
+ * with a coach when `coached`.
+ */
+export function withThought(summary: GameSummary, folder: string, current: CurrentGame, coached: boolean): GameSummary
 {
     if (summary.turn !== summary.ai || summary.end !== undefined) {
         return summary;
     }
 
     const thought = thoughtForLastMove(folder, current);
-    const helps = helpsIn(folder) ? "on" : judgedBefore(current) ? "off now" : undefined;
+    const helps = helpsIn(folder) ? (coached ? "coached" : "on") : judgedBefore(current) ? "off now" : undefined;
     return { ...summary, ...(thought === undefined ? {} : { thought }), ...(helps === undefined ? {} : { helps }) };
+}
+
+/** Whether a coach judges the player's moves when the helps are on: in Claude Code, with its agent in the player's folder (D-80, D-88). */
+export function coachRuns(context: Context): boolean
+{
+    return context.host?.() === "claude-code" && hasAgent(context.folder, coachAgent);
+}
+
+/** Whether to start the coach, once, after the player's own move has ended the game on the board, with the helps on: it judges that move too (D-88). */
+export function coachOnEnd(context: Context, folder: string, current: CurrentGame): boolean
+{
+    const { game, ai } = current;
+    return game.outcome.over && game.position.turn === ai && helpsIn(folder) && coachRuns(context) && firstCoachCall(folder, current);
+}
+
+/**
+ * How to start the agents, in one message, the one that thinks first, since it needs the time (Priya, review of T-112), and that the player sees nothing of
+ * them: their end needs no answer either. The end of the last move's agents, told just after, must not take their place (Priya, playtest of T-112).
+ */
+export function agentsLine(agents: readonly string[]): string
+{
+    const prompt = (agent: string) => `the prompt "${agent === coachAgent ? "Coach." : "Ponder."}"`;
+    const [first = "", second] = agents;
+
+    if (second === undefined) {
+        const why = first === coachAgent ? "Coach the player" : "Think on the player's time";
+        return `${why}: start the ${first} agent in the background with ${prompt(first)}; start it even when an agent of the move before has just ended, `
+            + "and write nothing about it in the chat, now or when it ends.";
+    }
+
+    return `Think on the player's time and coach them: in one message, start two agents in the background, ${first} with ${prompt(first)} and ${second} with `
+        + `${prompt(second)}; start them even when an agent of the move before has just ended, and write nothing about them in the chat, now or when they end.`;
 }
 
 /** The current game `now`, refused when there is none or when it is over, on time too. */
@@ -152,16 +188,22 @@ export function positionLines(game: GameSummary, withLastMove = true): string[]
         ...(game.plan === undefined ? [] : [`Plan: ${game.plan}`]),
         ...(game.thought === undefined ? [] : [thoughtLine(game.thought, game.level)]),
         ...moodLines(game),
-        ...(game.helps === "on" ? [helpsLine] : game.helps === "off now" ? [helpsOffLine] : []),
+        ...(game.helps === "coached" ? [`${helpsLine} ${coachLine}`] : game.helps === "on" ? [helpsLine] : game.helps === "off now" ? [helpsOffLine] : []),
     ];
 }
 
 /** The helps turned on: the AI may teach as the analyst does (D-62, D-78), never playing for the player. */
-const helpsLine = "Helps on: the player wants to learn. Tell your intentions, never their best move; after their move judge it when it stands out (ai_move's badge "
-    + `and note), draw arrows and squares to show what you say, and write up to ${talkLimits.aiHelps} characters.`;
+const helpsLine = "Helps on: the player wants to learn. Tell your intentions, never their best move; draw arrows and squares to show what you say, and write up to "
+    + `${talkLimits.aiHelps} characters.`;
+
+/**
+ * Where a coach runs, a coach, not the AI, judges the player's moves, and the AI knows it, so that it neither makes up what the coach said nor looks for it
+ * (D-88, Priya, review of T-112); where none runs, nobody judges them before the analyst (D-80).
+ */
+const coachLine = "A coach, not you, judges their moves and gives them hints on the board page; you don't see what it writes.";
 
 /** The helps turned off during a game: what the AI said and drew before no longer holds (Priya, round of D-78). */
-const helpsOffLine = `Helps off now: play as at a tournament again: no intentions, badges or arrows, comments of ${talkLimits.ai} characters at most.`;
+const helpsOffLine = `Helps off now: play as at a tournament again: no intentions or arrows, comments of ${talkLimits.ai} characters at most.`;
 
 /** Whether the AI judged or drew on a move of this game, which only the helps allow: a sign they were on. */
 function judgedBefore(current: CurrentGame): boolean
@@ -358,7 +400,7 @@ function endText({ result, termination }: { result: string; termination?: string
 }
 
 /** The last plies of a record, numbered as a player writes them, from the move number and side of its FEN. */
-function lastMoves(record: GameRecord, count: number): string
+export function lastMoves(record: GameRecord, count: number): string
 {
     const [, turn, , , , number] = (record.tags.FEN ?? "").split(" ");
     const startNumber = Number(number) || 1;

@@ -4,7 +4,7 @@ import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, e
 import { gameFolder, gameFolders } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
-import { type GameSummary, nextStep, positionLines, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "./game-summary.ts";
+import { coachRuns, type GameSummary, nextStep, positionLines, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "./game-summary.ts";
 import { levelText, levelToPlay } from "./levels.ts";
 import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 import { pastGameLines } from "./past-games.ts";
@@ -129,7 +129,7 @@ export function startNewGame({ ai_colour: colour, from, clock, level: chosen, re
     }
 
     return {
-        game: withThought(summaryOf(current, now), folder, current),
+        game: withThought(summaryOf(current, now), folder, current, coachRuns(context)),
         ...(archived === undefined ? {} : { archived: { name: archived, finished: going === undefined } }),
         past,
         ...(player === undefined ? {} : { player }),

@@ -10,17 +10,14 @@ import type { Text } from "./text.ts";
 import { Torretta } from "./torretta.tsx";
 import { hush, speak } from "./voice.ts";
 
-/**
- * The AI's words of the game, a bubble each, the newest by the Torretta: below it, or above it on a board turned round; the first points at it. With the helps
- * on, its judgment of the player's last move comes newest, in a line that opens on its note (D-78).
- */
-export function AiWords({ words, newestFirst, voice, judged, text }: { words: readonly string[]; newestFirst: boolean; voice?: string; judged?: Ply; text: Text; })
+/** The AI's words of the game, a bubble each, the newest by the Torretta: below it, or above it on a board turned round; the first points at it. */
+export function AiWords({ words, newestFirst, voice }: { words: readonly string[]; newestFirst: boolean; voice?: string; })
 {
     const list = useRef<HTMLOListElement>(null);
     useOnlyWhole(list, words, newestFirst);
     useSpokenNews(words, voice);
 
-    const says = (
+    return (
         <ol ref={list} class="says" aria-live="polite">
             {inOrder(
                 words.map((word, index) => (
@@ -32,14 +29,6 @@ export function AiWords({ words, newestFirst, voice, judged, text }: { words: re
             )}
         </ol>
     );
-
-    // The judgment sits by the Torretta, out of the bubbles' order: it never pushes the AI's words away.
-    if (judged === undefined) {
-        return says;
-    }
-
-    const line = <Judged ply={judged} text={text} />;
-    return newestFirst ? <>{line}{says}</> : <>{says}{line}</>;
 }
 
 /**
@@ -97,7 +86,7 @@ export function AiNote({ ply, opening, closing, summary, name, by, mood, voice, 
                             <Marked text={note} />
                         </span>
                     )}
-                    {shown.arrows === undefined && shown.squares === undefined ? null : <Legend review={shown} text={text} />}
+                    {shown.arrows === undefined && shown.squares === undefined ? null : <Legend review={shown} words={text.drawn} />}
                 </p>
             )}
             {summary === undefined ? null : <GameReview by={name} summary={summary} text={text} />}
@@ -113,35 +102,6 @@ export function AiNote({ ply, opening, closing, summary, name, by, mood, voice, 
                     {by === undefined ? null : <small>{signature(by.annotator, by.effort)}</small>}
                 </span>
             </p>
-        </div>
-    );
-}
-
-/** The AI's judgment of the player's move, with the helps on: its badge and the move in a line, which opens on its note (D-78). */
-function Judged({ ply, text }: { ply: Ply; text: Text; })
-{
-    const { badge, note } = ply.review ?? {};
-    const head = (
-        <>
-            {badge === undefined ? <NoteIcon /> : <BadgeIcon badge={badge} />}
-            <b>
-                <span class="move-number">{ply.number}{ply.side === "white" ? "." : "..."}</span>
-                <Figurines san={ply.san} side={ply.side} />
-            </b>{" "}
-            {badge === undefined ? null : text.badges[badge]}
-        </>
-    );
-
-    return (
-        <div class={`say move-note judged ${badge ?? ""}`}>
-            {note === undefined ? <span class="head">{head}</span> : (
-                <details>
-                    <summary class="head">{head}</summary>
-                    <span class="note">
-                        <Marked text={note} />
-                    </span>
-                </details>
-            )}
         </div>
     );
 }
@@ -225,8 +185,11 @@ function GameReview({ by, summary, text }: { by: string; summary: string; text: 
     );
 }
 
-/** What the colours drawn with a note mean, the ones it uses: the AI's legend, for the player (D-69). */
-function Legend({ review, text }: { review: MoveReview; text: Text; })
+/**
+ * What the colours drawn with a note or the coach's hint mean, the ones it uses, in the words of who drew them: the legend, for the player (D-69, Zoe, review
+ * and playtest of T-112).
+ */
+export function Legend({ review, words }: { review: Pick<MoveReview, "arrows" | "squares">; words: Text["drawn"]; })
 {
     const used = [...new Set([...(review.arrows ?? []), ...(review.squares ?? [])].map((drawn) => drawn.colour))];
 
@@ -235,7 +198,7 @@ function Legend({ review, text }: { review: MoveReview; text: Text; })
             {used.map((colour) => (
                 <span key={colour} class={colour}>
                     <i aria-hidden="true" />
-                    {text.drawn[colour]}
+                    {words[colour]}
                 </span>
             ))}
         </span>

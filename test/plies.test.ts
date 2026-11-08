@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readPgn } from "../src/core/index.ts";
 import { talkLimits } from "../src/games/index.ts";
-import { aiSpoke, aiWords, judgmentOf, playerWords, pliesOf, type Ply, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/plies.ts";
+import { aiSpoke, aiWords, judgmentsOf, playerWords, pliesOf, type Ply, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/plies.ts";
 import { isReviewed } from "../src/server/analyses.ts";
 
 describe("the moves on the page", () => {
@@ -23,12 +23,22 @@ describe("the moves on the page", () => {
         expect(badges(0)).toEqual([undefined, "best", undefined, undefined]);
     });
 
-    it("give the AI's judgment of the player's last move once it has answered it, never the book's (D-78)", () => {
+    it("give the coach's judgment of the player's last move once the AI has answered it, else of the one before, never the book's (D-78, D-88)", () => {
         const plies = (pgn: string): Ply[] => withBook(pliesOf(readPgn(pgn)[0]!), 2);
 
-        expect(judgmentOf(plies("1. e4 e5 2. d4 {[%badge mistake] [%review Too soon.]} exd4 *"), "white")?.san).toBe("d4");
-        expect(judgmentOf(plies("1. e4 e5 2. d4 {[%badge mistake]} *"), "white")).toBeUndefined();
-        expect(judgmentOf(plies("1. e4 e5 *"), "white")).toBeUndefined();
+        const none = { judgments: [] };
+        const sans = (shown: Ply[]) => shown.map(({ san }) => san);
+        expect(sans(judgmentsOf(plies("1. e4 e5 2. d4 {[%badge mistake] [%review Too soon.]} exd4 *"), "white", none))).toEqual(["d4"]);
+        expect(judgmentsOf(plies("1. e4 e5 2. d4 {[%badge mistake]} *"), "white", none)).toEqual([]);
+        expect(judgmentsOf(plies("1. e4 e5 *"), "white", none)).toEqual([]);
+        // A note held until the player's next move shows once they have played it, and stays until the coach judges another (Zoe and Federico, review of T-112).
+        expect(sans(judgmentsOf(plies("1. e4 e5 2. d4 {[%review Qh5 next.]} exd4 3. Nf3 *"), "white", none))).toEqual(["d4"]);
+        expect(sans(judgmentsOf(plies("1. e4 e5 2. d4 {[%review Qh5 next.]} exd4 3. Nf3 Nc6 *"), "white", none))).toEqual(["d4"]);
+        expect(sans(judgmentsOf(plies("1. e4 e5 2. d4 {[%review Qh5 next.]} exd4 3. Nf3 {[%badge best]} Nc6 *"), "white", none))).toEqual(["Nf3"]);
+        // One let go only now, however far back, goes first, above the latest (Zoe, playtest of T-112).
+        const late = "1. e4 e5 2. d4 {[%review Qh5 next.]} exd4 3. Nf3 Nc6 4. Bc4 {[%badge best]} Nf6 *";
+        expect(sans(judgmentsOf(plies(late), "white", { judgments: [{ ply: 3, note: "Qh5 next.", released: true }] }))).toEqual(["d4", "Bc4"]);
+        expect(sans(judgmentsOf(plies(late), "white", none))).toEqual(["Bc4"]);
     });
 
     it("take a game as reviewed only for the analyst's word, never for the opponent's badges (D-78)", () => {

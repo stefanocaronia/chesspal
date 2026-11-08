@@ -101,7 +101,7 @@ describe("a game in chat", () => {
         );
     });
 
-    it("lets the AI teach and judge the player's moves only with the helps on, and tells it when they go off (D-78)", async () => {
+    it("lets the AI teach only with the helps on, tells it a coach judges the player's moves, and tells it when the helps go off (D-78, D-88)", async () => {
         const context = playerFolder();
         const helps = (on: boolean): void => writeFileSync(join(gameFolder(context.home()), "settings.json"), JSON.stringify({ helps: on }));
         await run(context, "ai_say", { text: "c".repeat(300) });
@@ -113,18 +113,21 @@ describe("a game in chat", () => {
         await run(context, "new_game", { ai_colour: "black" });
         await run(context, "player_move", { move: "e4" });
         expect(await run(context, "status")).not.toContain("Helps");
-        await expect(run(context, "ai_move", { move: "e5", plan: "p", badge: "good", arrows: ["Gg8f6"], comment: "c".repeat(301) })).rejects.toThrow(
-            "The player has the helps off: play without badge and note, without arrows and squares, with the comment in 300 characters at most. Nothing changed.",
+        await expect(run(context, "ai_move", { move: "e5", plan: "p", arrows: ["Gg8f6"], comment: "c".repeat(301) })).rejects.toThrow(
+            "The player has the helps off: play without arrows and squares, with the comment in 300 characters at most. Nothing changed.",
         );
         await expect(run(context, "ai_move", { move: "e5", plan: "p", arrows: ["Ge4e4"] })).rejects.toThrow("an arrow goes from a square to another");
         await run(context, "ai_move", { move: "e5", plan: "p" });
 
         helps(true);
         await run(context, "player_move", { move: "Nf3" });
-        expect(await run(context, "status")).toContain("Helps on: the player wants to learn. Tell your intentions, never their best move;");
-        await expect(run(context, "ai_move", { move: "Nc6", plan: "p", badge: "book" })).rejects.toThrow();
-        await run(context, "ai_move", { move: "Nc6", plan: "p", badge: "good", note: "The centre.", comment: "c".repeat(500), arrows: ["Gc6d4"], squares: ["Re5"] });
-        expect(gameFile(context).pgn).toMatch(/2\. Nf3\s+\{ ?\[%badge good\]\s+\[%review The centre\.\] ?\}\s+2\.\.\. Nc6\s+\{ ?c{500}\s+\[%plan p\]\s+\[%cal Gc6d4\]\s+\[%csl Re5\] ?\}/);
+        const helpsOn = await run(context, "status");
+        expect(helpsOn).toContain("Helps on: the player wants to learn. Tell your intentions, never their best move;");
+        // No coach runs outside Claude Code: nobody judges the player's moves before the analyst (D-80, Priya, review of T-112).
+        expect(helpsOn).not.toContain("A coach");
+        expect(Object.keys(command("ai_move").input.shape)).not.toContain("badge");
+        await run(context, "ai_move", { move: "Nc6", plan: "p", comment: "c".repeat(500), arrows: ["Gc6d4"], squares: ["Re5"] });
+        expect(gameFile(context).pgn).toMatch(/2\. Nf3\s+Nc6\s+\{ ?c{500}\s+\[%plan p\]\s+\[%cal Gc6d4\]\s+\[%csl Re5\] ?\}/);
 
         helps(false);
         await run(context, "player_move", { move: "Bb5" });

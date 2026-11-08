@@ -1,17 +1,14 @@
 import { z } from "zod";
-import { type Badge, badges, boardText, drawingsText, moods, moodTag } from "../core/index.ts";
+import { boardText, drawingsText, moods, moodTag } from "../core/index.ts";
 import { commentWithPlan, talkLimits } from "../games/index.ts";
-import { hasPonderAgent, ponderAgentFor } from "../host-files/index.ts";
+import { coachAgent, hasAgent, ponderAgentFor } from "../host-files/index.ts";
 import { gameFolder, helpsIn } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
-import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
-import { closingLines, moveLines, type MovePlayed, shownMove } from "./game-summary.ts";
+import { arrowsInput, drawingsOf, squaresInput } from "./drawings.ts";
+import { agentsLine, closingLines, coachRuns, moveLines, type MovePlayed, shownMove } from "./game-summary.ts";
 import { playMove, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand, sentence } from "./registry.ts";
 import { give, waitingWords } from "./say.ts";
-
-// The badges the opponent gives: the book's is Chesspal's, never its own judgment (D-69).
-const judgments = badges.filter((badge) => badge !== "book") as [Exclude<Badge, "book">, ...Exclude<Badge, "book">[]];
 
 /** The AI's move, with its plan, kept hidden (D-29), and its comment for the player when it has something to say (D-12, D-54). */
 export const aiMove = defineCommand({
@@ -28,14 +25,9 @@ export const aiMove = defineCommand({
                 + `knight takes on f6"), a move you write with the pieces' figurines, as the tools show it (♞xf6+ for Nxf6+); your plans and threats only with the helps on, and then as long as a note of ${talkLimits.aiHelps} `
                 + "characters, to teach; **two asterisks** put a word or two in bold on the page",
         ),
-        badge: z.enum(judgments).optional().describe(
-            "only with the helps on: your badge on the player's last move, as chess.com names them, only on a move that stands out (a mistake, a miss, a fine find), "
-                + "never on a routine one",
-        ),
-        note: noteInput.optional().describe("only with the helps on: why, on the player's last move, in a sentence or two"),
         arrows: arrowsInput.describe(
-            "only with the helps on: arrows on the board after your move, to show what your comment says, never your move itself: Rf2e1; G green: the better move or "
-                + "the good idea; R red: a threat or the mistake; Y yellow: another way; B blue: a plan",
+            "only with the helps on: arrows on the board after your move, to show what your comment says, never your move itself: Rf2e1; G green: a good idea; "
+                + "R red: a threat or the mistake; Y yellow: another way; B blue: a plan",
         ),
         squares: squaresInput.describe("only with the helps on: squares to mark after your move, as PGN's %csl writes them: Rf2; colours as for arrows"),
         offer_draw: z.boolean().optional().describe("true offers the player a draw with this move: it stands until their move"),
@@ -47,22 +39,18 @@ export const aiMove = defineCommand({
     alwaysLoad: true,
     showsGame: true,
     positionals: ["move"],
-    run: ({ move, plan, comment, offer_draw: offerDraw = false, mood, badge, note, arrows, squares }, context): Played => {
+    run: ({ move, plan, comment, offer_draw: offerDraw = false, mood, arrows, squares }, context): Played => {
         const folder = gameFolder(context.home());
         refuseUnseenPosition(context, folder);
-        refuseWithoutHelps(folder, { comment, badge, note, arrows, squares });
+        refuseWithoutHelps(folder, { comment, arrows, squares });
         const drawings = drawingsOf(arrows, squares);
         // The player's words are read before the move, which would count as the answer to them; a move refused leaves them for the next call.
         const waiting = waitingWords(context);
         const words = [commentWithPlan(comment, plan), drawingsText(drawings), mood === undefined ? "" : moodTag(mood)].filter((part) => part !== "").join(" ");
-        const played = playMove(folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, {
-            comment: words,
-            offerDraw,
-            ...(badge === undefined && note === undefined ? {} : { judged: { ...(badge === undefined ? {} : { badge }), ...(note === undefined ? {} : { note }) } }),
-        });
-        const agent = ponderAgent(context, played);
+        const played = playMove(folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: words, offerDraw });
+        const agents = agentsAfter(context, folder, played);
         const board = context.pageOpen?.() === true ? {} : { board: true as const };
-        return { ...played, words: give(context, waiting), ...(agent === undefined ? {} : { ponder: agent }), ...board };
+        return { ...played, words: give(context, waiting), ...(agents.length === 0 ? {} : { agents }), ...board };
     },
     format: (result) => {
         // The mood the AI has just given is not told back: player_move and status tell it while it lasts (Priya, round of T-107).
@@ -73,17 +61,16 @@ export const aiMove = defineCommand({
             `Played ${shownMove(result.move)}.`,
             ...moveLines({ ...result, game }),
             ...(result.board === true ? ["No board page is open: copy this board into your message.", boardText(result.game.fen)] : []),
-            ...(result.ponder === undefined ? [] : [ponderLine(result.ponder)]),
+            ...(result.agents === undefined ? [] : [agentsLine(result.agents)]),
             ...closingLines(result.game, result.words),
         ].join("\n");
     },
 });
 
-/** A comment as long as a note, a badge, a note and drawings, only with the helps on (D-78): the player who has them off plays as at a tournament. */
-function refuseWithoutHelps(folder: string, { comment, badge, note, arrows, squares }: { comment?: string; badge?: string; note?: string; arrows?: string[]; squares?: string[]; }): void
+/** A comment as long as a note, and drawings, only with the helps on (D-78): the player who has them off plays as at a tournament. */
+function refuseWithoutHelps(folder: string, { comment, arrows, squares }: { comment?: string; arrows?: string[]; squares?: string[]; }): void
 {
     const asked = [
-        badge === undefined && note === undefined ? "" : "without badge and note",
         arrows === undefined && squares === undefined ? "" : "without arrows and squares",
         comment === undefined || comment.length <= talkLimits.ai ? "" : `with the comment in ${talkLimits.ai} characters at most`,
     ].filter((part) => part !== "");
@@ -93,22 +80,24 @@ function refuseWithoutHelps(folder: string, { comment, badge, note, arrows, squa
     }
 }
 
-/** The AI's move, the agent that thinks on the player's time when the host runs one (D-72), and whether the player sees no board page, so the AI copies the board (D-85). */
-type Played = MovePlayed & { ponder?: string; board?: true; };
+/**
+ * The AI's move, the agents to start on the player's time when the host runs them (D-72, D-88), and whether the player sees no board page, so the AI
+ * copies the board (D-85).
+ */
+type Played = MovePlayed & { agents?: string[]; board?: true; };
 
-/** The agent to start after the move: in Claude Code, in a folder init set up with it, while the game goes on (D-72). */
-function ponderAgent(context: Context, played: MovePlayed): string | undefined
+/**
+ * The agents to start after the move, in Claude Code, in a folder init set up with them: the one that thinks for the AI while the game goes on (D-72), then
+ * the coach with the helps on, which judges the player's move even when the AI's ends the game (D-88).
+ */
+function agentsAfter(context: Context, folder: string, played: MovePlayed): string[]
 {
-    if (context.host?.() !== "claude-code" || played.game.end !== undefined) {
-        return undefined;
+    if (context.host?.() !== "claude-code") {
+        return [];
     }
 
-    const agent = ponderAgentFor(played.game.level);
-    return hasPonderAgent(context.folder, agent) ? agent : undefined;
-}
-
-/** How to start the agent, and that the player sees nothing of it: its end needs no answer either. */
-function ponderLine(agent: string): string
-{
-    return `Think on the player's time: start the ${agent} agent in the background with the prompt "Ponder."; write nothing about it in the chat, now or when it ends.`;
+    const ponder = ponderAgentFor(played.game.level);
+    const thinks = played.game.end === undefined && hasAgent(context.folder, ponder);
+    const coaches = helpsIn(folder) && coachRuns(context);
+    return [...(thinks ? [ponder] : []), ...(coaches ? [coachAgent] : [])];
 }

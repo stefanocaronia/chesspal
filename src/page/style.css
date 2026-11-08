@@ -1201,8 +1201,8 @@ button {
     color: var(--light-square);
 }
 
-/* The square's name in the corner of the file, under the pointer or the piece dragged, in its place on the bottom rank (T-76) */
-.square-name {
+/* The square's name in the corner of the file, under the pointer or the piece dragged, in its place on the bottom rank (T-76); the help rows' names stay in line */
+.square .square-name {
     position: absolute;
     right: 4%;
     bottom: 2.5%;
@@ -2383,8 +2383,8 @@ button {
     color: var(--accent);
 }
 
-/* What the colours drawn with the note mean, the ones it uses */
-.move-note .legend {
+/* What the colours drawn with the note or the coach's hint mean, the ones it uses */
+.legend {
     display: flex;
     flex-wrap: wrap;
     gap: 2px 12px;
@@ -2393,13 +2393,13 @@ button {
     font-size: 12px;
 }
 
-.move-note .legend > span {
+.legend > span {
     display: inline-flex;
     align-items: center;
     gap: 5px;
 }
 
-.move-note .legend i {
+.legend i {
     width: 14px;
     height: 3px;
     border-radius: 2px;
@@ -3963,12 +3963,31 @@ button {
     }
 
     .board-map {
-        display: flex;
-        justify-content: flex-end;
+        display: flow-root;
         grid-area: map;
+        font-size: 14px;
+    }
+
+    .board-map .map-button {
+        float: right;
+        margin-left: 8px;
     }
 
     .helps-card .map-button {
+        display: none;
+    }
+
+    /* The coach's hint under the board, its words under its line, the map on its right; the card keeps the judgments (Zoe, playtest of T-112) */
+    .board-map .coach-hint summary {
+        padding: 6px 0;
+    }
+
+    .board-map .coach-hint .note {
+        clear: right;
+    }
+
+    .helps-card .coach-hint,
+    .helps-card .coach.hint-only {
         display: none;
     }
 
@@ -4205,6 +4224,55 @@ button {
     font-size: 13px;
     font-weight: 700;
     color: var(--ink);
+}
+
+/* The coach's words at the top of the card (D-88): its judgment of the player's last move, then its hint, folded until they open it */
+.helps-card .coach {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.coach-hint summary {
+    cursor: pointer;
+    list-style: none;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.coach-hint summary::-webkit-details-marker {
+    display: none;
+}
+
+/* The same sign on both, so that on a phone, with no pointer, they read as lines that open (Zoe, review of T-112) */
+.helps-card .coach summary::after,
+.board-map .coach-hint summary::after {
+    content: "▸";
+    margin-left: 6px;
+    color: var(--soft);
+}
+
+.helps-card .coach details[open] > summary::after,
+.board-map .coach-hint[open] > summary::after {
+    content: "▾";
+}
+
+.coach-hint .note {
+    display: block;
+    margin-top: 4px;
+    color: var(--say-ink);
+    font-size: 14.5px;
+}
+
+/* The squares and moves in the coach's words in the accent, as in the AI's, to find on the board; the move it judged with its number, which may be the one before */
+.helps-card .coach .on-board,
+.board-map .coach-hint .on-board {
+    color: var(--accent);
+}
+
+.helps-card .coach .move-number {
+    display: inline;
 }
 
 .help-rows {

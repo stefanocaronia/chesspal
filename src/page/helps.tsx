@@ -1,10 +1,14 @@
-// The helps on the page (D-78, Zoe's sketch B): the board says where, the card says what, the facts the AI sees at the game's level and only those.
+// The helps on the page (D-78, Zoe's sketch B): the board says where, the card says what, the facts the AI sees at the game's level and only those; and
+// the coach's words (D-88).
 import { Fragment } from "preact";
 import { useState } from "preact/hooks";
 import type { PieceFacts, Profile, Side } from "../core/index.ts";
+import { BadgeIcon, NoteIcon } from "./badges.tsx";
 import { type HelpsView, type StrategyCell, strategyOf, type StrategyRow } from "./helps-view.ts";
 import { Figurines } from "./move-list.tsx";
 import { Figurine } from "./pieces.tsx";
+import type { CoachHint, Ply } from "./plies.ts";
+import { Legend, Marked } from "./talk.tsx";
 import type { HelpsCardText, Text } from "./text.ts";
 
 /** The corner folded in ink on a piece at risk: on the board, and before its line in the card. */
@@ -21,11 +25,17 @@ export function Notch()
 }
 
 /**
- * The helps' card, between the opening and the moves: the tactics in lines, the strategy in a table and the control map, seen while its button
- * or M is held. A line under the pointer lights its squares on the board.
+ * The helps' card, between the opening and the moves: the coach's words, then the tactics in lines, the strategy in a table and the control map, seen while
+ * its button or M is held. A line under the pointer lights its squares on the board.
  */
-export function HelpsCard({ helps, onPoint, onMap, mapping, text }: {
+export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMap, mapping, text }: {
     helps: HelpsView;
+    /** The player's moves as the coach judged them: the last the AI has answered, and one a held note let go only now (D-88). */
+    judged: readonly Ply[];
+    /** The coach's hint for the player's turn, folded until they open it (Anatolij, review of T-112). */
+    hint?: CoachHint | undefined;
+    hintOpen: boolean;
+    onHint: (open: boolean) => void;
     onPoint: (squares: readonly string[]) => void;
     onMap: (held: boolean) => void;
     mapping: boolean;
@@ -40,6 +50,12 @@ export function HelpsCard({ helps, onPoint, onMap, mapping, text }: {
             <h3 class="helps-title">
                 {words.title}
             </h3>
+            {judged.length === 0 && hint === undefined ? null : (
+                <section class={`coach${judged.length === 0 ? " hint-only" : ""}`} aria-label={words.coach}>
+                    {judged.map((ply) => <Judged key={`${ply.number} ${ply.side}`} ply={ply} text={text} />)}
+                    {hint === undefined ? null : <HintLine hint={hint} open={hintOpen} onOpen={onHint} text={text} />}
+                </section>
+            )}
             <div class="tabs" role="tablist">
                 <button type="button" role="tab" aria-selected={tab === "tactics"} onClick={() => setTab("tactics")}>{words.tactics}</button>
                 <button type="button" role="tab" aria-selected={tab === "strategy"} onClick={() => setTab("strategy")}>{words.strategy}</button>
@@ -77,6 +93,54 @@ export function MapButton({ mapping, onMap, held, text }: { mapping: boolean; on
             {text.helpsCard.map}
             {held ? <small>({text.helpsCard.hold})</small> : null}
         </button>
+    );
+}
+
+/**
+ * The coach's hint, a line that opens on its words and the legend of what it draws (D-88): in the helps' card, and on a phone under the board, beside the
+ * map, where its drawings are in sight (Zoe, playtest of T-112).
+ */
+export function HintLine({ hint, open, onOpen, text }: { hint: CoachHint; open: boolean; onOpen: (open: boolean) => void; text: Text; })
+{
+    const words = text.helpsCard;
+
+    return (
+        <details class="coach-hint" open={open} onToggle={(event) => onOpen(event.currentTarget.open)}>
+            <summary>{open ? words.hideHint : words.showHint}</summary>
+            <span class="note">
+                <Marked text={hint.text} />
+            </span>
+            {hint.arrows === undefined && hint.squares === undefined ? null : <Legend review={hint} words={words.drawn} />}
+        </details>
+    );
+}
+
+/** The coach's judgment of the player's move: its badge and the move in a line, which opens on its note (D-78, D-88). */
+function Judged({ ply, text }: { ply: Ply; text: Text; })
+{
+    const { badge, note } = ply.review ?? {};
+    const head = (
+        <>
+            {badge === undefined ? <NoteIcon /> : <BadgeIcon badge={badge} />}
+            <b>
+                <span class="move-number">{ply.number}{ply.side === "white" ? "." : "..."}</span>
+                <Figurines san={ply.san} side={ply.side} />
+            </b>{" "}
+            {badge === undefined ? null : text.badges[badge]}
+        </>
+    );
+
+    return (
+        <div class={`move-note judged ${badge ?? ""}`}>
+            {note === undefined ? <span class="head">{head}</span> : (
+                <details>
+                    <summary class="head">{head}</summary>
+                    <span class="note">
+                        <Marked text={note} />
+                    </span>
+                </details>
+            )}
+        </div>
     );
 }
 

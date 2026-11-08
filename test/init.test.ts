@@ -43,7 +43,7 @@ describe("chesspal init", () => {
                 + "     Codex also asks about Chesspal's two hooks: choose Trust all.\n"
                 + "     They are small helpers that let it notice your moves on the board.\n"
                 + "  3. Say hello: the AI gives you the link to the board.\n\n"
-                + "  Updated 8 files.",
+                + "  Updated 9 files.",
         );
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${opponentInstructions()}\n<!-- chesspal: end -->\n`);
@@ -56,6 +56,10 @@ describe("chesspal init", () => {
             /^---\nname: chesspal-ponder-quick\n.*\ntools: mcp__chesspal__ponder\nmodel: haiku\n---\n\nYou are the player's chess opponent/s,
         );
         expect(text(chess, ".claude/agents/chesspal-ponder.md")).toContain("\nmodel: inherit\n");
+        // The coach works with its one tool on the AI's own model, and its description keeps the chat from asking it about the game (D-88).
+        expect(text(chess, ".claude/agents/chesspal-coach.md")).toMatch(
+            /^---\nname: chesspal-coach\ndescription: .*never to answer the player\.\ntools: mcp__chesspal__coach\nmodel: inherit\n---\n\nYou are the player's chess coach/s,
+        );
     });
 
     it("starts the server through cmd on Windows", async () => {
@@ -79,7 +83,7 @@ describe("chesspal init", () => {
         writeFileSync(join(folder, ".codex", "config.toml"), 'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\nenv = { CHESSPAL_HOME = "D:/runs" }\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n');
         // Codex runs hooks that changed only once the player trusts them again (T-125).
         expect((await runCommandLine(["init"], testContext(folder))).output).toContain(
-            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 8 files.",
+            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 9 files.",
         );
 
         expect(json(folder, ".mcp.json")).toEqual({ mcpServers: { other: { command: "other" }, chesspal: { command: "chesspal", args: ["mcp"], env: { CHESSPAL_HOME: "D:/runs" } } } });
@@ -104,7 +108,7 @@ describe("chesspal init", () => {
         const output = (await runCommandLine(["init"], { ...testContext(folder), language: "it-IT" })).output;
 
         expect(output).toMatch(/^♜ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code o Codex in questa cartella\.\n/);
-        expect(output).toMatch(/\n\n {2}Aggiornati 8 file\.$/);
+        expect(output).toMatch(/\n\n {2}Aggiornati 9 file\.$/);
         expect(output).not.toContain("consentili di nuovo");
         expect((await runCommandLine(["init", "la mia scacchiera"], { ...testContext(folder), language: "it-IT" })).output).toContain(
             '  1. Entra nella cartella: cd "la mia scacchiera"\n     poi apri Claude Code (claude) o Codex (codex).\n',

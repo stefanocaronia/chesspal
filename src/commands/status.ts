@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "../games/index.ts";
+import { coachAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
-import { closingLines, type GameSummary, newGameStep, positionLines, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought, wordLines } from "./game-summary.ts";
+import { agentsLine, closingLines, coachOnEnd, coachRuns, type GameSummary, newGameStep, positionLines, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought, wordLines } from "./game-summary.ts";
 import { levelText } from "./levels.ts";
 import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 import { playerLine } from "./profiles.ts";
@@ -32,6 +33,8 @@ interface Status
     analysis?: { game: string; brought?: true; };
     /** A game going on from before this chat, told once a chat: the player says whether to go on with it. */
     fromBefore?: true;
+    /** The coach to start, once, for the player's move that ended the game (D-88). */
+    coach?: true;
 }
 
 /** What Chesspal sees now, the first call of a chat: a dashboard under 150 tokens while the player is to move, with the next step. */
@@ -72,7 +75,7 @@ export const status = defineCommand({
             }
 
             if (current !== undefined) {
-                status.game = withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current);
+                status.game = withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current, coachRuns(context));
 
                 if (status.pageClosed === true) {
                     pageGiven(context, current.started);
@@ -80,6 +83,11 @@ export const status = defineCommand({
 
                 if (first && endOf(current.game) === undefined && fromBeforeChat(context, current.started)) {
                     status.fromBefore = true;
+                }
+
+                // The player's move on the board page that ended the game: the coach judges it too (D-88).
+                if (coachOnEnd(context, folder, current)) {
+                    status.coach = true;
                 }
             }
 
@@ -94,14 +102,14 @@ export const status = defineCommand({
 
         return status;
     },
-    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words = [], analysis, fromBefore }) =>
+    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words = [], analysis, fromBefore, coach }) =>
         [
             `Chesspal ${version}. Folder: ${folder}`,
             ...(page === undefined ? [] : [pageLine(page, pageClosed === true)]),
             ...(player === undefined ? [] : [player]),
             ...(speech === undefined ? [] : [speechLine(speech)]),
             ...(fromBefore === true ? [fromBeforeLine] : []),
-            ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true, pageClosed === true)),
+            ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true, pageClosed === true, coach === true)),
             ...(analysis === undefined ? [] : [analysisLine(analysis)]),
         ].join("\n"),
 });
@@ -140,13 +148,18 @@ function analysisLine({ game, brought }: NonNullable<Status["analysis"]>): strin
         : `In analysis on the board page: ${game}; analyse_game {"game": "${game}"} goes over it with the player.`;
 }
 
-/** The game's lines; a game the player brought to analyse takes the place of the next step (T-92). */
-function gameLines(game: GameSummary | undefined, words: readonly string[], brought: boolean, pageClosed: boolean): string[]
+/**
+ * The game's lines; a game the player brought to analyse takes the place of the next step (T-92). The coach to start goes just before the next step, where
+ * the AI acts on it (Priya, review of T-112).
+ */
+function gameLines(game: GameSummary | undefined, words: readonly string[], brought: boolean, pageClosed: boolean, coach: boolean): string[]
 {
+    const closing = [...(coach ? [agentsLine([coachAgent])] : []), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed))];
+
     if (game === undefined) {
-        return ["No game.", ...(brought ? wordLines(words) : closingLines(game, words, pageClosed))];
+        return ["No game.", ...closing];
     }
 
     const moves = game.lastMoves === "" ? [] : [`Moves: ${game.lastMoves}`];
-    return [`Game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`, ...moves, ...positionLines(game), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed))];
+    return [`Game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`, ...moves, ...positionLines(game), ...closing];
 }

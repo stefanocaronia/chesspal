@@ -88,7 +88,8 @@ describe("the AI thinking on the player's time (D-72)", () => {
         await run(context, "player_move", { move: "Bb5" });
 
         expect(await run({ ...context, host: () => "claude-code" }, "ai_move", { move: "a6", plan: "Develop." })).toContain(
-            '\nThink on the player\'s time: start the chesspal-ponder agent in the background with the prompt "Ponder."; write nothing about it in the chat, now or when it ends.\nNext: wait for',
+            '\nThink on the player\'s time: start the chesspal-ponder agent in the background with the prompt "Ponder."; start it even when an agent of the move before '
+                + "has just ended, and write nothing about it in the chat, now or when it ends.\nNext: wait for",
         );
 
         const club = playerFolder();
@@ -115,7 +116,7 @@ describe("the AI thinking on the player's time (D-72)", () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "black" });
 
-        expect(command?.byAgent).toBe(true);
+        expect(command?.byAgents).toEqual(["chesspal-ponder-quick", "chesspal-ponder"]);
         expect(command?.host).toBe("claude-code");
         await expect(run(context, "ponder", { position: 0, reply: "e4", say: "Hello." })).rejects.toThrow("One thing a call");
         await expect(run(context, "ponder", { position: 0, done: true, reply: "e4" })).rejects.toThrow("One thing a call");

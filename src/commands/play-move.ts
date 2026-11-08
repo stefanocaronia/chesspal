@@ -1,5 +1,5 @@
 // A move of the AI or of the player on the current game: played, timed by the clock, saved, and archived when it ends the game.
-import { clockAfterMove, clockTag, type MoveReview, reviewed } from "../core/index.ts";
+import { clockAfterMove, clockTag } from "../core/index.ts";
 import { archiveEnded, type CurrentGame, endOf, loadGame, saveGame, talkLine } from "../games/index.ts";
 import type { Context } from "./context.ts";
 import { gameGoingOn, type MovePlayed, summaryOf, withThought } from "./game-summary.ts";
@@ -16,15 +16,15 @@ export interface WithMove
     said?: { text: string; at: Date; };
     /** Milliseconds of the mover's turn that were not theirs, not taken off their clock (D-36). */
     allowance?: number;
-    /** The AI's badge and note on the player's last move, kept in its comment as the analyst keeps them (D-78). */
-    judged?: MoveReview;
+    /** A coach judges the player's moves with the helps on (D-88): the AI reads it after the player's move. */
+    coached?: boolean;
 }
 
 /**
  * Plays a move for one side `now` and saves the game, with the time it took and the clock after it in its comment ([%clk]). A refused move, or words refused
  * with it, change nothing: it throws the message `refused` writes from the core's.
  */
-export function playMove(folder: string, now: Date, mover: Mover, text: string, refused: (message: string, legal: readonly string[]) => string, { comment, said, offerDraw = false, allowance = 0, judged }: WithMove = {}): MovePlayed
+export function playMove(folder: string, now: Date, mover: Mover, text: string, refused: (message: string, legal: readonly string[]) => string, { comment, said, offerDraw = false, allowance = 0, coached = false }: WithMove = {}): MovePlayed
 {
     // A flag falls only past the allowance.
     const before = gameToMove(folder, mover, new Date(now.getTime() - allowance));
@@ -41,21 +41,10 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
         throw new Error("A draw can be offered once each side has made a move: play the move without offer_draw. Nothing changed.");
     }
 
-    if (judged !== undefined && game.record.moves.length === 0) {
-        throw new Error("The player has made no move yet: play without badge and note. Nothing changed.");
-    }
-
     const played = game.play(text);
 
     if (!played.played) {
         throw new Error(refused(played.message, played.legal));
-    }
-
-    if (judged !== undefined) {
-        // The player's move is the one before the move just played: its badge and note sit in its comment, beside its clock.
-        const judging = game.record.moves.length - 1;
-        const { nags, comment: judgedComment } = reviewed(game.record.moves[judging - 1]!, judged);
-        game.annotate(judging, { nags, comment: judgedComment ?? "" });
     }
 
     const clock = before.clock === undefined ? undefined : clockAfterMove(before.clock, position.turn, now, allowance, mover === "player");
@@ -76,7 +65,7 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
     saveGame(folder, current);
 
     const { archive, warning } = endOf(game) === undefined ? {} : archiveEnded(folder, current);
-    const result: MovePlayed = { move: `${position.moveNumber}${position.turn === "white" ? "." : "..."}${played.move.san}`, game: withThought(summaryOf(current, now, archive), folder, current) };
+    const result: MovePlayed = { move: `${position.moveNumber}${position.turn === "white" ? "." : "..."}${played.move.san}`, game: withThought(summaryOf(current, now, archive), folder, current, coached) };
 
     if (played.note !== undefined) {
         result.note = played.note;

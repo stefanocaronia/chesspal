@@ -11,7 +11,7 @@ import { noteAiModel } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { pagePorts } from "./bell.ts";
-import { callerOf } from "./caller.ts";
+import { allowedCaller, callerOf, callingAgent } from "./caller.ts";
 import { chatHasRead, startPage } from "./page.ts";
 
 /** What the host reads as the server starts, before any tool: where to begin, and the rule of every move (D-27). Short, since hosts may cut it. */
@@ -30,6 +30,12 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
 
     for (const command of list.filter((each) => each.cliOnly !== true)) {
         const tool = server.registerTool(command.name, toolConfig(command), async (input: unknown, extra) => {
+            // An agent's tool called by the chat, or by another agent, would give what only that agent may see (Priya, review of T-112).
+            if (command.byAgents !== undefined && !allowedCaller(await callingAgent(extra._meta, context.folder), command.byAgents)) {
+                // It names no agent to start: the chat that asked would start one itself (Priya, review of T-112).
+                return { content: [{ type: "text", text: `${command.name} is not yours to call: the player reads what it gives on the board page. Nothing changed.` }], isError: true };
+            }
+
             // Each call knows who makes it, for the commands that write it down (D-81).
             const caller = () => callerOf(extra._meta, server.server.getClientVersion(), context.folder);
             const result = await track(runTool(command, input, context, caller));
@@ -155,7 +161,7 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
     let refused = false;
 
     try {
-        if (command.byAgent !== true) {
+        if (command.byAgents === undefined) {
             context.calls?.();
         }
 
@@ -167,7 +173,7 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
     } finally {
         // What the tool read or wrote, the chat has seen: the doorbell rings it only for what changes after, and it may move on the game a tool showed it,
         // unless that tool was refused for a position it had not seen. An agent's call is not the chat's.
-        if (command.byAgent !== true) {
+        if (command.byAgents === undefined) {
             chatHasRead(context, command.showsGame === true && !refused);
         }
     }

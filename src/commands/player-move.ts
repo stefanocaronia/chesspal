@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { loadGame } from "../games/index.ts";
+import { coachAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
-import { closingLines, lastMoveText, moveLines, type MovePlayed, shownMove } from "./game-summary.ts";
+import { agentsLine, closingLines, coachOnEnd, coachRuns, lastMoveText, moveLines, type MovePlayed, shownMove } from "./game-summary.ts";
 import { inviteLine, pageInvite } from "./page-link.ts";
 import { playMove, positionIn, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
@@ -28,24 +30,28 @@ export const playerMove = defineCommand({
         }
 
         const started = context.positionSeen === null ? positionIn(folder).started : context.positionSeen?.started;
-        const played = playMove(folder, context.now(), "player", move, (message) => `${message} Ask the player again. Nothing changed.`, { allowance: chatAllowance, offerDraw });
+        const played = playMove(folder, context.now(), "player", move, (message) => `${message} Ask the player again. Nothing changed.`, { allowance: chatAllowance, offerDraw, coached: coachRuns(context) });
         // A game over by this move has no more moves to play there: the next game's window gives the address (Federico, round of D-85).
         const invite = played.game.end === undefined ? pageInvite(context, started) : undefined;
-        return { ...played, words: newWords(context), ...(invite === undefined ? {} : { invite }) };
+        const ended = played.game.end === undefined ? undefined : loadGame(folder);
+        const coach = ended !== undefined && coachOnEnd(context, folder, ended);
+        return { ...played, words: newWords(context), ...(invite === undefined ? {} : { invite }), ...(coach ? { coach } : {}) };
     },
     format: (result) =>
         [
             `Player: ${result.game.lastMove === undefined ? shownMove(result.move) : lastMoveText(result.game.lastMove)}.`,
             ...moveLines(result),
             ...(result.invite === undefined ? [] : [inviteLine(result.invite)]),
+            ...(result.coach === true ? [agentsLine([coachAgent])] : []),
             ...closingLines(result.game, result.words),
         ].join("\n"),
 });
 
-/** The player's move, with the board page's address once a game while no browser has it open (D-85). */
+/** The player's move, with the board page's address once a game while no browser has it open (D-85), and the coach to start when it ended the game (D-88). */
 interface PlayerMove extends MovePlayed
 {
     invite?: string;
+    coach?: true;
 }
 
 /**

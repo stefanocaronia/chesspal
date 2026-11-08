@@ -18,8 +18,11 @@ export interface Command<Schema extends z.ZodObject = z.ZodObject, Result = unkn
     alwaysLoad?: boolean;
     /** Its answer shows the chat the game as it is: the chat may move on it, and on no other (D-71). */
     showsGame?: boolean;
-    /** An agent calls it apart from the chat, as ponder (D-72): the doorbell's record of what the chat has read stays as it was. */
-    byAgent?: boolean;
+    /**
+     * The agents that call it apart from the chat, as ponder (D-72), by their names: the doorbell's record of what the chat has read stays as it was, and the
+     * server refuses it to the chat and to other agents (Priya, review of T-112).
+     */
+    byAgents?: readonly string[];
     /** The only host the MCP server offers it to, by the client's name, as ponder to Claude Code: elsewhere its description would cost tokens for nothing. */
     host?: string;
     /** Only the command line has it, as init: the MCP server leaves it out, and its description costs the AI no tokens. */

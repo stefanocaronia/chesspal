@@ -127,6 +127,12 @@ export interface Text
 export interface HelpsCardText
 {
     readonly title: string;
+    /** The coach's words in the card (D-88), and the line that opens its hint and closes it. */
+    readonly coach: string;
+    readonly showHint: string;
+    readonly hideHint: string;
+    /** What the hint's colours mean, as the coach draws them: never a move (Zoe, playtest of T-112). */
+    readonly drawn: Readonly<Record<DrawColour, string>>;
     readonly tactics: string;
     readonly strategy: string;
     readonly map: string;
@@ -502,6 +508,10 @@ const english: Text = {
     },
     helpsCard: {
         title: "Helps",
+        coach: "The coach",
+        showHint: "Show hint",
+        hideHint: "Hide hint",
+        drawn: { green: "idea", red: "threat", yellow: "line", blue: "target" },
         tactics: "Tactics",
         strategy: "Strategy",
         map: "Map",
@@ -766,6 +776,10 @@ const italian: Text = {
     },
     helpsCard: {
         title: "Aiuti",
+        coach: "L'allenatore",
+        showHint: "Mostra il suggerimento",
+        hideHint: "Nascondi il suggerimento",
+        drawn: { green: "idea", red: "minaccia", yellow: "linea", blue: "obiettivo" },
         tactics: "Tattica",
         strategy: "Strategia",
         map: "Mappa",

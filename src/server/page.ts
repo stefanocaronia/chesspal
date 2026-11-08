@@ -17,8 +17,27 @@ import { playMove, positionIn } from "../commands/play-move.ts";
 import { say } from "../commands/say.ts";
 import { gameToStudy, namedGame } from "../commands/study.ts";
 import { clockStarted, type GameRecord, writePgn } from "../core/index.ts";
-import { aiModelOf, type CurrentGame, drawOfferOf, endOf, gameInAnalysis, gameStamp, heardLines, loadGame, loadTableTalk, playerPgn, saveGame, startAnalysis, talkLimits, wakesTheChat, WordsRefused } from "../games/index.ts";
-import { gameFolder } from "../profiles/index.ts";
+import {
+    aiModelOf,
+    coachShown,
+    type CoachWords,
+    coachWords,
+    type CurrentGame,
+    drawOfferOf,
+    endOf,
+    gameInAnalysis,
+    gameStamp,
+    heardLines,
+    loadGame,
+    loadTableTalk,
+    playerPgn,
+    saveGame,
+    startAnalysis,
+    talkLimits,
+    wakesTheChat,
+    WordsRefused,
+} from "../games/index.ts";
+import { gameFolder, helpsIn } from "../profiles/index.ts";
 import { analysesOf, isReviewed } from "./analyses.ts";
 import { Bell, bellProbe, pagePorts } from "./bell.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, send, textOf } from "./http.ts";
@@ -673,9 +692,9 @@ function watchFolder(folder: string, heard: (name: string | null) => void): FSWa
     }
 }
 
-// The current game, the talk before the first, the game in analysis, the profile in use, and what a profile keeps (who plays, their picture, their settings); a folder's name, for a
+// The current game, what the coach wrote on it, the talk before the first, the game in analysis, the profile in use, and what a profile keeps (who plays, their picture, their settings); a folder's name, for a
 // profile made or gone.
-const watched = /^(?:game\.json|talk\.json|analysis\.json|active\.json|profile\.md|settings\.json|avatar\.\w+|[a-z0-9-]+)$/;
+const watched = /^(?:game\.json|coach\.json|talk\.json|analysis\.json|active\.json|profile\.md|settings\.json|avatar\.\w+|[a-z0-9-]+)$/;
 
 /**
  * The game in progress or just ended, as the player may see it: its PGN without the AI's plans while it goes on, the AI's side, when it started, and the
@@ -685,14 +704,16 @@ const watched = /^(?:game\.json|talk\.json|analysis\.json|active\.json|profile\.
 function sendGame(response: ServerResponse, served: Served): void
 {
     try {
+        const folder = gameFolder(served.context.home());
         const current = gameNow(served);
         // With no game the page still shows the talk before the first (D-77).
-        const spoken = current ?? loadTableTalk(gameFolder(served.context.home()));
+        const spoken = current ?? loadTableTalk(folder);
         const heard = heardLines(spoken, served.context.given);
         const talk = spoken.talk.map(({ who, text, ply }, index) => heard[index] === undefined ? { who, text, ply } : { who, text, ply, heard: heard[index] });
         const offer = current === undefined ? undefined : drawOfferOf(current);
+        const coach = coachOn(folder, current);
         const game = current === undefined ? null : {
-            pgn: playerPgn(current),
+            pgn: playerPgn(folder, current),
             ai: current.ai,
             started: current.started,
             talk,
@@ -700,9 +721,10 @@ function sendGame(response: ServerResponse, served: Served): void
             book: bookPlies(current.game.record),
             ...(current.clock === undefined ? {} : { clock: current.clock }),
             ...(offer === undefined ? {} : { drawOffer: offer }),
+            ...(coach === undefined ? {} : { coach }),
         };
         const analysis = current === undefined || endOf(current.game) !== undefined ? analysisShown(served) : undefined;
-        const aiModel = aiModelOf(gameFolder(served.context.home()));
+        const aiModel = aiModelOf(folder);
         const body = {
             game,
             ...(game === null && talk.length > 0 ? { talk } : {}),
@@ -716,6 +738,20 @@ function sendGame(response: ServerResponse, served: Served): void
     } catch (error) {
         send(response, 500, json, JSON.stringify({ error: (error as Error).message }));
     }
+}
+
+/**
+ * What the coach wrote that the player may see now, in a game going on with the helps on (D-88): its judgments, those whose note names a move they may still
+ * play once they have moved, and its hint for the position it was given in; none without anything. Once the game is over its PGN has the judgments.
+ */
+function coachOn(folder: string, current: CurrentGame | undefined): CoachWords | undefined
+{
+    if (current === undefined || endOf(current.game) !== undefined || !helpsIn(folder)) {
+        return undefined;
+    }
+
+    const shown = coachShown(coachWords(folder, current), current);
+    return shown.judgments.length === 0 && shown.hint === undefined ? undefined : shown;
 }
 
 /** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review; none without one, or when it cannot be read. */
