@@ -20,7 +20,7 @@ export const ratingLimits = { lowest: 100, highest: 3500 } as const;
 export const nameLimit = 40;
 
 /** The avatars Zoe drew, for a player without an image of their own (D-45). */
-export const drawnAvatars = ["short-hair", "bun", "glasses", "beanie", "beard", "curls", "cat", "owl"] as const;
+export const drawnAvatars = ["short-hair", "bun", "glasses", "beanie", "beard", "curls", "moustache", "silver-bob", "cat", "owl"] as const;
 export type DrawnAvatar = (typeof drawnAvatars)[number];
 
 /** A rating and where it comes from. */

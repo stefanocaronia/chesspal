@@ -2917,6 +2917,11 @@ button {
     box-shadow: 0 0 0 1px var(--line);
 }
 
+/* A drawn avatar, its colour in the picture: the page's colour while it loads */
+.avatar.drawn {
+    background: var(--say);
+}
+
 .me {
     position: relative;
     flex: none;
@@ -3201,11 +3206,18 @@ button {
     outline-offset: -1px;
 }
 
+/* The drawn avatars: always two rows of five, smaller on a narrow screen (Zoe, T-102) */
 .avatars {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 62px));
+    justify-content: space-between;
     gap: 8px;
     justify-items: center;
+}
+
+.avatars .avatar-choice {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .avatar-choice {
@@ -3238,8 +3250,8 @@ button {
 
 .avatar-choice .avatar {
     display: block;
-    width: 52px;
-    height: 52px;
+    width: 100%;
+    height: auto;
 }
 
 /* The player's own photo: a line of its own under the drawn avatars, at every width */

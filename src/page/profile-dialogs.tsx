@@ -64,7 +64,7 @@ export function NameButton({ profile, onOpen, text }: { profile: Profile; onOpen
     );
 }
 
-/** The change of picture, open while `open`: one of Zoe's avatars, or a photo of the player's, the one they have shown among them. */
+/** The change of picture, open while `open`: one of the drawn avatars, or a photo of the player's, the one they have shown among them. */
 export function PictureDialog({ open, profile, onClose, text }: { open: boolean; profile: Profile; onClose: () => void; text: Text; })
 {
     const [problem, setProblem] = useState<string | undefined>(undefined);

@@ -14,8 +14,8 @@ export const ratingLimits = { lowest: 100, highest: 3500 } as const;
 /** The longest name the server keeps. */
 export const nameLimit = 40;
 
-/** Zoe's avatars, by the ids the server keeps (D-45). */
-export const avatarIds = ["short-hair", "bun", "glasses", "beanie", "beard", "curls", "cat", "owl"] as const;
+/** The drawn avatars, by the ids the server keeps (D-45, T-102). */
+export const avatarIds = ["short-hair", "bun", "glasses", "beanie", "beard", "curls", "moustache", "silver-bob", "cat", "owl"] as const;
 export type AvatarId = (typeof avatarIds)[number];
 
 /** A profile as the server sends it: its id, the player's name, how they play, their rating, a drawn avatar, and their own image's stamp when they have one. */

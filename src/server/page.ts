@@ -113,7 +113,7 @@ const html = [
     "",
 ].join("\n");
 
-const types: Readonly<Record<string, string>> = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8", ".ogg": "audio/ogg" };
+const types: Readonly<Record<string, string>> = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".webp": "image/webp", ".json": "application/json; charset=utf-8", ".ogg": "audio/ogg" };
 
 function answer(request: IncomingMessage, response: ServerResponse, served: Served): void
 {
@@ -755,8 +755,10 @@ function sendFile(response: ServerResponse, path: string): void
         return;
     }
 
-    // A pieces' set loaded again for each piece that moves blanks the pieces drawn from it, at times until the next move (T-88): the browser keeps it an hour.
-    send(response, 200, type, bytes, type === types[".svg"] ? { "Cache-Control": "max-age=3600" } : {});
+    // A pieces' set loaded again for each piece that moves blanks the pieces drawn from it, at times until the next move (T-88): the browser keeps it an hour,
+    // and the drawn avatars too, all at once in the profile's dialog.
+    const kept = type === types[".svg"] || type === types[".webp"];
+    send(response, 200, type, bytes, kept ? { "Cache-Control": "max-age=3600" } : {});
 }
 
 function builtFile(path: string): string | undefined
