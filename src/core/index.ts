@@ -16,6 +16,7 @@ export { bookDepth, bookMoves, indexBook, indexOpenings, inOpenings, openingOf, 
 export type { Opening, OpeningBook, OpeningIndex } from "./openings.ts";
 export { pgnDate, readPgn, writePgn } from "./pgn.ts";
 export type { BishopFacts, CentreSquare, KingFacts, Outpost, PawnFacts, PawnSquare, Phase, Profile, SideProfile } from "./profile.ts";
+export { movesOnly } from "./record.ts";
 export type { Annotation, GameRecord, RecordedMove } from "./record.ts";
 export {
     type AiModel,

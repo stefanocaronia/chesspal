@@ -13,7 +13,7 @@ import type { Text } from "./text.ts";
  * The column, which the player folds with its tab (T-84); under the board, where three columns would leave the board small, always open. A game in analysis
  * (D-69) says above the moves that the AI is going over it, until its word on the whole game comes, which the talk shows.
  */
-export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, helps, analysis, shownPlies, onShow, onStep, onDownload, onAnalyse, text }: {
+export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, helps, analysis, shownPlies, onShow, onStep, onDownload, onSaveMoves, onAnalyse, text }: {
     plies: readonly Ply[];
     result?: string;
     how?: HowEnded;
@@ -32,6 +32,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     onStep: (step: Step) => void;
     /** In analysis (T-106): saves the game with its review as a PGN. */
     onDownload?: () => void;
+    /** Saves the moves alone as a PGN, for Lichess or chess.com (T-59). */
+    onSaveMoves?: () => void;
     /** Once the game is over: opens it in analysis, also from the table set for the next (D-77). */
     onAnalyse?: () => void;
     text: Text;
@@ -51,14 +53,10 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                         <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} text={text} />
                         {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
                         {helps}
-                        {onDownload === undefined ? null : (
+                        {onDownload === undefined && onSaveMoves === undefined ? null : (
                             <div class="card analysis-actions">
-                                <button type="button" onClick={onDownload}>
-                                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M12 4V15M7 10L12 15L17 10M5 19H19" />
-                                    </svg>
-                                    {text.study.download}
-                                </button>
+                                {onDownload === undefined ? null : <SaveButton label={text.study.download} onSave={onDownload} />}
+                                {onSaveMoves === undefined ? null : <SaveButton label={text.saveMoves} onSave={onSaveMoves} />}
                             </div>
                         )}
                         {onAnalyse === undefined ? null : <AnalyseButton label={text.study.analyseIt} onAnalyse={onAnalyse} />}
@@ -73,6 +71,19 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                     </>
                 )}
         </aside>
+    );
+}
+
+/** A button that saves the game as a file in the player's downloads. */
+function SaveButton({ label, onSave }: { label: string; onSave: () => void; })
+{
+    return (
+        <button type="button" onClick={onSave}>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4V15M7 10L12 15L17 10M5 19H19" />
+            </svg>
+            {label}
+        </button>
     );
 }
 

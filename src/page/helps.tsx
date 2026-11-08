@@ -1,7 +1,8 @@
 // The helps on the page (D-78, Zoe's sketch B): the board says where, the card says what, the facts the AI sees at the game's level and only those.
+import { Fragment } from "preact";
 import { useState } from "preact/hooks";
 import type { PieceFacts, Profile, Side } from "../core/index.ts";
-import { type HelpsView, type StrategyCell, strategyOf } from "./helps-view.ts";
+import { type HelpsView, type StrategyCell, strategyOf, type StrategyRow } from "./helps-view.ts";
 import { Figurines } from "./move-list.tsx";
 import { Figurine } from "./pieces.tsx";
 import type { HelpsCardText, Text } from "./text.ts";
@@ -163,6 +164,8 @@ function Strategy({ profile, text }: { profile: Profile; text: Text; })
     const words = text.helpsCard;
     const files = profile.openFiles.length === 0 ? "–" : profile.openFiles.join(", ");
     const { draw, pawnEnding } = profile;
+    // A name's meaning shows under its line at a click or a tap, since a phone has no pointer for the title (Rosa, T-117).
+    const [explained, setExplained] = useState<StrategyRow | undefined>(undefined);
     const notes = [
         words.openFiles(files),
         words.controlled(profile.controlled.white, profile.controlled.black, profile.controlled.contested),
@@ -188,12 +191,26 @@ function Strategy({ profile, text }: { profile: Profile; text: Text; })
                 <tbody>
                     {strategyOf(profile).map((line) => {
                         const [name, meaning] = words.rows[line.row];
+                        const open = explained === line.row;
                         return (
-                            <tr key={line.row}>
-                                <th title={meaning}>{name}</th>
-                                <td>{cellText(line.white, words)}</td>
-                                <td>{cellText(line.black, words)}</td>
-                            </tr>
+                            <Fragment key={line.row}>
+                                <tr>
+                                    <th>
+                                        <button type="button" class="term" title={meaning} aria-expanded={open} onClick={() => setExplained(open ? undefined : line.row)}>
+                                            {name}
+                                        </button>
+                                    </th>
+                                    <td>{cellText(line.white, words)}</td>
+                                    <td>{cellText(line.black, words)}</td>
+                                </tr>
+                                {open
+                                    ? (
+                                        <tr class="meaning">
+                                            <td colSpan={3}>{meaning}</td>
+                                        </tr>
+                                    )
+                                    : null}
+                            </Fragment>
                         );
                     })}
                 </tbody>

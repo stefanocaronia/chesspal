@@ -410,6 +410,7 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, badge, d
                             >
                                 {column === 0 ? <span class="coordinate rank">{rank}</span> : null}
                                 {row === 7 ? <span class="coordinate file">{file}</span> : null}
+                                <span class="square-name" aria-hidden="true">{square}</span>
                                 {motion.taken?.square === square
                                     ? (
                                         <span key={`taken ${fen}`} class="taken-piece">

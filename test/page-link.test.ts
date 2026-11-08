@@ -85,6 +85,16 @@ describe("the board page's address for a player who has not opened it", () => {
         expect(mate).not.toContain("invite the player");
     });
 
+    it("invites a resumed chat once a game too, though its first move came before any tool showed it the game (T-129)", async () => {
+        const folder = playerFolder();
+        await said(newGame, { ai_colour: "black", from: start }, testContext(folder));
+        const resumed: Context = { ...testContext(folder), page: url, pageOpen: () => false, told: new Set(), positionSeen: null };
+
+        expect(await said(playerMove, { move: "e4" }, resumed)).toContain("invite the player");
+        await said(aiMove, { move: "e5", plan: "Hold the centre." }, resumed);
+        expect(await said(playerMove, { move: "Nf3" }, resumed)).not.toContain("invite the player");
+    });
+
     it("never asks on the command line, where no page is served", async () => {
         expect(await said(status, {}, testContext(playerFolder()))).not.toContain("Board page");
     });

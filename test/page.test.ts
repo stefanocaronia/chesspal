@@ -225,7 +225,7 @@ describe("the player's moves on the page", () => {
         expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain("1. e4 e5 *");
     });
 
-    it("refuses a chat's words or game replaced on a game it was never shown, and its moves before any tool showed it the game (D-71)", async () => {
+    it("refuses a chat's words or game replaced on a game it was never shown, and its own decisions before any tool showed it the game, not the player's move (D-71)", async () => {
         const folder = playerFolder();
         const [chat, other] = [testContext(folder), testContext(folder)];
         await run(folder, "new_game", { ai_colour: "white" }, chat);
@@ -235,11 +235,13 @@ describe("the player's moves on the page", () => {
 
         await expect(run(folder, "ai_say", { text: "Nice bishop." }, other)).rejects.toThrow(changed);
         await expect(run(folder, "new_game", { ai_colour: "black", replace: true }, other)).rejects.toThrow(changed);
-        // A chat whose server has just started was shown no game: it reads one first, as a resumed chat must.
+        // A chat whose server has just started, as a resumed one, was shown no game: it decides nothing before a tool shows it the game, but plays the player's
+        // move, whose answer shows it (T-129).
         const fresh = { ...testContext(folder), positionSeen: null };
-        await expect(run(folder, "player_move", { move: "d4" }, fresh)).rejects.toThrow(changed);
-        await run(folder, "status", {}, fresh);
+        await expect(run(folder, "end_game", { result: "ai_resigns" }, fresh)).rejects.toThrow(changed);
+        await expect(run(folder, "ai_say", { text: "Hello." }, fresh)).rejects.toThrow(changed);
         await run(folder, "player_move", { move: "d4" }, fresh);
+        await run(folder, "ai_move", { move: "d5", plan: "A plan." }, fresh);
     });
 
     it("starts a new game with the sides of the game before, the one going on archived", async () => {

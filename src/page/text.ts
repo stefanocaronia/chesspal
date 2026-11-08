@@ -52,6 +52,8 @@ export interface Text
     /** The buttons that step through the moves (T-88). */
     readonly steps: Readonly<Record<Step, string>>;
     readonly noGame: string;
+    /** The button that saves the moves alone as a PGN, for Lichess or chess.com (T-59). */
+    readonly saveMoves: string;
     /** The header's word between games, on the table set for the next (D-77). */
     readonly noGameNow: string;
     /** A game the AI goes over with the player (D-69): what the header says, the badges it puts on the moves, and its word on the whole game. */
@@ -345,6 +347,7 @@ const english: Text = {
     moves: "Moves",
     steps: { first: "Start", back: "Previous move", forward: "Next move", last: "Back to the game" },
     noGame: "No game yet: press + to start one, or ask for one in the chat.",
+    saveMoves: "Save the moves (PGN)",
     noGameNow: "No game in progress",
     analysing: "Analysis in progress",
     badges: {
@@ -607,6 +610,7 @@ const italian: Text = {
     moves: "Mosse",
     steps: { first: "Inizio", back: "Mossa precedente", forward: "Mossa successiva", last: "Torna alla partita" },
     noGame: "Nessuna partita: premi + per iniziarne una, o chiedila nella chat.",
+    saveMoves: "Scarica le mosse (PGN)",
     noGameNow: "Nessuna partita in corso",
     analysing: "Analisi in corso",
     badges: {

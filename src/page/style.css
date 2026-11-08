@@ -53,6 +53,8 @@
     --gap: 20px;
     --left: 300px;
     --right: 300px;
+    /* The board's least size beside the talk: room for the AI's words, the box and both cards; a lower window scrolls (T-103) */
+    --least: 440px;
     --tab: 16px;
     --rail: 56px;
     --coin: 40px;
@@ -320,8 +322,7 @@ button {
     padding: var(--between) var(--gap);
     grid-template-columns: var(--left-now) auto var(--right-now);
     transition: grid-template-columns 200ms cubic-bezier(0.2, 0, 0, 1);
-    /* The talk keeps room for the AI's words, the box and both cards, however small the board. */
-    grid-template-rows: auto minmax(440px, auto);
+    grid-template-rows: auto minmax(var(--least), auto);
     grid-template-areas: ". head ." "talk board side";
     justify-content: center;
 }
@@ -364,7 +365,7 @@ button {
     position: relative;
     /* 12.5cqw is a square, for the lifted piece too */
     container-type: inline-size;
-    width: min(calc(100vw - var(--left-now) - var(--right-now) - 2 * var(--gap) - 2 * var(--between)), calc(100vh - var(--bar) - 3 * var(--between)));
+    width: min(calc(100vw - var(--left-now) - var(--right-now) - 2 * var(--gap) - 2 * var(--between)), max(var(--least), calc(100vh - var(--bar) - 3 * var(--between))));
     transition: width 200ms cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -1190,12 +1191,45 @@ button {
     bottom: 2.5%;
 }
 
-.square.light .coordinate {
+.square.light .coordinate,
+.square.light .square-name {
     color: var(--dark-square);
 }
 
-.square.dark .coordinate {
+.square.dark .coordinate,
+.square.dark .square-name {
     color: var(--light-square);
+}
+
+/* The square's name in the corner of the file, under the pointer or the piece dragged, in its place on the bottom rank (T-76) */
+.square-name {
+    position: absolute;
+    right: 4%;
+    bottom: 2.5%;
+    z-index: 2;
+    display: none;
+    font-size: clamp(9px, 1.6cqw, 13px);
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.square.over .square-name {
+    display: block;
+}
+
+.square.over .coordinate.file {
+    visibility: hidden;
+}
+
+@media (hover: hover) {
+    .square:hover .square-name {
+        display: block;
+    }
+
+    .square:hover .coordinate.file {
+        visibility: hidden;
+    }
 }
 
 .square .piece {
@@ -3819,14 +3853,14 @@ button {
     .app.folded {
         --right-now: 0px;
         grid-template-columns: var(--left-now) auto;
-        grid-template-rows: auto minmax(440px, auto) auto;
+        grid-template-rows: auto minmax(var(--least), auto) auto;
         grid-template-areas: ". head" "talk board" ". side";
         /* The page scrolls here: the board measures the page without its scroll bar */
         container-type: inline-size;
     }
 
     .board-wrap {
-        width: min(calc(100cqw - var(--left-now) - var(--between)), calc(100vh - var(--bar) - 3 * var(--between)));
+        width: min(calc(100cqw - var(--left-now) - var(--between)), max(var(--least), calc(100vh - var(--bar) - 3 * var(--between))));
     }
 
     .side,
@@ -4334,11 +4368,27 @@ button {
     border-top: 1px solid var(--line);
 }
 
-/* A term with its meaning under the pointer (Rosa). */
-.profile-table tbody th[title] {
+/* A term with its meaning under the pointer, and under its line at a click or a tap (Rosa, T-117). */
+.profile-table .term {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
     text-decoration: underline dotted color-mix(in srgb, var(--soft) 60%, transparent);
     text-underline-offset: 3px;
     cursor: help;
+}
+
+.profile-table tbody tr.meaning {
+    border-top: 0;
+}
+
+.profile-table tr.meaning td {
+    padding-bottom: 4px;
+    font-size: 12px;
+    font-style: italic;
 }
 
 .profile-foot {

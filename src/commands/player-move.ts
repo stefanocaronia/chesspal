@@ -2,7 +2,7 @@ import { z } from "zod";
 import { gameFolder, notationIn } from "../profiles/index.ts";
 import { closingLines, lastMoveText, moveLines, type MovePlayed, withWritten } from "./game-summary.ts";
 import { inviteLine, pageInvite } from "./page-link.ts";
-import { playMove, refuseUnseenPosition } from "./play-move.ts";
+import { playMove, positionIn, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
 import { newWords } from "./say.ts";
 
@@ -21,7 +21,13 @@ export const playerMove = defineCommand({
     positionals: ["move"],
     run: ({ move, offer_draw: offerDraw = false }, context): PlayerMove => {
         const folder = gameFolder(context.home());
-        refuseUnseenPosition(context, folder);
+
+        // A chat that has seen no game yet, new or resumed, plays the player's own move: its answer shows the game the AI decides on (D-71, T-129).
+        if (context.positionSeen !== null) {
+            refuseUnseenPosition(context, folder);
+        }
+
+        const started = context.positionSeen === null ? positionIn(folder).started : context.positionSeen?.started;
         const notation = notationIn(folder, context.language);
         const played = playMove(folder, context.now(), "player", move, (message) => `${message} Ask the player for another move. Nothing changed.`, {
             allowance: chatAllowance,
@@ -29,7 +35,7 @@ export const playerMove = defineCommand({
             notation,
         });
         // A game over by this move has no more moves to play there: the next game's window gives the address (Federico, round of D-85).
-        const invite = played.game.end === undefined ? pageInvite(context, context.positionSeen?.started) : undefined;
+        const invite = played.game.end === undefined ? pageInvite(context, started) : undefined;
         return { ...withWritten({ ...played, words: newWords(context) }, notation), ...(invite === undefined ? {} : { invite }) };
     },
     format: (result) =>

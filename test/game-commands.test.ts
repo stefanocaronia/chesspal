@@ -436,6 +436,19 @@ describe("a game in chat", () => {
         expect(await run(context, "export", { format: "pgn" })).toContain("[%plan The queen's gambit.]");
     });
 
+    it("exports the moves alone, without comments or plans, for Lichess or chess.com (T-59)", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "white" });
+        await run(context, "ai_move", { move: "d4", plan: "The queen's gambit.", comment: "Into the centre." });
+        await run(context, "end_game", { result: "ai_resigns" });
+
+        const moves = await run(context, "export", { format: "moves" });
+        expect(moves).toContain('[Result "0-1"]');
+        expect(moves).toContain("[Termination ");
+        expect(moves).toMatch(/\n\n1\. d4 0-1\n$/);
+        expect(moves).not.toContain("{");
+    });
+
     it("reads the game again when another process changed it, and never overwrites a game.json it cannot read", async () => {
         const context = playerFolder();
         const path = join(gameFolder(context.home()), "game.json");

@@ -13,6 +13,7 @@ import {
     materialOf,
     type Mood,
     moodAt,
+    movesOnly,
     openingOf,
     type PieceLetter,
     type Promotion,
@@ -21,6 +22,7 @@ import {
     type Square,
     suggestedLevel,
     timeControlText,
+    writePgn,
 } from "../core/index.ts";
 import { PlayerPicture } from "./avatars.tsx";
 import { BadgeCounts } from "./badges.tsx";
@@ -705,7 +707,8 @@ export function App({ start }: { start: Settings; })
                         shownPlies={at}
                         onShow={goTo}
                         onStep={step}
-                        {...(studied === undefined ? {} : { onDownload: () => download(studied.pgn, pgnName(live.record.tags)) })}
+                        {...(studied === undefined ? {} : { onDownload: () => download(studied.pgn, pgnName(live.record.tags, "analysis")) })}
+                        {...(total === 0 ? {} : { onSaveMoves: () => download(writePgn(movesOnly(live.record)), pgnName(live.record.tags)) })}
                         {...(between && game !== null ? { onAnalyse: () => void studyGame({ last: true }) } : {})}
                         text={text}
                     />
@@ -985,7 +988,7 @@ async function post(path: string, body: object, text: Text, name: string): Promi
     }
 }
 
-/** Saves a game in analysis with its review as a PGN file in the player's downloads (T-106): the board page loads it back ready. */
+/** Saves a PGN file in the player's downloads: a game in analysis with its review, which the board page loads back ready (T-106), or the moves alone (T-59). */
 function download(pgn: string, name: string): void
 {
     const link = document.createElement("a");
@@ -995,11 +998,11 @@ function download(pgn: string, name: string): void
     URL.revokeObjectURL(link.href);
 }
 
-/** The file's name from the game's tags: Ann-Bob-2026.11.02-analysis.pgn, without characters a file's name cannot hold. */
-function pgnName(tags: Readonly<Record<string, string>>): string
+/** The file's name from the game's tags and what it holds: Ann-Bob-2026.11.02-analysis.pgn, without characters a file's name cannot hold. */
+function pgnName(tags: Readonly<Record<string, string>>, kind?: string): string
 {
-    const parts = [tags.White, tags.Black, tags.Date?.includes("?") === true ? undefined : tags.Date].filter((part) => part !== undefined && part !== "");
-    return `${[...parts, "analysis"].join("-").replace(/[\\/:*?"<>|\s]+/g, "_")}.pgn`;
+    const parts = [tags.White, tags.Black, tags.Date?.includes("?") === true ? undefined : tags.Date, kind].filter((part) => part !== undefined && part !== "");
+    return `${(parts.length === 0 ? ["game"] : parts).join("-").replace(/[\\/:*?"<>|\s]+/g, "_")}.pgn`;
 }
 
 /** The game with the player's move played on a copy, for the board to show before the server answers; the game itself when the move is not legal. */

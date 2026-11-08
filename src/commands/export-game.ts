@@ -1,21 +1,23 @@
 import { z } from "zod";
-import { playerPgn } from "../games/index.ts";
+import { movesPgn, playerPgn } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import { defineCommand } from "./registry.ts";
 
 interface Exported
 {
-    format: "pgn" | "fen";
+    format: "pgn" | "moves" | "fen";
     text: string;
 }
 
-/** The game as PGN or its position as FEN, for the player to copy or keep: the plans stay hidden while it goes on (D-29). */
+/** The game as PGN or its position as FEN, for the player to copy or keep: the plans stay hidden while it goes on (D-29); the moves alone for another site (T-59). */
 export const exportGame = defineCommand({
     name: "export",
-    description: "Gives the game as PGN, or its position as FEN, for the player to copy or keep. While the game goes on, the PGN leaves out your plans. "
-        + 'Example: export {format: "pgn"}.',
-    input: z.object({ format: z.enum(["pgn", "fen"]).describe("pgn for the whole game, fen for the position") }),
+    description: "Gives the game as PGN, its moves alone as PGN for Lichess or chess.com, or its position as FEN, for the player to copy or keep. While the game goes on, "
+        + 'the PGN leaves out your plans. Example: export {format: "moves"}.',
+    input: z.object({
+        format: z.enum(["pgn", "moves", "fen"]).describe("pgn for the whole game with its comments, moves for the moves alone, to load on Lichess or chess.com, fen for the position"),
+    }),
     // Read only for the host: a flag that has fallen is written, as the time already decided.
     readOnly: true,
     positionals: ["format"],
@@ -26,7 +28,8 @@ export const exportGame = defineCommand({
             throw new Error("There is no game to export: start one with new_game.");
         }
 
-        return { format, text: format === "fen" ? current.game.position.fen : playerPgn(current) };
+        const text = format === "fen" ? current.game.position.fen : format === "moves" ? movesPgn(current) : playerPgn(current);
+        return { format, text };
     },
     format: (result) => result.text,
 });
