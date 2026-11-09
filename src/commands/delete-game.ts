@@ -1,6 +1,6 @@
 // A game deleted from a profile (D-92): played here or kept to study, with its review. Only the command line and the page delete, never the AI.
 import { z } from "zod";
-import { archiveName, deleteGame as deleteGameFile, endAnalysis, endOf, gameInAnalysis, listedName, loadGame, removeGame } from "../games/index.ts";
+import { deleteGame as deleteGameFile, endAnalysis, gameInAnalysis, isOverOnTable, listedName, removeGame } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { defineCommand } from "./registry.ts";
 
@@ -16,16 +16,15 @@ export const deleteGame = defineCommand({
     run: ({ game }, context): { deleted: string; } => {
         const folder = gameFolder(context.home());
         const name = listedName(folder, game);
+        // Asked before deleting, so that nothing fails halfway: the game over still on the table would go back to the archive with the next game.
+        const onTable = isOverOnTable(folder, name);
         deleteGameFile(folder, name);
 
         if (gameInAnalysis(folder)?.game === name) {
             endAnalysis(folder);
         }
 
-        // The game over still on the table would go back to the archive with the next game.
-        const current = loadGame(folder);
-
-        if (current !== undefined && endOf(current.game) !== undefined && archiveName(current) === name) {
+        if (onTable) {
             removeGame(folder);
         }
 

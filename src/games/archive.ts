@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { type GameRecord, movesOnly, pgnDate, readPgn, withAiModel, writePgn } from "../core/index.ts";
 import { aiModelOf } from "./ai-model.ts";
 import { coachWords, withCoach } from "./coach.ts";
-import { type CurrentGame, endOf } from "./current-game.ts";
+import { type CurrentGame, endOf, loadGame } from "./current-game.ts";
 import { makeFolder, writeAtomically } from "./files.ts";
 import { withoutPlans } from "./plans.ts";
 
@@ -12,6 +12,17 @@ import { withoutPlans } from "./plans.ts";
 export function archiveName(current: CurrentGame): string
 {
     return nameAt(new Date(current.started));
+}
+
+/** Whether the game over still in game.json is this one of the archive, named as listed; a game.json Chesspal cannot read is no game. */
+export function isOverOnTable(folder: string, name: string): boolean
+{
+    try {
+        const current = loadGame(folder);
+        return current !== undefined && endOf(current.game) !== undefined && archiveName(current) === name;
+    } catch {
+        return false;
+    }
 }
 
 /**

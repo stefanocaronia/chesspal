@@ -558,7 +558,7 @@
     font-weight: 700;
 }
 
-/* Squares and files in chips, a count in bold, a yes as a green tick, nothing as a faint dash */
+/* Squares and files in chips, a count in bold, a yes as a green tick, nothing as a faint dash, no more as a faint cross */
 .strategy .chip {
     display: inline-block;
     margin: 1px 3px 1px 0;
@@ -579,9 +579,19 @@
     opacity: 0.5;
 }
 
-.strategy .yes {
+.strategy .yes,
+.strategy .no {
     display: inline-grid;
     vertical-align: -3px;
+}
+
+.strategy .no svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: var(--soft);
+    stroke-width: 2;
+    stroke-linecap: round;
 }
 
 .strategy .yes svg {

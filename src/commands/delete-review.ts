@@ -2,7 +2,7 @@
 // delete, never the AI.
 import { z } from "zod";
 import { isReviewed, unreviewed } from "../core/index.ts";
-import { gameInAnalysis, rewriteGame, startAnalysis } from "../games/index.ts";
+import { forgetCoach, gameInAnalysis, isOverOnTable, rewriteGame, startAnalysis } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { defineCommand } from "./registry.ts";
 import { namedGame } from "./study.ts";
@@ -21,6 +21,11 @@ export const deleteReview = defineCommand({
         const folder = gameFolder(context.home());
         const { record, name } = namedGame(context, game);
         rewriteGame(folder, name, unreviewed(record));
+
+        // The coach's judgments on the game just over would go back into it.
+        if (isOverOnTable(folder, name)) {
+            forgetCoach(folder);
+        }
 
         // The page showing the game hears of it, and shows it without its review.
         if (gameInAnalysis(folder)?.game === name) {

@@ -155,6 +155,25 @@ describe("the page's server", () => {
         expect(await post(page, "/api/study", { game: "study/2026-01-01-000000.pgn" })).toMatchObject({ status: 400 });
     });
 
+    it("deletes a game's review, then the game, as the command line does (D-92)", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const kept = "study/2026-11-02-153012.pgn";
+        await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' });
+        await run(folder, "annotate_game", { notes: [{ move: "2.", badge: "inaccuracy", note: "early queen" }], summary: "A quiet start." });
+
+        for (const route of ["/api/delete-review", "/api/delete-game"]) {
+            expect(await post(page, route, {})).toMatchObject({ status: 400, body: expect.stringContaining("Send the game as JSON") });
+            expect(await post(page, route, { game: "../../etc/passwd" })).toMatchObject({ status: 409 });
+        }
+
+        expect(await post(page, "/api/delete-review", { game: kept })).toMatchObject({ status: 200, body: `{"game":"${kept}","reviewed":true}` });
+        expect(JSON.parse((await get(page, "/api/analyses")).body)).toMatchObject([{ name: kept, reviewed: false }]);
+        expect(await post(page, "/api/delete-game", { game: kept })).toMatchObject({ status: 200, body: `{"deleted":"${kept}"}` });
+        expect(JSON.parse((await get(page, "/api/analyses")).body)).toEqual([]);
+        expect(await post(page, "/api/delete-game", { game: kept })).toMatchObject({ status: 409, body: expect.stringContaining("There is no") });
+    });
+
     it("lists the games played, reviewed or not, and opens the one just over for the chat to go over", async () => {
         const folder = playerFolder();
         const page = await open(folder);

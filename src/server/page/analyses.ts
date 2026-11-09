@@ -26,13 +26,13 @@ export interface AnalysisItem
     readonly site?: string;
 }
 
-/** The games to analyse in the profile in use, the latest 20: those kept to study and those played, reviewed or not. */
+/** The games to analyse in the profile in use, the latest first, all of them for the page's search: those kept to study and those played, reviewed or not. */
 export function analysesOf(home: string): AnalysisItem[]
 {
     const folder = gameFolder(home);
     // By the time in their names, which orders kept and played games together.
     const stamp = (name: string): string => gameStemOf(name) ?? "";
-    const names = [...keptGames(folder), ...archivedGames(folder)].sort((one, other) => stamp(other).localeCompare(stamp(one))).slice(0, shown);
+    const names = [...keptGames(folder), ...archivedGames(folder)].sort((one, other) => stamp(other).localeCompare(stamp(one)));
     return names.flatMap((name) => itemOf(name, () => name.startsWith("study/") ? keptGame(folder, name) : archivedGame(folder, name)));
 }
 
@@ -63,9 +63,6 @@ export function answerAnalyses(request: IncomingMessage, response: ServerRespons
 }
 
 const deletions: Readonly<Record<string, typeof deleteGame | typeof deleteReview>> = { "/api/delete-game": deleteGame, "/api/delete-review": deleteReview };
-
-// Enough for now; a longer list would load more as it scrolls.
-const shown = 20;
 
 function itemOf(name: string, read: () => GameRecord): AnalysisItem[]
 {

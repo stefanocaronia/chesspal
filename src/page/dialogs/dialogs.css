@@ -456,6 +456,51 @@ h3 + .switch {
 
 /* The analyses (D-92): the row that loads a game, dashed, then a row for each game, its result on a tile, who played, when, the opening and how long, who
    reviewed it, and the score with how it went for the player; the menu of each row, and the question a row asks in its place (Zoe) */
+/* The analyses' dialog scrolls with the wheel or a finger, without a scrollbar (Stefano) */
+.dialog:has(> .analyses) {
+    scrollbar-width: none;
+}
+
+.dialog:has(> .analyses)::-webkit-scrollbar {
+    display: none;
+}
+
+/* The search over the analyses, a magnifier in the field */
+.analyses .search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--page);
+    color: var(--soft);
+}
+
+.analyses .search:focus-within {
+    border-color: var(--accent);
+}
+
+.analyses .search input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 0;
+    border: 0;
+    outline: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+}
+
+.analyses > .none {
+    margin: 12px 0;
+    color: var(--soft);
+    font-size: 14px;
+    text-align: center;
+}
+
 .load-row {
     display: flex;
     align-items: center;
@@ -653,14 +698,17 @@ h3 + .switch {
     color: var(--ink);
 }
 
+/* Over the dialog in the browser's top layer, placed by its button */
 .row-menu {
-    position: absolute;
-    z-index: 3;
-    top: calc(100% - 6px);
-    right: 6px;
+    position: fixed;
+    inset: auto;
     display: grid;
     min-width: 230px;
+    max-width: calc(100vw - 16px);
+    margin: 0;
     padding: 6px;
+    overflow: visible;
+    color: var(--ink);
     border: 1px solid var(--line);
     border-radius: 10px;
     background: var(--card);
@@ -780,11 +828,6 @@ h3 + .switch {
     .analyses .score {
         min-width: 40px;
         padding-right: 0;
-    }
-
-    .row-menu {
-        left: 40px;
-        min-width: 0;
     }
 
     .analyses .ask {

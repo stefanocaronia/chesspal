@@ -219,6 +219,9 @@ export interface StudyText
     readonly yours: string;
     readonly bring: string;
     readonly bringNote: string;
+    /** The search's hint, and what it says when it finds none. */
+    readonly search: string;
+    readonly noMatch: string;
     readonly reviewed: string;
     readonly unreviewed: string;
     moves(count: number): string;
@@ -568,6 +571,8 @@ const english: Text = {
         yours: "Your analyses",
         bring: "Load a game",
         bringNote: "a PGN played elsewhere, pasted or from a file",
+        search: "Names, models, openings…",
+        noMatch: "No game found",
         reviewed: "reviewed",
         unreviewed: "to review",
         moves: (count) => `${count} ${count === 1 ? "move" : "moves"}`,
@@ -643,7 +648,7 @@ const english: Text = {
             bishopPair: ["Bishop pair", "Both bishops still on the board."],
             space: ["Space (squares in the enemy's half)", "How many squares of the enemy's half one's pieces attack."],
             undeveloped: ["Minor pieces not developed", "Knights and bishops still on their first squares."],
-            castled: ["Castling", "How it castled; not yet while it still can, no more once the king or the rooks have moved."],
+            castled: ["Castling", "How it castled; a dash while it still can, a cross once the king or the rooks have moved."],
             kingAttacks: ["Enemy attacks around the king", "How many enemy attacks fall on the squares next to the king."],
         },
         groups: { pawns: "Pawns", pieces: "Pieces", king: "King" },
@@ -888,6 +893,8 @@ const italian: Text = {
         yours: "Le tue analisi",
         bring: "Carica una partita",
         bringNote: "un PGN giocato altrove, incollato o da file",
+        search: "Nomi, modelli, aperture…",
+        noMatch: "Nessuna partita trovata",
         reviewed: "commentata",
         unreviewed: "da commentare",
         moves: (count) => `${count} ${count === 1 ? "mossa" : "mosse"}`,
@@ -963,7 +970,7 @@ const italian: Text = {
             bishopPair: ["Coppia degli alfieri", "Tutti e due gli alfieri ancora sulla scacchiera."],
             space: ["Spazio (case nella metà avversaria)", "Quante case della metà avversaria attaccano i propri pezzi."],
             undeveloped: ["Pezzi minori non sviluppati", "Cavalli e alfieri ancora sulle case di partenza."],
-            castled: ["Arrocco", "Come ha arroccato; non ancora finché può farlo, non più quando il re o le torri si sono già mossi."],
+            castled: ["Arrocco", "Come ha arroccato; un trattino finché può ancora farlo, una croce quando il re o le torri si sono già mossi."],
             kingAttacks: ["Attacchi nemici attorno al re", "Quanti attacchi nemici cadono sulle case accanto al re."],
         },
         groups: { pawns: "Pedoni", pieces: "Pezzi", king: "Re" },

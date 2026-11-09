@@ -13,6 +13,7 @@ export {
     deleteGame,
     gameStemOf,
     isGameName,
+    isOverOnTable,
     keepToStudy,
     keptGame,
     keptGames,
@@ -23,7 +24,7 @@ export {
     startOfNewGame,
 } from "./archive.ts";
 export { type ChatStart, cleanSince, lastChatStart, saveChatStart } from "./chat-start.ts";
-export { type CoachHint, type CoachJudgment, type CoachLead, coachShown, coachStarted, coachWaitingSince, type CoachWords, coachWords, keepHint, keepJudgment, keepLead, startCoach, withCoach } from "./coach.ts";
+export { type CoachHint, type CoachJudgment, type CoachLead, coachShown, coachStarted, coachWaitingSince, type CoachWords, coachWords, forgetCoach, keepHint, keepJudgment, keepLead, startCoach, withCoach } from "./coach.ts";
 export { bothSidesMoved, type CurrentGame, drawOfferOf, endOf, type GameEnd, gameStamp, loadGame, removeGame, saveGame, type Speaker, type TalkLine } from "./current-game.ts";
 export { makeFolder, renameOver, writeAtomically } from "./files.ts";
 export { commentWithPlan, currentPlan, planOf, withoutPlans } from "./plans.ts";

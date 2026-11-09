@@ -560,7 +560,7 @@ function Chips({ items }: { items: readonly string[]; })
     return items.length === 0 ? <span class="none">–</span> : <>{items.map((item) => <b key={item} class="chip">{item}</b>)}</>;
 }
 
-/** A cell of the strategy (Stefano): how many squares, files or islands, a count in bold, a yes as a tick, nothing as a faint dash. */
+/** A cell of the strategy (Stefano): a count in bold, a yes as a tick, nothing or not yet as a faint dash, no more as a faint cross: marks, not words. */
 function Cell({ cell, words }: { cell: StrategyCell; words: HelpsCardText; })
 {
     const none = <span class="none">–</span>;
@@ -589,5 +589,17 @@ function Cell({ cell, words }: { cell: StrategyCell; words: HelpsCardText; })
         return none;
     }
 
-    return cell === "not-yet" || cell === "no-more" ? <span class="soft">{cell === "not-yet" ? words.notYet : words.noMore}</span> : <b class="chip">{cell}</b>;
+    if (cell === "not-yet") {
+        return <span class="none" role="img" aria-label={words.notYet} title={words.notYet}>–</span>;
+    }
+
+    return cell === "no-more"
+        ? (
+            <span class="no" role="img" aria-label={words.noMore} title={words.noMore}>
+                <svg viewBox="0 0 16 16">
+                    <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
+                </svg>
+            </span>
+        )
+        : <b class="chip">{cell}</b>;
 }

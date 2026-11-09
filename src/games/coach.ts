@@ -1,6 +1,6 @@
 // What the coach writes during a game with the helps on (D-88): its judgments of the player's moves, its hint for their turn and who it sees ahead (D-90),
 // in coach.json beside game.json, where no command of the opponent's reads them; the judgments and the leads go into the game's PGN once it is over.
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { type Badge, badges, type DrawColour, type DrawnArrow, type DrawnSquare, Game, type GameRecord, type Lead, leadOf, leadText, readLead, type RecordedMove, reviewed, reviewOf, withLead } from "../core/index.ts";
@@ -107,6 +107,12 @@ export function startCoach(folder: string, current: CurrentGame): boolean
 
     write(folder, { ...kept, begun: plies });
     return true;
+}
+
+/** Forgets the coach's words on the game over, when its review is deleted (D-92): they would go back into its PGN. */
+export function forgetCoach(folder: string): void
+{
+    rmSync(join(folder, fileName), { force: true });
 }
 
 /**

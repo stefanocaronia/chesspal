@@ -105,7 +105,7 @@ export function reviewed(move: RecordedMove, review: MoveReview): RecordedMove
 
 /**
  * The record without the AI's review (D-92): the badges with the NAGs they wrote, the notes, drawings and estimates of who is ahead on the moves, the word on
- * the game and who signed it. What the comments held besides stays, as do the NAGs of moves without a badge.
+ * the game and who signed it. What the comments held besides stays, as do the NAGs of moves without a badge and the Annotator of a game it never reviewed.
  */
 export function unreviewed(record: GameRecord): GameRecord
 {
@@ -114,7 +114,9 @@ export function unreviewed(record: GameRecord): GameRecord
         return recordedMove(move.san, nags, withoutReview(move.comment).replace(/\s*\[%lead [^\]]*\]/g, "").trim());
     });
     const comment = withoutReview(record.comment);
-    const tags = Object.fromEntries(Object.entries(record.tags).filter(([name]) => name !== "Annotator" && name !== effortTag));
+    // The signature is the AI's only on a game it reviewed: a game from elsewhere keeps its own Annotator.
+    const signedByAi = isReviewed(record) || record.moves.some((move) => reviewMark.test(move.comment ?? ""));
+    const tags = signedByAi ? Object.fromEntries(Object.entries(record.tags).filter(([name]) => name !== "Annotator" && name !== effortTag)) : record.tags;
     return comment === "" ? { tags, moves } : { tags, comment, moves };
 }
 
@@ -201,6 +203,7 @@ const judgmentNags = new Set([1, 2, 3, 4, 5, 6]);
 // The badges PGN has a NAG for: !! ! ?! ? ??.
 const nagOfBadge: Partial<Record<Badge, number>> = { brilliant: 3, great: 1, inaccuracy: 6, mistake: 2, blunder: 4 };
 const badgePattern = /\[%badge (\w+)\]/;
+const reviewMark = /\[%(badge|review) /;
 const notePattern = /\[%review ([^\]]*)\]/;
 const closingPattern = /\[%closing ([^\]]*)\]/;
 const arrowPattern = /\[%cal ([^\]]*)\]/;
