@@ -1213,12 +1213,12 @@ button {
     color: var(--light-square);
 }
 
-/* The square's name top right, under the pointer or the piece dragged, when the player turns it on (Stefano, T-76); top left on a square with a badge,
-   in place of the rank there; the help rows' names stay in line */
+/* The square's name in the corner of the file, under the pointer or the piece dragged, in its place on the bottom rank, when the player turns it on (T-76): bottom
+   right, where no badge sits (Stefano); the help rows' names stay in line */
 .square .square-name {
     position: absolute;
-    top: 3%;
     right: 4%;
+    bottom: 2.5%;
     z-index: 2;
     display: none;
     font-size: clamp(9px, 1.6cqw, 13px);
@@ -1227,16 +1227,11 @@ button {
     pointer-events: none;
 }
 
-.square:has(.badge, .move-badge) .square-name {
-    right: auto;
-    left: 4%;
-}
-
 .board.named .square.over .square-name {
     display: block;
 }
 
-.board.named .square.over:has(.badge, .move-badge) .coordinate.rank {
+.board.named .square.over .coordinate.file {
     visibility: hidden;
 }
 
@@ -1245,7 +1240,7 @@ button {
         display: block;
     }
 
-    .board.named .square:hover:has(.badge, .move-badge) .coordinate.rank {
+    .board.named .square:hover .coordinate.file {
         visibility: hidden;
     }
 }
