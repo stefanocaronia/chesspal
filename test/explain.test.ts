@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game } from "../src/core/index.ts";
-import { bubblePlace, explain, keptSquares } from "../src/page/explain.ts";
+import { bubblePlace, explain, keptSquares } from "../src/page/board/explain.ts";
 
 /** A game from a position in FEN. */
 function at(fen: string): Game

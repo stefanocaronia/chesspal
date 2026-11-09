@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isReviewed, readPgn } from "../src/core/index.ts";
 import { talkLimits } from "../src/games/index.ts";
-import { aiSpoke, aiWords, judgmentsOf, playerWords, pliesOf, type Ply, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/plies.ts";
+import { aiSpoke, aiWords, judgmentsOf, playerWords, pliesOf, type Ply, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/game/plies.ts";
 
 describe("the moves on the page", () => {
     it("number the moves of a game that starts with Black to move", () => {

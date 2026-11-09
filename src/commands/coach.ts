@@ -6,12 +6,13 @@ import { activeProfile, gameFolder, helpsIn } from "../profiles/index.ts";
 import { clockLine, clockSummaryOf } from "./clock.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
-import { lastMoves, speechLine, speechOf } from "./game-summary.ts";
+import { lastMoves } from "./game-summary.ts";
 import { aheadWords, leadFrom, leadInput } from "./lead-input.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
 import { waitForPlayer, wordsOf } from "./ponder.ts";
 import { profileLines } from "./position.ts";
 import { defineCommand } from "./registry.ts";
+import { speechLine, speechOf } from "./speech.ts";
 import { colourName, compactView, materialText, riskLine } from "./view.ts";
 
 /** What coach answers: stop, the moves to work on, the words kept and what comes next, or still the player's move; with the game's key and the position. */

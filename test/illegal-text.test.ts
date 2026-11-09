@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { IllegalReason } from "../src/core/index.ts";
 import { type ServerRefusal, textFor } from "../src/page/text.ts";
-import type { Refused } from "../src/server/page.ts";
+import type { Refused } from "../src/server/page/http.ts";
 
 // Every reason, by a record the compiler checks against the type: a reason added to the core and not here fails the types.
 const reasons: Record<IllegalReason, true> = {

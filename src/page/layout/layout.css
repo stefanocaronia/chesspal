@@ -1,0 +1,672 @@
+/* The page's grid: the header, the board between the two columns, how they fold away, and the grid at each width. Its widths, 840 and 1099px, are also
+   in layout/folds.ts: change them together */
+
+/* The header */
+.top {
+    grid-area: head;
+    height: var(--bar);
+    margin-top: var(--between);
+    container-type: inline-size;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 var(--gap);
+}
+
+/* In the page's grid the header spans the board, edge to edge, as far from it as the cards */
+.app .top {
+    margin: 0;
+    padding: 0;
+}
+
+.title {
+    flex: 1;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+/* A game over says how it ended by the new game, which stands out in the accent (T-77) */
+.verdict {
+    margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    animation: appear 200ms;
+}
+
+.verdict:empty {
+    display: none;
+}
+
+/* The chip's icon says what it is about; the game in analysis stands out in the accent's colour (D-69) */
+.verdict:has(.icon) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.verdict .icon {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    stroke-width: 2;
+}
+
+.verdict.analysis {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--ink);
+}
+
+/* The answer to the AI's offer: accepting and declining weigh the same */
+.command.answer {
+    color: var(--ink);
+    border-color: var(--line);
+}
+
+/* While the AI's draw offer stands, the answer keeps its words and the other commands only their icons; in a game going on, a narrow board keeps icons alone */
+.top:has(.answer) .command:not(.answer) span {
+    display: none;
+}
+
+@container (max-width: 800px) {
+    .top:has(.icon.resign) .command:not(.answer) span {
+        display: none;
+    }
+
+    /* Beside a narrow board the offer and its answer take the room of the other commands, which come back once it is answered */
+    .top:has(.answer) .command:not(.answer) {
+        display: none;
+    }
+}
+
+/* The AI's name gives way before its verb (D-65) */
+.verdict:has(.ai-name) {
+    display: flex;
+    gap: 0.3em;
+}
+
+.verdict .ai-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.verdict .ai-name + span {
+    flex-shrink: 0;
+}
+
+.top .torretta {
+    flex-shrink: 0;
+}
+
+/* The header's buttons never wrap or shrink: the word on a game over gives way */
+.top .command,
+.top .icon-button {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* The header's chip when no game goes on: neutral, not the accent, with a pause sign (D-77) */
+.verdict.idle {
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--ink);
+}
+
+.verdict.idle .icon {
+    color: var(--soft);
+    stroke-width: 2.4;
+}
+
+/* Beside the word on a game over, the Torretta alone stands for the name, and the flip keeps only its icon; a phone gives the word a line of its own */
+@media (min-width: 841px) {
+    @container (max-width: 720px) {
+        .top:has(.verdict:not(:empty)) .title,
+        .top:has(.verdict:not(:empty)) .command:not(.primary):not(.answer) span {
+            display: none;
+        }
+
+        .top:has(.verdict:not(:empty)) .verdict {
+            margin-right: auto;
+        }
+    }
+}
+
+.top:has(.verdict.idle, .verdict.over) .command:has(.icon.flip) span {
+    display: none;
+}
+
+/* On a phone the player's card is under the board, below the fold: between games the header's new game stands out too, on the first screen */
+@media (max-width: 840px) {
+    .top:has(.verdict.idle, .verdict.over) .command:has(.icon.new) {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--on-accent);
+    }
+}
+
+/* Three columns: the talk, the board, the game, under the header, which spans the board. The side columns take the board's height and scroll inside it; folded,
+   they slide under the board, which grows into the room */
+.app {
+    --left-now: var(--left);
+    --right-now: var(--right);
+    --rows: var(--between);
+    display: grid;
+    gap: var(--rows) var(--between);
+    padding: var(--between) var(--gap);
+    grid-template-columns: var(--left-now) auto var(--right-now);
+    transition: grid-template-columns 200ms cubic-bezier(0.2, 0, 0, 1);
+    grid-template-rows: auto minmax(var(--least), auto);
+    grid-template-areas: ". head ." "talk board side";
+    justify-content: center;
+}
+
+/* Beside a narrow board the header's buttons keep only their icons */
+@container (max-width: 560px) {
+    .command span {
+        display: none;
+    }
+}
+
+.app.talk-rail {
+    --left-now: var(--rail);
+}
+
+.app.talk-folded {
+    --left-now: 0px;
+}
+
+.app.folded {
+    --right-now: 0px;
+}
+
+.board-wrap {
+    grid-area: board;
+    position: relative;
+    /* 12.5cqw is a square, for the lifted piece too */
+    container-type: inline-size;
+    width: min(calc(100vw - var(--left-now) - var(--right-now) - 2 * var(--gap) - 2 * var(--between)), max(var(--least), calc(100vh - var(--bar) - 3 * var(--between))));
+    transition: width 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.talk {
+    grid-area: talk;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--between);
+    contain: size;
+    min-height: 0;
+}
+
+/* Narrowing, the talk fades into its card of faces while it slides under the board, in the same 200ms */
+.app.talk-rail .talk,
+.app.talk-folded .talk {
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 120ms 80ms, visibility 0s 200ms;
+}
+
+/* A column's tab (T-84), a drawer's handle at the top: open, on the outer edge of the column's first card; folded, the column slides under the board and the
+   tab peeks out from under it */
+.fold-tab {
+    align-self: start;
+    position: relative;
+    display: flex;
+    width: var(--tab);
+    height: 48px;
+    margin-top: calc(var(--ear) - 24px);
+    transition: width 200ms cubic-bezier(0.2, 0, 0, 1), margin 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.fold-tab.folded {
+    width: calc(var(--tab) + var(--tuck));
+}
+
+.fold-tab.of-talk {
+    grid-area: talk;
+    justify-self: start;
+    margin-left: calc(-1 * var(--tab));
+}
+
+.fold-tab.of-talk.folded {
+    margin-left: calc(var(--between) - var(--tab));
+}
+
+.fold-tab.of-game {
+    grid-area: side;
+    justify-self: end;
+    margin-right: calc(-1 * var(--tab));
+}
+
+.fold-tab.of-game.folded {
+    margin-right: calc(var(--between) - var(--tab));
+}
+
+.fold-tab button {
+    flex: 1;
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    color: var(--soft);
+}
+
+.fold-tab button:hover {
+    color: var(--ink);
+}
+
+.fold-tab .icon {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2;
+}
+
+/* Rounded on the outer side, its icon clear of the board; the card it leans on gives its inner edge */
+.fold-tab.of-talk button {
+    border-right: 0;
+    border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.fold-tab.of-game button {
+    border-left: 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.fold-tab.of-talk.folded button {
+    padding-right: var(--tuck);
+}
+
+.fold-tab.of-game.folded button {
+    padding-left: var(--tuck);
+}
+
+/* The talk narrowed to a card beside the board, with two equal coins where the faces sat in the cards: the Torretta above and the player below, once the talk
+   has slid under the board */
+.faces {
+    grid-area: talk;
+    justify-self: start;
+    display: none;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    width: var(--rail);
+    min-height: 0;
+    overflow: hidden;
+    padding: calc(var(--ear) - var(--coin) / 2 - 1px) 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.app.talk-rail .faces {
+    display: flex;
+    animation: faces-in 120ms 80ms both;
+}
+
+/* Folding, the card of faces slides under the board in its turn */
+.app.talk-folded .faces {
+    display: flex;
+    visibility: hidden;
+    transition: visibility 0s 200ms;
+}
+
+.app.flipped .faces {
+    flex-direction: column-reverse;
+}
+
+@keyframes faces-in {
+    from {
+        opacity: 0;
+    }
+}
+
+/* Each face with the name and side written down the card from it: the lower one's run up to it */
+.rail-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-height: 0;
+}
+
+.rail-player.you,
+.app.flipped .rail-player.ai {
+    flex-direction: column-reverse;
+}
+
+.app.flipped .rail-player.you {
+    flex-direction: column;
+}
+
+/* The lower name reads upwards, its letters' tops to the left */
+.rail-player.you .rail-name,
+.app.flipped .rail-player.ai .rail-name {
+    rotate: 180deg;
+}
+
+.app.flipped .rail-player.you .rail-name {
+    rotate: none;
+}
+
+.rail-name {
+    min-height: 0;
+    overflow: hidden;
+    writing-mode: vertical-rl;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.face {
+    flex: none;
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--coin);
+    height: var(--coin);
+    border-radius: 50%;
+    background: var(--say);
+}
+
+/* Both faces fill their circle, with no edge */
+.face svg,
+.face img {
+    width: var(--coin);
+    height: var(--coin);
+    clip-path: circle(50%);
+}
+
+/* Who moves: their name in the accent */
+.rail-player.moving .rail-name {
+    color: var(--accent);
+}
+
+/* The AI spoke while the talk was narrowed or folded: on the Torretta, or on the tab */
+.face.unread::after,
+.fold-tab button.unread::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--page);
+}
+
+.fold-tab button.unread::after {
+    top: -4px;
+    right: auto;
+    left: -4px;
+}
+
+/* A long name or model goes to its ellipsis instead of widening the page on a phone (Zoe, round of T-118). Each side's talk has half the column at most:
+   past it, its words scroll; the box and the cards never give way. */
+.ai-block,
+.you-block {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    flex: 0 1 auto;
+    max-height: calc(50% - var(--between) / 2);
+}
+
+.you-block > .compose,
+.you-block > .player {
+    flex: none;
+}
+
+/* The game's column, which folds from its tab (T-84) */
+.side {
+    grid-area: side;
+    display: flex;
+    flex-direction: column;
+    gap: var(--between);
+    contain: size;
+    min-height: 0;
+}
+
+.board-steps,
+.board-map {
+    display: none;
+}
+
+.app.folded .side {
+    visibility: hidden;
+    transition: visibility 0s 200ms;
+}
+
+/* With no game, the game's column opens with this note, as tall as the game's card, so the column's tab sits in its middle */
+.side > .card.empty {
+    min-height: 74px;
+    display: flex;
+    align-items: center;
+}
+
+/* Between games the chip is never cut: beside it the Torretta stands for the name at every width, and the flip keeps only its icon */
+@media (min-width: 841px) {
+    .top:has(.verdict.idle, .verdict.over) .title {
+        display: none;
+    }
+
+    .top:has(.verdict.idle, .verdict.over) .verdict {
+        margin-right: auto;
+    }
+}
+
+/* Beside the board, a column's content keeps its width and its outer edge while the column folds: it slides under the board, the text never flows again */
+@media (min-width: 841px) {
+    .talk > * {
+        width: var(--left);
+    }
+}
+
+@media (min-width: 1100px) {
+    .side {
+        align-items: flex-end;
+    }
+
+    .side > * {
+        width: var(--right);
+    }
+}
+
+/* Where three columns would leave the board small, the game's column goes under the board, always open */
+@media (min-width: 841px) and (max-width: 1099px) {
+    .app,
+    .app.folded {
+        --right-now: 0px;
+        grid-template-columns: var(--left-now) auto;
+        grid-template-rows: auto minmax(var(--least), auto) auto;
+        grid-template-areas: ". head" "talk board" ". side";
+        /* The page scrolls here: the board measures the page without its scroll bar */
+        container-type: inline-size;
+    }
+
+    .board-wrap {
+        width: min(calc(100cqw - var(--left-now) - var(--between)), max(var(--least), calc(100vh - var(--bar) - 3 * var(--between))));
+    }
+
+    .side,
+    .app.folded .side {
+        visibility: visible;
+        contain: none;
+    }
+
+    .fold-tab.of-game {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app,
+    .board-wrap,
+    .fold-tab,
+    .app.talk-rail .talk {
+        transition: none;
+    }
+
+    .app.talk-rail .faces,
+    .verdict {
+        animation: none;
+    }
+}
+
+/* A phone, or a narrow window: one column. The AI above the board, the player's words and card below it, then the game */
+@media (max-width: 840px) {
+    :root {
+        --gap: 12px;
+    }
+
+    .command span {
+        display: none;
+    }
+
+    /* The header has no room for the word on a game over: it takes a line of its own under the buttons */
+    .top {
+        height: auto;
+        min-height: var(--bar);
+        flex-wrap: wrap;
+        gap: var(--between) 8px;
+    }
+
+    /* The name gives way to the buttons, which keep to the first line */
+    .title {
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    .verdict {
+        order: 1;
+        flex-basis: 100%;
+        text-align: center;
+        justify-content: center;
+    }
+
+    /* The AI's draw offer and its answer share the second line */
+    .answer {
+        order: 1;
+    }
+
+    .top:has(.answer) .verdict {
+        flex: 1 0 60%;
+    }
+
+    .app,
+    .app.folded,
+    .app.talk-rail,
+    .app.talk-folded {
+        grid-template-columns: 1fr;
+        grid-template-rows: none;
+        grid-template-areas: "head" "ai" "board" "you" "side";
+    }
+
+    .app.flipped {
+        grid-template-areas: "head" "you" "board" "ai" "side";
+    }
+
+    /* The helps' map right under the board, by the thumb, so the board stays in sight while it shows (D-78, Zoe) */
+    .app:has(.board-map) {
+        grid-template-areas: "head" "ai" "board" "map" "you" "side";
+    }
+
+    .app.flipped:has(.board-map) {
+        grid-template-areas: "head" "you" "board" "map" "ai" "side";
+    }
+
+    .talk,
+    .app.talk-rail .talk,
+    .app.talk-folded .talk {
+        display: contents;
+        visibility: visible;
+        opacity: 1;
+    }
+
+    .ai-block {
+        grid-area: ai;
+    }
+
+    .you-block {
+        grid-area: you;
+    }
+
+    .board-wrap {
+        width: 100%;
+    }
+
+    .says,
+    .sent {
+        max-height: 30vh;
+    }
+
+    .side,
+    .app.folded .side {
+        display: flex;
+        visibility: visible;
+        contain: none;
+    }
+
+    .fold-tab,
+    .app.talk-rail .faces,
+    .app.talk-folded .faces {
+        display: none;
+    }
+
+    /* A game in analysis, turned round or not: the card on top, the board, its steps under the thumb, the Torretta's note, the card below, the moves (Zoe, T-40) */
+    .app:has(.talk.studied),
+    .app.flipped:has(.talk.studied) {
+        grid-template-areas: "head" "ai" "board" "steps" "note" "you" "side";
+    }
+
+    .talk.studied > .ai-block {
+        display: contents;
+    }
+
+    .talk.studied > .ai-block > :not(.ai-note) {
+        grid-area: ai;
+    }
+
+    .talk.studied .ai-note {
+        grid-area: note;
+        margin-top: 0;
+    }
+
+    /* With no chat listening, its note comes before the Torretta's (Zoe) */
+    .app:has(.talk.studied > .ai-block > .asleep),
+    .app.flipped:has(.talk.studied > .ai-block > .asleep) {
+        grid-template-areas: "head" "ai" "board" "steps" "asleep" "note" "you" "side";
+    }
+
+    .talk.studied > .ai-block > .asleep {
+        grid-area: asleep;
+        margin: 0;
+    }
+
+    .board-steps {
+        display: block;
+        grid-area: steps;
+    }
+
+    .app:has(.talk.studied) .side .steps {
+        display: none;
+    }
+}

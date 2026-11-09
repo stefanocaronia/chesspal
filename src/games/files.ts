@@ -1,3 +1,4 @@
+// Writing the player's files safely: whole or not at all, with failures that say what to do (D-27).
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 
 /** Writes a file whole or not at all: a temporary file beside it, then renamed over it (D-27). A failure says what to do about it. */

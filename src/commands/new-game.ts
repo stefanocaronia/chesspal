@@ -2,15 +2,18 @@ import { z } from "zod";
 import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../core/index.ts";
 import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../games/index.ts";
 import { gameFolder, gameFolders } from "../profiles/index.ts";
+import { coachRuns } from "./agents.ts";
+import { nextStep, positionLines, sidesLine } from "./answer-lines.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
-import { coachRuns, type GameSummary, nextStep, positionLines, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "./game-summary.ts";
+import { type GameSummary, summaryOf, withThought } from "./game-summary.ts";
 import { levelText, levelToPlay } from "./levels.ts";
 import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 import { pastGameLines } from "./past-games.ts";
 import { refuseUnseenPosition } from "./play-move.ts";
 import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
+import { type Speech, speechLine, speechOf } from "./speech.ts";
 
 interface NewGame
 {
@@ -201,7 +204,7 @@ export class ChatNotClear extends Error
 const remembered = 3;
 
 /** From how many plies a game played in a chat asks for a clean one before the next (D-57): one left after a few moves does not. */
-export const pliesBeforeClearing = 20;
+const pliesBeforeClearing = 20;
 
 // A FEN's board: eight ranks of pieces and empty counts.
 const fenPattern = /^[pnbrqkPNBRQK1-8]+(?:\/[pnbrqkPNBRQK1-8]+){7}(?:\s|$)/;

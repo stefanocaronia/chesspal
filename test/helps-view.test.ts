@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game, readPgn } from "../src/core/index.ts";
-import { atRiskOn, helpsOf, strategyOf } from "../src/page/helps-view.ts";
+import { atRiskOn, helpsOf, strategyOf } from "../src/page/helps/view.ts";
 
 // White's knight on f3 pinned to its queen by the bishop on g4, which h3 attacks undefended.
 const pinned = game("1. e4 e5 2. Nf3 d6 3. Bc4 Bg4 4. Nc3 Nc6 5. h3 *");

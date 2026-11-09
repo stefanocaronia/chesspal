@@ -1,19 +1,16 @@
+// The MCP server an AI host starts: every command as a tool (D-5), and the board page served for as long as the chat lasts (D-47).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { aiMove } from "../commands/ai-move.ts";
-import { type Caller, type Context, defaultContext } from "../commands/context.ts";
-import { commands } from "../commands/index.ts";
-import { PositionChanged } from "../commands/play-move.ts";
-import { type AnyCommand, inputProblems, isBoolean } from "../commands/registry.ts";
+import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, inputProblems, isBoolean, PositionChanged } from "../commands/index.ts";
 import { endOf, loadGame, noteAiModel } from "../games/index.ts";
 import { hasAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { pagePorts } from "./bell.ts";
 import { allowedCaller, callerOf, callingAgent } from "./caller.ts";
-import { chatHasRead, startPage } from "./page.ts";
+import { chatHasRead, startPage } from "./page/page.ts";
 
 /** What the host reads as the server starts, before any tool: where to begin, and the rule of every move (D-27). Short, since hosts may cut it. */
 export const serverInstructions = "Chesspal keeps the chess for you: the rules, the board, the clock, the games and the player's memory. Call `status` at the start of every "

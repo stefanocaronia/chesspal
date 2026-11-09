@@ -1,0 +1,572 @@
+/* The helps (D-78): their signs on the board, their card, the coach and the strategy's table */
+
+/* A piece at risk: a corner folded in ink, bottom left, the square's free corner */
+.help-notch {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    z-index: 2;
+    display: block;
+    width: clamp(14px, 6.5cqw, 44px);
+    height: clamp(14px, 6.5cqw, 44px);
+    pointer-events: none;
+}
+
+.help-notch svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.help-notch path {
+    fill: var(--help-ink);
+    stroke: var(--help-halo);
+    stroke-width: 0.9;
+    stroke-linejoin: round;
+}
+
+.help-notch circle {
+    fill: var(--help-on);
+}
+
+/* A pin: a thin dashed ink line from the pinner to what stands behind, under the arrows; without a head, never an arrow */
+.helps-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    aspect-ratio: 1;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* A pin's line: a pale halo under the dashes, so they read on the dark squares as on the light */
+.helps-layer line.halo {
+    stroke: rgba(255, 255, 255, 0.35);
+    stroke-width: 0.13;
+}
+
+.helps-layer line:not(.halo) {
+    stroke: var(--help-line);
+    stroke-width: 0.065;
+    stroke-dasharray: 0.16 0.12;
+    stroke-linecap: round;
+}
+
+/* The map (Zoe, after the round): every square on one neutral ground, then light where only White reaches, dark where only Black does, half and half
+   when both do; the two counts together in the middle, as a domino. The drawings and the pieces step back */
+.board.mapping ~ .arrows,
+.board.mapping .move-badge {
+    opacity: 0.12;
+}
+
+.board.mapping .square.noted::after {
+    opacity: 0.15;
+}
+
+.board.mapping .piece {
+    opacity: 0.45;
+}
+
+.control-ground {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: #8d96a1;
+}
+
+.control-ground.white {
+    background: #eef1f4;
+}
+
+.control-ground.black {
+    background: #2b323c;
+}
+
+.control-ground.both {
+    background: linear-gradient(135deg, #eef1f4 50%, #2b323c 50%);
+}
+
+.control-count {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 1;
+    display: flex;
+    translate: -50% -50%;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(17, 22, 29, 0.55);
+    pointer-events: none;
+    /* A font of its own, heavy and sized by the board, not the page's: the counts must read on any square at any width */
+    font: 800 clamp(10px, 2.2cqw, 17px) / 1 "Segoe UI", system-ui, sans-serif;
+}
+
+.control-count b {
+    min-width: 1.35em;
+    padding: 0.2em 0.25em;
+    text-align: center;
+}
+
+.control-count .white {
+    background: #fff;
+    color: var(--help-ink);
+}
+
+.control-count .black {
+    background: var(--help-ink);
+    color: #fff;
+}
+
+/* The helps' card in the game's column */
+.helps-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    min-height: 0;
+    flex: 0 1 auto;
+    /* No scrollbar in the page (Stefano): the card fits its column's width, and a column too short for it scrolls it under the wheel or the finger */
+    overflow: hidden auto;
+    scrollbar-width: none;
+}
+
+/* The card's title, and on its right the icons held: the map and the board without its drawings (T-138) */
+.helps-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.helps-tools {
+    display: flex;
+    gap: 4px;
+}
+
+.helps-head .hold-button {
+    padding: 3px 6px;
+}
+
+/* The coach's words at the top of the card (D-88): its judgment of the player's last move, then its hint, folded until they open it */
+.helps-card .coach {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.coach-hint summary {
+    cursor: pointer;
+    list-style: none;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.coach-hint summary::-webkit-details-marker {
+    display: none;
+}
+
+/* The same sign on both, so that on a phone, with no pointer, they read as lines that open (Zoe, review of T-112) */
+.helps-card .coach summary::after,
+.board-map .coach-hint summary::after {
+    content: "▸";
+    margin-left: 6px;
+    color: var(--soft);
+}
+
+.helps-card .coach details[open] > summary::after,
+.board-map .coach-hint[open] > summary::after {
+    content: "▾";
+}
+
+.coach-hint .note {
+    display: block;
+    margin-top: 4px;
+    color: var(--say-ink);
+    font-size: 14.5px;
+}
+
+/* The squares and moves in the coach's words in the accent, as in the AI's, to find on the board; the move it judged with its number, which may be the one before */
+.helps-card .coach .on-board,
+.board-map .coach-hint .on-board {
+    color: var(--accent);
+}
+
+.helps-card .coach .move-number {
+    display: inline;
+}
+
+.help-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--soft);
+}
+
+/* Each kind of fact in its colour, on its icon and as a light tint (Stefano): a piece at risk red, a pin orange, nothing at risk green, the checks blue, the
+   loose pieces grey */
+.help-rows li {
+    --row: var(--soft);
+    position: relative;
+    padding: 3px 6px 3px 26px;
+    border-radius: 6px;
+    line-height: 1.35;
+    background: color-mix(in srgb, var(--row) 10%, transparent);
+}
+
+.help-rows li.risk {
+    --row: var(--badge-blunder);
+}
+
+.help-rows li.pin {
+    --row: var(--badge-mistake);
+}
+
+.help-rows li.safe {
+    --row: var(--badge-best);
+    color: var(--ink);
+}
+
+.help-rows li.check {
+    --row: var(--accent);
+}
+
+.help-rows li.info {
+    --row: var(--accent);
+}
+
+.help-rows li.points:hover {
+    background: color-mix(in srgb, var(--row) 24%, transparent);
+    color: var(--ink);
+}
+
+.help-rows li.quiet {
+    font-size: 12px;
+}
+
+.help-rows .square-name {
+    color: var(--ink);
+}
+
+/* The checks and the loose pieces in figures, as the move list draws them; the loose ones White's first, then Black's. */
+.help-rows .help-move {
+    margin-right: 0.5em;
+    color: var(--ink);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.help-rows .help-pieces + .help-pieces {
+    margin-left: 0.4em;
+    padding-left: 0.6em;
+    border-left: 1px solid var(--line);
+}
+
+.help-rows .help-notch {
+    left: 6px;
+    top: 4px;
+    bottom: auto;
+    width: 14px;
+    height: 14px;
+}
+
+.help-rows .help-notch path {
+    fill: var(--row);
+    stroke: none;
+}
+
+.help-rows .help-notch circle {
+    fill: var(--card);
+}
+
+.help-rows .row-icon {
+    position: absolute;
+    left: 6px;
+    top: 3px;
+    width: 14px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    color: var(--row);
+}
+
+.help-rows .row-icon svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.helps-card .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--line);
+}
+
+.helps-card .tabs [role="tab"] {
+    border: 0;
+    background: none;
+    color: var(--soft);
+    font: inherit;
+    font-weight: 600;
+    padding: 4px 8px 6px;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+}
+
+.helps-card .tabs [role="tab"][aria-selected="true"] {
+    color: var(--ink);
+    border-bottom-color: var(--accent);
+}
+
+/* The icons held, the map's and the one that hides the drawings: in the card's title, or under the board on a phone */
+.hold-button {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 2px 8px;
+    background: var(--card);
+    color: var(--soft);
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+}
+
+.board-map .hold-button {
+    padding: 7px 12px;
+}
+
+.hold-button svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
+/* The eye shut, drawn in lines */
+.hold-button.bare-button svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.hold-button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+}
+
+.strategy-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    color: var(--soft);
+}
+
+.strategy-table th,
+.strategy-table td {
+    padding: 2px 4px;
+    text-align: left;
+    font-weight: 400;
+}
+
+.strategy-table thead th {
+    color: var(--ink);
+    font-weight: 700;
+}
+
+.strategy-table tbody tr + tr {
+    border-top: 1px solid var(--line);
+}
+
+/* A term with its meaning under the pointer, and under its line at a click or a tap (Rosa, T-117). */
+.strategy-table .term {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    text-decoration: underline dotted color-mix(in srgb, var(--soft) 60%, transparent);
+    text-underline-offset: 3px;
+    cursor: help;
+}
+
+.strategy-table tbody tr.meaning {
+    border-top: 0;
+}
+
+.strategy-table tr.meaning td {
+    padding-bottom: 4px;
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* The table's groups under their figure, in the accent; the sides' heads with their pawn */
+.strategy-table tr.group th {
+    padding-top: 7px;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.strategy-table tbody tr.group + tr {
+    border-top: 0;
+}
+
+/* The strategy (Stefano): the phase in a pill and the open files on top, then the bar of the squares controlled, the table in groups, the notes */
+.strategy {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.strategy-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    margin: 0;
+    font-size: 12px;
+    color: var(--soft);
+}
+
+.strategy .phase {
+    padding: 1px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    color: var(--ink);
+    font-weight: 700;
+}
+
+/* Squares and files in chips, a count in bold, a yes as a green tick, nothing as a faint dash */
+.strategy .chip {
+    display: inline-block;
+    margin: 1px 3px 1px 0;
+    padding: 0 5px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--ink) 10%, transparent);
+    color: var(--ink);
+    font-weight: 700;
+}
+
+.strategy .count {
+    color: var(--ink);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.strategy .none {
+    opacity: 0.5;
+}
+
+.strategy .yes {
+    display: inline-grid;
+    vertical-align: -3px;
+}
+
+.strategy .yes svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: var(--badge-best);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* The squares each side controls: White's in white, both in grey, Black's in black, each as long as its count */
+.control {
+    display: grid;
+    gap: 3px;
+    font-size: 11px;
+    color: var(--soft);
+}
+
+.control-title {
+    font-size: 12px;
+}
+
+.control-bar {
+    display: flex;
+    height: 18px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    overflow: hidden;
+    font-weight: 700;
+}
+
+.control-bar span {
+    flex-basis: 0;
+    display: grid;
+    place-items: center;
+    min-width: 20px;
+}
+
+.control-bar .white {
+    background: #f4f6f8;
+    color: var(--fixed-ink);
+}
+
+.control-bar .both {
+    background: #8d98a7;
+    color: #fff;
+}
+
+.control-bar .black {
+    background: var(--fixed-ink);
+    color: #f4f6f8;
+}
+
+.control-legend {
+    display: flex;
+    justify-content: space-between;
+}
+
+.strategy-table .figurine {
+    margin-right: 3px;
+}
+
+/* On a phone, or in a narrow window, the map of the squares and the coach's hint go under the board, out of the helps' card */
+@media (max-width: 840px) {
+    .board-map {
+        display: flow-root;
+        grid-area: map;
+        font-size: 14px;
+    }
+
+    .board-map .hold-button {
+        float: right;
+        margin-left: 8px;
+    }
+
+    .helps-card .hold-button {
+        display: none;
+    }
+
+    /* The coach's hint under the board, its words under its line, the map on its right; the card keeps the judgments (Zoe, playtest of T-112) */
+    .board-map .coach-hint summary {
+        padding: 6px 0;
+    }
+
+    .board-map .coach-hint .note {
+        clear: right;
+    }
+
+    .helps-card .coach-hint,
+    .helps-card .coach.hint-only {
+        display: none;
+    }
+}

@@ -37,24 +37,6 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
     return current;
 }
 
-/** The most a line of the AI's may hold in the games of `folder`: an analyst's note with the helps on (D-78); a longer one with them off is refused. */
-function aiMost(folder: string, who: Sayer, text: string): number
-{
-    if (who !== "ai") {
-        return talkLimits.ai;
-    }
-
-    if (helpsIn(folder)) {
-        return talkLimits.aiHelps;
-    }
-
-    if (text.trim().length > talkLimits.ai) {
-        throw new Error(`The player has the helps off: write at most ${talkLimits.ai} characters. Nothing changed.`);
-    }
-
-    return talkLimits.ai;
-}
-
 /** What the player wrote on the board page that the AI has not been given in this chat, given now: each game tool gives it once; never to an agent (D-89). */
 export function newWords(context: Context): string[]
 {
@@ -93,6 +75,24 @@ export function give(context: Context, words: readonly Words[]): string[]
     }
 
     return words.map(({ text }) => text);
+}
+
+/** The most a line of the AI's may hold in the games of `folder`: an analyst's note with the helps on (D-78); a longer one with them off is refused. */
+function aiMost(folder: string, who: Sayer, text: string): number
+{
+    if (who !== "ai") {
+        return talkLimits.ai;
+    }
+
+    if (helpsIn(folder)) {
+        return talkLimits.aiHelps;
+    }
+
+    if (text.trim().length > talkLimits.ai) {
+        throw new Error(`The player has the helps off: write at most ${talkLimits.ai} characters. Nothing changed.`);
+    }
+
+    return talkLimits.ai;
 }
 
 /** A line of the talk with no game, which starts it the first time; no mood, which only the end of a game takes. */

@@ -3,33 +3,17 @@ import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "
 import { coachAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
+import { agentsLine, analystLine, analystRuns, coachOnEnd, coachRuns, reviewedLine, withAnalyst } from "./agents.ts";
+import { closingLines, newGameStep, positionLines, sidesLine, wordLines } from "./answer-lines.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
-import {
-    agentsLine,
-    analystLine,
-    analystRuns,
-    closingLines,
-    coachOnEnd,
-    coachRuns,
-    type GameSummary,
-    newGameStep,
-    positionLines,
-    reviewedLine,
-    sidesLine,
-    type Speech,
-    speechLine,
-    speechOf,
-    summaryOf,
-    withAnalyst,
-    withThought,
-    wordLines,
-} from "./game-summary.ts";
+import { type GameSummary, summaryOf, withThought } from "./game-summary.ts";
 import { levelText } from "./levels.ts";
 import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
 import { unansweredWords } from "./say.ts";
+import { type Speech, speechLine, speechOf } from "./speech.ts";
 
 interface Status
 {
@@ -66,7 +50,7 @@ export const status = defineCommand({
     readOnly: true,
     alwaysLoad: true,
     showsGame: true,
-    run: (_input, context): Status => {
+    run: (input, context): Status => {
         // The folder is the profile's, in the data folder (D-71): the names of its games are relative to it.
         const folder = gameFolder(context.home());
         const player = playerLine(context);

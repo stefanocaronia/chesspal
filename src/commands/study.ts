@@ -2,7 +2,7 @@
 // goes on, nothing is studied: the analysis would help the game being played (D-60, D-62).
 import { z } from "zod";
 import { Game, type GameRecord } from "../core/index.ts";
-import { archivedGame, archivedGames, archivedName, type CurrentGame, endOf, keptGame, keptGames } from "../games/index.ts";
+import { archivedGame, archivedGames, archivedName, type CurrentGame, endOf, keptGame, listedName } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
@@ -72,7 +72,7 @@ export function gameToStudy(context: Context, name?: string): Studied
 export function namedGame(context: Context, name: string): Required<Studied>
 {
     const folder = gameFolder(context.home());
-    const full = fullName(folder, name);
+    const full = listedName(folder, name);
     return { record: full.startsWith("study/") ? keptGame(folder, full) : archivedGame(folder, full), name: full };
 }
 
@@ -88,7 +88,7 @@ export function moveNumbers(record: GameRecord): string[]
     const start = new Game({ tags: record.tags, moves: [] }).position;
     const blackFirst = start.turn === "black" ? 1 : 0;
 
-    return record.moves.map((_move, index) => {
+    return record.moves.map((move, index) => {
         const ply = index + blackFirst;
         return `${start.moveNumber + Math.floor(ply / 2)}${ply % 2 === 0 ? "." : "..."}`;
     });
@@ -122,27 +122,6 @@ export function positionLine({ game, move }: StudiedPosition, name?: string): st
     const where = `${move === undefined ? "At the start" : `After ${move}`}${name === undefined ? "" : ` in ${name}`}`;
     const { outcome, position } = game;
     return `${where}: ${outcome.over ? `the board ends the game by ${outcome.ending}` : `${colourName(position.turn)} to move`}.`;
-}
-
-/**
- * A game's name as the lists write it, from a name without its folder or its .pgn too: 2026-11-04-173054 is games/2026-11-04-173054.pgn, or the game kept
- * to study by that name when no game played has it; any other name as it is, for the archive to refuse.
- */
-function fullName(folder: string, name: string): string
-{
-    const [, shelf, stem] = /^\s*(?:(games|study)\/)?(\d{4}-\d{2}-\d{2}-\d{6})(?:\.pgn)?\s*$/.exec(name) ?? [];
-
-    if (stem === undefined) {
-        return name;
-    }
-
-    if (shelf !== undefined) {
-        return `${shelf}/${stem}.pgn`;
-    }
-
-    const played = `games/${stem}.pgn`;
-    const kept = `study/${stem}.pgn`;
-    return !archivedGames(folder).includes(played) && keptGames(folder).includes(kept) ? kept : played;
 }
 
 function plyOf(record: GameRecord, numbers: readonly string[], move: string): number

@@ -2,7 +2,9 @@ import { z } from "zod";
 import { loadGame } from "../games/index.ts";
 import { coachAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
-import { agentsLine, closingLines, coachOnEnd, coachRuns, lastMoveText, moveLines, type MovePlayed, shownMove, withAnalyst } from "./game-summary.ts";
+import { agentsLine, coachOnEnd, coachRuns, withAnalyst } from "./agents.ts";
+import { closingLines, lastMoveText, moveLines, shownMove } from "./answer-lines.ts";
+import { type MovePlayed } from "./game-summary.ts";
 import { inviteLine, pageInvite } from "./page-link.ts";
 import { playMove, positionIn, refuseUnseenPosition } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
@@ -58,4 +60,4 @@ interface PlayerMove extends MovePlayed
  * The time a move in the chat leaves off the player's clock (D-36): the AI writing after its move and reading the player's, about 10 s as Priya measured.
  * Claude Code's hooks will time it exactly (T-53); the board page's moves need none.
  */
-export const chatAllowance = 10_000;
+const chatAllowance = 10_000;

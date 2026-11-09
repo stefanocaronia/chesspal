@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -9,11 +9,11 @@ import { commands } from "../src/commands/index.ts";
 import { PositionChanged } from "../src/commands/play-move.ts";
 import { status } from "../src/commands/status.ts";
 import { archivedGames, noteAiModel } from "../src/games/index.ts";
-import { anchorName } from "../src/page/anchor.ts";
+import { anchorName } from "../src/page/app/anchor.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell.ts";
-import { chatHasRead, type Page, startPage } from "../src/server/page.ts";
-import { profilesShown } from "../src/server/profile-routes.ts";
+import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
+import { profilesShown } from "../src/server/page/profiles.ts";
 import { testContext } from "./commands.ts";
 
 const opened: Page[] = [];
@@ -514,6 +514,17 @@ describe("the profiles on the page (D-23, D-45)", () => {
 
         expect((await post(page, "/api/settings?profile=anna", { theme: "dark" })).status).toBe(500);
         expect((await get(page, "/api/game")).status).toBe(200);
+    });
+
+    it("answers a game it cannot read with an error, and goes on serving", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        mkdirSync(gameFolder(folder), { recursive: true });
+        writeFileSync(join(gameFolder(folder), "game.json"), "{ not json");
+
+        expect((await post(page, "/api/start", {})).status).toBe(500);
+        expect((await get(page, "/api/game")).status).toBe(500);
+        expect((await get(page, "/")).status).toBe(200);
     });
 
     it("does not wake the chat when another profile is put in use, but its game is news at the next ring", async () => {

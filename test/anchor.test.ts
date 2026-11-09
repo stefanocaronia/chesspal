@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anchorAction, anchorName, anchorOf, hashOf, shownHash } from "../src/page/anchor.ts";
+import { anchorAction, anchorName, anchorOf, hashOf, shownHash } from "../src/page/app/anchor.ts";
 
 describe("the move shown in the page's address (T-155)", () => {
     it("reads a game by its name and how many of its moves are shown, or the game as it is", () => {

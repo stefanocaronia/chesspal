@@ -117,8 +117,8 @@ export function keptGame(root: string, name: string): GameRecord
 /** When an archived game started, from its name, in the player's time: 2026-11-02 15:30. */
 export function archivedWhen(name: string): string
 {
-    const [, day, hour, minute] = /(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})/.exec(name) ?? [];
-    return day === undefined ? name : `${day} ${hour}:${minute}`;
+    const stem = gameStemOf(name);
+    return stem === undefined ? name : `${stem.slice(0, 10)} ${stem.slice(11, 13)}:${stem.slice(13, 15)}`;
 }
 
 /**
@@ -171,7 +171,56 @@ export function rewriteGame(folder: string, name: string, record: GameRecord): v
 // The games of a profile, played here or kept to study: each with how the AI lists them.
 type Shelf = "games" | "study";
 const shelves = { games: { what: "of the archive", list: "past_games" }, study: { what: "kept to study", list: "study_games" } };
-const namePattern = /^\d{4}-\d{2}-\d{2}-\d{6}\.pgn$/;
+// A game's name is the time it started, 2026-11-02-153012, with .pgn, in its shelf's folder (D-41): the only place that writes the format.
+const stemPattern = /\d{4}-\d{2}-\d{2}-\d{6}/;
+const namePattern = new RegExp(`^${stemPattern.source}\\.pgn$`);
+const listedPattern = new RegExp(`^\\s*(?:(games|study)/)?(${stemPattern.source})(\\.pgn)?\\s*$`);
+
+/** The time a game's name holds, 2026-11-02-153012, wherever it is in the text; undefined when there is none. */
+export function gameStemOf(name: string): string | undefined
+{
+    return stemPattern.exec(name)?.[0];
+}
+
+/** Whether a text is a game's name as the lists write it, games/2026-11-02-153012.pgn, with or without its folder. */
+export function isGameName(text: string): boolean
+{
+    return new RegExp(listedPattern.source, "i").exec(text)?.[3] !== undefined;
+}
+
+/**
+ * A game's name as the lists write it, from a name without its folder or its .pgn too: 2026-11-04-173054 is games/2026-11-04-173054.pgn, or the game kept
+ * to study by that name when no game played has it; any other name as it is, for the archive to refuse.
+ */
+export function listedName(folder: string, name: string): string
+{
+    const [, shelf, stem] = listedPattern.exec(name) ?? [];
+
+    if (stem === undefined) {
+        return name;
+    }
+
+    if (shelf !== undefined) {
+        return `${shelf}/${stem}.pgn`;
+    }
+
+    const played = `games/${stem}.pgn`;
+    const kept = `study/${stem}.pgn`;
+    return !archivedGames(folder).includes(played) && keptGames(folder).includes(kept) ? kept : played;
+}
+
+/** The game as PGN for the player: while it goes on, without the AI's plans (D-29); once over, with the coach's judgments too (D-88). */
+export function playerPgn(folder: string, current: CurrentGame): string
+{
+    return writePgn(endOf(current.game) === undefined ? withoutPlans(current.game.record) : endedRecord(folder, current));
+}
+
+/** The game as PGN with its moves alone, without comments or plans, for Lichess or chess.com (T-59). */
+export function movesPgn(current: CurrentGame): string
+{
+    const { record, outcome } = current.game;
+    return writePgn(movesOnly(endOf(current.game) === undefined ? record : withTermination(record, outcome)));
+}
 
 function gameNames(folder: string, shelf: Shelf): string[]
 {
@@ -207,19 +256,6 @@ function gameNamed(folder: string, shelf: Shelf, name: string): GameRecord
     }
 
     return record;
-}
-
-/** The game as PGN for the player: while it goes on, without the AI's plans (D-29); once over, with the coach's judgments too (D-88). */
-export function playerPgn(folder: string, current: CurrentGame): string
-{
-    return writePgn(endOf(current.game) === undefined ? withoutPlans(current.game.record) : endedRecord(folder, current));
-}
-
-/** The game as PGN with its moves alone, without comments or plans, for Lichess or chess.com (T-59). */
-export function movesPgn(current: CurrentGame): string
-{
-    const { record, outcome } = current.game;
-    return writePgn(movesOnly(endOf(current.game) === undefined ? record : withTermination(record, outcome)));
 }
 
 /** Whether two records are the same game: the same tags and the same moves, whatever their comments say. */

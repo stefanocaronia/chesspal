@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game, readPgn } from "../src/core/index.ts";
-import { type EndSeen, type GameState, howEnded, seeEnd } from "../src/page/ending.ts";
+import { type EndSeen, type GameState, howEnded, seeEnd } from "../src/page/game/ending.ts";
 
 describe("how a game ended", () => {
     it("is the board's ending when the board ended it", () => {

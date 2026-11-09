@@ -186,12 +186,6 @@ const probeWait = 1000;
 const silenceLog = "listen.log";
 const silenceLines = 100;
 
-/** The chat's folder, where its server started: Claude Code names it, and the hook's cwd follows the cd's of the chat. */
-function chatFolder(hook: { cwd?: string; }): string
-{
-    return resolve(process.env.CLAUDE_PROJECT_DIR ?? hook.cwd ?? process.cwd());
-}
-
 /** Adds a line to the log of the hooks that heard no bell, keeping its last lines; a log that cannot be written never stops the hook. */
 export function noteSilence(folder: string, why: string, now = new Date()): void
 {
@@ -203,6 +197,12 @@ export function noteSilence(folder: string, why: string, now = new Date()): void
     } catch {
         // The log only explains; the hook ends the same.
     }
+}
+
+/** The chat's folder, where its server started: Claude Code names it, and the hook's cwd follows the cd's of the chat. */
+function chatFolder(hook: { cwd?: string; }): string
+{
+    return resolve(process.env.CLAUDE_PROJECT_DIR ?? hook.cwd ?? process.cwd());
 }
 
 function hookInput(input: string): { session?: string; cwd?: string; }

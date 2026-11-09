@@ -1,7 +1,7 @@
 // A move of the AI or of the player on the current game: played, timed by the clock, saved, and archived when it ends the game.
 import { clockAfterMove, clockTag } from "../core/index.ts";
 import { archiveEnded, type CurrentGame, endOf, loadGame, saveGame, talkLine } from "../games/index.ts";
-import type { Context } from "./context.ts";
+import type { Context, SeenPosition } from "./context.ts";
 import { gameGoingOn, type MovePlayed, summaryOf, withThought } from "./game-summary.ts";
 import { colourName } from "./view.ts";
 
@@ -78,16 +78,6 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
     return result;
 }
 
-/**
- * Where the game a chat sees stands: the game by its start, none when there is none, and how many plies it has. Not by its folder, which a profile
- * completed renames (D-71); a game in another profile started at another time.
- */
-export interface Position
-{
-    readonly started?: string;
-    readonly plies: number;
-}
-
 /** A chat's move, resignation or game replaced on a position it has not seen (D-71): it was decided on another. */
 export class PositionChanged extends Error
 {
@@ -98,7 +88,7 @@ export class PositionChanged extends Error
 }
 
 /** The position of the profile's game now. */
-export function positionIn(folder: string): Position
+export function positionIn(folder: string): SeenPosition
 {
     const current = loadGame(folder);
     return current === undefined ? { plies: 0 } : { started: current.started, plies: current.game.record.moves.length };
@@ -128,7 +118,7 @@ export function refuseOtherGame(context: Context, folder: string): void
     }
 }
 
-function samePosition(one: Position, other: Position): boolean
+function samePosition(one: SeenPosition, other: SeenPosition): boolean
 {
     return one.started === other.started && one.plies === other.plies;
 }

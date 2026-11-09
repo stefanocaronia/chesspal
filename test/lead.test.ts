@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { leadOf, leadText, readLead, readPgn, withLead } from "../src/core/index.ts";
-import { standingAt, standingsOf } from "../src/page/lead-view.ts";
-import { pliesOf, withJudgments, withoutReviews } from "../src/page/plies.ts";
+import { pliesOf, withJudgments, withoutReviews } from "../src/page/game/plies.ts";
+import { standingAt, standingsOf } from "../src/page/lead/view.ts";
 
 describe("who is ahead, as the AI estimates it (D-90)", () => {
     it("reads the figures an AI writes, in pawns from White's side or a mate it sees, and writes them as the PGN keeps them", () => {

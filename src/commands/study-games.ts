@@ -16,7 +16,7 @@ export const studyGames = defineCommand({
     input: z.object({}),
     readOnly: true,
     idempotent: true,
-    run: (_input, context): { games: string[]; } => {
+    run: (input, context): { games: string[]; } => {
         const folder = gameFolder(context.home());
         return { games: keptGames(folder).flatMap((name) => studyLines(folder, name)) };
     },

@@ -1,3 +1,4 @@
+// The commands: the only way the AI, the command line and the page change a game (D-5, D-27), each defined once in the file named as its tool.
 import { aiMove } from "./ai-move.ts";
 import { aiSay } from "./ai-say.ts";
 import { analyseGame } from "./analyse-game.ts";
@@ -17,6 +18,21 @@ import { newProfile, profiles, setAvatar, useProfile } from "./profiles.ts";
 import type { AnyCommand } from "./registry.ts";
 import { status } from "./status.ts";
 import { studyGames } from "./study-games.ts";
+
+// What the server and the command line use besides the list: the context, the reading of an input, and the operations the page shares with the tools.
+export { aiMove } from "./ai-move.ts";
+export { analyseGame } from "./analyse-game.ts";
+export { gameAt } from "./clock.ts";
+export { type Caller, type Context, defaultContext } from "./context.ts";
+export { answerDraw, DrawRefused, offerDraw } from "./draw-offer.ts";
+export { endGame } from "./end-game.ts";
+export { ChatNotClear, newGame, startNewGame } from "./new-game.ts";
+export { bookOpening, bookPlies } from "./opening-book.ts";
+export { playMove, PositionChanged, positionIn } from "./play-move.ts";
+export { chooseDrawnAvatar, GameGoingOn, newProfile, useProfile } from "./profiles.ts";
+export { type AnyCommand, baseType, type Command, commandLineFieldProblem, inputProblems, isBoolean, isList, takesNumbers } from "./registry.ts";
+export { say } from "./say.ts";
+export { gameToStudy, namedGame } from "./study.ts";
 
 /** Every command of Chesspal, in the order the command line lists them and the MCP server offers them. */
 export const commands: AnyCommand[] = [

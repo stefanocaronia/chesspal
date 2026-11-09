@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readPgn } from "../src/core/index.ts";
-import { pliesOf } from "../src/page/plies.ts";
-import { studiedSides } from "../src/page/studied.ts";
+import { studiedSides } from "../src/page/dialogs/studied.ts";
+import { pliesOf } from "../src/page/game/plies.ts";
 
 const sides = { white: "White", black: "Black" };
 

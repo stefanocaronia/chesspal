@@ -93,6 +93,32 @@ interface Placed
     color: Color;
 }
 
+/** Which pieces attack a square: chess.js's direct attacks, a piece pinned to its king only along the pin's line, and the pawns that take en passant. */
+export type Reach = (square: Square, color: Color) => Square[];
+
+/** Which pieces attack a square as the facts count them: a piece pinned to its king only along the pin's line, though it still gives check; no en passant. */
+export function attacksOf(chess: Chess): Reach
+{
+    return alongPins(chess, piecesOf(chess).filter((piece) => piece.type === "k").flatMap((king) => pinsTo(chess, king)));
+}
+
+/** The squares strictly between two squares on one line. */
+export function squaresBetween(from: Square, to: Square): Square[]
+{
+    const ray = rayFrom(from, Math.sign(fileOf(to) - fileOf(from)), Math.sign(rankOf(to) - rankOf(from)));
+    return ray.slice(0, ray.indexOf(to));
+}
+
+export function fileOf(square: Square): number
+{
+    return files.indexOf(square[0]!);
+}
+
+export function rankOf(square: Square): number
+{
+    return Number(square[1]);
+}
+
 function computed(chess: Chess, legal: readonly Move[]): Facts
 {
     const placed = piecesOf(chess);
@@ -122,15 +148,6 @@ function computed(chess: Chess, legal: readonly Move[]): Facts
     };
 
     return chess.inCheck() ? facts : { ...facts, otherChecks: otherChecks(chess) };
-}
-
-/** Which pieces attack a square: chess.js's direct attacks, a piece pinned to its king only along the pin's line, and the pawns that take en passant. */
-export type Reach = (square: Square, color: Color) => Square[];
-
-/** Which pieces attack a square as the facts count them: a piece pinned to its king only along the pin's line, though it still gives check; no en passant. */
-export function attacksOf(chess: Chess): Reach
-{
-    return alongPins(chess, piecesOf(chess).filter((piece) => piece.type === "k").flatMap((king) => pinsTo(chess, king)));
 }
 
 function reachOf(chess: Chess, kingPins: readonly Pin[], legal: readonly Move[]): Reach
@@ -265,23 +282,6 @@ function rayFrom(from: Square, fileStep: number, rankStep: number): Square[]
     }
 
     return ray;
-}
-
-/** The squares strictly between two squares on one line. */
-export function squaresBetween(from: Square, to: Square): Square[]
-{
-    const ray = rayFrom(from, Math.sign(fileOf(to) - fileOf(from)), Math.sign(rankOf(to) - rankOf(from)));
-    return ray.slice(0, ray.indexOf(to));
-}
-
-export function fileOf(square: Square): number
-{
-    return files.indexOf(square[0]!);
-}
-
-export function rankOf(square: Square): number
-{
-    return Number(square[1]);
 }
 
 /** Compares two names of squares or colours: a fixed alphabet, no locale. */

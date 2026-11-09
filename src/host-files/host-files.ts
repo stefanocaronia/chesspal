@@ -1,3 +1,4 @@
+// What `chesspal init` writes in a player's folder for each AI host: the opponent's instructions, the MCP server, the hooks and the agents.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { makeFolder, writeAtomically } from "../games/index.ts";

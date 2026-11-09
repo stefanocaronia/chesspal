@@ -8,7 +8,7 @@ import type { Context } from "../src/commands/context.ts";
 import { newGame } from "../src/commands/new-game.ts";
 import { playerMove } from "../src/commands/player-move.ts";
 import { status } from "../src/commands/status.ts";
-import { chatHasRead, type Page, startPage } from "../src/server/page.ts";
+import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];

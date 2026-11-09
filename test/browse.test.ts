@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stepKeys, stepped } from "../src/page/browse.ts";
+import { stepKeys, stepped } from "../src/page/game/browse.ts";
 
 describe("looking back through the game (T-88)", () => {
     it("steps one move at a time or to either end, never past them", () => {

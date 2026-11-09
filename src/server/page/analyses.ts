@@ -1,0 +1,61 @@
+// The analyses the page lists (T-106): the games brought to study and those played here, to analyse or open again on the board page.
+import { bookOpening } from "../../commands/index.ts";
+import { type AiModel, aiModelIn, type GameRecord, isReviewed } from "../../core/index.ts";
+import { archivedGame, archivedGames, gameStemOf, keptGame, keptGames } from "../../games/index.ts";
+import { gameFolder } from "../../profiles/index.ts";
+
+/** An analysis as the page lists it: who played, with the AI's model (D-82), when, how it ended, its opening, how long, and whether the AI has reviewed it. */
+export interface AnalysisItem
+{
+    readonly name: string;
+    readonly white: string;
+    readonly black: string;
+    readonly aiModel?: AiModel;
+    readonly date?: string;
+    readonly result: string;
+    readonly opening?: string;
+    readonly moves: number;
+    readonly reviewed: boolean;
+}
+
+/** The games to analyse in the profile in use, the latest 20: those kept to study and those played, reviewed or not. */
+export function analysesOf(home: string): AnalysisItem[]
+{
+    const folder = gameFolder(home);
+    // By the time in their names, which orders kept and played games together.
+    const stamp = (name: string): string => gameStemOf(name) ?? "";
+    const names = [...keptGames(folder), ...archivedGames(folder)].sort((one, other) => stamp(other).localeCompare(stamp(one))).slice(0, shown);
+    return names.flatMap((name) => itemOf(name, () => name.startsWith("study/") ? keptGame(folder, name) : archivedGame(folder, name)));
+}
+
+// Enough for now; a longer list would load more as it scrolls.
+const shown = 20;
+
+function itemOf(name: string, read: () => GameRecord): AnalysisItem[]
+{
+    let record: GameRecord;
+
+    try {
+        record = read();
+    } catch {
+        // A game that cannot be read stays out of the list.
+        return [];
+    }
+
+    const { tags } = record;
+    const date = tags.Date === undefined || tags.Date.includes("?") ? undefined : tags.Date;
+    const opening = bookOpening(record)?.name;
+    const aiModel = aiModelIn(record);
+
+    return [{
+        name,
+        white: tags.White ?? "?",
+        black: tags.Black ?? "?",
+        ...(aiModel === undefined ? {} : { aiModel }),
+        ...(date === undefined ? {} : { date }),
+        result: tags.Result ?? "*",
+        ...(opening === undefined ? {} : { opening }),
+        moves: Math.ceil(record.moves.length / 2),
+        reviewed: isReviewed(record),
+    }];
+}

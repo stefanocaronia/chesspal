@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Context } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import { positionIn, refuseOtherGame, refuseUnseenPosition } from "../src/commands/play-move.ts";
-import * as page from "../src/page/profile.ts";
+import * as page from "../src/page/profile/profile.ts";
 import { readFrontMatter, writeFrontMatter } from "../src/profiles/front-matter.ts";
 import {
     activateProfile,

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { arrowOf, type DrawnArrow, type DrawnSquare, squareOf } from "../core/index.ts";
 
 /** The most a note of the AI's on a move may hold: a few sentences. */
-export const noteLimit = 700;
+const noteLimit = 700;
 
 // The most arrows, and the most squares, on one move.
 const drawLimit = 6;

@@ -22,7 +22,7 @@ export interface Opening
 }
 
 /** No line of the book is longer: past it, no position is looked up. */
-export const bookDepth = 40;
+const bookDepth = 40;
 
 /** The book's moves: each position on a line of Lichess's files to the moves its lines play from it, the theory the AI knows at the master level (D-15, D-60). */
 export type OpeningBook = Readonly<Record<string, readonly string[]>>;

@@ -1,9 +1,9 @@
 // The page's words in the player's language (D-32): Italian or English, from the browser's or as the settings say (D-56).
 import type { AiLevel, Badge, DrawColour, IllegalReason, Phase, PieceLetter, Side } from "../core/index.ts";
-import type { Step } from "./browse.ts";
-import type { HowEnded } from "./ending.ts";
-import type { StrategyGroup, StrategyRow } from "./helps-view.ts";
-import type { AvatarId, Level, RatingSite } from "./profile.ts";
+import type { Step } from "./game/browse.ts";
+import type { HowEnded } from "./game/ending.ts";
+import type { StrategyGroup, StrategyRow } from "./helps/view.ts";
+import type { AvatarId, Level, RatingSite } from "./profile/profile.ts";
 
 /** The words of the page in one language. */
 export interface Text

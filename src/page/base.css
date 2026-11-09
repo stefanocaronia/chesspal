@@ -1,0 +1,160 @@
+/* What every part shares: the page's type, its buttons and icons, the focus ring, the spinner */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--page);
+    color: var(--ink);
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+}
+
+button,
+textarea {
+    font: inherit;
+    color: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+.icon {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.command {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 7px 11px;
+    font-size: 14px;
+    color: var(--soft);
+}
+
+.command:hover,
+.command[aria-pressed="true"] {
+    color: var(--ink);
+    border-color: var(--line);
+    background: var(--card);
+}
+
+.command.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+}
+
+.command.primary:hover {
+    background: color-mix(in oklab, var(--accent) 85%, var(--ink));
+    border-color: transparent;
+    color: var(--on-accent);
+}
+
+/* A draw the player cannot offer now: before a move each, on the AI's turn, or with an offer standing (D-65); their own offer stands pressed, at full strength */
+.command[aria-disabled="true"]:not([aria-pressed="true"]) {
+    cursor: default;
+    opacity: 0.5;
+}
+
+.command[aria-disabled="true"]:not([aria-pressed="true"]):hover {
+    color: var(--soft);
+    border-color: transparent;
+    background: none;
+}
+
+.icon-button {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--soft);
+}
+
+.icon-button:hover {
+    color: var(--ink);
+}
+
+:root[data-theme="dark"] .icon-button .sun,
+:root:not([data-theme="dark"]) .icon-button .moon {
+    display: none;
+}
+
+.spinner {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spinner {
+        animation-duration: 3s;
+    }
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* The cards, in every column */
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    box-shadow: var(--shadow);
+}
+
+.note {
+    color: var(--soft);
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.empty {
+    margin: 0;
+    color: var(--soft);
+}
+
+.problem {
+    max-width: 40em;
+    margin: 24px auto;
+    padding: 0 16px;
+}

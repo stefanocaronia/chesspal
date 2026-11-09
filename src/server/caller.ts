@@ -2,7 +2,7 @@
 // Codex sends the model and the effort with each call; Claude Code writes them into the chat's transcript, on the line of the call.
 import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import type { Caller } from "../commands/context.ts";
+import type { Caller } from "../commands/index.ts";
 import { lastChatStart } from "../games/index.ts";
 
 /** The host as it names itself to the server. */
@@ -35,12 +35,6 @@ export async function callerOf(meta: Record<string, unknown> | undefined, client
     return client === undefined ? undefined : { annotator: client.title ?? client.name, hostOnly: true };
 }
 
-/** The model and effort on the transcript's line of a tool call, in the chat's file or its subagents'; Claude Code writes it a few milliseconds late. */
-export async function lineOfCall(transcript: string, call: string, wait = 50): Promise<Caller | undefined>
-{
-    return (await foundCall(transcript, call, wait))?.caller;
-}
-
 /** Who in Claude Code made a tool call: the chat itself, or one of its agents by its type. */
 export type CallingAgent = { chat: true; } | { agent: string; };
 
@@ -70,6 +64,12 @@ export async function callingAgent(meta: Record<string, unknown> | undefined, fo
 export function allowedCaller(caller: CallingAgent | undefined, agents: readonly string[]): boolean
 {
     return caller === undefined || ("agent" in caller && agents.includes(caller.agent));
+}
+
+/** The model and effort on the transcript's line of a tool call, in the chat's file or its subagents'; Claude Code writes it a few milliseconds late. */
+async function lineOfCall(transcript: string, call: string, wait = 50): Promise<Caller | undefined>
+{
+    return (await foundCall(transcript, call, wait))?.caller;
 }
 
 // Three seconds at most: the line comes 30 or 40 milliseconds after a short call, but over 300 after annotate_game's long one. Nobody waits for it on the

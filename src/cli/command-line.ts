@@ -1,8 +1,7 @@
+// The `chesspal` command line: a command's input read from the arguments, its result written for a person.
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import type { z } from "zod";
-import { type Context, defaultContext } from "../commands/context.ts";
-import { commands } from "../commands/index.ts";
-import { type AnyCommand, baseType, commandLineFieldProblem, inputProblems, isBoolean, isList, takesNumbers } from "../commands/registry.ts";
+import { type AnyCommand, baseType, commandLineFieldProblem, commands, type Context, defaultContext, inputProblems, isBoolean, isList, takesNumbers } from "../commands/index.ts";
 import { version } from "../version.ts";
 
 export interface CommandLineResult

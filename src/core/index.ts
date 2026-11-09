@@ -11,8 +11,8 @@ export { aiLevels, layersOf, levelForPlayer, levelOf, levelTag, sees, suggestedL
 export type { AiLevel, Layer } from "./levels.ts";
 export { materialOf } from "./material.ts";
 export type { Material } from "./material.ts";
-export { endWithMood, type Mood, moodAt, moodMoves, type MoodNow, moodOf, moods, moodTag, withoutMoods } from "./moods.ts";
-export { bookDepth, bookMoves, indexBook, indexOpenings, inOpenings, openingOf, outOfBookMove } from "./openings.ts";
+export { endWithMood, type Mood, moodAt, type MoodNow, moodOf, moods, moodTag, withoutMoods } from "./moods.ts";
+export { bookMoves, indexBook, indexOpenings, inOpenings, openingOf, outOfBookMove } from "./openings.ts";
 export type { Opening, OpeningBook, OpeningIndex } from "./openings.ts";
 export { pgnDate, readPgn, writePgn } from "./pgn.ts";
 export type { BishopFacts, CentreSquare, KingFacts, Outpost, PawnFacts, PawnSquare, Phase, Profile, SideProfile } from "./profile.ts";
@@ -32,7 +32,6 @@ export {
     type DrawnArrow,
     type DrawnSquare,
     gameReviewOf,
-    isBadge,
     isReviewed,
     type MoveReview,
     reviewed,

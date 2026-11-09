@@ -10,7 +10,7 @@ export const moods = ["neutral", "happy", "surprised", "worried", "thoughtful", 
 export type Mood = (typeof moods)[number];
 
 /** How many of the AI's moves each mood lasts, the one it comes with included: a surprise is a flash (Julián, round of T-107). */
-export const moodMoves: Readonly<Record<Mood, number>> = { neutral: 0, happy: 3, surprised: 1, worried: 3, thoughtful: 3, sad: 3 };
+const moodMoves: Readonly<Record<Mood, number>> = { neutral: 0, happy: 3, surprised: 1, worried: 3, thoughtful: 3, sad: 3 };
 
 /** The AI's mood at a point of a game, and how many more of its moves keep it before it fades: 0 when its next move ends it. */
 export interface MoodNow

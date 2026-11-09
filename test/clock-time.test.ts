@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { timeShown } from "../src/page/clock-time.ts";
+import { timeShown } from "../src/page/players/clock-time.ts";
 
 describe("the page's clock (T-37)", () => {
     it("shows minutes and seconds, and tenths in the last 20 seconds", () => {

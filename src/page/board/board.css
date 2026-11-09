@@ -1,0 +1,972 @@
+/* The board: squares, pieces and how they move, the marks, the drawings, the notices and the end of a game */
+
+/* The board, above the columns' tabs, which slide under it */
+.board {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    aspect-ratio: 1;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--board-shadow);
+    user-select: none;
+    container-type: inline-size;
+}
+
+.square {
+    position: relative;
+}
+
+.square.light {
+    background-color: var(--light-square);
+}
+
+.square.dark {
+    background-color: var(--dark-square);
+}
+
+.square.last {
+    background-image: linear-gradient(var(--last-move), var(--last-move));
+}
+
+.square.selected {
+    background-image: linear-gradient(var(--selected), var(--selected));
+}
+
+/* The king checkmated (T-77): its square red, over the last move's colour */
+.square.mated {
+    background-image: linear-gradient(var(--mated), var(--mated));
+}
+
+/* The player's marks with the right button (T-73): orange squares and arrows, gone at a left click */
+.square.marked {
+    background-image: linear-gradient(var(--mark-square), var(--mark-square));
+}
+
+/* The square the player points at in the AI's words (T-111): a white ring with a dark edge, which reads on every board and over the rings the AI draws */
+.square.pointed {
+    outline: max(4px, 0.8cqw) solid #fff;
+    outline-offset: calc(-1 * max(4px, 0.8cqw));
+    box-shadow: inset 0 0 0 calc(max(4px, 0.8cqw) + 2px) rgba(0, 0, 0, 0.55);
+}
+
+/* On a square the AI marked, the pointer's ring takes the place of the AI's while it lasts */
+.square.noted.pointed::after {
+    box-shadow: inset 0 0 0 max(4px, 0.8cqw) #fff, inset 0 0 0 calc(max(4px, 0.8cqw) + 2px) rgba(0, 0, 0, 0.55);
+}
+
+.arrows {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    aspect-ratio: 1;
+    /* Over every square, the sliding piece's too (z-index 1) */
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+/* The helps' arrows, seen while the player plays, show the pieces through them more (Stefano, T-142) */
+.arrows.drawn {
+    opacity: 0.5;
+}
+
+/* The round cap closes a shaft round the square's centre, as on Lichess: arrows off one square meet in one round knot, at any angle (Stefano, T-142) */
+.arrows path {
+    fill: none;
+    stroke: var(--mark);
+    stroke-width: 0.2;
+    stroke-linecap: round;
+}
+
+/* The helps' arrows, the AI's and the coach's, thinner than the player's own, on a thin edge: they read as the helps' (Stefano, T-142) */
+.arrows.drawn path {
+    stroke-width: 0.14;
+}
+
+.arrows polygon {
+    fill: var(--mark);
+}
+
+/* What the AI draws with its note in an analysis (D-69): arrows and squares in the four colours of PGN's %cal and %csl */
+.arrows g.green {
+    --mark: var(--drawn-green);
+}
+
+.arrows g.red {
+    --mark: var(--drawn-red);
+}
+
+.arrows g.yellow {
+    --mark: var(--drawn-yellow);
+}
+
+.arrows g.blue {
+    --mark: var(--drawn-blue);
+}
+
+/* The AI's arrows have a white edge, as its rings do (D-78): they read as its own whatever colour the player marks in */
+.arrows .edge {
+    stroke: #fff;
+}
+
+.arrows path.edge {
+    stroke-width: 0.2;
+}
+
+.arrows polygon.edge {
+    fill: #fff;
+    stroke-width: 0.06;
+    stroke-linejoin: round;
+}
+
+/* The AI's squares are rings (Zoe, T-40): the last move's fill and the player's marks stay seen under them */
+.square.noted::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 max(3px, 0.6cqw) var(--ring), inset 0 0 0 calc(max(3px, 0.6cqw) + 1.5px) rgba(255, 255, 255, 0.8);
+}
+
+.square.noted.green {
+    --ring: var(--drawn-green);
+}
+
+.square.noted.red {
+    --ring: var(--drawn-red);
+}
+
+.square.noted.yellow {
+    --ring: var(--drawn-yellow);
+}
+
+.square.noted.blue {
+    --ring: var(--drawn-blue);
+}
+
+/* Moving a piece (T-70, Zoe's design): dots for the legal moves, rings on captures, a gold edge on the square a dragged piece would land on */
+.square.hint::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 33%;
+    height: 33%;
+    border-radius: 50%;
+    background: var(--hint);
+    pointer-events: none;
+}
+
+.square.hint.capture::before {
+    inset: 4%;
+    width: auto;
+    height: auto;
+    margin: 0;
+    background: none;
+    border: 1cqw solid var(--hint);
+}
+
+.square.over {
+    box-shadow: inset 0 0 0 max(2px, 0.625cqw) var(--hover-edge);
+}
+
+@media (hover: hover) {
+    .board.playable .square.hint:hover,
+    .board.playable .square.target:hover {
+        box-shadow: inset 0 0 0 max(2px, 0.625cqw) var(--hover-edge);
+    }
+}
+
+.square.from .piece {
+    opacity: var(--ghost);
+}
+
+.board.playable .square.own {
+    cursor: grab;
+    touch-action: none;
+}
+
+.board.playable .square.hint,
+.board.playable .square.target {
+    cursor: pointer;
+}
+
+/* Over every element's own cursor, the hand's while a piece is in the air */
+:root.dragging,
+:root.dragging * {
+    cursor: grabbing !important;
+}
+
+/* The lifted piece follows the pointer without a transition; the piece inside it rises. Fixed to the window, it never gives the page a scrollbar */
+.lifted {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 12.5cqw;
+    height: 12.5cqw;
+    z-index: 10;
+    pointer-events: none;
+    translate: var(--x) var(--y);
+}
+
+.lifted .piece {
+    display: block;
+    width: 100%;
+    height: 100%;
+    transition: transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    filter: drop-shadow(0 0 0 transparent);
+}
+
+.lifted.up .piece {
+    transform: scale(1.1);
+    filter: drop-shadow(0.375cqw 1cqw 0.75cqw var(--lift-shadow));
+}
+
+.lifted.up.touch .piece {
+    transform: translateY(-75%) scale(1.25);
+}
+
+.lifted.back {
+    transition: translate 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.lifted.back .piece {
+    transform: none;
+    filter: drop-shadow(0 0 0 transparent);
+    transition-duration: 180ms;
+}
+
+/* A move not dragged slides from its square, in 12.5cqw a square, and a king in check rings like a bell struck (T-74) */
+.square.slide {
+    z-index: 1;
+}
+
+/* The square's own piece only: one taken or fading on it keeps its own animation */
+.square.slide > .piece {
+    animation: slide 220ms cubic-bezier(0.25, 0.8, 0.35, 1);
+}
+
+.square.shake > .piece {
+    animation: ring 320ms cubic-bezier(0.3, 0, 0.2, 1) 200ms;
+}
+
+/* The piece taken stays under the one that takes it until it arrives */
+.square .taken-piece .piece {
+    animation: taken 220ms step-end forwards;
+}
+
+/* A jump through the game (T-88): a piece no longer there fades, one that was not there appears */
+.square .gone-piece .piece {
+    animation: taken 220ms forwards;
+}
+
+.square.appear > .piece {
+    animation: appear 220ms;
+}
+
+@keyframes appear {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes taken {
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes slide {
+    from {
+        translate: calc(var(--dx) * 12.5cqw) calc(var(--dy) * 12.5cqw);
+    }
+}
+
+/* The hammer's blow, then a vibration that dies away: each swing smaller, eased at both ends */
+@keyframes ring {
+    12% {
+        translate: -2.5% 0;
+    }
+
+    34% {
+        translate: 1.8% 0;
+    }
+
+    56% {
+        translate: -1.1% 0;
+    }
+
+    78% {
+        translate: 0.5% 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lifted .piece,
+    .lifted.back {
+        transition: none;
+    }
+
+    .square.slide > .piece,
+    .square.shake > .piece,
+    .square.appear > .piece {
+        animation: none;
+    }
+
+    .square .taken-piece,
+    .square .gone-piece {
+        display: none;
+    }
+}
+
+/* The end of the game (T-77): the kings' badges and the loser's king laid down stay; the effects play once, when the game ends under the player's eyes */
+/* The king laid down keeps its size and lies on the base the other pieces stand on, in the middle of its square: it turns about the point that puts it
+   there, which each set's drawing places */
+.square.fallen .piece {
+    rotate: -90deg;
+    transform-origin: var(--fallen-pivot, 50% 50%);
+}
+
+:root[data-set="nitida"] {
+    --fallen-pivot: 53.7% 54.8%;
+}
+
+:root[data-set="torretta"] {
+    --fallen-pivot: 52% 50.8%;
+}
+
+:root[data-set="cburnett"] {
+    --fallen-pivot: 50.2% 50.9%;
+}
+
+.badge {
+    position: absolute;
+    top: 2.5%;
+    right: 2.5%;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: clamp(14px, 3.8cqw, 30px);
+    height: clamp(14px, 3.8cqw, 30px);
+    border-radius: 50%;
+    color: #fff;
+    font-size: clamp(9px, 2.5cqw, 19px);
+    font-weight: 800;
+    line-height: 1;
+    /* Edged in white, to stand out on any square, the red one too */
+    box-shadow: 0 0 0 max(1.5px, 0.25cqw) #fff, 0 0.2cqw 0.6cqw rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
+.badge svg {
+    width: 66%;
+    height: 66%;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.badge.crown {
+    background: #e0a526;
+    color: #3b2a00;
+}
+
+/* The mate white on the red square, edged in red */
+.badge.mate {
+    background: #fff;
+    color: #c81e1e;
+    box-shadow: 0 0 0 max(1.5px, 0.25cqw) #c81e1e, 0 0.2cqw 0.6cqw rgba(0, 0, 0, 0.4);
+}
+
+.badge.flag {
+    background: #4a4f57;
+}
+
+.badge.half {
+    background: #69727d;
+}
+
+/* A move's badge (D-69, T-41): 16px beside a move, a third of a square in the corner of its arrival, edged in white as the kings' badges */
+.move-badge {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    vertical-align: -3px;
+}
+
+.square .move-badge {
+    position: absolute;
+    top: 2.5%;
+    right: 2.5%;
+    z-index: 2;
+    width: clamp(16px, 4.25cqw, 30px);
+    height: clamp(16px, 4.25cqw, 30px);
+    border-radius: 50%;
+    box-shadow: 0 0 0 max(1.5px, 0.25cqw) #fff, 0 0.2cqw 0.6cqw rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
+/* With the king's badge on the same square, at the end, the move's stands beside it (Zoe, T-40) */
+.square:has(.badge) .move-badge {
+    right: calc(2.5% + clamp(14px, 3.8cqw, 30px) + max(4px, 0.6cqw));
+}
+
+/* Checkmate: the king rings with the check, its square fills with red from the edges, then it falls */
+@media (prefers-reduced-motion: no-preference) {
+    .board.fresh.by-checkmate .square.mated {
+        background-image: none;
+        animation: mate-in 300ms cubic-bezier(0.2, 0.8, 0.2, 1) 450ms forwards;
+    }
+}
+
+.board.fresh.by-checkmate .square.fallen .piece {
+    animation: ring 320ms cubic-bezier(0.3, 0, 0.2, 1) 200ms, fall 450ms 800ms backwards;
+}
+
+/* A resignation: the king is laid down slowly, as a player lays theirs */
+.board.fresh.by-resignation .square.fallen .piece {
+    animation: lay 1000ms cubic-bezier(0.45, 0, 0.55, 1) 250ms backwards;
+}
+
+/* Stalemate: the king darts one way and the other, and finds no square */
+.board.fresh.by-stalemate .square.stalled .piece {
+    animation: dart 700ms cubic-bezier(0.4, 0, 0.2, 1) 250ms;
+}
+
+/* The other draws: both kings light up together */
+.board.fresh:not(.by-stalemate) .square.drawn {
+    animation: draw-glow 1000ms ease-in-out 200ms;
+}
+
+/* The badges come once the kings have taken the end */
+.board.fresh .badge {
+    animation: badge-in 320ms cubic-bezier(0.3, 1.4, 0.5, 1) 800ms backwards;
+}
+
+.board.fresh.by-checkmate .badge {
+    animation-delay: 1350ms;
+}
+
+.board.fresh.by-resignation .badge {
+    animation-delay: 1200ms;
+}
+
+.board.fresh.by-stalemate .badge {
+    animation-delay: 950ms;
+}
+
+/* The player won: a narrow golden sheen crosses the board once, after the badges; a loss needs no more than the king and its badge */
+.board.fresh.player-won::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 44%, rgba(255, 230, 150, 0.6) 50%, transparent 56%) 0 0 / 300% 100% no-repeat;
+    mix-blend-mode: screen;
+    animation: sheen 900ms cubic-bezier(0.45, 0, 0.55, 1) 1600ms backwards;
+}
+
+@keyframes mate-in {
+    from {
+        box-shadow: inset 0 0 0 0 var(--mated);
+    }
+
+    to {
+        box-shadow: inset 0 0 0 7cqw var(--mated);
+    }
+}
+
+/* Falling, the king drops fast, bounces once off the board and settles */
+@keyframes fall {
+    from {
+        rotate: 0deg;
+        animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+    }
+
+    45% {
+        rotate: -90deg;
+        animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
+    }
+
+    68% {
+        rotate: -74deg;
+        animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+    }
+
+    86% {
+        rotate: -90deg;
+        animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
+    }
+
+    94% {
+        rotate: -86deg;
+        animation-timing-function: ease-in;
+    }
+}
+
+@keyframes lay {
+    from {
+        rotate: 0deg;
+    }
+}
+
+@keyframes dart {
+    20% {
+        translate: 6% -3%;
+    }
+
+    40%,
+    80% {
+        translate: 0 0;
+    }
+
+    60% {
+        translate: -6% -3%;
+    }
+}
+
+@keyframes draw-glow {
+    40%,
+    60% {
+        /* A ring in the skin's colour, much darker than its squares, to show on the light and the dark ones */
+        box-shadow: inset 0 0 0 0.6cqw color-mix(in oklab, var(--dark-square) 50%, var(--fixed-ink)), inset 0 0 2.5cqw 0.4cqw color-mix(in oklab, var(--dark-square) 40%, transparent);
+    }
+}
+
+@keyframes badge-in {
+    from {
+        scale: 0;
+        opacity: 0;
+    }
+}
+
+@keyframes sheen {
+    from {
+        background-position: 100% 0;
+    }
+
+    to {
+        background-position: 0 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .board.fresh,
+    .board.fresh .square,
+    .board.fresh .piece,
+    .board.fresh .badge {
+        animation: none;
+    }
+
+    .board.fresh::after {
+        display: none;
+    }
+}
+
+/* The ranks and files grow with the board, as 13 points on 800, tucked into the corners the pieces leave free */
+.coordinate {
+    position: absolute;
+    font-size: clamp(9px, 1.6cqw, 13px);
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.coordinate.rank {
+    top: 3%;
+    left: 4%;
+}
+
+.coordinate.file {
+    right: 4%;
+    bottom: 2.5%;
+}
+
+.square.light .coordinate,
+.square.light .square-name {
+    color: var(--dark-square);
+}
+
+.square.dark .coordinate,
+.square.dark .square-name {
+    color: var(--light-square);
+}
+
+/* The square's name in the corner of the file, under the pointer or the piece dragged, in its place on the bottom rank, when the player turns it on (T-76): bottom
+   right, where no badge sits (Stefano); the help rows' names stay in line */
+.square .square-name {
+    position: absolute;
+    right: 4%;
+    bottom: 2.5%;
+    z-index: 2;
+    display: none;
+    font-size: clamp(9px, 1.6cqw, 13px);
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.board.named .square.over .square-name {
+    display: block;
+}
+
+.board.named .square.over .coordinate.file {
+    visibility: hidden;
+}
+
+@media (hover: hover) {
+    .board.named .square:hover .square-name {
+        display: block;
+    }
+
+    .board.named .square:hover .coordinate.file {
+        visibility: hidden;
+    }
+}
+
+.square .piece {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* The pieces: one shape each, in the colour of its side with a black edge (D-49) */
+.piece {
+    --piece-edge-width: 6.5px;
+}
+
+/* How much of its colours a piece keeps against the page: all of them, but on a board that is off (D-77). Opaque, so no square shows through it */
+@property --kept {
+    syntax: "<percentage>";
+    inherits: true;
+    initial-value: 100%;
+}
+
+.piece.white {
+    --piece-fill: color-mix(in oklab, var(--white-piece) var(--kept), var(--page));
+    --piece-edge: color-mix(in oklab, #000 var(--kept), var(--page));
+}
+
+.piece.black {
+    --piece-fill: color-mix(in oklab, var(--black-piece) var(--kept), var(--page));
+    --piece-edge: color-mix(in oklab, #000 var(--kept), var(--page));
+    --piece-detail: color-mix(in oklab, var(--white-piece) var(--kept), var(--page));
+}
+
+/* Why a move was refused (T-11): a bubble over the square it went to, its tail on the square; a ring on the piece that forbids it */
+.notice {
+    --shift: -50%;
+    position: absolute;
+    z-index: 3;
+    left: calc((var(--column) + 0.5) * 12.5cqw);
+    top: calc(var(--row) * 12.5cqw);
+    transform: translate(var(--shift), calc(-100% - 8px));
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: max-content;
+    max-width: min(78cqw, 340px);
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 7px;
+    /* Ink in both themes (T-91), as the arrows that explain */
+    background: var(--explain-ink);
+    color: #f4f6f9;
+    font-size: 13.5px;
+    line-height: 1.35;
+    box-shadow: var(--shadow);
+    pointer-events: none;
+    animation: notice-in 160ms ease-out;
+}
+
+.notice::after {
+    content: "";
+    position: absolute;
+    left: calc(-1 * var(--shift) - 6px);
+    top: 100%;
+    border: 6px solid transparent;
+    border-top-color: var(--explain-ink);
+}
+
+/* The kind of reason (T-91): a light tile with the piece, a pin, a bar, castling; the player's king on red */
+.explain-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 2px;
+    border-radius: 6px;
+    background: #e3e9f0;
+}
+
+.explain-icon.king {
+    background: #f3c4c4;
+}
+
+.explain-icon .piece {
+    width: 100%;
+    height: 100%;
+}
+
+.explain-icon svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: var(--explain-ink);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.explain-icon .bar {
+    stroke-width: 3;
+}
+
+/* The arrow that explains a refused move: ink, apart from the player's orange ones */
+.arrows.explain {
+    opacity: 0.78;
+}
+
+/* An explaining arrow starts off the culprit's piece, and its cap would carry it back onto it */
+.arrows.explain path {
+    stroke: var(--explain-ink);
+    stroke-linecap: butt;
+}
+
+.arrows.explain polygon {
+    fill: var(--explain-ink);
+}
+
+.notice.start {
+    --shift: 0%;
+    left: calc(var(--column) * 12.5cqw + 4px);
+}
+
+.notice.start::after {
+    left: calc(6.25cqw - 10px);
+}
+
+.notice.end {
+    --shift: -100%;
+    left: calc((var(--column) + 1) * 12.5cqw - 4px);
+}
+
+.notice.end::after {
+    left: auto;
+    right: calc(6.25cqw - 10px);
+}
+
+.notice.below {
+    top: calc((var(--row) + 1) * 12.5cqw);
+    transform: translate(var(--shift), 8px);
+}
+
+/* Where the bubble hides neither the culprit nor the arrow's point (T-91, Zoe): under the whole board on a phone, beside the piece on a wide board */
+.notice.under-board {
+    top: 100cqw;
+    transform: translate(var(--shift), 8px);
+}
+
+.notice.below::after,
+.notice.under-board::after {
+    top: auto;
+    bottom: 100%;
+    border-top-color: transparent;
+    border-bottom-color: var(--explain-ink);
+}
+
+.notice.right,
+.notice.left {
+    top: calc((var(--row) + 0.5) * 12.5cqw);
+    max-width: min(calc((var(--room) * 12.5cqw) - 12px), 340px);
+}
+
+.notice.right {
+    --room: calc(7 - var(--column));
+    left: calc((var(--column) + 1) * 12.5cqw + 8px);
+    transform: translateY(-50%);
+}
+
+.notice.left {
+    --room: var(--column);
+    left: calc(var(--column) * 12.5cqw - 8px);
+    transform: translate(-100%, -50%);
+}
+
+.notice.right::after,
+.notice.left::after {
+    top: calc(50% - 6px);
+}
+
+.notice.right::after {
+    left: auto;
+    right: 100%;
+    border-top-color: transparent;
+    border-right-color: var(--explain-ink);
+}
+
+.notice.left::after {
+    left: 100%;
+    right: auto;
+    border-top-color: transparent;
+    border-left-color: var(--explain-ink);
+}
+
+/* On a phone's board the bubble takes its width, in two lines, its tail on the piece's column. The width is board/board.tsx's narrowBoard too */
+@container (max-width: 519px) {
+    .board-wrap .notice:not(.centre) {
+        left: 4px;
+        width: calc(100cqw - 8px);
+        max-width: none;
+        --shift: 0%;
+    }
+
+    .board-wrap .notice:not(.centre)::after {
+        left: calc((var(--column) + 0.5) * 12.5cqw - 10px);
+        right: auto;
+    }
+}
+
+.notice.centre {
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.notice.centre::after {
+    content: none;
+}
+
+@keyframes notice-in {
+    from {
+        opacity: 0;
+    }
+}
+
+/* The choice of the piece a pawn becomes (T-11): four round buttons in a column from its square, over a shade */
+.promotion {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 4;
+    width: 100%;
+    aspect-ratio: 1;
+}
+
+.promotion-shade {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.promotion-piece {
+    position: absolute;
+    left: calc(var(--column) * 12.5cqw);
+    top: calc(var(--row) * 12.5cqw);
+    width: 12.5cqw;
+    height: 12.5cqw;
+    padding: 0.6cqw;
+    border: 0;
+    border-radius: 50%;
+    background: var(--light-square);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+}
+
+.promotion-piece:hover {
+    box-shadow: var(--shadow), inset 0 0 0 max(2px, 0.625cqw) var(--hover-edge);
+}
+
+/* White inside dark reads on every square and every theme. */
+.promotion-piece:focus-visible,
+.square:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4.5px var(--fixed-ink);
+}
+
+.promotion-piece .piece {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.square.culprit {
+    box-shadow: inset 0 0 0 max(2.5px, 0.5cqw) var(--explain-ink), inset 0 0 0 calc(max(2.5px, 0.5cqw) + 1.5px) rgba(255, 255, 255, 0.85);
+}
+
+/* Between games the board goes off (D-77): the squares sink toward the page and the pieces fade, the table set and nobody playing. A game the page saw end
+   keeps its final position less off, once its effects are over, with the kings' badges and the last move in full. A thin line keeps its edge, which the
+   light squares would lose in the page */
+.board-wrap.off > .board {
+    box-shadow: 0 0 0 1px var(--line);
+}
+
+.board-wrap.off .square.light {
+    background-color: color-mix(in oklab, var(--light-square) 40%, var(--page));
+}
+
+.board-wrap.off .square.dark {
+    background-color: color-mix(in oklab, var(--dark-square) 40%, var(--page));
+}
+
+/* The pieces fade toward the page and never turn see-through, so each side keeps one colour on every square; cburnett, which ignores the variables, loses
+   contrast instead, opaque as well */
+.board-wrap.off .piece {
+    --kept: 45%;
+}
+
+:root[data-set="cburnett"] .board-wrap.off .piece {
+    filter: grayscale(0.5) contrast(0.55);
+}
+
+:root[data-set="cburnett"] .board-wrap.off > .ended .piece {
+    filter: grayscale(0.3) contrast(0.8);
+}
+
+:root[data-set="cburnett"] .board-wrap.off > .ended .badge .piece {
+    filter: none;
+}
+
+.board-wrap.off .coordinate {
+    opacity: 0.4;
+}
+
+.board-wrap.off > .ended .square.light {
+    background-color: color-mix(in oklab, var(--light-square) 62%, var(--page));
+}
+
+.board-wrap.off > .ended .square.dark {
+    background-color: color-mix(in oklab, var(--dark-square) 62%, var(--page));
+}
+
+.board-wrap.off > .ended .piece {
+    --kept: 75%;
+}
+
+.board-wrap.off > .ended .badge .piece {
+    --kept: 100%;
+}
+
+/* It goes off gently, and comes back at once with the next game */
+@media (prefers-reduced-motion: no-preference) {
+    .board-wrap.off .square {
+        transition: background-color 400ms ease;
+    }
+
+    .board-wrap.off .piece,
+    .board-wrap.off .coordinate {
+        transition: opacity 400ms ease, --kept 400ms ease;
+    }
+}

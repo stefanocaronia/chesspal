@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextFold } from "../src/page/folds.ts";
+import { nextFold } from "../src/page/layout/folds.ts";
 
 describe("the side columns' tabs", () => {
     it("narrow the talk to its faces, then fold it, then open it whole", () => {

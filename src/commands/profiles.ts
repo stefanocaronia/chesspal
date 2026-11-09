@@ -43,7 +43,7 @@ export const profiles = defineCommand({
     cliOnly: true,
     readOnly: true,
     idempotent: true,
-    run: (_input, context): { profiles: PlayerProfile[]; active: string; } => ({ profiles: listProfiles(context.home()), active: activeProfile(context.home()).id }),
+    run: (input, context): { profiles: PlayerProfile[]; active: string; } => ({ profiles: listProfiles(context.home()), active: activeProfile(context.home()).id }),
     format: ({ profiles, active }) => profiles.map((profile) => `${profile.id === active ? "*" : " "} ${profile.id}: ${playerText(profile)}`).join("\n"),
 });
 
@@ -144,7 +144,7 @@ export function playerLine(context: Context): string | undefined
 }
 
 /** Throws while a game goes on in the profile in use. */
-export function refuseWhilePlaying(context: Context): void
+function refuseWhilePlaying(context: Context): void
 {
     const current = gameAt(gameFolder(context.home()), context.now());
 

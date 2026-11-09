@@ -9,7 +9,7 @@ export const badges = ["brilliant", "great", "best", "excellent", "good", "book"
 export type Badge = (typeof badges)[number];
 
 /** The colours the AI draws with on the board, by the letters PGN's [%cal] and [%csl] write them with. */
-export const drawColours = { G: "green", R: "red", Y: "yellow", B: "blue" } as const;
+const drawColours = { G: "green", R: "red", Y: "yellow", B: "blue" } as const;
 
 /** A colour the AI draws with. */
 export type DrawColour = (typeof drawColours)[keyof typeof drawColours];
@@ -143,6 +143,15 @@ export function aiModelIn(record: GameRecord): AiModel | undefined
     return signerOf(record.tags, ["AIModel", "AIEffort"]);
 }
 
+/** The record with the AI's word on the whole game, or its last word on the ending, in place of the one it had: each only when given. */
+export function withGameReview(record: GameRecord, { summary, closing }: { summary?: string; closing?: string; }): GameRecord
+{
+    const summed = summary === undefined ? gameReviewOf(record) : noteText(summary);
+    const closed = closing === undefined ? closingOf(record) : noteText(closing);
+    const comment = [withoutReview(record.comment), summed ? `[%review ${summed}]` : "", closed ? `[%closing ${closed}]` : ""].filter((part) => part !== "").join(" ");
+    return comment === "" ? { tags: record.tags, moves: record.moves } : { tags: record.tags, comment, moves: record.moves };
+}
+
 // The effort has no tag of its own in PGN: Chesspal's sits beside the Annotator.
 const effortTag = "AnnotatorEffort";
 
@@ -166,17 +175,8 @@ function signed(tags: Record<string, string>, [modelTag, modelEffortTag]: [strin
     return { ...Object.fromEntries(others), [modelTag]: model, ...(effort === undefined ? {} : { [modelEffortTag]: effort }) };
 }
 
-/** The record with the AI's word on the whole game, or its last word on the ending, in place of the one it had: each only when given. */
-export function withGameReview(record: GameRecord, { summary, closing }: { summary?: string; closing?: string; }): GameRecord
-{
-    const summed = summary === undefined ? gameReviewOf(record) : noteText(summary);
-    const closed = closing === undefined ? closingOf(record) : noteText(closing);
-    const comment = [withoutReview(record.comment), summed ? `[%review ${summed}]` : "", closed ? `[%closing ${closed}]` : ""].filter((part) => part !== "").join(" ");
-    return comment === "" ? { tags: record.tags, moves: record.moves } : { tags: record.tags, comment, moves: record.moves };
-}
-
 /** Whether a word is one of the badges. */
-export function isBadge(word: string | undefined): word is Badge
+function isBadge(word: string | undefined): word is Badge
 {
     return (badges as readonly string[]).includes(word ?? "");
 }

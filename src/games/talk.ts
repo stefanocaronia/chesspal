@@ -55,23 +55,6 @@ export class WordsRefused extends Error
     }
 }
 
-/** The lines the player wrote since the AI's last move: those it answers with its next move, and the 200 characters of this move are counted on them. */
-export function playerLinesThisMove(current: CurrentGame): TalkLine[]
-{
-    const since = sinceAiMoved(current);
-    return current.talk.filter((line) => line.who === "player" && line.ply >= since);
-}
-
-/** How many characters the player may still write for this move; between games a whole line each time, with no count (D-74). */
-export function wordsLeft(current: Talk): number
-{
-    if (!going(current)) {
-        return talkLimits.player;
-    }
-
-    return Math.max(talkLimits.player - playerLinesThisMove(current).reduce((sum, line) => sum + line.text.length, 0), 0);
-}
-
 /** Whether the player's last line wakes the chat: the first of a move, and between games the first since the AI last spoke (D-54, D-74). */
 export function wakesTheChat(current: Talk): boolean
 {
@@ -102,6 +85,23 @@ export function heardLines(current: Talk, given: ReadonlySet<string>): (Heard | 
         const key = keyOf(current, index);
         return line.who === "ai" ? undefined : !waiting.has(key) ? "answered" : given.has(key) ? "read" : "sent";
     });
+}
+
+/** The lines the player wrote since the AI's last move: those it answers with its next move, and the 200 characters of this move are counted on them. */
+function playerLinesThisMove(current: CurrentGame): TalkLine[]
+{
+    const since = sinceAiMoved(current);
+    return current.talk.filter((line) => line.who === "player" && line.ply >= since);
+}
+
+/** How many characters the player may still write for this move; between games a whole line each time, with no count (D-74). */
+function wordsLeft(current: Talk): number
+{
+    if (!going(current)) {
+        return talkLimits.player;
+    }
+
+    return Math.max(talkLimits.player - playerLinesThisMove(current).reduce((sum, line) => sum + line.text.length, 0), 0);
 }
 
 /**

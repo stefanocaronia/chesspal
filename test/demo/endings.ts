@@ -10,7 +10,7 @@ import { endGame } from "../../src/commands/end-game.ts";
 import { newGame } from "../../src/commands/new-game.ts";
 import { playerMove } from "../../src/commands/player-move.ts";
 import { newProfile } from "../../src/commands/profiles.ts";
-import { startPage } from "../../src/server/page.ts";
+import { startPage } from "../../src/server/page/page.ts";
 
 /** A game one move from its end, and its end; the player has White. */
 interface Scene

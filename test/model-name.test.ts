@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modelName, signature } from "../src/page/model-name.ts";
+import { modelName, signature } from "../src/page/players/model-name.ts";
 
 describe("a model's name on the page (D-81, D-82)", () => {
     it("names a Claude model as people say it, however the host writes its id", () => {

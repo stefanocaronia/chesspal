@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game, readPgn } from "../src/core/index.ts";
-import { endSoundOf, soundOf } from "../src/page/sounds.ts";
+import { endSoundOf, soundOf } from "../src/page/sounds/sounds.ts";
 
 describe("the board's sounds", () => {
     it("sound a move, a capture, a check, a mate and a draw by how the board stands after it, and nothing before the first move", () => {

@@ -26,21 +26,18 @@ import {
     withGameReview,
     withLead,
 } from "../core/index.ts";
-import { keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis } from "../games/index.ts";
+import { isGameName, keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis } from "../games/index.ts";
 import { analystAgent, instructions } from "../host-files/index.ts";
 import { activeProfile, gameFolder } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
-import { speechLine, speechOf } from "./game-summary.ts";
 import { bookOpening, bookReaches } from "./opening-book.ts";
 import { defineCommand } from "./registry.ts";
+import { speechLine, speechOf } from "./speech.ts";
 import { gameToStudy, knownTag, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
 import { balanceText, colourName, riskLine } from "./view.ts";
 
 // The analyst's instructions, read at the first analysis.
 let analystText: string | undefined;
-
-// A game's name as past_games, study_games and analyse_game write it: games/2026-11-02-153012.pgn.
-const gameName = /^\s*(games\/|study\/)?\d{4}-\d{2}-\d{2}-\d{6}\.pgn\s*$/i;
 
 /** A move as the analysis gives it: what happened, never how good it was (D-6). */
 interface MoveFacts
@@ -128,7 +125,7 @@ export const analyseGame = defineCommand({
         }
 
         // A game's name given as pgn, as an AI often gives it, is that game (Priya, retest of T-133).
-        const named = pgn !== undefined && gameName.test(pgn) ? pgn.trim() : game;
+        const named = pgn !== undefined && isGameName(pgn) ? pgn.trim() : game;
         const studied = pgn === undefined || named !== game ? gameToStudy(context, named) : importedGame(context, pgn);
 
         // One analyst a game: the chat goes over the review there is (Stefano, T-133).
@@ -156,7 +153,7 @@ export const analyseGame = defineCommand({
         [
             ...(analysis.instructions === undefined ? [] : [analysis.instructions, ""]),
             ...(analysis.speech === undefined ? [] : [analysis.speech]),
-            ...headLines(analysis),
+            ...analysisHead(analysis),
             ...analysis.moves.map(moveLine),
         ].join("\n"),
 });
@@ -209,7 +206,7 @@ function importedGame(context: Context, pgn: string): Studied
  */
 function markBook(context: Context, { record, name }: Required<Studied>, moves: readonly MoveFacts[]): void
 {
-    const inBook = bookPlies(record, moves);
+    const inBook = bookPliesOfFacts(record, moves);
     const unmarked = record.moves.slice(0, inBook).some((move) => reviewOf(move.comment)?.badge === undefined);
 
     if (!unmarked) {
@@ -224,8 +221,8 @@ function markBook(context: Context, { record, name }: Required<Studied>, moves: 
     rewriteGame(gameFolder(context.home()), name, { ...record, moves: marked });
 }
 
-/** How many plies from the start the opening book knows: to the move before the first out of it; none from another position. */
-function bookPlies(record: GameRecord, moves: readonly MoveFacts[]): number
+/** How many plies from the start the opening book knows, as opening-book's bookPlies counts them, read from the facts already found: none from another position. */
+function bookPliesOfFacts(record: GameRecord, moves: readonly MoveFacts[]): number
 {
     const firstOut = moves.findIndex((move) => move.outOfBook);
     return record.tags.FEN !== undefined ? 0 : firstOut >= 0 ? firstOut : moves.length;
@@ -253,7 +250,7 @@ function analysisOf({ record, name }: Studied, playerName: string | undefined): 
         termination: ended?.termination,
         opening: opening === undefined ? undefined : `${opening.eco} ${opening.name}`,
         inBook: opening !== undefined && !moves.some((move) => move.outOfBook) ? true : undefined,
-        bookTo: opening === undefined ? undefined : moves[bookPlies(record, moves) - 1]?.move,
+        bookTo: opening === undefined ? undefined : moves[bookPliesOfFacts(record, moves) - 1]?.move,
         review: [gameReviewOf(record), closingOf(record)].filter((word) => word !== undefined).join(" ") || undefined,
         name,
         start: tags.FEN === undefined ? undefined : { fen: tags.FEN, ...start },
@@ -322,7 +319,7 @@ function movesOf(record: GameRecord, ai: Side | undefined): Replay
 }
 
 /** The head of the analysis: who played, when and how fast, how it ended, the opening, and the game's name for look and position. */
-function headLines(analysis: Analysis): string[]
+function analysisHead(analysis: Analysis): string[]
 {
     const { ai, level, player } = analysis;
     const named = (side: Side) => `${side === "white" ? analysis.white : analysis.black}${side === player ? " (the player)" : ""}`;

@@ -1,3 +1,4 @@
+// What a command is, and the reading of its input schema that the command line and the MCP server share.
 import { z } from "zod";
 import type { Context } from "./context.ts";
 
@@ -61,22 +62,6 @@ export function inputProblems(command: string, issues: readonly z.core.$ZodIssue
     return issues.map((issue) => inputIssue(command, issue, given, written)).join(" ");
 }
 
-function inputIssue(command: string, issue: z.core.$ZodIssue, given: Record<string, unknown>, written: (name: string) => string): string
-{
-    const path = issue.path.map(String).join(".");
-
-    if (issue.code === "unrecognized_keys") {
-        return path === "" ? `${command} has no parameter ${issue.keys.map(written).join(", ")}.` : `${written(path)} has no ${issue.keys.join(", ")}.`;
-    }
-
-    // A parameter left out, whatever zod calls it.
-    if (issue.path.length === 1 && given[path] === undefined) {
-        return `${command} needs ${written(path)}.`;
-    }
-
-    return path === "" ? `${issue.message}.` : `${written(path)}: ${issue.message}.`;
-}
-
 /**
  * What keeps a field of a command's input from being given on the command line: one named no-x, read as turning x off, or json, read as answering in JSON;
  * undefined for any other. A positional is never an option, so json is its name freely.
@@ -113,6 +98,22 @@ export function takesNumbers(field: z.ZodType): boolean
 {
     const definition = baseDefinition(field) as { type: string; element?: z.ZodType; };
     return definition.type === "number" || (definition.type === "array" && definition.element !== undefined && baseType(definition.element) === "number");
+}
+
+function inputIssue(command: string, issue: z.core.$ZodIssue, given: Record<string, unknown>, written: (name: string) => string): string
+{
+    const path = issue.path.map(String).join(".");
+
+    if (issue.code === "unrecognized_keys") {
+        return path === "" ? `${command} has no parameter ${issue.keys.map(written).join(", ")}.` : `${written(path)} has no ${issue.keys.join(", ")}.`;
+    }
+
+    // A parameter left out, whatever zod calls it.
+    if (issue.path.length === 1 && given[path] === undefined) {
+        return `${command} needs ${written(path)}.`;
+    }
+
+    return path === "" ? `${issue.message}.` : `${written(path)}: ${issue.message}.`;
 }
 
 function baseDefinition(field: z.ZodType): { type: string; innerType?: z.ZodType; }

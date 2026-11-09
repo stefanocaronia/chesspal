@@ -1,0 +1,576 @@
+/* The game's column: the moves, the lead, the game's card and its commands */
+
+/* The game's card, as tall as a player's across the board: a little board where the player's card has their face, round people, a square game */
+.game-card {
+    margin: 0;
+    min-height: 74px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+}
+
+.tile {
+    position: relative;
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius);
+    /* A board of four squares in the skin's colours, the dark one at the bottom left as on a board */
+    background: conic-gradient(var(--dark-square) 0 25%, var(--light-square) 0 50%, var(--dark-square) 0 75%, var(--light-square) 0);
+    overflow: hidden;
+}
+
+.tile .piece {
+    --piece-edge-width: 7px;
+    width: 40px;
+    height: 40px;
+}
+
+/* The king to move, edged in the accent like the coin of whoever moves */
+.tile.moving {
+    box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent);
+}
+
+/* At the end both kings: side by side in a draw, the loser laid at the winner's feet */
+.tile.over {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding-bottom: 4px;
+}
+
+.tile.over .piece {
+    --piece-edge-width: 8px;
+    width: 30px;
+    height: 30px;
+}
+
+.tile.draw .piece + .piece {
+    margin-left: -12px;
+}
+
+.tile.win > span {
+    position: absolute;
+    display: grid;
+}
+
+.tile.win .piece {
+    width: 100%;
+    height: 100%;
+}
+
+.tile.win .up {
+    right: 5px;
+    bottom: 4px;
+    width: 28px;
+    height: 28px;
+}
+
+/* Laid down, the king is as wide as it was tall: it drops 5px to rest where the other stands */
+.tile.win .down {
+    left: 4px;
+    bottom: -1px;
+    width: 24px;
+    height: 24px;
+    rotate: -90deg;
+}
+
+.game-card .what {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.game-card p {
+    margin: 0;
+}
+
+.game-card .head,
+.game-card .when {
+    color: var(--soft);
+}
+
+.game-card .big {
+    color: var(--ink);
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+.game-card .when {
+    margin-top: 2px;
+}
+
+/* The game ended under the player's eyes: once the board has shown it, with the kings' badges, the card lights up in the accent and fades back */
+.game-card.lit {
+    animation: lit 1200ms ease-out 1350ms;
+}
+
+@keyframes lit {
+    20% {
+        box-shadow: 0 0 0 2px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .game-card.lit {
+        animation: none;
+    }
+}
+
+/* Who is ahead, as the AI estimates it (D-90): White's share from the left, Black's from the right, the figure on the side ahead, as chess.com's bar; an edge
+   and a mark of the even game in the middle keep it a bar of two sides in both themes, never one of progress (Zoe, review of T-148) */
+.lead-bar {
+    position: relative;
+    height: 14px;
+    margin-top: 6px;
+    border-radius: 7px;
+    background: #3b4048;
+    box-shadow: 0 0 0 1px rgb(138 144 153 / 0.6);
+    overflow: hidden;
+}
+
+.lead-bar::after {
+    content: "";
+    position: absolute;
+    inset: 3px auto 3px calc(50% - 0.5px);
+    width: 1px;
+    background: #8a9099;
+}
+
+/* On a position after the one the AI estimated: the player's move, until the coach speaks again */
+.lead-bar.earlier {
+    opacity: 0.55;
+}
+
+.lead-bar .white {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: #f5f5f2;
+    transition: width 400ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lead-bar .white {
+        transition: none;
+    }
+}
+
+.lead-bar .figure {
+    position: absolute;
+    top: 0;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+.lead-bar .figure.white,
+.lead-bar .figure.even {
+    left: 6px;
+    color: #2a2f36;
+}
+
+.lead-bar .figure.black {
+    right: 6px;
+    color: #f5f5f2;
+}
+
+/* The chart of the game in analysis: the white area is White's share, the line in the middle an even game; a dot on a move a badge marks, a line on the move
+   shown, gold as on the board and in the moves (Zoe, review of T-148) */
+.lead-card {
+    display: grid;
+    gap: 8px;
+}
+
+.lead-chart {
+    position: relative;
+    height: 72px;
+    border-radius: 6px;
+    background: #3b4048;
+    box-shadow: 0 0 0 1px rgb(138 144 153 / 0.6);
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.lead-chart svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.lead-chart .white-area {
+    fill: #f5f5f2;
+}
+
+.lead-chart .pending {
+    fill: #5a606a;
+}
+
+.lead-chart .even {
+    stroke: #8a9099;
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    fill: none;
+}
+
+.lead-chart .shown {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: #ffc450;
+    box-shadow: 0 0 0 1px rgb(20 23 27 / 0.6);
+    pointer-events: none;
+}
+
+.lead-chart .dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px #ffffff;
+    pointer-events: none;
+}
+
+.lead-chart .dot.brilliant {
+    background: var(--badge-brilliant);
+}
+
+.lead-chart .dot.great {
+    background: var(--badge-great);
+}
+
+.lead-chart .dot.miss {
+    background: var(--badge-miss);
+}
+
+.lead-chart .dot.mistake {
+    background: var(--badge-mistake);
+}
+
+.lead-chart .dot.blunder {
+    background: var(--badge-blunder);
+}
+
+.opening {
+    display: grid;
+    gap: 2px;
+    font-size: 13px;
+}
+
+.opening p {
+    margin: 0;
+}
+
+.opening .family {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+.opening .book {
+    display: grid;
+    align-self: center;
+    color: var(--accent);
+}
+
+.opening .book .icon {
+    width: 21px;
+    height: 21px;
+    stroke-width: 2.3;
+}
+
+.opening .book.out {
+    color: var(--ink);
+}
+
+.opening .variation {
+    color: var(--ink);
+}
+
+.opening .out {
+    color: var(--soft);
+    font-size: 12px;
+}
+
+/* A game in analysis (D-69): the AI's word on the whole game above the moves, and its note on the move shown in the talk, under the Torretta */
+.review {
+    display: grid;
+    gap: 4px;
+    font-size: 13.5px;
+    line-height: 1.45;
+}
+
+.review.waiting {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--soft);
+}
+
+.review ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.review p,
+.ai-note p {
+    margin: 0;
+}
+
+.review .head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--soft);
+    font-size: 12px;
+}
+
+/* The moves' card takes the column's room left: its title, then the list */
+.moves-card {
+    flex: 1;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+}
+
+.moves-card .card-title {
+    padding: 2px 4px 0;
+}
+
+/* Positioned, so that the moves' hidden names scroll with the list instead of stretching the page */
+.moves {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    /* It scrolls with no scrollbar, kept on the move shown */
+    overflow: hidden auto;
+    scrollbar-width: none;
+    font-size: 14px;
+}
+
+.moves ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.moves li {
+    display: grid;
+    grid-template-columns: 30px 1fr 1fr;
+    padding: 3px 6px;
+    border-radius: 5px;
+}
+
+.moves .result {
+    margin: 6px;
+    font-weight: 600;
+}
+
+.moves li:nth-child(even) {
+    background: var(--page);
+}
+
+.moves .number {
+    color: var(--soft);
+}
+
+/* A move is a button that shows it on the board (T-88); shown or not it keeps the same room, so stepping with the arrows never shifts the line (Stefano, T-140) */
+.moves .ply {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    margin-left: -6px;
+    background: none;
+    border: 0;
+    border-radius: 5px;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+/* The move under the pointer in a neutral grey, never the accent, so it never reads as the move shown (Stefano, T-140) */
+.moves .ply:hover {
+    background: color-mix(in oklab, var(--ink) 9%, transparent);
+}
+
+/* The move shown in the board's gold of the last move, laid on the light square as there, with dark ink in both themes: the yellow move in the list is the yellow
+   move on the board, and it follows the skin (Stefano, T-140) */
+.moves .ply.current {
+    background: var(--light-square) linear-gradient(var(--last-move), var(--last-move));
+    color: var(--fixed-ink);
+}
+
+.moves .current .takes {
+    color: #4d5866;
+}
+
+/* A ring in the card's colour keeps a badge's disc whole on the gold */
+.moves .current .move-badge {
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px var(--card);
+}
+
+/* The buttons that step through the moves, under them as on Lichess and chess.com */
+.steps {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+}
+
+.steps button {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    padding: 6px 0;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.steps button:hover:not(:disabled) {
+    background: var(--page);
+    border-color: var(--line);
+}
+
+.steps button:disabled {
+    color: var(--soft);
+    opacity: 0.5;
+    cursor: default;
+}
+
+.steps .icon {
+    width: 20px;
+    height: 20px;
+    stroke-width: 2;
+}
+
+/* A piece in a move: the set's small one (T-94), White's white and Black's black, edged so either shows on either theme */
+.figurine {
+    display: inline-block;
+    width: 1.15em;
+    height: 1.15em;
+    margin-right: 0.05em;
+    vertical-align: -0.22em;
+}
+
+/* A capture's x is grey, so the squares of a move read first */
+.takes {
+    color: var(--soft);
+    font-weight: 400;
+}
+
+/* In analysis, the game's own commands in the right column (T-106): save its PGN with the review, open the other analyses */
+.analysis-actions {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+}
+
+.analysis-actions button {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.analysis-actions button:hover {
+    border-color: var(--accent);
+}
+
+/* Where the game's column runs under the board, the moves in two columns */
+@media (max-width: 1099px) {
+    .moves ol {
+        columns: 2;
+        column-gap: 12px;
+    }
+
+    .moves li {
+        break-inside: avoid;
+    }
+}
+
+/* A card's title in the game's column, its icon in the accent as the opening's book: the helps' lifebuoy, the moves' score sheet (Stefano) */
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.card-title .icon {
+    width: 19px;
+    height: 19px;
+    stroke-width: 2.1;
+    color: var(--accent);
+}
+
+/* A card's title is the button that folds the card to it and opens it again, a chevron after the name (Stefano) */
+.card-fold {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.card-fold .chevron {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: var(--soft);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.card-fold:hover .chevron,
+.card-fold:focus-visible .chevron {
+    stroke: var(--accent);
+}
+
+/* A folded card is its title alone: the moves' gives the column's room back to the cards above */
+.moves-card.folded {
+    flex: none;
+    min-height: 0;
+}
+
+/* The saves and the steps stay at the foot of the column, with the moves folded too (Stefano) */
+.side > .moves-card + * {
+    margin-top: auto;
+}

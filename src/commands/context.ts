@@ -1,7 +1,7 @@
+// What every command runs with besides its input, injected by the command line, the MCP server or the tests: the folders, the time, the randomness.
 import { userInfo } from "node:os";
 import { dataFolder, openFolder } from "../home/index.ts";
 import { ensureProfile } from "../profiles/index.ts";
-import type { Position } from "./play-move.ts";
 
 /** What a command runs with, besides its input: given by the command line or the MCP server, and by the tests. */
 export interface Context
@@ -42,7 +42,7 @@ export interface Context
      * The position the last tool that showed the game showed the chat: its moves are refused on a game changed since, by another chat or on the page
      * (D-71); null in a chat no tool has shown the game yet, none outside a chat.
      */
-    positionSeen?: Position | null | undefined;
+    positionSeen?: SeenPosition | null | undefined;
     /** The instructions the MCP server gave in this chat, by their name and the chat's start: each comes once a chat (D-68); none on the command line. */
     told?: Set<string>;
     /** Who makes this tool call, as far as the host ties it to the call (D-81); none on the command line. */
@@ -58,6 +58,16 @@ export interface Caller
     readonly effort?: string;
     /** The annotator is the host's name: the model is not known. */
     readonly hostOnly?: boolean;
+}
+
+/**
+ * Where the game a chat sees stands: the game by its start, none when there is none, and how many plies it has. Not by its folder, which a profile
+ * completed renames (D-71); a game in another profile started at another time.
+ */
+export interface SeenPosition
+{
+    readonly started?: string;
+    readonly plies: number;
 }
 
 /** The context of a process started in the player's folder: the data folder is found at the first command that needs it, once. */

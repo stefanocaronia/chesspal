@@ -1,0 +1,824 @@
+/* The dialogs: the settings, the profiles and the wizard of the first one, the new game, the study of a game and the analyses */
+
+/* A dialog over the page, the settings' (D-56) and the others alike */
+.dialog {
+    width: min(740px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    padding: 0 20px 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+}
+
+.dialog::backdrop {
+    background: rgba(16, 22, 29, 0.4);
+}
+
+/* Its title, with the way back before it when there is one and the close button at the end */
+.dialog header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 0 8px;
+    background: var(--card);
+}
+
+.dialog h2 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.dialog .note {
+    margin: 0 0 12px;
+}
+
+/* The settings (D-56), each choice shown at once, in cards of two columns, one under 600px (Stefano, T-141): the look on the left; the play and the language
+   on the right */
+.setting-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+}
+
+.setting-column {
+    display: grid;
+    gap: 14px;
+}
+
+/* A section: a card with its icon and a title stronger than the labels under it */
+.setting-card {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--page);
+}
+
+.setting-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font-size: 15px;
+    font-weight: 650;
+}
+
+.setting-card h3 .icon {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2;
+    color: var(--accent);
+}
+
+.setting-group {
+    margin: 0 0 14px;
+}
+
+.setting-group:last-child {
+    margin-bottom: 0;
+}
+
+/* A choice's label, and beside it the name of a skin, whose tiles have none */
+.setting-label {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: var(--soft);
+}
+
+.setting-label b {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+/* The pieces' colours and the arrows' side by side, one under the other where four dots would not fit */
+.setting-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
+    gap: 14px;
+}
+
+/* Three words in a segmented bar: the theme, the language */
+.segments {
+    display: flex;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+}
+
+.segments button {
+    flex: 1;
+    padding: 5px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--soft);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.segments button:hover {
+    color: var(--ink);
+}
+
+.segments button[aria-checked="true"] {
+    background: var(--card);
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* The colours as dots, the skins as tiles of four squares, the last one gold as the last move; their names in their titles */
+.swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.swatches.skins {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 36px));
+    gap: 7px;
+}
+
+.swatch {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--line);
+}
+
+.swatch[data-board] {
+    display: grid;
+    grid-template: 1fr 1fr / 1fr 1fr;
+    width: auto;
+    height: auto;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.swatch[data-board] i:first-child {
+    background: var(--light-square);
+}
+
+.swatch[data-board] i:nth-child(2),
+.swatch[data-board] i:nth-child(3) {
+    background: var(--dark-square);
+}
+
+.swatch[data-board] i:nth-child(4) {
+    background: var(--light-square) linear-gradient(var(--last-move), var(--last-move));
+}
+
+.swatch[data-pieces] {
+    background: linear-gradient(90deg, var(--white-piece) 50%, var(--black-piece) 50%);
+}
+
+.swatch[data-marks] {
+    background: var(--mark);
+}
+
+/* The piece sets: a white and a black knight over the set's name */
+.piece-sets {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.piece-sets button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 4px 5px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font-size: 13px;
+    box-shadow: 0 0 0 1px var(--line);
+}
+
+.sample {
+    display: inline-flex;
+}
+
+.sample .piece {
+    width: 26px;
+    height: 26px;
+}
+
+.swatch:hover,
+.piece-sets button:hover {
+    box-shadow: 0 0 0 1px var(--soft);
+}
+
+.swatch[aria-checked="true"],
+.piece-sets button[aria-checked="true"] {
+    box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent);
+}
+
+/* The keyboard's focus in ink, outside the chosen ring, so the two never read the same */
+.swatch:focus-visible,
+.piece-sets button:focus-visible {
+    outline-color: var(--ink);
+    outline-offset: 4px;
+}
+
+/* The switches, one per line, the label on the left */
+.switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-top: 1px solid var(--line);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+h3 + .switch {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.switch input {
+    appearance: none;
+    flex: none;
+    position: relative;
+    width: 34px;
+    height: 20px;
+    margin: 0;
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--soft) 45%, var(--card));
+    cursor: pointer;
+    transition: background 120ms;
+}
+
+.switch input::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: translate 120ms;
+}
+
+.switch input:checked {
+    background: var(--accent);
+}
+
+.switch input:checked::after {
+    translate: 14px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .switch input,
+    .switch input::after {
+        transition: none;
+    }
+}
+
+/* On a phone the cards go one under the other, and the skins in two rows of tiles big enough for a finger */
+@media (max-width: 600px) {
+    .setting-columns {
+        grid-template-columns: 1fr;
+    }
+
+    .swatches {
+        gap: 6px;
+    }
+
+    .swatches.skins {
+        grid-template-columns: repeat(5, minmax(0, 40px));
+        gap: 10px;
+    }
+}
+
+/* On the narrowest phones a segment's words may go on two lines */
+@media (max-width: 360px) {
+    .segments button {
+        white-space: normal;
+    }
+}
+
+/* A choice among a few words, in the profiles' list */
+.choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: none;
+    font-size: 14px;
+}
+
+.choice:hover {
+    border-color: var(--soft);
+}
+
+.choice[aria-checked="true"] {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.wizard {
+    max-width: 480px;
+    margin: 32px auto;
+    padding: 28px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: var(--shadow);
+}
+
+.wizard h1 {
+    margin: 12px 0 4px;
+    font-size: 24px;
+}
+
+.wizard .lead {
+    margin: 0 0 24px;
+    color: var(--soft);
+}
+
+.wizard .lead span {
+    display: block;
+    margin-top: 4px;
+}
+
+@media (max-width: 520px) {
+    .wizard {
+        margin: 0;
+        padding: 20px 16px;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+}
+
+.profile-form fieldset {
+    min-width: 0;
+    margin: 0 0 20px;
+    padding: 0;
+    border: 0;
+}
+
+.profile-form legend,
+.profile-form .field > span {
+    display: block;
+    margin-bottom: 8px;
+    padding: 0;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.profile-form legend small {
+    font-weight: 400;
+    color: var(--soft);
+}
+
+.profile-form .field {
+    display: block;
+    margin-bottom: 20px;
+}
+
+.profile-form input[type="text"],
+.profile-form input[type="number"],
+.profile-form select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--page);
+    color: var(--ink);
+    font: inherit;
+    font-size: 16px;
+}
+
+/* The account's name suggested in the wizard (T-120): Chrome's arrow, quieter than the selects' chevron, is the only sign of it */
+.profile-form input::-webkit-calendar-picker-indicator {
+    opacity: 0.45;
+}
+
+.study textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--page);
+    color: var(--ink);
+    font: 13px/1.4 ui-monospace, monospace;
+    resize: vertical;
+}
+
+.study .file input {
+    font: inherit;
+    font-size: 14px;
+    color: var(--soft);
+}
+
+/* The file button as our secondary buttons, in both themes */
+.study .file input::file-selector-button {
+    margin-right: 10px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+.study .note {
+    margin: 0 0 16px;
+}
+
+/* The analyses to open again (T-106): a line each, who played and how it ended, then when, the opening and how long, and whether the AI has reviewed it */
+.study h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--soft);
+}
+
+.analyses ul {
+    display: grid;
+    gap: 6px;
+    max-height: 40vh;
+    overflow-y: auto;
+    margin: 0 0 18px;
+    padding: 0;
+    list-style: none;
+}
+
+.analyses button {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.analyses button:hover {
+    border-color: var(--accent);
+}
+
+.analyses b {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.analyses .note {
+    margin: 0;
+    font-size: 12px;
+}
+
+.analyses .state {
+    color: var(--soft);
+    font-size: 12px;
+    text-align: right;
+}
+
+.analyses .state.reviewed {
+    color: var(--accent);
+}
+
+.profile-form textarea:focus-visible,
+.profile-form input:focus-visible,
+.profile-form select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+}
+
+/* The drawn avatars: always two rows of five, smaller on a narrow screen (Zoe, T-102) */
+.avatars {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 62px));
+    justify-content: space-between;
+    gap: 8px;
+    justify-items: center;
+}
+
+.avatars .avatar-choice {
+    width: 100%;
+}
+
+.avatar-choice {
+    position: relative;
+    padding: 3px;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    background: none;
+    line-height: 0;
+    cursor: pointer;
+}
+
+.avatar-choice input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.avatar-choice:has(input:checked),
+.avatar-choice[aria-pressed="true"],
+.avatar-choice.on {
+    border-color: var(--accent);
+}
+
+.avatar-choice:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.avatar-choice .avatar {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* The player's own photo: a line of its own under the drawn avatars, at every width */
+.avatar-choice.upload {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: fit-content;
+    margin-top: 10px;
+    padding-right: 14px;
+    border-radius: 30px;
+    color: var(--accent);
+    font-size: 14px;
+    line-height: 1.2;
+}
+
+.avatar-choice.upload .avatar {
+    width: 36px;
+    height: 36px;
+}
+
+.ring {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 2px dashed var(--line);
+    border-radius: 50%;
+    color: var(--soft);
+}
+
+.ring .icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* How the player plays: two by two, each with its note under it */
+.levels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.level {
+    position: relative;
+    cursor: pointer;
+}
+
+.level input {
+    position: absolute;
+    opacity: 0;
+}
+
+.level > span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    height: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--page);
+}
+
+.level small {
+    color: var(--soft);
+    font-size: 13px;
+}
+
+.level:has(input:checked) > span {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.level:has(input:focus-visible) > span {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.rating {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.profile-form .start {
+    width: 100%;
+    padding: 13px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.profile-form .start:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.profile-form .problem,
+.dialog .problem {
+    margin: 0 0 12px;
+    padding: 0;
+    color: var(--low-time);
+    font-size: 14px;
+}
+
+.dialog .avatars {
+    margin-top: 8px;
+}
+
+.dialog .avatar-choice.upload {
+    margin-bottom: 12px;
+}
+
+.profile-list {
+    display: grid;
+    gap: 6px;
+    margin: 8px 0 12px;
+}
+
+.profile-list .choice {
+    min-width: 0;
+    font-size: 15px;
+    text-align: left;
+}
+
+/* The profile in use: a tick at the end of its line, not the ring of a field being typed in */
+.profile-list .choice[aria-checked="true"] {
+    border-color: var(--line);
+    box-shadow: none;
+}
+
+.profile-list .choice span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.profile-list .in-use {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+}
+
+.profile-list .choice:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.profile-list .avatar {
+    flex: none;
+    width: 32px;
+    height: 32px;
+}
+
+.dialog .new-profile {
+    border-color: var(--line);
+    color: var(--ink);
+}
+
+.dialog .new-profile:disabled {
+    color: var(--soft);
+    cursor: default;
+}
+
+/* Where the games are (T-119), under the wizard's form and the players' menu, with the button that opens it */
+.data-folder {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+
+.data-folder .note {
+    flex: 1 1 220px;
+    margin: 0;
+}
+
+.data-folder b {
+    color: var(--ink);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.data-folder .command {
+    border-color: var(--line);
+    color: var(--ink);
+}
+
+.data-folder .command:disabled {
+    color: var(--soft);
+    cursor: default;
+}
+
+.data-folder .problem {
+    flex-basis: 100%;
+    margin: 0;
+}
+
+/* The new game (T-58): the colours and the clocks in a row, the levels two by two with what the AI sees under them */
+.new-game .row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
+    gap: 8px;
+}
+
+.new-game .row .level > span {
+    align-items: center;
+    gap: 4px;
+    padding: 9px 4px;
+}
+
+/* Each colour by its king, either by both, and each clock by its minutes as a slice of the hour */
+.new-game .row .piece {
+    width: 30px;
+    height: 30px;
+    margin: -3px 0;
+}
+
+.new-game .kings {
+    display: flex;
+}
+
+.new-game .kings .piece + .piece {
+    margin-left: -8px;
+}
+
+.new-game .clock-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.new-game .clock-icon .slice {
+    fill: currentColor;
+    stroke: none;
+}
+
+.new-game .sees {
+    margin: 10px 0 0;
+    color: var(--soft);
+    font-size: 13px;
+}
+
+.new-game .levels {
+    grid-auto-rows: 1fr;
+}
