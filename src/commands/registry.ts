@@ -2,7 +2,7 @@
 import { z } from "zod";
 import type { Context } from "./context.ts";
 
-/** A command is defined once: the command line and the MCP server are generated from it (D-5), and later the page's actions. */
+/** A command is defined once: the command line and the MCP server are generated from it (D-5); the page's routes call the same commands. */
 export interface Command<Schema extends z.ZodObject = z.ZodObject, Result = unknown>
 {
     name: string;

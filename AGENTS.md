@@ -50,7 +50,7 @@ This file is about **developing** Chesspal. The instructions for **playing** are
 - **Keep it simple.** Chesspal computes only what an AI is weak at: the rules, the board and what it sees, facts about the position, the clock, the files and the memory.
 - **Never an engine, never a score.** Chesspal never judges a move or weighs a position: no search, no evaluation, no exchange balance (D-6, D-19). It gives the AI separate facts; the judgment is the AI's. An engine is only a developer's test tool (D-35): it runs in `project/` as a simulated player against the AI and to check the AI's judgments, never in the package, this repo, `package.json` or CI, and never where the playing AI can see it.
 - **The game's state is on disk, changed only by commands** (D-27): they validate every move with chess.js and write atomically; the AI, the page and the CLI read and change it only through them.
-- Every operation is a command defined once, from which the CLI and the MCP server are generated, and later the page's actions (D-5). Every command validates its input, returns a value and never prints.
+- Every operation is a command defined once, from which the CLI and the MCP server are generated (D-5); the page has routes of its own, which call the same commands and hold no logic of their own. Every command validates its input, returns a value and never prints.
 - **`src/core` runs in the browser too**: no Node, no console, no imports from commands, server or CLI (ESLint enforces it), so the page uses the same code for legal moves and their reasons (D-17, D-18).
 
 ## Performance
