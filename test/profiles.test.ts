@@ -166,6 +166,17 @@ describe("the profiles (D-23)", () => {
         );
     });
 
+    it("read the player's names on Lichess and chess.com, written by hand, and keep them when the profile changes (D-93)", () => {
+        const root = playerFolder();
+        mkdirSync(profileFolder(root, "lia"), { recursive: true });
+        writeFileSync(join(profileFolder(root, "lia"), "profile.md"), "---\nname: Lia\nlichess: ' lia_k '\nchesscom: ''\n---\n");
+
+        expect(listProfiles(root)).toEqual([{ id: "lia", name: "Lia", accounts: { lichess: "lia_k" } }]);
+
+        updateProfile(root, "lia", { avatar: "cat" });
+        expect(listProfiles(root)[0]?.accounts).toEqual({ lichess: "lia_k" });
+    });
+
     it("read a profile.md as an editor may save it: a byte-order mark, capitals, a name too long", () => {
         const root = playerFolder();
         mkdirSync(profileFolder(root, "lia"), { recursive: true });

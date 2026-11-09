@@ -11,6 +11,7 @@ import { FoldButton, useCardFold } from "./card-fold.tsx";
 import type { HowEnded } from "./ending.ts";
 import { MoveList, Steps } from "./move-list.tsx";
 import type { Ply } from "./plies.ts";
+import { ResultTile } from "./result-tile.tsx";
 
 /**
  * The column, which the player folds with its tab; under the board, where three columns would leave the board small, always open. A game in analysis
@@ -157,23 +158,7 @@ function GameCard({ plies, result, how, lit, started, move, toMove, bar, text }:
 
     return (
         <section class={`card game-card${lit ? " lit" : ""}`} aria-label={text.game}>
-            {winner === undefined
-                ? (
-                    <span class="tile over draw" aria-hidden="true">
-                        <Piece letter="K" />
-                        <Piece letter="k" />
-                    </span>
-                )
-                : (
-                    <span class="tile over win" aria-hidden="true">
-                        <span class="down">
-                            <Piece letter={winner === "white" ? "k" : "K"} />
-                        </span>
-                        <span class="up">
-                            <Piece letter={winner === "white" ? "K" : "k"} />
-                        </span>
-                    </span>
-                )}
+            <ResultTile result={winner === undefined ? "1/2-1/2" : result} />
             <div class="what">
                 <p class="head">
                     <b class="big">{result === "1/2-1/2" ? "½–½" : result.replace("-", "–")}</b> · {winner === undefined ? text.draw : text.won(winner)}

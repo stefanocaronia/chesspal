@@ -7,7 +7,7 @@ import { type Context, positionIn } from "../../commands/index.ts";
 import { gameStamp } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { Bell, bellProbe, pagePorts } from "../bell.ts";
-import { analysesOf } from "./analyses.ts";
+import { analysesOf, answerAnalyses } from "./analyses.ts";
 import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls } from "./game.ts";
 import { json, send } from "./http.ts";
@@ -101,7 +101,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         return;
     }
 
-    if (answerProfiles(request, response, url, served) || answerGame(request, response, url, served)) {
+    if (answerProfiles(request, response, url, served) || answerGame(request, response, url, served) || answerAnalyses(request, response, url, served)) {
         return;
     }
 
@@ -112,7 +112,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
             405,
             "text/plain; charset=utf-8",
             "The page only reads, moves with POST /api/move, writes with POST /api/message, starts a game with POST /api/new and its clocks with POST /api/start, "
-                + "offers or answers a draw with POST /api/draw, resigns with POST /api/resign, brings a game to analyse or opens one again with POST /api/study, and keeps the profiles with POST /api/profile/… and /api/settings.",
+                + "offers or answers a draw with POST /api/draw, resigns with POST /api/resign, brings a game to analyse or opens one again with POST /api/study, deletes a game or its review with POST /api/delete-game and /api/delete-review, and keeps the profiles with POST /api/profile/… and /api/settings.",
         );
         return;
     }

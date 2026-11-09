@@ -39,12 +39,21 @@ export interface ProfileFields
     readonly avatar?: DrawnAvatar;
 }
 
+/** The player's names on the sites they play on. */
+export interface Accounts
+{
+    readonly lichess?: string;
+    readonly chesscom?: string;
+}
+
 /** A profile: its folder's name, and what profile.md says; a folder without one is named by the folder. */
 export interface PlayerProfile extends ProfileFields
 {
     readonly id: string;
     /** Made by Chesspal at the first start, until the player completes it: the board page's wizard does (D-71). */
     readonly new?: true;
+    /** The player's names on Lichess and chess.com, written by hand in profile.md, by which the games they load are theirs (D-93). */
+    readonly accounts?: Accounts;
 }
 
 /** The profiles in the data folder, by their folders' names. */
@@ -264,7 +273,22 @@ function readProfile(root: string, id: string): PlayerProfile
         ...(rated ? { rating: { value, site } } : {}),
         ...(avatar === undefined ? {} : { avatar }),
         ...(fields.new === "true" ? { new: true as const } : {}),
+        ...accountsIn(fields),
     };
+}
+
+/** The player's names on the sites, from profile.md's lichess and chesscom lines; none without either. */
+function accountsIn(fields: Readonly<Record<string, string>>): { accounts?: Accounts; }
+{
+    const named = (site: string): string | undefined => fields[site]?.trim().slice(0, nameLimit).trim() || undefined;
+    const lichess = named("lichess");
+    const chesscom = named("chesscom");
+
+    if (lichess === undefined && chesscom === undefined) {
+        return {};
+    }
+
+    return { accounts: { ...(lichess === undefined ? {} : { lichess }), ...(chesscom === undefined ? {} : { chesscom }) } };
 }
 
 // Writes the fields that change, and keeps the others as the file has them, even those this version does not read.

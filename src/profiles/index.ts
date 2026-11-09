@@ -2,6 +2,7 @@
 // commands, beside the games.
 export { type ImageType, imageTypeOf, imageTypes, ownImage, ownImageStamp, removeOwnImage, saveOwnImage, sentImageLimit } from "./avatar.ts";
 export {
+    type Accounts,
     activateProfile,
     activeProfile,
     createProfile,

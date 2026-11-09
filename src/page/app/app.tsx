@@ -171,7 +171,7 @@ export function App({ start }: { start: Settings; })
     // With the helps on, the player sees all of Chesspal's facts, whatever the AI's level (D-79), in a game and in the analysis of one (Stefano).
     const analysing = studied !== undefined;
     // Seen from the player's side (D-91): theirs in a game, in analysis the side the game names theirs, none when it names neither.
-    const you = analysing ? playerIn(studiedSides(live.record.tags, served?.profile.name ?? "", name, text.sides)) : game?.ai === undefined ? undefined : game.ai === "white" ? "black" : "white";
+    const you = analysing ? playerIn(studiedSides(live.record.tags, served?.profile.name ?? "", name, text.sides, served?.profile.accounts)) : game?.ai === undefined ? undefined : game.ai === "white" ? "black" : "white";
     const helps = useMemo(() => (going || analysing) && settings.helps ? helpsOf(shown, you) : undefined, [shown, going, analysing, settings.helps, you]);
     // Who the AI saw ahead, the coach's with the helps on in a game and the analyst's in analysis, for the bar and the chart (D-90).
     const drawnOnBoard = live.outcome.over && live.outcome.result === "1/2-1/2";
@@ -312,7 +312,7 @@ export function App({ start }: { start: Settings; })
     const profile = served.profile;
     const picture = <PlayerPicture profile={profile} />;
     // In analysis the cards name the players of the game, the player's side at the bottom when they played it (D-69).
-    const sides = studied === undefined ? undefined : studiedSides(live.record.tags, profile.name, name, text.sides);
+    const sides = studied === undefined ? undefined : studiedSides(live.record.tags, profile.name, name, text.sides, profile.accounts);
 
     const player = sides?.bottom ?? (game === null || game.ai === "black" ? "white" : "black");
     const ai = player === "white" ? "black" : "white";
@@ -498,7 +498,7 @@ export function App({ start }: { start: Settings; })
                     text={text}
                 />
                 <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
-                <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} you={profile.name} ai={name} text={text} />
+                <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} you={profile.name} accounts={profile.accounts} ai={name} text={text} />
                 {offline ? <p class="offline" role="alert">{text.offline(name)}</p> : null}
                 <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`} inert={offline}>
                     {header}

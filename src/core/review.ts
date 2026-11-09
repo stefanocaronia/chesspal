@@ -103,6 +103,21 @@ export function reviewed(move: RecordedMove, review: MoveReview): RecordedMove
     return recordedMove(move.san, nag === undefined ? nags : [nag, ...nags], comment);
 }
 
+/**
+ * The record without the AI's review (D-92): the badges with the NAGs they wrote, the notes, drawings and estimates of who is ahead on the moves, the word on
+ * the game and who signed it. What the comments held besides stays, as do the NAGs of moves without a badge.
+ */
+export function unreviewed(record: GameRecord): GameRecord
+{
+    const moves = record.moves.map((move) => {
+        const nags = badgePattern.test(move.comment ?? "") ? (move.nags ?? []).filter((nag) => !judgmentNags.has(nag)) : move.nags;
+        return recordedMove(move.san, nags, withoutReview(move.comment).replace(/\s*\[%lead [^\]]*\]/g, "").trim());
+    });
+    const comment = withoutReview(record.comment);
+    const tags = Object.fromEntries(Object.entries(record.tags).filter(([name]) => name !== "Annotator" && name !== effortTag));
+    return comment === "" ? { tags, moves } : { tags, comment, moves };
+}
+
 /** The arrows and squares as PGN's [%cal] and [%csl] write them, for a comment; empty without any. */
 export function drawingsText({ arrows = [], squares = [] }: Pick<MoveReview, "arrows" | "squares">): string
 {

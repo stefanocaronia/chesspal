@@ -10,6 +10,7 @@ export {
     archiveEnded,
     archiveGame,
     archiveName,
+    deleteGame,
     gameStemOf,
     isGameName,
     keepToStudy,
@@ -23,7 +24,7 @@ export {
 } from "./archive.ts";
 export { type ChatStart, cleanSince, lastChatStart, saveChatStart } from "./chat-start.ts";
 export { type CoachHint, type CoachJudgment, type CoachLead, coachShown, coachStarted, coachWaitingSince, type CoachWords, coachWords, keepHint, keepJudgment, keepLead, startCoach, withCoach } from "./coach.ts";
-export { bothSidesMoved, type CurrentGame, drawOfferOf, endOf, type GameEnd, gameStamp, loadGame, saveGame, type Speaker, type TalkLine } from "./current-game.ts";
+export { bothSidesMoved, type CurrentGame, drawOfferOf, endOf, type GameEnd, gameStamp, loadGame, removeGame, saveGame, type Speaker, type TalkLine } from "./current-game.ts";
 export { makeFolder, renameOver, writeAtomically } from "./files.ts";
 export { commentWithPlan, currentPlan, planOf, withoutPlans } from "./plans.ts";
 export { endTableTalk, loadTableTalk, saveTableTalk, type TableTalk } from "./table-talk.ts";

@@ -29,6 +29,8 @@ export interface ProfileShown
     readonly rating?: { readonly value: number; readonly site: RatingSite; };
     readonly avatar?: AvatarId;
     readonly image?: string;
+    /** The player's names on Lichess and chess.com, written in profile.md (D-93). */
+    readonly accounts?: { readonly lichess?: string; readonly chesscom?: string; };
 }
 
 /** What the wizard asks: the name, how the player plays, a rating and its site, a drawn avatar or a photo of theirs. */

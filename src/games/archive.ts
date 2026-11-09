@@ -1,5 +1,5 @@
 // The finished games, as PGN in games/ (D-9, D-41), with the AI's plans for the analyst (D-21); and the games played elsewhere, kept to study in study/ (D-68).
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { type GameRecord, movesOnly, pgnDate, readPgn, withAiModel, writePgn } from "../core/index.ts";
 import { aiModelOf } from "./ai-model.ts";
@@ -155,17 +155,37 @@ export function keepToStudy(root: string, record: GameRecord, now: Date): string
 /** Writes again a game of a profile, played or kept to study, by its name as listed: with the AI's review (D-69). */
 export function rewriteGame(folder: string, name: string, record: GameRecord): void
 {
-    const [, shelf, file] = /^(games|study)\/(.*)$/.exec(name) ?? [];
-
-    if (shelf === undefined || !namePattern.test(file ?? "") || !existsSync(join(folder, name))) {
-        throw new Error(`There is no ${name} to write again: give a game's name as past_games or study_games writes it.`);
-    }
+    const path = listedPath(folder, name, "to write again");
 
     try {
-        writeAtomically(join(folder, name), writePgn(record));
+        writeAtomically(path, writePgn(record));
     } catch (error) {
         throw new Error(`Chesspal could not write ${name}: ${(error as Error).message}`, { cause: error });
     }
+}
+
+/** Deletes a game of a profile, played or kept to study, by its name as listed (D-92), its review with it. */
+export function deleteGame(folder: string, name: string): void
+{
+    const path = listedPath(folder, name, "to delete");
+
+    try {
+        rmSync(path);
+    } catch (error) {
+        throw new Error(`Chesspal could not delete ${name}: ${(error as Error).message}`, { cause: error });
+    }
+}
+
+/** The file of a game by its name as listed, games/… or study/…; refused when there is none, saying what it was wanted for. */
+function listedPath(folder: string, name: string, wanted: string): string
+{
+    const [, shelf, file] = /^(games|study)\/(.*)$/.exec(name) ?? [];
+
+    if (shelf === undefined || !namePattern.test(file ?? "") || !existsSync(join(folder, name))) {
+        throw new Error(`There is no ${name} ${wanted}: give a game's name as past_games or study_games writes it.`);
+    }
+
+    return join(folder, name);
 }
 
 // The games of a profile, played here or kept to study: each with how the AI lists them.

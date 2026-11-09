@@ -4,6 +4,8 @@ import { aiSay } from "./ai-say.ts";
 import { analyseGame } from "./analyse-game.ts";
 import { annotateGame } from "./annotate-game.ts";
 import { coach } from "./coach.ts";
+import { deleteGame } from "./delete-game.ts";
+import { deleteReview } from "./delete-review.ts";
 import { endGame } from "./end-game.ts";
 import { exportGame } from "./export-game.ts";
 import { init } from "./init.ts";
@@ -24,6 +26,8 @@ export { aiMove } from "./ai-move.ts";
 export { analyseGame } from "./analyse-game.ts";
 export { gameAt } from "./clock.ts";
 export { type Caller, type Context, defaultContext } from "./context.ts";
+export { deleteGame } from "./delete-game.ts";
+export { deleteReview } from "./delete-review.ts";
 export { answerDraw, DrawRefused, offerDraw } from "./draw-offer.ts";
 export { endGame } from "./end-game.ts";
 export { ChatNotClear, newGame, startNewGame } from "./new-game.ts";
@@ -53,6 +57,8 @@ export const commands: AnyCommand[] = [
     analyseGame,
     annotateGame,
     studyGames,
+    deleteReview,
+    deleteGame,
     profiles,
     newProfile,
     useProfile,

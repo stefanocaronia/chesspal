@@ -1,6 +1,6 @@
 // The player's current game on disk (D-27, D-41): game.json, its PGN and the talk on the board page inside, written whole at every change, and kept in
 // memory while nobody else changes it.
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { type Clock, Game, readPgn, type Side, writePgn } from "../core/index.ts";
@@ -119,6 +119,14 @@ export function bothSidesMoved(game: Game): boolean
 export function gameStamp(folder: string): string | undefined
 {
     return stampOf(join(folder, fileName));
+}
+
+/** Removes game.json, when the game over it holds is deleted from the archive (D-92): a new game would archive it again. */
+export function removeGame(folder: string): void
+{
+    const path = join(folder, fileName);
+    kept.delete(path);
+    rmSync(path, { force: true });
 }
 
 const fileName = "game.json";

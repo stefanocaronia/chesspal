@@ -454,33 +454,18 @@ h3 + .switch {
     margin: 0 0 16px;
 }
 
-/* The analyses to open again: a line each, who played and how it ended, then when, the opening and how long, and whether the AI has reviewed it */
-.study h3 {
-    margin: 0 0 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--soft);
-}
-
-.analyses ul {
-    display: grid;
-    gap: 6px;
-    max-height: 40vh;
-    overflow-y: auto;
-    margin: 0 0 18px;
-    padding: 0;
-    list-style: none;
-}
-
-.analyses button {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 2px 10px;
+/* The analyses (D-92): the row that loads a game, dashed, then a row for each game, its result on a tile, who played, when, the opening and how long, who
+   reviewed it, and the score with how it went for the player; the menu of each row, and the question a row asks in its place (Zoe) */
+.load-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     width: 100%;
-    padding: 8px 12px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--card);
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    background: none;
     color: var(--ink);
     font: inherit;
     font-size: 14px;
@@ -488,29 +473,323 @@ h3 + .switch {
     cursor: pointer;
 }
 
-.analyses button:hover {
+.load-row:hover {
     border-color: var(--accent);
 }
 
-.analyses b {
+.load-row .plus {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    background: var(--page);
+    color: var(--accent);
+}
+
+.load-row small,
+.row-menu small,
+.ask small {
+    display: block;
+    color: var(--soft);
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.analyses .games {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.analyses .game {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+}
+
+.analyses .game:hover,
+.analyses .game:has(.row-actions .on) {
+    border-color: var(--accent);
+}
+
+.analyses .reopen {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 8px 4px 8px 8px;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.analyses .tile {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+}
+
+.analyses .tile.over .piece {
+    width: 27px;
+    height: 27px;
+}
+
+.analyses .tile.win .up {
+    right: 4px;
+    bottom: 3px;
+    width: 26px;
+    height: 26px;
+}
+
+.analyses .tile.win .down {
+    left: 3px;
+    bottom: -1px;
+    width: 22px;
+    height: 22px;
+}
+
+.analyses .tile.draw .piece + .piece {
+    margin-left: -11px;
+}
+
+/* A game without a result: its star on a coin of the card's colour, readable where the four squares meet */
+.analyses .tile.open {
+    background: radial-gradient(circle, var(--card) 0 11px, transparent 11.5px), conic-gradient(var(--dark-square) 0 25%, var(--light-square) 0 50%, var(--dark-square) 0 75%, var(--light-square) 0);
+    color: var(--soft);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.analyses .what {
+    display: grid;
+    flex: 1;
+    gap: 1px;
+    min-width: 0;
+    line-height: 1.3;
+}
+
+.analyses .who,
+.analyses .meta {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
 
-.analyses .note {
-    margin: 0;
+.analyses .who {
+    font-size: 14px;
+}
+
+.analyses .meta,
+.analyses .state {
+    color: var(--soft);
     font-size: 12px;
 }
 
 .analyses .state {
-    color: var(--soft);
-    font-size: 12px;
-    text-align: right;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .analyses .state.reviewed {
     color: var(--accent);
+}
+
+/* The score in a column of its own, right-aligned with tabular figures, so that it does not move from row to row */
+.analyses .score {
+    display: grid;
+    flex: none;
+    justify-items: end;
+    align-content: center;
+    min-width: 46px;
+    padding-right: 4px;
+    line-height: 1.2;
+}
+
+.analyses .score b {
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+}
+
+.analyses .score small {
+    color: var(--soft);
+    font-size: 12px;
+}
+
+.analyses .row-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    padding: 0 8px 0 4px;
+    border-left: 1px solid var(--line);
+}
+
+.analyses .row-actions .icon-button {
+    width: 34px;
+    height: 34px;
+    border-color: transparent;
+}
+
+.analyses .row-actions .icon-button .icon {
+    stroke-width: 3;
+}
+
+.analyses .row-actions .icon-button:hover,
+.analyses .row-actions .icon-button.on {
+    border-color: var(--line);
+    background: var(--page);
+    color: var(--ink);
+}
+
+.row-menu {
+    position: absolute;
+    z-index: 3;
+    top: calc(100% - 6px);
+    right: 6px;
+    display: grid;
+    min-width: 230px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+    box-shadow: var(--shadow);
+}
+
+.row-menu button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.row-menu button:hover,
+.row-menu button:focus-visible {
+    background: var(--page);
+}
+
+.row-menu hr {
+    margin: 4px 6px;
+    border: 0;
+    border-top: 1px solid var(--line);
+}
+
+.row-menu .danger {
+    color: var(--low-time);
+}
+
+/* The question in place of the row: red for a deletion, the accent to analyse again */
+.analyses .ask {
+    --asked: var(--low-time);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 10px 12px;
+    border: 1px solid var(--asked);
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--asked) 7%, var(--card));
+}
+
+.analyses .ask.redo {
+    --asked: var(--accent);
+}
+
+.ask p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.35;
+}
+
+.ask .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.ask button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.ask button.yes {
+    border-color: var(--asked);
+    background: var(--asked);
+    color: var(--on-accent);
+    font-weight: 600;
+}
+
+@media (max-width: 600px) {
+    .analyses .reopen {
+        gap: 10px;
+    }
+
+    .analyses .tile {
+        width: 40px;
+        height: 40px;
+    }
+
+    .analyses .row-actions {
+        padding: 0 4px;
+        border-left: 0;
+    }
+
+    .analyses .row-actions .icon-button {
+        width: 40px;
+        height: 44px;
+    }
+
+    .analyses .who {
+        display: -webkit-box;
+        white-space: normal;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-height: 1.25;
+    }
+
+    .analyses .score {
+        min-width: 40px;
+        padding-right: 0;
+    }
+
+    .row-menu {
+        left: 40px;
+        min-width: 0;
+    }
+
+    .analyses .ask {
+        grid-template-columns: 1fr;
+    }
 }
 
 .profile-form textarea:focus-visible,

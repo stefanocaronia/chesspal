@@ -215,12 +215,26 @@ export interface StudyText
     readonly file: string;
     readonly note: string;
     readonly start: string;
-    /** The list of the analyses, and the part that brings a new game. */
+    /** The list of the analyses, and the step that loads a new game (D-92), with its line. */
     readonly yours: string;
     readonly bring: string;
+    readonly bringNote: string;
     readonly reviewed: string;
     readonly unreviewed: string;
     moves(count: number): string;
+    /** How a game of the player's went for them. */
+    readonly outcome: { readonly won: string; readonly lost: string; readonly drawn: string; };
+    /** A row's menu (D-92): its button, its items with their lines, and the question each asks in the row. */
+    readonly more: string;
+    readonly redo: string;
+    readonly redoNote: string;
+    readonly unreview: string;
+    readonly unreviewNote: string;
+    readonly remove: string;
+    askRedo(game: string, by: string | undefined): { readonly question: string; readonly note: string; readonly yes: string; };
+    askUnreview(game: string): { readonly question: string; readonly note: string; readonly yes: string; };
+    askRemove(game: string, when: string | undefined): { readonly question: string; readonly note: string; readonly yes: string; };
+    readonly cancel: string;
     /** The column's button that saves the game in analysis with its review, and its tooltip. */
     readonly download: string;
     readonly downloadHint: string;
@@ -552,10 +566,26 @@ const english: Text = {
         note: "The game is kept to study; the AI goes over it with you in the chat.",
         start: "Analyse",
         yours: "Your analyses",
-        bring: "Bring a game",
+        bring: "Load a game",
+        bringNote: "a PGN played elsewhere, pasted or from a file",
         reviewed: "reviewed",
         unreviewed: "to review",
         moves: (count) => `${count} ${count === 1 ? "move" : "moves"}`,
+        outcome: { won: "won", lost: "lost", drawn: "drawn" },
+        more: "More",
+        redo: "Analyse again",
+        redoNote: "with your chat's model and effort",
+        unreview: "Delete the analysis",
+        unreviewNote: "the game stays, to review",
+        remove: "Delete the game",
+        askRedo: (game, by) => ({
+            question: `Analyse ${game} again?`,
+            note: `${by === undefined ? "The review" : `The review by ${by}`} is deleted; your chat's analyst writes it again, with the model and effort it has now.`,
+            yes: "Analyse again",
+        }),
+        askUnreview: (game) => ({ question: `Delete the analysis of ${game}?`, note: "Its badges, notes and the coach's judgments go; the game stays.", yes: "Delete" }),
+        askRemove: (game, when) => ({ question: `Delete the game ${game}${when === undefined ? "" : ` of ${when}`}?`, note: "With its analysis. It cannot be undone.", yes: "Delete" }),
+        cancel: "Cancel",
         download: "Annotated PGN",
         downloadHint: "The game with the review's comments and judgments",
         analyseIt: "Analyse the game",
@@ -856,10 +886,26 @@ const italian: Text = {
         note: "La partita resta tra quelle da studiare; l'AI la commenta con te nella chat.",
         start: "Analizza",
         yours: "Le tue analisi",
-        bring: "Porta una partita",
+        bring: "Carica una partita",
+        bringNote: "un PGN giocato altrove, incollato o da file",
         reviewed: "commentata",
         unreviewed: "da commentare",
         moves: (count) => `${count} ${count === 1 ? "mossa" : "mosse"}`,
+        outcome: { won: "vinta", lost: "persa", drawn: "patta" },
+        more: "Altro",
+        redo: "Rifai l'analisi",
+        redoNote: "con il modello e l'effort della tua chat",
+        unreview: "Elimina l'analisi",
+        unreviewNote: "la partita resta, da commentare",
+        remove: "Elimina la partita",
+        askRedo: (game, by) => ({
+            question: `Rifare l'analisi di ${game}?`,
+            note: `${by === undefined ? "L'analisi" : `L'analisi di ${by}`} si cancella; la rifà l'analista della tua chat, col modello e l'effort che ha ora.`,
+            yes: "Rifai",
+        }),
+        askUnreview: (game) => ({ question: `Eliminare l'analisi di ${game}?`, note: "Bollini, note e giudizi dell'allenatore si cancellano; la partita resta.", yes: "Elimina" }),
+        askRemove: (game, when) => ({ question: `Eliminare la partita ${game}${when === undefined ? "" : ` del ${when}`}?`, note: "Con la sua analisi. Non si può annullare.", yes: "Elimina" }),
+        cancel: "Annulla",
         download: "PGN annotato",
         downloadHint: "La partita con i commenti e i giudizi della revisione",
         analyseIt: "Analizza la partita",

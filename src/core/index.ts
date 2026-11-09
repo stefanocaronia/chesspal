@@ -37,6 +37,7 @@ export {
     reviewed,
     reviewOf,
     squareOf,
+    unreviewed,
     withAiModel,
     withAnnotator,
     withGameReview,
