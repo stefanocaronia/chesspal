@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { timeShown } from "../src/page/players/clock-time.ts";
 
-describe("the page's clock (T-37)", () => {
+describe("the page's clock", () => {
     it("shows minutes and seconds, and tenths in the last 20 seconds", () => {
         expect(timeShown(272_900)).toBe("4:32");
         expect(timeShown(3_723_000)).toBe("1:02:03");

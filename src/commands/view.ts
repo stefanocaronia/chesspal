@@ -1,4 +1,4 @@
-// The view of a position the AI reads (D-26): the facts the core computes, in the format the T-27 bench chose; never the grid, which is the player's.
+// The view of a position the AI reads (D-26): the facts the core computes, in the format a bench chose; never the grid, which is the player's.
 import type { Facts, Material, PieceFacts, PieceLetter, Side, Square } from "../core/index.ts";
 
 /** The view after the player's move: the check, the pieces attacked, then what is at risk, the pins, the checks and the moves of each piece. */

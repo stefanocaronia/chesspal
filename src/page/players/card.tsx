@@ -1,5 +1,5 @@
 // A player's card beside the board: their picture, name and side, whose move it is, the pieces they took and how far ahead they are (D-20), and their
-// clock (T-37).
+// clock.
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { type Clock, type PieceLetter, type Side, timeLeft } from "../../core/index.ts";

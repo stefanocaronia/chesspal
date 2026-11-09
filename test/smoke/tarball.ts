@@ -1,4 +1,4 @@
-// The package as a player gets it (T-24): packed, installed in a temporary folder, run through npm's shim (the .cmd one on Windows) for its version and
+// The package as a player gets it: packed, installed in a temporary folder, run through npm's shim (the .cmd one on Windows) for its version and
 // chesspal init, and the MCP server started as .mcp.json starts it, with initialize timed against its budget, tools/list and a call to status.
 // Run it with: npm run smoke, after npm run build. It exits with 1 at the first check that fails.
 import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from "node:child_process";

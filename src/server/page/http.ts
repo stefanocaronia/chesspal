@@ -6,7 +6,7 @@ import type { WordsRefused } from "../../games/index.ts";
 export const json = "application/json; charset=utf-8";
 
 /**
- * A request refused, as the page reads it: the server's words, and the code of a refusal the page says in the player's language (T-11), with the characters
+ * A request refused, as the page reads it: the server's words, and the code of a refusal the page says in the player's language, with the characters
  * left for words too long; without a code, the page shows the words.
  */
 export interface Refused

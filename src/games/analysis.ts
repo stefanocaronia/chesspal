@@ -4,7 +4,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomically } from "./files.ts";
 
-/** The game in analysis: its name as the lists write it, when the analysis last changed it, and whether the player brought it on the page and the AI has not gone over it yet (T-92). */
+/** The game in analysis: its name as the lists write it, when the analysis last changed it, and whether the player brought it on the page and the AI has not gone over it yet. */
 export interface Analysis
 {
     readonly game: string;

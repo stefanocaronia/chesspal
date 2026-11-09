@@ -1,4 +1,4 @@
-// The talk on the board page (D-51, T-65): the player's words and the AI's answers, kept in game.json beside the PGN, or in talk.json with no game (D-77).
+// The talk on the board page (D-51): the player's words and the AI's answers, kept in game.json beside the PGN, or in talk.json with no game (D-77).
 import { type CurrentGame, endOf, type Speaker, type TalkLine } from "./current-game.ts";
 import type { TableTalk } from "./table-talk.ts";
 
@@ -41,7 +41,7 @@ export function talkLine(current: Talk, sayer: Sayer, text: string, at: Date, pl
     return { who, text: words, ply, at: at.toISOString(), ...(sayer === "agent" ? { agent: true } : {}) };
 }
 
-/** Words refused, and why, for the page to say it in the player's language (T-11): none, the move's characters spent, more than a line or what is left holds. */
+/** Words refused, and why, for the page to say it in the player's language: none, the move's characters spent, more than a line or what is left holds. */
 export class WordsRefused extends Error
 {
     readonly reason: "empty" | "spent" | "long" | "longer-than-left";

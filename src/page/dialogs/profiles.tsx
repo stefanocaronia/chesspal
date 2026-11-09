@@ -25,7 +25,7 @@ import { Dialog } from "./dialog.tsx";
 
 /**
  * The page at the first start, while the profile Chesspal made is new: who plays, and the game comes after (D-23, D-71); a game played before stays in it.
- * The system's account is only a suggestion for the name (T-120), and the page says where the games go (T-119).
+ * The system's account is only a suggestion for the name, and the page says where the games go.
  */
 export function Wizard({ text, hasGame, account, dataFolder, onMade }: {
     text: Text;
@@ -123,7 +123,7 @@ export function ProfilesDialog({ open, profiles, active, playing, dataFolder, on
     active: ProfileShown;
     /** A game goes on: the profile stays until it ends. */
     playing: boolean;
-    /** Where the profiles are, folder by folder (T-119). */
+    /** Where the profiles are, folder by folder. */
     dataFolder: readonly string[];
     onClose: () => void;
     text: Text;
@@ -184,7 +184,7 @@ export function ProfilesDialog({ open, profiles, active, playing, dataFolder, on
     );
 }
 
-/** Where the games are, as the file manager walks there, and a button that opens it there (T-119). */
+/** Where the games are, as the file manager walks there, and a button that opens it there. */
 function DataFolder({ folders, text }: { folders: readonly string[]; text: Text; })
 {
     const words = text.profile;
@@ -221,7 +221,7 @@ function DataFolder({ folders, text }: { folders: readonly string[]; text: Text;
     );
 }
 
-/** The form that makes a profile and puts it in use: the wizard's, with the system's account as a suggestion (T-120), and the menu's for another player. */
+/** The form that makes a profile and puts it in use: the wizard's, with the system's account as a suggestion, and the menu's for another player. */
 function ProfileForm({ text, submit, suggestion, onMade }: { text: Text; submit: string; suggestion?: string; onMade: () => void; })
 {
     const words = text.profile;

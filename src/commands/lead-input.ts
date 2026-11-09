@@ -9,7 +9,7 @@ export const leadInput = z.union([z.number(), z.string()]).refine(
         + "up to 99",
 );
 
-/** Who is ahead in words, the side and by how much, so that the AI reads its own sign back (Anatolij, review of T-148). */
+/** Who is ahead in words, the side and by how much, so that the AI reads its own sign back (Anatolij). */
 export function aheadWords(lead: Lead): string
 {
     if ("mate" in lead) {

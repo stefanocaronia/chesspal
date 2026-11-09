@@ -55,7 +55,7 @@ export const aiMove = defineCommand({
         return { ...played, game: withAnalyst(played.game, context), words: give(context, waiting), ...(agents.length === 0 ? {} : { agents }), ...board };
     },
     format: (result) => {
-        // The mood the AI has just given is not told back: player_move and status tell it while it lasts (Priya, round of T-107).
+        // The mood the AI has just given is not told back: player_move and status tell it while it lasts (Priya).
         const game = { ...result.game };
         delete game.mood;
         // The board goes before the player's words and the next step, which stays the last line.

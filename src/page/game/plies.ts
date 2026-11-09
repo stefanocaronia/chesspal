@@ -87,8 +87,7 @@ export function withoutReviews(plies: Ply[]): Ply[]
 }
 
 /**
- * The coach's judgments the card shows (D-78, D-88): first one whose note was held until the player's last move let it go, however far back its move (Zoe,
- * playtest of T-112); then the latest, of the player's last move the AI has answered, else of the one before (Zoe and Federico, review of T-112). Only
+ * The coach's judgments the card shows (D-78, D-88): first one whose note was held until the player's last move let it go, however far back its move (Zoe); then the latest, of the player's last move the AI has answered, else of the one before (Zoe and Federico). Only
  * those with a badge of their own or a note.
  */
 export function judgmentsOf(plies: readonly Ply[], player: Side, { judgments }: CoachShown): Ply[]
@@ -103,7 +102,7 @@ export function judgmentsOf(plies: readonly Ply[], player: Side, { judgments }: 
 /** How long a line of the player's may be: the server's limit (D-54), which a test keeps equal. */
 export const talkLimits = { line: 200 } as const;
 
-/** A line said on the board page, with the moves the game had then (T-65); the player's with how far it got: written, read by the AI, or answered. */
+/** A line said on the board page, with the moves the game had then; the player's with how far it got: written, read by the AI, or answered. */
 export interface TalkLine
 {
     readonly who: "player" | "ai";
@@ -112,7 +111,7 @@ export interface TalkLine
     readonly heard?: "sent" | "read" | "answered";
 }
 
-/** How many times the AI has spoken in the game, its comments on its moves and its lines on the page: the page sees it speak when the count grows (T-84). */
+/** How many times the AI has spoken in the game, its comments on its moves and its lines on the page: the page sees it speak when the count grows. */
 export function aiSpoke(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): number
 {
     return plies.filter((ply) => ply.side === ai && ply.comment !== undefined).length + talk.filter((line) => line.who === "ai").length;

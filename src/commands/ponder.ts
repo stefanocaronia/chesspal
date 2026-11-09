@@ -170,8 +170,8 @@ export function wordsOf(comment: string | undefined): string | undefined
 }
 
 /**
- * How long one call waits for the player's move at most, under the minute a host may give a tool (Priya, T-109), how often it looks, and how long the agent
- * waits in all before it stops: a player who leaves the game open must not keep it asking (Priya, round of T-109).
+ * How long one call waits for the player's move at most, under the minute a host may give a tool (Priya), how often it looks, and how long the agent
+ * waits in all before it stops: a player who leaves the game open must not keep it asking (Priya).
  */
 const playerWait = { most: 50_000, every: 500, inAll: 10 * 60_000 } as const;
 
@@ -184,7 +184,7 @@ function toPonder(folder: string, now: Date, position: number | undefined): Curr
         return undefined;
     }
 
-    // A flag fallen is the page's or the chat's to write, so that the doorbell rings it (Federico, round of T-109).
+    // A flag fallen is the page's or the chat's to write, so that the doorbell rings it (Federico).
     const { turn } = current.game.position;
 
     if (current.clock !== undefined && timeLeft(current.clock, turn, now)[turn] <= 0) {

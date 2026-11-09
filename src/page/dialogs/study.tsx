@@ -1,4 +1,4 @@
-// The dialog of the analyses (T-92, T-106): the games analysed or brought to study, to open again, and a game played elsewhere brought as a PGN, pasted or read
+// The dialog of the analyses: the games analysed or brought to study, to open again, and a game played elsewhere brought as a PGN, pasted or read
 // from a file, which the server keeps to study and puts in analysis.
 import { useEffect, useState } from "preact/hooks";
 import type { AiModel } from "../../core/index.ts";

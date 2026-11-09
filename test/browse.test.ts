@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { stepKeys, stepped } from "../src/page/game/browse.ts";
 
-describe("looking back through the game (T-88)", () => {
+describe("looking back through the game", () => {
     it("steps one move at a time or to either end, never past them", () => {
         expect(stepped("back", 10, 10)).toBe(9);
         expect(stepped("forward", 9, 10)).toBe(10);

@@ -123,7 +123,7 @@
 }
 
 /* Who is ahead, as the AI estimates it (D-90): White's share from the left, Black's from the right, the figure on the side ahead, as chess.com's bar; an edge
-   and a mark of the even game in the middle keep it a bar of two sides in both themes, never one of progress (Zoe, review of T-148) */
+   and a mark of the even game in the middle keep it a bar of two sides in both themes, never one of progress (Zoe) */
 .lead-bar {
     position: relative;
     height: 14px;
@@ -181,7 +181,7 @@
 }
 
 /* The chart of the game in analysis: the white area is White's share, the line in the middle an even game; a dot on a move a badge marks, a line on the move
-   shown, gold as on the board and in the moves (Zoe, review of T-148) */
+   shown, gold as on the board and in the moves (Zoe) */
 .lead-card {
     display: grid;
     gap: 8px;
@@ -388,7 +388,7 @@
     color: var(--soft);
 }
 
-/* A move is a button that shows it on the board (T-88); shown or not it keeps the same room, so stepping with the arrows never shifts the line (Stefano, T-140) */
+/* A move is a button that shows it on the board; shown or not it keeps the same room, so stepping with the arrows never shifts the line (Stefano) */
 .moves .ply {
     justify-self: start;
     display: inline-flex;
@@ -404,13 +404,13 @@
     cursor: pointer;
 }
 
-/* The move under the pointer in a neutral grey, never the accent, so it never reads as the move shown (Stefano, T-140) */
+/* The move under the pointer in a neutral grey, never the accent, so it never reads as the move shown (Stefano) */
 .moves .ply:hover {
     background: color-mix(in oklab, var(--ink) 9%, transparent);
 }
 
 /* The move shown in the board's gold of the last move, laid on the light square as there, with dark ink in both themes: the yellow move in the list is the yellow
-   move on the board, and it follows the skin (Stefano, T-140) */
+   move on the board, and it follows the skin (Stefano) */
 .moves .ply.current {
     background: var(--light-square) linear-gradient(var(--last-move), var(--last-move));
     color: var(--fixed-ink);
@@ -462,7 +462,7 @@
     stroke-width: 2;
 }
 
-/* A piece in a move: the set's small one (T-94), White's white and Black's black, edged so either shows on either theme */
+/* A piece in a move: the set's small one, White's white and Black's black, edged so either shows on either theme */
 .figurine {
     display: inline-block;
     width: 1.15em;
@@ -477,7 +477,7 @@
     font-weight: 400;
 }
 
-/* In analysis, the game's own commands in the right column (T-106): save its PGN with the review, open the other analyses */
+/* In analysis, the game's own commands in the right column: save its PGN with the review, open the other analyses */
 .analysis-actions {
     display: flex;
     gap: 8px;

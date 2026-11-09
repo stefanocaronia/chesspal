@@ -1,4 +1,4 @@
-// The board under the pointer and the keyboard (T-11, T-70, T-73): a press picks a piece and a second plays it, a drag lifts it and drops it, the right
+// The board under the pointer and the keyboard: a press picks a piece and a second plays it, a drag lifts it and drops it, the right
 // button lights squares and draws arrows, the arrows walk the squares.
 import type { RefObject } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
@@ -14,7 +14,7 @@ export interface BoardPointer
     /** The arrow the right button is drawing. */
     readonly drawing: Arrow | undefined;
     readonly focused: string;
-    /** The squares of the move the player dragged, which lands where it was dropped instead of sliding there (T-74). */
+    /** The squares of the move the player dragged, which lands where it was dropped instead of sliding there. */
     readonly dragged: { current: string | undefined; };
     own(square: string): boolean;
     isTarget(square: string): boolean;
@@ -71,7 +71,7 @@ export function useBoardPointer({ columns, ranks, pieces, player, selected, targ
         }
     };
 
-    // The keyboard (T-11): the arrows move between the squares as the board is turned, Enter and Space press one as a click does, Esc puts the piece down.
+    // The keyboard: the arrows move between the squares as the board is turned, Enter and Space press one as a click does, Esc puts the piece down.
     const [cursor, setCursor] = useState<string | undefined>(undefined);
     const focused = cursor ?? selected ?? `${columns[0]}${ranks[7]}`;
 
@@ -167,7 +167,7 @@ export function useBoardPointer({ columns, ranks, pieces, player, selected, targ
             return;
         }
 
-        // The right button marks a square, or draws an arrow when dragged (T-73); the left one clears them all, and moves.
+        // The right button marks a square, or draws an arrow when dragged; the left one clears them all, and moves.
         if (event.button === 2) {
             marking.current = { from: square, id: event.pointerId };
             board.current!.setPointerCapture(event.pointerId);

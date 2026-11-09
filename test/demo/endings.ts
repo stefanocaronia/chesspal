@@ -1,4 +1,4 @@
-// The ends of a game on the board, to watch their effects (T-77): npm run endings. Each button sets a game one move from its end with Chesspal's commands,
+// The ends of a game on the board, to watch their effects: npm run endings. Each button sets a game one move from its end with Chesspal's commands,
 // then plays that move or ends the game, so the page shows the end as it happens. The game lives in tmp/endings, its data folder, emptied at each start. The board page,
 // which refuses to be framed by another site, comes through this server, as if it were its own.
 import { mkdirSync, rmSync } from "node:fs";

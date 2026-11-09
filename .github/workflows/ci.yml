@@ -38,7 +38,7 @@ jobs:
       - run: npm run smoke
         timeout-minutes: 5
 
-  # The oldest Node that package.json's engines allows (T-123): the package builds and runs there, which the newest 22 would not show.
+  # The oldest Node that package.json's engines allows: the package builds and runs there, which the newest 22 would not show.
   oldest-node:
     runs-on: ubuntu-latest
     steps:

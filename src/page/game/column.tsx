@@ -1,5 +1,5 @@
 // The game's column on the right of the board (D-53): the game's card with who is ahead (D-90), the chart of the game in analysis, its opening (D-16), the
-// helps (D-78), the moves, the saves and the buttons that step through them (T-88).
+// helps (D-78), the moves, the saves and the buttons that step through them.
 import type { ComponentChildren } from "preact";
 import { type Opening, outOfBookMove, type Side } from "../../core/index.ts";
 import { LeadBar, LeadChart } from "../lead/lead.tsx";
@@ -13,7 +13,7 @@ import { MoveList, Steps } from "./move-list.tsx";
 import type { Ply } from "./plies.ts";
 
 /**
- * The column, which the player folds with its tab (T-84); under the board, where three columns would leave the board small, always open. A game in analysis
+ * The column, which the player folds with its tab; under the board, where three columns would leave the board small, always open. A game in analysis
  * (D-69) says above the moves that the AI is going over it, until its word on the whole game comes, which the talk shows.
  */
 export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, helps, standings, analysis, shownPlies, onShow, onStep, onDownload, onSaveMoves, onAnalyse, text }: {
@@ -35,9 +35,9 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     shownPlies: number;
     onShow: (plies: number) => void;
     onStep: (step: Step) => void;
-    /** In analysis (T-106): saves the game with its review as a PGN. */
+    /** In analysis: saves the game with its review as a PGN. */
     onDownload?: () => void;
-    /** Saves the moves alone as a PGN, for Lichess or chess.com (T-59). */
+    /** Saves the moves alone as a PGN, for Lichess or chess.com. */
     onSaveMoves?: () => void;
     /** Once the game is over: opens it in analysis, also from the table set for the next (D-77). */
     onAnalyse?: () => void;
@@ -112,9 +112,9 @@ function AnalyseButton({ label, onAnalyse }: { label: string; onAnalyse: () => v
 }
 
 /**
- * The game's card, as tall as a player's (T-84): a little board of four squares with the king to move, the move and when the game started; at the end, the result on the
+ * The game's card, as tall as a player's: a little board of four squares with the king to move, the move and when the game started; at the end, the result on the
  * square, the winner's king standing over the loser's, laid down, or both standing in a draw, how it ended and how many moves it lasted; lit up a moment when the
- * game ends under the player's eyes (T-77).
+ * game ends under the player's eyes.
  */
 function GameCard({ plies, result, how, lit, started, move, toMove, bar, text }: {
     plies: readonly Ply[];

@@ -1,5 +1,5 @@
-// The doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes for Claude Code and Codex (T-62), waits at the page of its chat and, when
-// the player moves or writes there (T-65), tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
+// The doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes for Claude Code and Codex, waits at the page of its chat and, when
+// the player moves or writes there, tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { get, type IncomingMessage, type ServerResponse } from "node:http";
@@ -114,7 +114,7 @@ export function pagePorts(folder: string): number[]
     return [5870, 6870, 7870].map((base) => base + offset);
 }
 
-/** What Codex's Stop hook answers to wake the chat (T-62): its turn goes on with the doorbell's line. */
+/** What Codex's Stop hook answers to wake the chat: its turn goes on with the doorbell's line. */
 export const codexBellAnswer = JSON.stringify({ decision: "block", reason: bellLine });
 
 /**
@@ -131,7 +131,7 @@ export async function listen(codex = false): Promise<void>
 
     const heard = await bellHeard(input).catch((error: unknown): BellHeard => ({ folder: chatFolder(hookInput(input)), rang: false, why: `failed: ${(error as Error).message}` }));
 
-    // Codex's turn ends with a hook that heard no bell, and the player's next move on the page wakes nobody: the log keeps why (T-62).
+    // Codex's turn ends with a hook that heard no bell, and the player's next move on the page wakes nobody: the log keeps why.
     if (codex && !heard.rang) {
         noteSilence(heard.folder, heard.why);
     }

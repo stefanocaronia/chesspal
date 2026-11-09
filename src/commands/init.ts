@@ -6,14 +6,14 @@ import { z } from "zod";
 import { codexHooksPath, setUpHosts } from "../host-files/index.ts";
 import { defineCommand } from "./registry.ts";
 
-/** The player's folder set up for the AI hosts (T-7): the folder, and the files written there. */
+/** The player's folder set up for the AI hosts: the folder, and the files written there. */
 interface FolderSetUp
 {
     folder: string;
     written: string[];
-    /** The folder as the player goes into it from where init ran, when it is not that one (T-127): chess. */
+    /** The folder as the player goes into it from where init ran, when it is not that one: chess. */
     enter?: string;
-    /** Codex's hooks changed in a folder that had them: Codex runs them only once the player trusts them again (T-125). */
+    /** Codex's hooks changed in a folder that had them: Codex runs them only once the player trusts them again. */
     hooksChanged?: true;
 }
 

@@ -14,7 +14,7 @@ export function speechOf(folder: string, systemLanguage: string | undefined): Sp
     return language === undefined ? undefined : { language };
 }
 
-/** What the AI is told of the player's speech once a chat (Priya, retest of T-54); the moves are SAN in every language (D-87). */
+/** What the AI is told of the player's speech once a chat (Priya); the moves are SAN in every language (D-87). */
 export function speechLine({ language }: Speech): string
 {
     return `The player speaks ${language}.`;

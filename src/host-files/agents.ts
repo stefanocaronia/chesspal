@@ -42,7 +42,7 @@ export function agentFiles(folder: string): { path: string; text: string; }[]
     return [
         { agent: quickAgent, model: "haiku", description: thinking, tools: ["ponder"], text: ponder },
         { agent: ownAgent, model: "inherit", description: thinking, tools: ["ponder"], text: ponder },
-        // Its description tells the chat it starts the agent only as ai_move says, never to ask it about the game (Priya, review of T-112).
+        // Its description tells the chat it starts the agent only as ai_move says, never to ask it about the game (Priya).
         { agent: coachAgent, model: "inherit", description: "Chesspal's coach. Started only as Chesspal's answers say, in the background, never to answer the player.", tools: ["coach"], text: instructions("coach") },
         {
             agent: analystAgent,
@@ -53,7 +53,7 @@ export function agentFiles(folder: string): { path: string; text: string; }[]
         },
     ].map(({ agent, model, description, tools, text }) => ({
         path: agentPath(folder, agent),
-        // The tools it works with: Claude Code gives an agent its MCP tools loaded, with no search first (Priya, round of T-109).
+        // The tools it works with: Claude Code gives an agent its MCP tools loaded, with no search first (Priya).
         text: ["---", `name: ${agent}`, `description: ${description}`, `tools: ${tools.map((tool) => `mcp__chesspal__${tool}`).join(", ")}`, `model: ${model}`, "---", "", text, ""].join("\n"),
     }));
 }

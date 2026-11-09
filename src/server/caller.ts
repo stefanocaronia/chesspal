@@ -1,4 +1,4 @@
-// Who makes a tool call (D-81): only what the host ties to that call, never what the AI says of itself nor a setting the chat may have changed (T-113).
+// Who makes a tool call (D-81): only what the host ties to that call, never what the AI says of itself nor a setting the chat may have changed.
 // Codex sends the model and the effort with each call; Claude Code writes them into the chat's transcript, on the line of the call.
 import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -40,7 +40,7 @@ export type CallingAgent = { chat: true; } | { agent: string; };
 
 /**
  * Who in Claude Code made a tool call: the chat, when its line is in the chat's transcript, or the agent whose file has it, by the type Claude Code notes
- * beside that file (Priya, review of T-112). Undefined when it cannot be told: another host, no chat noted, no line, or no type.
+ * beside that file (Priya). Undefined when it cannot be told: another host, no chat noted, no line, or no type.
  */
 export async function callingAgent(meta: Record<string, unknown> | undefined, folder: string, wait = 50): Promise<CallingAgent | undefined>
 {

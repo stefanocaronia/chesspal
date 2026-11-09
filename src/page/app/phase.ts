@@ -53,5 +53,5 @@ export interface Verdict
     readonly verdict?: string;
 }
 
-/** What the header's chip says: the game in analysis (D-69), a game over (T-77), a draw offered or declined (D-65), no game going on (D-77). */
+/** What the header's chip says: the game in analysis (D-69), a game over, a draw offered or declined (D-65), no game going on (D-77). */
 export type VerdictKind = "analysis" | "over" | "offer" | "idle";

@@ -11,7 +11,7 @@ import { colourName, materialText } from "./view.ts";
 /** The positional profile of a position: of a game studied, with where it stands. */
 type Described = Profile & { where?: string; };
 
-/** The positional profile of the game in progress (D-19, T-12), or of any position of a game over (D-68): separate facts, never a score. */
+/** The positional profile of the game in progress (D-19), or of any position of a game over (D-68): separate facts, never a score. */
 export const position = defineCommand({
     name: "position",
     description:

@@ -40,7 +40,7 @@
     --torretta-light: #f4c84c;
     --torretta-alarm: #ef6a4c;
     --torretta-ponder: #8f9a8a;
-    /* The badges of the moves (D-69, T-41): white signs, dark on the yellow one; each disc at least 3:1 with its sign */
+    /* The badges of the moves (D-69): white signs, dark on the yellow one; each disc at least 3:1 with its sign */
     --badge-ink: #fff;
     --badge-note: #7b8794;
     --badge-brilliant: #0f9a9e;
@@ -55,12 +55,12 @@
     --badge-miss: #c2407d;
     --badge-blunder: #d22c2c;
     --shadow: 0 1px 2px rgba(29, 39, 51, 0.06), 0 6px 18px rgba(29, 39, 51, 0.06);
-    /* On a light page the board keeps a thin edge in its dark squares colour, and a deeper shadow, so its light squares do not melt into the page (T-83) */
+    /* On a light page the board keeps a thin edge in its dark squares colour, and a deeper shadow, so its light squares do not melt into the page */
     --board-shadow: 0 0 0 1px color-mix(in oklab, var(--dark-square) 55%, transparent), 0 2px 4px rgba(29, 39, 51, 0.1), 0 10px 28px rgba(29, 39, 51, 0.12);
     --gap: 20px;
     --left: 300px;
     --right: 300px;
-    /* The board's least size beside the talk: room for the AI's words, the box and both cards; a lower window scrolls (T-103) */
+    /* The board's least size beside the talk: room for the AI's words, the box and both cards; a lower window scrolls */
     --least: 440px;
     --tab: 16px;
     --rail: 56px;
@@ -101,7 +101,7 @@
     color-scheme: dark;
 }
 
-/* Zoe's palettes (T-82): on the page's root and on each swatch of the settings. Board skins, each with its own highlights */
+/* Zoe's palettes: on the page's root and on each swatch of the settings. Board skins, each with its own highlights */
 :root[data-board="azzurro"],
 [data-board="azzurro"] {
     --light-square: #eaf1f8;

@@ -32,7 +32,7 @@ export function sendFile(response: ServerResponse, path: string): void
         return;
     }
 
-    // A pieces' set loaded again for each piece that moves blanks the pieces drawn from it, at times until the next move (T-88): the browser keeps it an hour,
+    // A pieces' set loaded again for each piece that moves blanks the pieces drawn from it, at times until the next move: the browser keeps it an hour,
     // and the drawn avatars too, all at once in the profile's dialog.
     const kept = type === types[".svg"] || type === types[".webp"];
     send(response, 200, type, bytes, kept ? { "Cache-Control": "max-age=3600" } : {});

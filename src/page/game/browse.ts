@@ -1,4 +1,4 @@
-// Looking back through the game played (T-88): one step at a time or to either end, with the keys of Lichess and chess.com, only to look at it.
+// Looking back through the game played: one step at a time or to either end, with the keys of Lichess and chess.com, only to look at it.
 
 /** A step through the game's moves. */
 export type Step = "first" | "back" | "forward" | "last";

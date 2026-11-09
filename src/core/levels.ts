@@ -5,7 +5,7 @@ import type { GameRecord } from "./record.ts";
 export const aiLevels = ["beginner", "club", "strong", "master"] as const;
 export type AiLevel = (typeof aiLevels)[number];
 
-/** The layers of facts: the board as the player sees it (D-59), the tactical view (D-26), the positional profile (T-12), the opening book's moves (D-15). */
+/** The layers of facts: the board as the player sees it (D-59), the tactical view (D-26), the positional profile, the opening book's moves (D-15). */
 const layers = ["board", "tactics", "strategy", "theory"] as const;
 export type Layer = (typeof layers)[number];
 

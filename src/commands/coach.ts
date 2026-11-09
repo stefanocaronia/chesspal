@@ -85,11 +85,11 @@ export const coach = defineCommand({
                 return { stop: "moved" };
             }
 
-            // The chat may start a second coach on the same position, told again before the first called: one judges it (Priya, playtest of T-112).
+            // The chat may start a second coach on the same position, told again before the first called: one judges it (Priya).
             return startCoach(folder, current) ? { start } : { stop: "started" };
         }
 
-        // A new game may have started while the coach thought on the last one: its words never go to another game (Federico, review of T-112).
+        // A new game may have started while the coach thought on the last one: its words never go to another game (Federico).
         if (current === undefined || gameKey(current) !== game || position > current.game.record.moves.length) {
             return { stop: "moved" };
         }
@@ -215,7 +215,7 @@ function startOf(current: CurrentGame, folder: string, context: Context): string
     ];
 }
 
-/** The game's moves as the coach reads them, with the position a game set up began in, the last ones of a long game, and its opening by the book (Anatolij, T-112). */
+/** The game's moves as the coach reads them, with the position a game set up began in, the last ones of a long game, and its opening by the book (Anatolij). */
 function movesLines(record: GameRecord): string[]
 {
     const opening = openingLine(record);
@@ -238,7 +238,7 @@ function judgedPly(current: CurrentGame, position: number): number | undefined
 
 /**
  * The player's move to judge, the position they played it in with the book there, and, when the opponent answered it, what it left at risk and the checks
- * it let the opponent give (Anatolij, review of T-112), and the answer with its words.
+ * it let the opponent give (Anatolij), and the answer with its words.
  */
 function judgedLines({ game }: CurrentGame, ply: number, player: Side): string[]
 {
@@ -315,7 +315,7 @@ function keep(folder: string, current: CurrentGame, place: Place, { ahead, badge
     }
 
     // On the position the game ended in there is no turn to help and the result says who won; a position before it keeps who was ahead there, when the game
-    // ended while the coach thought (Federico, review of T-148).
+    // ended while the coach thought (Federico).
     const ended = over && position === current.game.record.moves.length;
 
     if (ended && (hint !== undefined || ahead !== undefined)) {
@@ -343,7 +343,7 @@ function keep(folder: string, current: CurrentGame, place: Place, { ahead, badge
 
     if (judging && ply !== undefined) {
         // A note that names a move the player could play in the position it was given for waits until none of them is legal on their turn: until then it
-        // would play for them (Anatolij, review of T-112).
+        // would play for them (Anatolij).
         const then = toMove ? legal : new Game({ tags: current.game.record.tags, moves: current.game.record.moves.slice(0, position) }).legalMoves();
         const held = note === undefined ? [] : [...new Set(namedMoves(note, then))];
         keepJudgment(folder, current, { ply, ...(badge === undefined ? {} : { badge }), ...(note === undefined ? {} : { note }), ...(held.length === 0 ? {} : { held }) });
@@ -388,7 +388,7 @@ function sideToMoveAt({ game }: CurrentGame, position: number): Side
     return (game.record.moves.length - position) % 2 === 0 ? turn : turn === "white" ? "black" : "white";
 }
 
-/** Refuses a hint that plays for the player: a move they may play now written in it, or drawn as an arrow (Anatolij, review of T-112). */
+/** Refuses a hint that plays for the player: a move they may play now written in it, or drawn as an arrow (Anatolij). */
 function refuseMoves(hint: string, arrows: readonly string[], legal: readonly Move[]): void
 {
     const drawn = arrows.map((arrow) => legal.find((move) => move.from === arrow.slice(1, 3) && move.to === arrow.slice(3, 5))?.san).filter((san) => san !== undefined);
@@ -415,7 +415,7 @@ const moveWords = /(?<![\p{L}\d]|\.\.\.|…)(?:O-O(?:-O)?|0-0(?:-0)?|[KQRBN][a-h
 
 /**
  * A move as the coach may write it and Chesspal lists it, alike: its piece and capture, the square it goes to and its promotion; a castling as it is. A
- * piece on a square without the capture names that piece, never a move taking it (Priya and Anatolij, review of T-112).
+ * piece on a square without the capture names that piece, never a move taking it (Priya and Anatolij).
  */
 function moveKey(san: string): string
 {

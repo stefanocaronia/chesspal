@@ -31,7 +31,7 @@ const helpsLine = "Helps on: the player wants to learn. Tell your intentions, ne
 
 /**
  * Where a coach runs, a coach, not the AI, judges the player's moves, and the AI knows it, so that it neither makes up what the coach said nor looks for it
- * (D-88, Priya, review of T-112); where none runs, nobody judges them before the analyst (D-80).
+ * (D-88, Priya); where none runs, nobody judges them before the analyst (D-80).
  */
 const coachLine = "A coach, not you, judges their moves and gives them hints on the board page; you don't see what it writes.";
 
@@ -88,7 +88,7 @@ export function wordLines(words: readonly string[]): string[]
 
 /**
  * What the AI does next: the one line every host reads, even where the server's instructions are not shown. Words of the player's ask for an answer. With the
- * board page open in no browser, a new game starts there, never in the chat (T-131).
+ * board page open in no browser, a new game starts there, never in the chat.
  */
 export function nextStep(game: GameSummary | undefined, words: readonly string[] = [], pageClosed = false): string
 {
@@ -130,7 +130,7 @@ export function nextStep(game: GameSummary | undefined, words: readonly string[]
 /** How a new game starts: the player chooses it in the board page's window, which new_game without choices opens (D-85). */
 export const newGameStep = "call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.";
 
-// With the page open in no browser the window cannot open: the player opens the page and presses New game (T-131).
+// With the page open in no browser the window cannot open: the player opens the page and presses New game.
 const closedPageGameStep = "they start it on the board page with its New game button, where they choose the colour, the clock and the level: tell them so with "
     + "the page's address, and never offer to set it up in the chat.";
 
@@ -154,7 +154,7 @@ function offerLines({ drawOffer, turn, ai }: GameSummary): string[]
     return [];
 }
 
-/** What the AI thought on the player's time, saying by which model and that Chesspal checked only that it is legal: the facts do not cover every blunder (Anatolij, round of T-109). */
+/** What the AI thought on the player's time, saying by which model and that Chesspal checked only that it is legal: the facts do not cover every blunder (Anatolij). */
 function thoughtLine({ move, why }: Thought, level: AiLevel): string
 {
     return `Thought on their time ${onQuickModel(level) ? "by a quicker model" : "by your model"} (legal, not checked): ${move}, ${why}`;

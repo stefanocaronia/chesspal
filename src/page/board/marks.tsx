@@ -38,7 +38,7 @@ export function Badge({ kind }: { kind: BadgeKind; })
 
 /**
  * The arrows over the board, in squares from its top left corner: a knight's turns once, the long leg first. In ink when they explain a refused move, and
- * cut short (T-91, Zoe): off the culprit's piece, and before the piece they point at, so both stay in sight.
+ * cut short (Zoe): off the culprit's piece, and before the piece they point at, so both stay in sight.
  */
 export function Arrows({ arrows, at, explain, occupied }: {
     arrows: readonly Arrow[];
@@ -76,7 +76,7 @@ export function Arrows({ arrows, at, explain, occupied }: {
         return { key: `${from}${to}`, from, colour, shaft, head };
     });
 
-    // Arrows off one square meet in one shape; an arrow from elsewhere keeps its own edge over them, so no shape is lost where points meet (Stefano, T-142).
+    // Arrows off one square meet in one shape; an arrow from elsewhere keeps its own edge over them, so no shape is lost where points meet (Stefano).
     const starts = [...new Set(shapes.map(({ from }) => from))];
     return (
         <svg class={explain !== undefined ? "arrows explain" : occupied !== undefined ? "arrows drawn" : "arrows"} viewBox="0 0 8 8" aria-hidden="true">
@@ -130,7 +130,7 @@ export function controlOf(counts: readonly [number, number] | undefined): "white
 }
 
 /**
- * A bubble by the piece of a refused move, where it hides neither the culprit nor the arrow's point (`where`, T-91), kept on the board at its edges; in the
+ * A bubble by the piece of a refused move, where it hides neither the culprit nor the arrow's point (`where`), kept on the board at its edges; in the
  * board's middle without a piece.
  */
 export function Bubble({ notice, place, where }: { notice: Notice; place?: [number, number]; where: BubblePlace; })
@@ -296,7 +296,7 @@ function towards(point: readonly [number, number], target: readonly [number, num
     return [point[0] + (target[0] - point[0]) / length * distance, point[1] + (target[1] - point[1]) / length * distance];
 }
 
-/** The bubble's icon for a kind of reason (T-91): the piece moved, a pin, the player's king on red, a bar, the two ways of castling. */
+/** The bubble's icon for a kind of reason: the piece moved, a pin, the player's king on red, a bar, the two ways of castling. */
 function ExplainIcon({ kind, piece }: { kind: ExplainKind; piece: string; })
 {
     const white = piece === piece.toUpperCase();
@@ -331,5 +331,5 @@ const pinTrim = 0.35;
 // An arrow's head, in squares: how long, and how far each side of its line.
 const arrowHead = { length: 0.42, width: 0.3 };
 
-// The helps' point, smaller in step with their thinner shaft (Stefano, T-142).
+// The helps' point, smaller in step with their thinner shaft (Stefano).
 const helpsHead = { length: 0.3, width: 0.21 };

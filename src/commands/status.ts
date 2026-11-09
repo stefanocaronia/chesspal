@@ -30,9 +30,9 @@ interface Status
     game?: GameSummary;
     /** Why the game on disk cannot be read, when it cannot. */
     problem?: string;
-    /** What the player wrote on the board page that the AI has not answered yet, all of it (T-65). */
+    /** What the player wrote on the board page that the AI has not answered yet, all of it. */
     words?: string[];
-    /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there (T-92). */
+    /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there. */
     analysis?: { game: string; brought?: true; analyst?: true; };
     /** A game going on from before this chat, told once a chat: the player says whether to go on with it. */
     fromBefore?: true;
@@ -144,7 +144,7 @@ function fromBeforeChat(context: Context, started: string): boolean
     return start === undefined || cleanSince(start, started);
 }
 
-/** The game in analysis; the next step when the player has just brought it on the board page (T-92). */
+/** The game in analysis; the next step when the player has just brought it on the board page. */
 function analysisLine({ game, brought, analyst }: NonNullable<Status["analysis"]>): string
 {
     if (brought === true) {
@@ -159,8 +159,8 @@ function analysisLine({ game, brought, analyst }: NonNullable<Status["analysis"]
 }
 
 /**
- * The game's lines; a game the player brought to analyse takes the place of the next step (T-92). The coach to start goes just before the next step, where
- * the AI acts on it (Priya, review of T-112).
+ * The game's lines; a game the player brought to analyse takes the place of the next step. The coach to start goes just before the next step, where
+ * the AI acts on it (Priya).
  */
 function gameLines(game: GameSummary | undefined, words: readonly string[], brought: boolean, pageClosed: boolean, coach: boolean): string[]
 {

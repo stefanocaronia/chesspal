@@ -26,7 +26,7 @@ export const playerMove = defineCommand({
     run: ({ move, offer_draw: offerDraw = false }, context): PlayerMove => {
         const folder = gameFolder(context.home());
 
-        // A chat that has seen no game yet, new or resumed, plays the player's own move: its answer shows the game the AI decides on (D-71, T-129).
+        // A chat that has seen no game yet, new or resumed, plays the player's own move: its answer shows the game the AI decides on (D-71).
         if (context.positionSeen !== null) {
             refuseUnseenPosition(context, folder);
         }
@@ -58,6 +58,6 @@ interface PlayerMove extends MovePlayed
 
 /**
  * The time a move in the chat leaves off the player's clock (D-36): the AI writing after its move and reading the player's, about 10 s as Priya measured.
- * Claude Code's hooks will time it exactly (T-53); the board page's moves need none.
+ * Claude Code's hooks will time it exactly; the board page's moves need none.
  */
 const chatAllowance = 10_000;

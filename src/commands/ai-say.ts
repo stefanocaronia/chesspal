@@ -19,7 +19,7 @@ interface Said
     coach?: true;
 }
 
-/** The AI's words on the board page without a move (T-65), read only there, on the player's time: an answer, or a word it has to say (D-54, D-72). */
+/** The AI's words on the board page without a move, read only there, on the player's time: an answer, or a word it has to say (D-54, D-72). */
 export const aiSay = defineCommand({
     name: "ai_say",
     description: "Says a word on the board page without a move, once while the player is to move: an answer to what they wrote or to their draw offer, or "
@@ -44,7 +44,7 @@ export const aiSay = defineCommand({
             return { words };
         }
 
-        // The chat woken by the player's ending move on the page may have gone to its words without the coach (Priya, playtest of T-112).
+        // The chat woken by the player's ending move on the page may have gone to its words without the coach (Priya).
         return { game: withAnalyst(summaryOf(current, context.now(), archivedName(folder, current)), context, current), words, ...(coachOnEnd(context, folder, current) ? { coach: true as const } : {}) };
     },
     format: ({ game, words, coach }) =>

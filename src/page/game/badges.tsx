@@ -1,4 +1,4 @@
-// The badges the AI puts on the moves of a game it reviews (D-69, T-41): a disc in the badge's colour with its sign, drawn by us. One drawing for the move list
+// The badges the AI puts on the moves of a game it reviews (D-69): a disc in the badge's colour with its sign, drawn by us. One drawing for the move list
 // (16px) and the corner of a square (about 28px); the colours are the page's --badge-* variables, for the light and the dark theme.
 import type { JSX } from "preact";
 import { type Badge, badges, type Side } from "../../core/index.ts";

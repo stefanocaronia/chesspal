@@ -125,7 +125,7 @@ export class Game
         return factsOf(this.chess, legalMovesOf(this.chess));
     }
 
-    /** The positional profile (D-19, T-12): pawns, files, outposts, space, mobility, development, king safety, control, phase, draws; computed once for each position. */
+    /** The positional profile (D-19): pawns, files, outposts, space, mobility, development, king safety, control, phase, draws; computed once for each position. */
     get profile(): Profile
     {
         const key = this.chess.hash();
@@ -244,7 +244,7 @@ export class Game
         const [, piece, file, rank, separator, target = "", promotion] = parts;
         const capture = separator === "x" || separator === ":";
 
-        // "bc4" is a bishop without its capital, or a pawn's capture without its x, as "bb4" or "cc6" is a piece or a pawn: never guessed (T-11, Anatolij, round of D-87).
+        // "bc4" is a bishop without its capital, or a pawn's capture without its x, as "bb4" or "cc6" is a piece or a pawn: never guessed (Anatolij, round of D-87).
         if (piece === undefined && file !== undefined && rank === undefined && !capture) {
             return smallLetter(input, file, target);
         }
@@ -393,7 +393,7 @@ function normalized(text: string): string
     return text.trim()
         .replace(/^\d+\s*(?:\.[\s.]*|…\s*)/, "")
         .replace(/[︎️]/g, "")
-        // A space after the piece's letter, "N f3", as an AI may show the player how to write (Priya, retest of T-54).
+        // A space after the piece's letter, "N f3", as an AI may show the player how to write (Priya).
         .replace(/^([A-Z♔-♟])\s+(?=[a-h1-8x:])/, "$1")
         .replace(/[–—−×♔-♟]/g, (sign) => asciiOf[sign] ?? sign)
         // A small t too, so that "tf1" is told the rook's R as "Tf1" is.
@@ -445,7 +445,7 @@ function gameOver({ ending, result }: Extract<Outcome, { over: true; }>): Refuse
     return { refusal: "over", message: `The game is over by ${ending} (${result}): no move can follow.` };
 }
 
-/** A move written with a piece's letter of another language (T-11): Cf3 for an Italian or French knight, Dd1 for a queen; none for another mistake. */
+/** A move written with a piece's letter of another language: Cf3 for an Italian or French knight, Dd1 for a queen; none for another mistake. */
 function foreignLetter(input: string, bare: string): Refused | undefined
 {
     const [, move = "", becomes = ""] = /^(.*[18])=?([A-Z])$/.exec(bare) ?? [];

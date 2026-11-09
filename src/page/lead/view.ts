@@ -33,7 +33,7 @@ export function standingsOf(plies: readonly Ply[], drawnOnBoard = false): Standi
         return ply.lead === undefined ? [] : [{ plies: index + 1, share: shareOf(ply.lead), lead: ply.lead }];
     });
 
-    // A draw the board gave takes the place of the AI's last figure, a mate it saw that was not played too (Anatolij and Federico, review of T-148).
+    // A draw the board gave takes the place of the AI's last figure, a mate it saw that was not played too (Anatolij and Federico).
     return drawnOnBoard && plies.length > 0
         ? [...standings.filter((standing) => standing.plies < plies.length), { plies: plies.length, share: 0, drawn: true }]
         : standings;
@@ -56,7 +56,7 @@ export const chartBadges: ReadonlySet<Badge> = new Set(["brilliant", "great", "m
 
 /**
  * A lead's share of the bar, from -1 to 1, on a curve as the bars of chess sites: the first pawns, where a game between people turns, move it most; held to
- * the range, a mate all of it (Anatolij and Zoe, review of T-148).
+ * the range, a mate all of it (Anatolij and Zoe).
  */
 function shareOf(lead: Lead): number
 {

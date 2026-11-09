@@ -31,7 +31,7 @@ describe("the board page's address for a player who has not opened it", () => {
         const asked = `Board page: ${url}, open in no browser: give the player this address before anything else.`;
 
         expect(await said(status, {}, context)).toContain(`\n${asked}\n`);
-        // A new game starts on the page, which the AI names, never in the chat (T-131).
+        // A new game starts on the page, which the AI names, never in the chat.
         expect(await said(status, {}, context)).toMatch(/\nNext: when the player wants a game, they start it on the board page with its New game button, .*never offer to set it up in the chat\.$/);
         expect(await said(newGame, { ai_colour: "white", from: start }, context)).toMatch(new RegExp(`\\n${escaped(asked)}\\nNext: `));
 
@@ -87,7 +87,7 @@ describe("the board page's address for a player who has not opened it", () => {
         expect(mate).not.toContain("invite the player");
     });
 
-    it("invites a resumed chat once a game too, though its first move came before any tool showed it the game (T-129)", async () => {
+    it("invites a resumed chat once a game too, though its first move came before any tool showed it the game", async () => {
         const folder = playerFolder();
         await said(newGame, { ai_colour: "black", from: start }, testContext(folder));
         const resumed: Context = { ...testContext(folder), page: url, pageOpen: () => false, told: new Set(), positionSeen: null };

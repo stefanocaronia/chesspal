@@ -61,7 +61,7 @@ export interface MovePlayed
     game: GameSummary;
     /** What went wrong after the move was saved, such as the archive not written. */
     warning?: string;
-    /** What the player wrote on the board page that the AI has not been given yet (T-65). */
+    /** What the player wrote on the board page that the AI has not been given yet. */
     words?: string[];
 }
 

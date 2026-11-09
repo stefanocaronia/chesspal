@@ -23,13 +23,13 @@ export function setUpHosts(folder: string, platform: string): string[]
     return written.map(({ path }) => path);
 }
 
-/** Where Codex reads a folder's hooks, which it runs only once the player trusts them (T-125). */
+/** Where Codex reads a folder's hooks, which it runs only once the player trusts them. */
 export function codexHooksPath(folder: string): string
 {
     return join(folder, ".codex", "hooks.json");
 }
 
-/** The instructions of the AI opponent, read from the package wherever it is installed (T-8). */
+/** The instructions of the AI opponent, read from the package wherever it is installed. */
 export function opponentInstructions(): string
 {
     return instructions("opponent");
@@ -153,7 +153,7 @@ function codexConfigFile(folder: string, platform: string): FileChange | undefin
     return text === before ? undefined : { path, text };
 }
 
-/** Codex's hooks, read once the player has trusted them: the doorbell of the moves on the page (T-62) and how each chat starts (T-104), beside the player's own. */
+/** Codex's hooks, read once the player has trusted them: the doorbell of the moves on the page and how each chat starts, beside the player's own. */
 function codexHooksFile(folder: string): FileChange | undefined
 {
     const path = codexHooksPath(folder);
@@ -162,7 +162,7 @@ function codexHooksFile(folder: string): FileChange | undefined
     return changed(path, { ...config, hooks: withHook(withHook(hooks, "Stop", codexBellHook), "SessionStart", codexChatHook) });
 }
 
-// Codex's Stop hook for the doorbell (T-62): it holds the turn until the player acts on the page, then Codex goes on; a day at most. On Windows Codex runs
+// Codex's Stop hook for the doorbell: it holds the turn until the player acts on the page, then Codex goes on; a day at most. On Windows Codex runs
 // it in PowerShell, where `chesspal` would be npm's .ps1 shim, which a strict execution policy stops.
 const codexBellHook = {
     type: "command",
@@ -172,7 +172,7 @@ const codexBellHook = {
     statusMessage: "Waiting for your move on the board page",
 };
 
-// Codex's SessionStart hook (T-104): it notes how each chat starts, as Claude Code's does (D-57).
+// Codex's SessionStart hook: it notes how each chat starts, as Claude Code's does (D-57).
 const codexChatHook = { type: "command", command: "chesspal chat", commandWindows: "chesspal.cmd chat" };
 
 /** A JSON file's new content, when it differs from what is there. */

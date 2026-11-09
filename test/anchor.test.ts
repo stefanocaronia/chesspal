@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { anchorAction, anchorName, anchorOf, hashOf, shownHash } from "../src/page/app/anchor.ts";
 
-describe("the move shown in the page's address (T-155)", () => {
+describe("the move shown in the page's address", () => {
     it("reads a game by its name and how many of its moves are shown, or the game as it is", () => {
         expect(anchorOf("#2026-11-04-184025/31")).toEqual({ game: "2026-11-04-184025", plies: 31 });
         expect(anchorOf("#2026-11-04-184025/0")).toEqual({ game: "2026-11-04-184025", plies: 0 });

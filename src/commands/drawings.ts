@@ -12,7 +12,7 @@ const drawLimit = 6;
 /** A note of the AI's on a move, as its input reads it: on one line of commands, so without brackets or braces. */
 export const noteInput = z.string().trim().min(1).max(noteLimit).regex(/^[^[\]{}]*$/, "write it without [ ] { }");
 
-// A drawing as the AI may write it, spaced or with a dash, as PGN writes it: "R f2 e1" and "Rf2-e1" are Rf2e1 (Priya, playtest of T-112).
+// A drawing as the AI may write it, spaced or with a dash, as PGN writes it: "R f2 e1" and "Rf2-e1" are Rf2e1 (Priya).
 const drawing = z.string().overwrite((text) => text.replace(/[\s-]+/g, ""));
 
 /** The arrows the AI draws, as their input reads them. */

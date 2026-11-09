@@ -30,11 +30,11 @@ describe("the moves on the page", () => {
         expect(sans(judgmentsOf(plies("1. e4 e5 2. d4 {[%badge mistake] [%review Too soon.]} exd4 *"), "white", none))).toEqual(["d4"]);
         expect(judgmentsOf(plies("1. e4 e5 2. d4 {[%badge mistake]} *"), "white", none)).toEqual([]);
         expect(judgmentsOf(plies("1. e4 e5 *"), "white", none)).toEqual([]);
-        // A note held until the player's next move shows once they have played it, and stays until the coach judges another (Zoe and Federico, review of T-112).
+        // A note held until the player's next move shows once they have played it, and stays until the coach judges another (Zoe and Federico).
         expect(sans(judgmentsOf(plies("1. e4 e5 2. d4 {[%review Qh5 next.]} exd4 3. Nf3 *"), "white", none))).toEqual(["d4"]);
         expect(sans(judgmentsOf(plies("1. e4 e5 2. d4 {[%review Qh5 next.]} exd4 3. Nf3 Nc6 *"), "white", none))).toEqual(["d4"]);
         expect(sans(judgmentsOf(plies("1. e4 e5 2. d4 {[%review Qh5 next.]} exd4 3. Nf3 {[%badge best]} Nc6 *"), "white", none))).toEqual(["Nf3"]);
-        // One let go only now, however far back, goes first, above the latest (Zoe, playtest of T-112).
+        // One let go only now, however far back, goes first, above the latest (Zoe).
         const late = "1. e4 e5 2. d4 {[%review Qh5 next.]} exd4 3. Nf3 Nc6 4. Bc4 {[%badge best]} Nf6 *";
         expect(sans(judgmentsOf(plies(late), "white", { judgments: [{ ply: 3, note: "Qh5 next.", released: true }] }))).toEqual(["d4", "Bc4"]);
         expect(sans(judgmentsOf(plies(late), "white", none))).toEqual(["Bc4"]);

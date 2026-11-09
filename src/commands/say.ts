@@ -1,4 +1,4 @@
-// The talk on the board page (D-51, T-65): a line of the player's or the AI's, saved with the game, and the player's words the AI has not been given yet.
+// The talk on the board page (D-51): a line of the player's or the AI's, saved with the game, and the player's words the AI has not been given yet.
 import { endWithMood, type Mood } from "../core/index.ts";
 import { archiveEnded, endOf, loadGame, loadTableTalk, saveGame, saveTableTalk, type Sayer, type TableTalk, type Talk, talkLimits, talkLine, unheardWords, type Words } from "../games/index.ts";
 import { gameFolder, helpsIn } from "../profiles/index.ts";

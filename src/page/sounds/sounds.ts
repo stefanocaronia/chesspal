@@ -1,5 +1,5 @@
-// The board's sounds (T-71): a move, a capture, a check, a mate, a draw, recorded by Stefano (T-80); a capture, a check and a mate play over the
-// move's, as they are a piece set down too. A resignation, a flag fallen and a draw offered are electronic until he records them (T-100). A browser
+// The board's sounds: a move, a capture, a check, a mate, a draw, recorded by Stefano; a capture, a check and a mate play over the
+// move's, as they are a piece set down too. A resignation, a flag fallen and a draw offered are electronic until he records them. A browser
 // that cannot decode them, or a sound still loading, plays a tone synthesised with Web Audio instead.
 import type { Game } from "../../core/index.ts";
 import type { HowEnded } from "../game/ending.ts";

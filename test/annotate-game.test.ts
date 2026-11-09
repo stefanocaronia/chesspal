@@ -134,7 +134,7 @@ describe("annotate_game (D-69)", () => {
         await analyse(context, { pgn });
 
         // Once the review gives who is ahead, the answer names the moves still without it but the mate, which the board says; a review without it, as
-        // those before D-90, is not asked for it (Priya, review of T-148).
+        // those before D-90, is not asked for it (Priya).
         expect(await annotate(context, { notes: [{ move: "1.", badge: "book" }] })).not.toContain("Who is ahead");
         expect(await annotate(context, { ahead: { "1.": 0.3 } })).toMatch(
             /: who is ahead after 1 move\. [\s\S]*\nWho is ahead is still missing after 1\.\.\. 2\. 2\.\.\. 3\. 3\.\.\.: give it with ahead, for the page's bar and chart\.$/,
@@ -160,7 +160,7 @@ describe("annotate_game (D-69)", () => {
         );
         expect(readFileSync(join(gameFolder(context.folder), kept), "utf8")).toBe(before);
 
-        // A PGN from elsewhere keeps Chesspal's [%lead], never an engine's [%eval] (Federico, review of T-148).
+        // A PGN from elsewhere keeps Chesspal's [%lead], never an engine's [%eval] (Federico).
         const other = playerFolder();
         expect(await analyse(other, { pgn: pgn.replace("1. e4 e5", "1. e4 {[%eval 1.2] [%lead +0.3]} e5 {[%eval -3.4]}") })).toContain("\n1.e4: ahead +0.3\n1...e5\n");
         const [imported] = readPgn(readFileSync(join(gameFolder(other.folder), kept), "utf8"));

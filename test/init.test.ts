@@ -11,7 +11,7 @@ const folders: string[] = [];
 // The doorbell of the moves on the page (D-47), as init writes it into Claude Code's settings.
 const bellHook = { type: "command", command: "chesspal listen", asyncRewake: true, timeout: 86_400 };
 const chatHook = { type: "command", command: "chesspal chat" };
-// The doorbell as init writes it into Codex's hooks (T-62).
+// The doorbell as init writes it into Codex's hooks.
 const codexBellHook = {
     type: "command",
     command: "chesspal listen --codex",
@@ -19,7 +19,7 @@ const codexBellHook = {
     timeout: 86_400,
     statusMessage: "Waiting for your move on the board page",
 };
-// How each chat starts, noted in Codex too (T-104).
+// How each chat starts, noted in Codex too.
 const codexChatHook = { type: "command", command: "chesspal chat", commandWindows: "chesspal.cmd chat" };
 
 afterEach(() => {
@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 describe("chesspal init", () => {
-    it("sets up a folder for Claude Code and Codex, with the opponent's instructions, and says how to go into it (T-127)", async () => {
+    it("sets up a folder for Claude Code and Codex, with the opponent's instructions, and says how to go into it", async () => {
         const folder = playerFolder();
         const { output, exitCode } = await runCommandLine(["init", "chess"], testContext(folder));
         const chess = join(folder, "chess");
@@ -87,7 +87,7 @@ describe("chesspal init", () => {
         writeFileSync(join(folder, ".claude", "settings.json"), "﻿" + JSON.stringify({ model: "opus", permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [ownStop] } }));
         writeFileSync(join(folder, ".codex", "hooks.json"), JSON.stringify({ hooks: { Stop: [ownStop] } }));
         writeFileSync(join(folder, ".codex", "config.toml"), 'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\nenv = { CHESSPAL_HOME = "D:/runs" }\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n');
-        // Codex runs hooks that changed only once the player trusts them again (T-125).
+        // Codex runs hooks that changed only once the player trusts them again.
         expect((await runCommandLine(["init"], testContext(folder))).output).toContain(
             "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 10 files.",
         );

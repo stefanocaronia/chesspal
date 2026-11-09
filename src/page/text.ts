@@ -36,7 +36,7 @@ export interface Text
     readonly marksColour: string;
     readonly play: string;
     readonly dots: string;
-    /** The setting that shows a square's name under the pointer (T-76). */
+    /** The setting that shows a square's name under the pointer. */
     readonly squareNames: string;
     readonly explain: string;
     /** The setting that marks the opening book's moves while the game goes on. */
@@ -49,13 +49,13 @@ export interface Text
     readonly names: Readonly<Record<string, string>>;
     readonly game: string;
     readonly moves: string;
-    /** The buttons that step through the moves (T-88). */
+    /** The buttons that step through the moves. */
     readonly steps: Readonly<Record<Step, string>>;
     readonly noGame: string;
     /** The tooltips of a card's title in the game's column, which folds the card and opens it again (Stefano). */
     readonly foldCard: string;
     readonly openCard: string;
-    /** The button that saves the moves alone as a PGN, for Lichess or chess.com (T-59), and its tooltip. */
+    /** The button that saves the moves alone as a PGN, for Lichess or chess.com, and its tooltip. */
     readonly saveMoves: string;
     readonly saveMovesHint: string;
     /** The header's word between games, on the table set for the next (D-77). */
@@ -86,7 +86,7 @@ export interface Text
     readonly ai: string;
     readonly sides: Readonly<Record<Side, string>>;
     readonly yourTurn: string;
-    /** A player's clock, for a screen reader (T-37). */
+    /** A player's clock, for a screen reader. */
     readonly clock: (time: string, running: boolean) => string;
     readonly send: string;
     readonly sent: string;
@@ -95,7 +95,7 @@ export interface Text
     readonly move: string;
     readonly draw: string;
     readonly checkmate: string;
-    /** How a game ended, as the game's card says it under the result (T-77). */
+    /** How a game ended, as the game's card says it under the result. */
     readonly ended: Readonly<Record<HowEnded, string>>;
     readonly opening: string;
     readonly outOfBook: string;
@@ -110,13 +110,13 @@ export interface Text
     readonly startClocks: string;
     /** A command such as /clear written in the page's talk, which is for the host's window. */
     commandHere(name: string): string;
-    /** The choice of the piece a pawn becomes on the last rank (T-11). */
+    /** The choice of the piece a pawn becomes on the last rank. */
     readonly promoteTo: string;
-    /** A square the piece picked may go to, for a screen reader (T-11). */
+    /** A square the piece picked may go to, for a screen reader. */
     readonly canGo: string;
-    /** The board for a screen reader (T-11): who moves, and the last move. */
+    /** The board for a screen reader: who moves, and the last move. */
     boardLabel(turn: Side, lastMove: string | undefined): string;
-    /** A request the server refused, by its code (T-11), with the characters left for words too long and the host's name. */
+    /** A request the server refused, by its code, with the characters left for words too long and the host's name. */
     readonly refused: Readonly<Record<ServerRefusal, (most: number, name: string) => string>>;
     piece(letter: PieceLetter, side: Side): string;
     taken(pieces: readonly string[], ahead: number): string;
@@ -130,15 +130,15 @@ export interface Text
     lasted(count: number): string;
     won(side: Side): string;
     toMove(side: Side): string;
-    /** The header's word on a game over (T-77): how it ended and who won. */
+    /** The header's word on a game over: how it ended and who won. */
     verdict(how: HowEnded | undefined, winner: Side | undefined): string;
-    /** Why the board refuses a move (T-11, D-18): the piece moved, the square it went to, the piece that forbids it. */
+    /** Why the board refuses a move (D-18): the piece moved, the square it went to, the piece that forbids it. */
     illegal(move: RefusedMove): string;
     /** The profiles (D-23, D-45): the wizard at the first start, the player's picture, the menu of the profiles. */
     readonly profile: ProfileText;
-    /** The new game's dialog (D-48, T-58). */
+    /** The new game's dialog (D-48). */
     readonly start: StartText;
-    /** The dialog that brings a game played elsewhere to analyse (T-92). */
+    /** The dialog that brings a game played elsewhere to analyse. */
     readonly study: StudyText;
     /** The helps' card (D-78): the facts the AI sees at the game's level. */
     readonly helpsCard: HelpsCardText;
@@ -152,13 +152,13 @@ export interface HelpsCardText
     readonly coach: string;
     readonly showHint: string;
     readonly hideHint: string;
-    /** What the hint's colours mean, as the coach draws them: never a move (Zoe, playtest of T-112). */
+    /** What the hint's colours mean, as the coach draws them: never a move (Zoe). */
     readonly drawn: Readonly<Record<DrawColour, string>>;
     readonly tactics: string;
     readonly strategy: string;
     readonly map: string;
     readonly mapHint: string;
-    /** The button held to see the board without the arrows and the squares drawn on it (Stefano, T-138). */
+    /** The button held to see the board without the arrows and the squares drawn on it (Stefano). */
     readonly bare: string;
     readonly bareHint: string;
     readonly attackers: string;
@@ -248,7 +248,7 @@ export interface ProfileText
     readonly gameMoves: string;
     readonly name: string;
     readonly namePlaceholder: string;
-    /** Before the data folder's path (T-119). */
+    /** Before the data folder's path. */
     readonly gamesIn: string;
     readonly openFolder: string;
     /** On the button for a moment, once the file manager has opened it. */
@@ -301,7 +301,7 @@ export type ServerRefusal =
     | "pgn-unreadable";
 
 /**
- * A move the board refused (T-11), as the page names it: why, the piece moved, the square it went to and whether a piece stood there, the piece that forbids
+ * A move the board refused, as the page names it: why, the piece moved, the square it went to and whether a piece stood there, the piece that forbids
  * it, and the square the reason concerns besides (the rook's corner, the square castling crosses).
  */
 export interface RefusedMove

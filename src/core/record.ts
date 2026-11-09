@@ -21,7 +21,7 @@ export interface GameRecord
     readonly moves: readonly RecordedMove[];
 }
 
-/** The game with its tags and moves alone, without comments, plans or judgments: for Lichess or chess.com to load (T-59). */
+/** The game with its tags and moves alone, without comments, plans or judgments: for Lichess or chess.com to load. */
 export function movesOnly(record: GameRecord): GameRecord
 {
     return { tags: record.tags, moves: record.moves.map((move) => ({ san: move.san })) };

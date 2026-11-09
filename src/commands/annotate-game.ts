@@ -69,7 +69,7 @@ export const annotateGame = defineCommand({
         }
 
         // Who reviews it, before the game is read: no wait between reading and writing it, in which the coach's judgment or another review written meanwhile
-        // would be lost (Federico, review of T-133).
+        // would be lost (Federico).
         const caller = await context.caller?.();
         const studied = game === undefined ? gameAnalysed(context) : namedGame(context, game);
         // Every move is checked before the game is written: all or nothing.
@@ -86,7 +86,7 @@ export const annotateGame = defineCommand({
             moves[index] = reviewed(moves[index]!, { ...(kept === undefined ? {} : { badge: kept }), ...(note === undefined ? {} : { note }), ...drawingsOf(arrows, squares) });
         }
 
-        // A review written before D-90 is not asked for who is ahead unless this call starts giving it (Priya, review of T-148).
+        // A review written before D-90 is not asked for who is ahead unless this call starts giving it (Priya).
         const estimating = estimates.length > 0 || moves.some((move) => leadOf(move.comment) !== undefined);
 
         for (const [move, lead] of estimates) {
@@ -145,7 +145,7 @@ function unestimatedMoves(record: GameRecord, numbers: readonly string[]): strin
     return record.moves.flatMap((move, index) => leadOf(move.comment) !== undefined || (ended && index === record.moves.length - 1) ? [] : [numbers[index]!]);
 }
 
-/** A move given in notes or in ahead, as analyse_game numbers it, refused with where it was given (Priya, review of T-148). */
+/** A move given in notes or in ahead, as analyse_game numbers it, refused with where it was given (Priya). */
 function indexIn(record: GameRecord, move: string, field: "notes" | "ahead"): number
 {
     try {
@@ -158,7 +158,7 @@ function indexIn(record: GameRecord, move: string, field: "notes" | "ahead"): nu
 
 function gameAnalysed(context: Context): Required<Studied>
 {
-    // The game in analysis follows the board page, which the player may turn to another game while an agent works (Federico, T-133).
+    // The game in analysis follows the board page, which the player may turn to another game while an agent works (Federico).
     if (context.agent !== undefined) {
         throw new Error("Give the game's name as game, as analyse_game named it: the board page may have opened another game since. Nothing changed.");
     }

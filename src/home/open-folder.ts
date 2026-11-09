@@ -1,4 +1,4 @@
-// The data folder shown to the player in the system's own file manager (T-119): Explorer, Finder, or the Linux desktop's.
+// The data folder shown to the player in the system's own file manager: Explorer, Finder, or the Linux desktop's.
 import { spawn } from "node:child_process";
 
 /** Opens a folder in the system's file manager, without waiting for it to close: whether the manager started, for the page to say so when it did not. */

@@ -1,4 +1,4 @@
-// How the pieces move when the board shows a new position (T-74, T-88): a move slides its piece over the one it takes, a step back slides it home, a jump
+// How the pieces move when the board shows a new position: a move slides its piece over the one it takes, a step back slides it home, a jump
 // through the game moves every piece to its place.
 import type { Move } from "../../core/index.ts";
 import { files } from "./squares.ts";
@@ -11,7 +11,7 @@ export interface Motion
 {
     readonly slides: ReadonlyMap<string, string>;
     readonly taken?: { readonly square: string; readonly letter: string; };
-    /** After a jump through the game (T-88): the pieces that fade from their squares, and the squares where a piece appears. */
+    /** After a jump through the game: the pieces that fade from their squares, and the squares where a piece appears. */
     readonly gone?: readonly { readonly square: string; readonly letter: string; }[];
     readonly appear?: ReadonlySet<string>;
     readonly shake?: string;

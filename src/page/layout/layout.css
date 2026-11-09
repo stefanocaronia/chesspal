@@ -26,7 +26,7 @@
     letter-spacing: 0.01em;
 }
 
-/* A game over says how it ended by the new game, which stands out in the accent (T-77) */
+/* A game over says how it ended by the new game, which stands out in the accent */
 .verdict {
     margin: 0;
     min-width: 0;
@@ -215,7 +215,7 @@
     transition: opacity 120ms 80ms, visibility 0s 200ms;
 }
 
-/* A column's tab (T-84), a drawer's handle at the top: open, on the outer edge of the column's first card; folded, the column slides under the board and the
+/* A column's tab, a drawer's handle at the top: open, on the outer edge of the column's first card; folded, the column slides under the board and the
    tab peeks out from under it */
 .fold-tab {
     align-self: start;
@@ -416,7 +416,7 @@
     left: -4px;
 }
 
-/* A long name or model goes to its ellipsis instead of widening the page on a phone (Zoe, round of T-118). Each side's talk has half the column at most:
+/* A long name or model goes to its ellipsis instead of widening the page on a phone (Zoe). Each side's talk has half the column at most:
    past it, its words scroll; the box and the cards never give way. */
 .ai-block,
 .you-block {
@@ -433,7 +433,7 @@
     flex: none;
 }
 
-/* The game's column, which folds from its tab (T-84) */
+/* The game's column, which folds from its tab */
 .side {
     grid-area: side;
     display: flex;
@@ -631,7 +631,7 @@
         display: none;
     }
 
-    /* A game in analysis, turned round or not: the card on top, the board, its steps under the thumb, the Torretta's note, the card below, the moves (Zoe, T-40) */
+    /* A game in analysis, turned round or not: the card on top, the board, its steps under the thumb, the Torretta's note, the card below, the moves (Zoe) */
     .app:has(.talk.studied),
     .app.flipped:has(.talk.studied) {
         grid-template-areas: "head" "ai" "board" "steps" "note" "you" "side";

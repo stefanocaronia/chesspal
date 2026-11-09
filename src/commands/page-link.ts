@@ -1,4 +1,4 @@
-// The board page's address for the AI to give the player when no browser has the page open: the instructions alone do not get it said (T-62).
+// The board page's address for the AI to give the player when no browser has the page open: the instructions alone do not get it said.
 import type { Context } from "./context.ts";
 
 /** The board page's address when the chat serves it and no browser has it open; none on the command line, or with the page open. */

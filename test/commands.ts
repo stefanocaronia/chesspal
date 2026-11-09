@@ -23,7 +23,7 @@ function temporary(folder: string): string
     return folder;
 }
 
-/** A command with every kind of field, for the command line and the server: the real ones come with the chess (T-6). */
+/** A command with every kind of field, for the command line and the server: the real ones come with the chess. */
 export const play = defineCommand({
     name: "play",
     description: "Plays a move in a test game. Only the tests know it.",

@@ -1,5 +1,5 @@
 // The settings' panel (D-56): a dialog over the page, opened from the header's gear, which shows each choice at once and closes with Esc. Its sections are cards
-// in two columns, one under 600px, and its choices short: segments, tiles, dots and switches (Stefano, T-141).
+// in two columns, one under 600px, and its choices short: segments, tiles, dots and switches (Stefano).
 import type { ComponentChildren, JSX } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import { Piece } from "../pieces/pieces.tsx";

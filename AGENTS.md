@@ -90,7 +90,7 @@ Clean, compact, ordered code that is easy to understand.
 - Public API first in a file, private helpers below it.
 - Let TypeScript infer local types; annotate parameters and return types of exported functions, Preact components excepted (they return JSX).
 - Relative imports use the `.ts` extension; the build rewrites them to `.js`.
-- Comments in English, one or two lines at most: the code should explain itself. A one-line `/** */` on exported functions and types when the name is not enough.
+- Comments in English, one or two lines at most: the code should explain itself. A one-line `/** */` on exported functions and types when the name is not enough. No task numbers (`T-12`) in comments or test names: they belong in commit messages.
 - Error messages say what went wrong and how to fix it: an AI reads them.
 - Use our own utilities before writing new helpers.
 - Test every module through its public API, with randomness and time injected.

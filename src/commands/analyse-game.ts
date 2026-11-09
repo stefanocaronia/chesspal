@@ -124,11 +124,11 @@ export const analyseGame = defineCommand({
             throw new Error("Give game or pgn, not both: game names a game of the archive, pgn brings one played elsewhere.");
         }
 
-        // A game's name given as pgn, as an AI often gives it, is that game (Priya, retest of T-133).
+        // A game's name given as pgn, as an AI often gives it, is that game (Priya).
         const named = pgn !== undefined && isGameName(pgn) ? pgn.trim() : game;
         const studied = pgn === undefined || named !== game ? gameToStudy(context, named) : importedGame(context, pgn);
 
-        // One analyst a game: the chat goes over the review there is (Stefano, T-133).
+        // One analyst a game: the chat goes over the review there is (Stefano).
         if (context.agent === analystAgent && isReviewed(studied.record)) {
             throw new Error("Stop now: this game has its review already. End with one line for the AI that started you: go over that review with the player.");
         }
@@ -178,7 +178,7 @@ function importedGame(context: Context, pgn: string): Studied
 
     const [{ tags, moves }] = records as [GameRecord];
 
-    // A game analysed here and exported comes back with its review (T-106): Chesspal's own marks stay, as the clock; any other comment goes.
+    // A game analysed here and exported comes back with its review: Chesspal's own marks stay, as the clock; any other comment goes.
     const brought = {
         tags,
         moves: moves.map(({ san, comment }) => {

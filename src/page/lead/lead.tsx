@@ -7,7 +7,7 @@ import { chartBadges, sideAhead, type Standing } from "./view.ts";
 
 /**
  * The bar: White's share from the left, Black's from the right, with the figure on the side ahead; even and bare before the first estimate, so that the card
- * keeps its lines in place, and faded on a position after the one estimated (Zoe, review of T-148).
+ * keeps its lines in place, and faded on a position after the one estimated (Zoe).
  */
 export function LeadBar({ standing, shown, text }: { standing: Standing | undefined; shown: number; text: Text; })
 {
@@ -64,7 +64,7 @@ export function LeadChart({ plies, standings, shown, onShow, text }: { plies: re
                 <div class="lead-chart" role="img" aria-label={text.lead.chartHint} title={text.lead.chartHint} onClick={go}>
                     <svg viewBox={`0 0 ${width} 2`} preserveAspectRatio="none" aria-hidden="true">
                         <path class="white-area" d={area} />
-                        {/* The moves not estimated yet, while the AI goes over the game: grey, never Black's (Zoe, review of T-148) */}
+                        {/* The moves not estimated yet, while the AI goes over the game: grey, never Black's (Zoe) */}
                         {last.plies < width ? <rect class="pending" x={last.plies} y="0" width={width - last.plies} height="2" /> : null}
                         <path class="even" d={`M0 1 L${width} 1`} vector-effect="non-scaling-stroke" />
                     </svg>

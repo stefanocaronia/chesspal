@@ -21,7 +21,7 @@ export interface Command<Schema extends z.ZodObject = z.ZodObject, Result = unkn
     showsGame?: boolean;
     /**
      * The agents that call it apart from the chat, as ponder (D-72), by their names: the doorbell's record of what the chat has read stays as it was, and the
-     * server refuses it to the chat and to other agents (Priya, review of T-112).
+     * server refuses it to the chat and to other agents (Priya).
      */
     byAgents?: readonly string[];
     /** The agents that call it besides the chat, as the analyst analyse_game (D-89): their calls leave the doorbell's record of what the chat has read as it was. */

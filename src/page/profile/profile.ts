@@ -14,7 +14,7 @@ export const ratingLimits = { lowest: 100, highest: 3500 } as const;
 /** The longest name the server keeps. */
 export const nameLimit = 40;
 
-/** The drawn avatars, by the ids the server keeps (D-45, T-102). */
+/** The drawn avatars, by the ids the server keeps (D-45). */
 export const avatarIds = ["short-hair", "bun", "glasses", "beanie", "beard", "curls", "moustache", "silver-bob", "cat", "owl"] as const;
 export type AvatarId = (typeof avatarIds)[number];
 
@@ -85,7 +85,7 @@ export async function chooseAvatar(profile: string, avatar: AvatarId): Promise<R
     return refusalOf(await post(forProfile("/api/profile/avatar", profile), jsonOf({ avatar })));
 }
 
-/** Opens the data folder in the system's file manager, where the page runs (T-119): the server's refusal, or undefined. */
+/** Opens the data folder in the system's file manager, where the page runs: the server's refusal, or undefined. */
 export async function openDataFolder(): Promise<Refused | undefined>
 {
     return refusalOf(await post("/api/data-folder/open", jsonOf({})));

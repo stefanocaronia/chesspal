@@ -60,7 +60,7 @@ export function archiveEnded(folder: string, current: CurrentGame): { archive?: 
 }
 
 /**
- * Writes the coach's judgments into a game over already in the archive, beside what the analyst may have written there since (Federico, review of T-112);
+ * Writes the coach's judgments into a game over already in the archive, beside what the analyst may have written there since (Federico);
  * archives the game when it is not there.
  */
 export function archiveCoached(folder: string, current: CurrentGame): { archive?: string; warning?: string; }
@@ -215,7 +215,7 @@ export function playerPgn(folder: string, current: CurrentGame): string
     return writePgn(endOf(current.game) === undefined ? withoutPlans(current.game.record) : endedRecord(folder, current));
 }
 
-/** The game as PGN with its moves alone, without comments or plans, for Lichess or chess.com (T-59). */
+/** The game as PGN with its moves alone, without comments or plans, for Lichess or chess.com. */
 export function movesPgn(current: CurrentGame): string
 {
     const { record, outcome } = current.game;

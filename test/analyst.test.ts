@@ -35,9 +35,9 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         await run(context, "player_say", { text: "Sì, analizziamola" });
         expect(await run(context, "status")).toContain(`\nNext: answer the player with ai_say. To go over it, on their yes, ${analystLine}`);
 
-        // Once the agent is at work, the offer is not made again (Federico, review of T-133), nor once it has reviewed the game, whatever the page opens since.
+        // Once the agent is at work, the offer is not made again (Federico), nor once it has reviewed the game, whatever the page opens since.
         // The chat goes over its review then, and never starts it again (Stefano, after Priya's playtest).
-        // The game's name given as pgn, as haiku gives it, is that game (Priya, retest of T-133).
+        // The game's name given as pgn, as haiku gives it, is that game (Priya).
         const analyst = { ...context, agent: "chesspal-analyst" };
         expect(await run(analyst, "analyse_game", { pgn: "games/2026-11-02-153012.pgn" })).toMatch(/^The player speaks Italian\.\nYou played Black/);
         const reviewed = "The analyst agent has gone over this game, or is at it: never start it again. When the player wants it gone over, go over it with them from what "
@@ -96,7 +96,7 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         expect(analysis).toMatch(/^The player speaks Italian\.\nYou played Black at the /);
         expect(await run(analyst, "look")).not.toContain("Bella partita");
         expect(await run(analyst, "look", { move: "2..." })).not.toContain("Bella partita");
-        // The game in analysis follows the board page: the agent names its game (Federico, retest of T-133).
+        // The game in analysis follows the board page: the agent names its game (Federico).
         await expect(run(analyst, "annotate_game", { summary: "Corta." })).rejects.toThrow("Give the game's name as game, as analyse_game named it");
         // The chat's analyse_game still says how to analyse, the first time in the chat.
         expect(await run(context, "analyse_game")).toMatch(/^The player asked you to analyse a game[\s\S]*\n- Each line of the analysis is a move/);

@@ -40,7 +40,7 @@
     margin: 0 0 12px;
 }
 
-/* The settings (D-56), each choice shown at once, in cards of two columns, one under 600px (Stefano, T-141): the look on the left; the play and the language
+/* The settings (D-56), each choice shown at once, in cards of two columns, one under 600px (Stefano): the look on the left; the play and the language
    on the right */
 .setting-columns {
     display: grid;
@@ -416,7 +416,7 @@ h3 + .switch {
     font-size: 16px;
 }
 
-/* The account's name suggested in the wizard (T-120): Chrome's arrow, quieter than the selects' chevron, is the only sign of it */
+/* The account's name suggested in the wizard: Chrome's arrow, quieter than the selects' chevron, is the only sign of it */
 .profile-form input::-webkit-calendar-picker-indicator {
     opacity: 0.45;
 }
@@ -454,7 +454,7 @@ h3 + .switch {
     margin: 0 0 16px;
 }
 
-/* The analyses to open again (T-106): a line each, who played and how it ended, then when, the opening and how long, and whether the AI has reviewed it */
+/* The analyses to open again: a line each, who played and how it ended, then when, the opening and how long, and whether the AI has reviewed it */
 .study h3 {
     margin: 0 0 8px;
     font-size: 13px;
@@ -520,7 +520,7 @@ h3 + .switch {
     outline-offset: -1px;
 }
 
-/* The drawn avatars: always two rows of five, smaller on a narrow screen (Zoe, T-102) */
+/* The drawn avatars: always two rows of five, smaller on a narrow screen (Zoe) */
 .avatars {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 62px));
@@ -738,7 +738,7 @@ h3 + .switch {
     cursor: default;
 }
 
-/* Where the games are (T-119), under the wizard's form and the players' menu, with the button that opens it */
+/* Where the games are, under the wizard's form and the players' menu, with the button that opens it */
 .data-folder {
     display: flex;
     flex-wrap: wrap;
@@ -775,7 +775,7 @@ h3 + .switch {
     margin: 0;
 }
 
-/* The new game (T-58): the colours and the clocks in a row, the levels two by two with what the AI sees under them */
+/* The new game: the colours and the clocks in a row, the levels two by two with what the AI sees under them */
 .new-game .row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));

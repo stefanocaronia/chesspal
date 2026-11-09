@@ -1,5 +1,5 @@
-// The game on the page: the game it shows, and the player's moves and words (T-65), new games, clocks, draws and resignations (D-65) and games brought to
-// analyse (T-92), each done as the chat's tools do it, with the doorbell rung for the chat.
+// The game on the page: the game it shows, and the player's moves and words, new games, clocks, draws and resignations (D-65) and games brought to
+// analyse, each done as the chat's tools do it, with the doorbell rung for the chat.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { analyseGame, answerDraw, bookPlies, ChatNotClear, type Context, DrawRefused, endGame, gameAt, gameToStudy, namedGame, newGame, offerDraw, playMove, say, startNewGame } from "../../commands/index.ts";
 import { clockStarted, type GameRecord, isReviewed, writePgn } from "../../core/index.ts";
@@ -150,7 +150,7 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
 }
 
 /**
- * A new game from the page, with the sides, the level and the clock the player chose (T-64, T-58): the sides and the level they leave out are as in the game
+ * A new game from the page, with the sides, the level and the clock the player chose: the sides and the level they leave out are as in the game
  * before, and no clock means a game without one. One going on goes to the archive unfinished, and the doorbell tells the chat.
  */
 async function newGameFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
@@ -263,7 +263,7 @@ function resignFromPage(request: IncomingMessage, response: ServerResponse, serv
 }
 
 /**
- * A game the player brings from elsewhere to analyse (T-92): kept to study and put in analysis as analyse_game does with a PGN, the page showing it at once,
+ * A game the player brings from elsewhere to analyse: kept to study and put in analysis as analyse_game does with a PGN, the page showing it at once,
  * and the doorbell rung for the chat to go over it. Never while a game goes on.
  */
 async function studyFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
@@ -280,7 +280,7 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
     const pgn = textOf(body?.pgn);
     const game = textOf(body?.game);
     const last = body?.last === true;
-    // A game a link of the page opens is there to look at: the chat is not asked to go over it (T-155).
+    // A game a link of the page opens is there to look at: the chat is not asked to go over it.
     const look = body?.look === true;
 
     if (pgn === undefined && game === undefined && !last) {
@@ -301,7 +301,7 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
         const opened = last ? lastPlayed(served.context) : game === undefined ? kept(served, pgn!) : namedGame(served.context, game);
         reviewed = isReviewed(opened.record);
         brought = !reviewed && !look;
-        // A game not yet reviewed is marked as brought, for status to ask the AI to go over it (T-92); one reviewed is ready, and the chat sleeps on (T-106).
+        // A game not yet reviewed is marked as brought, for status to ask the AI to go over it; one reviewed is ready, and the chat sleeps on.
         startAnalysis(gameFolder(served.context.home()), opened.name, served.context.now(), brought);
     } catch (error) {
         send(response, 400, json, JSON.stringify({ error: (error as Error).message, refusal: "pgn-unreadable" }));
@@ -334,7 +334,7 @@ function sendGame(response: ServerResponse, served: Served): void
         pgn: playerPgn(folder, current),
         ai: current.ai,
         started: current.started,
-        // Its name in the archive, for the page's address (T-155).
+        // Its name in the archive, for the page's address.
         name: archiveName(current),
         talk,
         // How many of its first moves are the book's: the page marks them while the game goes on, as the AI's review does after.
@@ -449,7 +449,7 @@ function refusalFrom(error: unknown, refusal?: Refused["refusal"]): Refused
     return refusal === undefined ? { error: message } : { error: message, refusal };
 }
 
-/** The game as the page reads it now: a flag that has fallen ends it (D-13), and the doorbell tells the chat, which hears how from status (T-37). */
+/** The game as the page reads it now: a flag that has fallen ends it (D-13), and the doorbell tells the chat, which hears how from status. */
 function gameNow(served: Served): CurrentGame | undefined
 {
     const folder = gameFolder(served.context.home());

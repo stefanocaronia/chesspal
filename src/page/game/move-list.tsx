@@ -1,5 +1,5 @@
 // The moves of the game beside the board, in pairs, with the pieces drawn as figures, the same in every language (D-50); the player looks back through them
-// with a click on one or with the buttons under them (T-88).
+// with a click on one or with the buttons under them.
 import type { JSX } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { Side } from "../../core/index.ts";

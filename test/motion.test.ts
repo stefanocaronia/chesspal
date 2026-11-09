@@ -10,7 +10,7 @@ const played = (...moves: string[]): Game => {
 };
 
 describe("how the pieces move on the board", () => {
-    it("slides a move's piece over the one it takes, but for a piece the player dragged there (T-74)", () => {
+    it("slides a move's piece over the one it takes, but for a piece the player dragged there", () => {
         const before = played("e4", "d5");
         const after = played("e4", "d5", "exd5");
         const move = after.lastMove!;
@@ -33,7 +33,7 @@ describe("how the pieces move on the board", () => {
         expect(backOf(castling).slides).toEqual(new Map([["e1", "g1"], ["h1", "f1"]]));
     });
 
-    it("moves each piece of a jump through the game to the nearest square like it, fading the rest (T-88)", () => {
+    it("moves each piece of a jump through the game to the nearest square like it, fading the rest", () => {
         const start = piecesOf(new Game().position.fen);
         const later = piecesOf(played("e4", "e5", "Nf3", "Nc6", "Nxe5", "Nxe5").position.fen);
         const motion = rearranged(start, later);

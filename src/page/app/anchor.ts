@@ -1,5 +1,5 @@
 // The move shown, kept in the page's address as #2026-11-04-184025/31: the game by its name and how many of its moves are shown, so that a reload keeps it and
-// a link brings the player back to it (T-155).
+// a link brings the player back to it.
 import { useEffect, useRef, useState } from "preact/hooks";
 
 /** A place in a game as the address keeps it: the game's name without its folder, and how many of its moves are shown, none for the game as it is. */
@@ -44,7 +44,7 @@ export interface AnchoredGames
 /**
  * What the page does with the place the address names: goes to its move on the game shown; drops it while a game goes on; waits while its game opens in
  * analysis, `asked` already; else opens its game in analysis, but the game just played, which opens on the player's yes alone (D-89): the link waits for
- * it while the table is set (D-77), and goes once another game shows (Zoe, review of T-155).
+ * it while the table is set (D-77), and goes once another game shows (Zoe).
  */
 export function anchorAction(wanted: Anchor, games: AnchoredGames, asked: string | undefined): "view" | "drop" | "wait" | "open"
 {
@@ -63,7 +63,7 @@ export function anchorAction(wanted: Anchor, games: AnchoredGames, asked: string
     return wanted.game === asked ? "wait" : "open";
 }
 
-/** The hash of the move shown: the game alone at its end, and while it goes on, when the player wants the position as it is (Zoe, review of T-155). */
+/** The hash of the move shown: the game alone at its end, and while it goes on, when the player wants the position as it is (Zoe). */
 export function shownHash(games: AnchoredGames, viewing: number | undefined): string
 {
     return games.shown === undefined ? "" : hashOf(viewing === undefined || games.going ? { game: games.shown } : { game: games.shown, plies: viewing });
@@ -111,7 +111,7 @@ export function useAnchor(games: AnchoredGames, viewing: number | undefined, vie
         const game = wanted.game;
         asked.current = game;
         void open(game).then((opened) => {
-            // A place written since stays wanted (Federico, review of T-155).
+            // A place written since stays wanted (Federico).
             if (!opened && asked.current === game) {
                 setWanted(undefined);
             }

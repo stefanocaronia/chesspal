@@ -1,4 +1,4 @@
-// The analyses the page lists (T-106): the games brought to study and those played here, to analyse or open again on the board page.
+// The analyses the page lists: the games brought to study and those played here, to analyse or open again on the board page.
 import { bookOpening } from "../../commands/index.ts";
 import { type AiModel, aiModelIn, type GameRecord, isReviewed } from "../../core/index.ts";
 import { archivedGame, archivedGames, gameStemOf, keptGame, keptGames } from "../../games/index.ts";

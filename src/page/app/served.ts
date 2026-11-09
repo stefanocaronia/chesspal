@@ -1,5 +1,5 @@
 // What the page asks the server (D-47): the game of the player's folder, read again each time it changes, and the player's moves, words and choices sent
-// there, refused in the player's language (T-11).
+// there, refused in the player's language.
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { AiModel, Clock, Side } from "../../core/index.ts";
 import type { CoachShown, TalkLine } from "../game/plies.ts";
@@ -24,7 +24,7 @@ export function useServed(onNewGame: () => void): ServedPage
     const [data, setData] = useState<PageData | undefined>(undefined);
     const [problem, setProblem] = useState<string | undefined>(undefined);
     const [offline, setOffline] = useState(false);
-    // Reads the game again: when the server says it changed, and when a clock runs out on the page (T-37).
+    // Reads the game again: when the server says it changed, and when a clock runs out on the page.
     const reload = useRef(() => {});
 
     useEffect(() => {
@@ -101,12 +101,12 @@ export interface PageData
     readonly profile: ProfileShown;
     readonly profiles: readonly ProfileShown[];
     readonly settings?: object;
-    /** Where the profiles are, folder by folder from the player's own (T-119). */
+    /** Where the profiles are, folder by folder from the player's own. */
     readonly dataFolder: readonly string[];
 }
 
 /**
- * Sends a request to the server: the reason it was refused, in the player's language when the page knows the refusal (T-11, D-57), with the host's name where
+ * Sends a request to the server: the reason it was refused, in the player's language when the page knows the refusal (D-57), with the host's name where
  * it sends the player, or undefined.
  */
 export async function post(path: string, body: object, text: Text, name: string): Promise<Refused | undefined>
@@ -139,7 +139,7 @@ export function sendMessage(words: string, text: Text, name: string): Promise<Re
     return post("/api/message", { text: words.trim() }, text, name);
 }
 
-/** A request the server refused: why, and whether the player's words were the cause, which the talk says rather than the board (T-11). */
+/** A request the server refused: why, and whether the player's words were the cause, which the talk says rather than the board. */
 export interface Refused
 {
     readonly text: string;

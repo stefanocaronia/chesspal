@@ -1,5 +1,5 @@
-// The page's keys and wheel: [ and ] fold the side columns (T-84), M holds the helps' map (D-78), the arrows, Home and End step through the moves and f
-// and x turn the board (T-88), and the wheel over the board steps too.
+// The page's keys and wheel: [ and ] fold the side columns, M holds the helps' map (D-78), the arrows, Home and End step through the moves and f
+// and x turn the board, and the wheel over the board steps too.
 import { useEffect, useRef } from "preact/hooks";
 import { flipKeys, type Step, stepKeys } from "../game/browse.ts";
 import { type Column, foldKeys, gameUnderBoard, oneColumn } from "../layout/folds.ts";
@@ -65,7 +65,7 @@ export function useMapKey(helping: boolean, map: (held: boolean) => void): void
     }, [helping]);
 }
 
-/** The keys of Lichess and chess.com: the arrows, Home and End step through the moves (T-88), f and x turn the board round. */
+/** The keys of Lichess and chess.com: the arrows, Home and End step through the moves, f and x turn the board round. */
 export function useBrowseKeys(step: (to: Step) => void, flip: () => void): void
 {
     useEffect(() => {

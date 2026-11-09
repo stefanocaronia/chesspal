@@ -28,9 +28,9 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
 
     for (const command of list.filter((each) => each.cliOnly !== true)) {
         const tool = server.registerTool(command.name, toolConfig(command), async (input: unknown, extra) => {
-            // An agent's tool called by the chat, or by another agent, would give what only that agent may see (Priya, review of T-112).
+            // An agent's tool called by the chat, or by another agent, would give what only that agent may see (Priya).
             if (command.byAgents !== undefined && !allowedCaller(await callingAgent(extra._meta, context.folder), command.byAgents)) {
-                // It names no agent to start: the chat that asked would start one itself (Priya, review of T-112).
+                // It names no agent to start: the chat that asked would start one itself (Priya).
                 return { content: [{ type: "text", text: `${command.name} is not yours to call: the player reads what it gives on the board page. Nothing changed.` }], isError: true };
             }
 
@@ -195,7 +195,7 @@ async function sharingAgent(command: AnyCommand, meta: Record<string, unknown> |
     return caller !== undefined && "agent" in caller && agents.includes(caller.agent) ? caller.agent : undefined;
 }
 
-/** Whether a game goes on, or may: a game that cannot be read is the command's to report, as the chat's call (Federico, T-133). */
+/** Whether a game goes on, or may: a game that cannot be read is the command's to report, as the chat's call (Federico). */
 function gameGoingOn(context: Context): boolean
 {
     try {

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" width="600" height="200">
-<!-- Chesspal, the small pieces of the set "cburnett" (T-94): simplified from the pieces of Colin M.L. Burnett, under the licence BSD 3-Clause
+<!-- Chesspal, the small pieces of the set "cburnett": simplified from the pieces of Colin M.L. Burnett, under the licence BSD 3-Clause
      (see CREDITS.md). Copyright (c) Colin M.L. Burnett. All rights reserved. The original's notice: Chesspal, the piece set "cburnett" by Colin M.L. Burnett, under the licence BSD 3-Clause (one of the licences the author offers: GFDL, CC BY-SA 3.0, BSD, GPL). Source: https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces (Chess_klt45.svg and the others) Changed for Chesspal (D-52): the twelve pieces gathered in one file as symbols wK to bP, their styles written on the elements, their ids prefixed.
      Changed for Chesspal by Zoe Whitaker: each piece reduced to one solid silhouette, without inner lines, for the pieces taken and the moves. -->
 <defs>

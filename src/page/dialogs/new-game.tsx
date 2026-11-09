@@ -1,4 +1,4 @@
-// The new game's dialog (D-48, T-58): the player's colour, the AI's level with what it sees there (D-61), and the clock.
+// The new game's dialog (D-48): the player's colour, the AI's level with what it sees there (D-61), and the clock.
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { type AiLevel, aiLevels, type Side } from "../../core/index.ts";
@@ -36,7 +36,7 @@ export function NewGameDialog({ open, choice, going, onStart, onClose, text }: {
 
 const colours = ["white", "black", "random"] as const;
 
-/** The colours by their king, the chosen set's silhouette in fixed colours, which both themes show (T-94); either colour by both kings. */
+/** The colours by their king, the chosen set's silhouette in fixed colours, which both themes show; either colour by both kings. */
 const colourIcons: Readonly<Record<(typeof colours)[number], ComponentChildren>> = {
     white: <Piece letter="K" small />,
     black: <Piece letter="k" small />,

@@ -1,4 +1,4 @@
-// The side columns the player folds (T-84): the talk on the left, which narrows to its two faces before it folds, the game on the right; each as this browser
+// The side columns the player folds: the talk on the left, which narrows to its two faces before it folds, the game on the right; each as this browser
 // remembers it.
 
 /** A side column: the talk or the game. */

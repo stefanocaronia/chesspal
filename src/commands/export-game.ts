@@ -10,7 +10,7 @@ interface Exported
     text: string;
 }
 
-/** The game as PGN or its position as FEN, for the player to copy or keep: the plans stay hidden while it goes on (D-29); the moves alone for another site (T-59). */
+/** The game as PGN or its position as FEN, for the player to copy or keep: the plans stay hidden while it goes on (D-29); the moves alone for another site. */
 export const exportGame = defineCommand({
     name: "export",
     description: "Gives the game as PGN, its moves alone as PGN for Lichess or chess.com, or its position as FEN, for the player to copy or keep. While the game goes on, "

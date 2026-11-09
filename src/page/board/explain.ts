@@ -1,4 +1,4 @@
-// How the board shows why a move was refused (T-91): an icon for the kind of reason, an arrow from the piece that forbids it, or a ring on it.
+// How the board shows why a move was refused: an icon for the kind of reason, an arrow from the piece that forbids it, or a ring on it.
 import type { Illegal, IllegalReason } from "../../core/index.ts";
 
 /** The family of a reason, which picks the bubble's icon: the piece's own way of moving, a pin, a king in danger, a piece in the way, castling. */
@@ -30,7 +30,7 @@ export function explain(illegal: Illegal, to: string, king: string | undefined):
 export type BubblePlace = "above" | "below" | "under-board" | "left" | "right";
 
 /**
- * Where the bubble of a refused move goes (Zoe's rule, T-91), squares as seen, in columns and rows from the top left: over the piece moved, else under it,
+ * Where the bubble of a refused move goes (Zoe's rule), squares as seen, in columns and rows from the top left: over the piece moved, else under it,
  * so as never to hide the squares to `keep` (the culprit, the arrow's point); else under the board on a narrow one, or beside the piece on a wide one.
  */
 export function bubblePlace(piece: readonly [number, number], keep: readonly (readonly [number, number])[], narrow: boolean): BubblePlace

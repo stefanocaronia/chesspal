@@ -24,13 +24,13 @@ export interface Context
     page?: string;
     /** Whether a browser has the board page open now, when the MCP server serves it. */
     pageOpen?: () => boolean;
-    /** Opens a folder in the system's file manager: the data folder, from the board page (T-119); whether it could; none in the tests. */
+    /** Opens a folder in the system's file manager: the data folder, from the board page; whether it could; none in the tests. */
     openFolder?: (folder: string) => Promise<boolean>;
     /** Opens the New game window on the board pages open now, where the player chooses the game: whether one was open. */
     askNewGame?: () => boolean;
     /** The AI host, as it names itself to the MCP server: claude-code, which notes how each chat starts (D-57); none on the command line. */
     host?: () => string | undefined;
-    /** The player's words on the board page given to the AI in this process, by line: each comes once (T-65). */
+    /** The player's words on the board page given to the AI in this process, by line: each comes once. */
     readonly given: Set<string>;
     /** Told when the board page has news that no file holds: words the AI was given, which it shows read (D-53), and the AI's model (D-82). */
     heard?: () => void;
@@ -51,7 +51,7 @@ export interface Context
     agent?: string;
 }
 
-/** Who made a tool call: the model, else the host's name, never what the AI says of itself; the effort only when the host gives it (T-113). */
+/** Who made a tool call: the model, else the host's name, never what the AI says of itself; the effort only when the host gives it. */
 export interface Caller
 {
     readonly annotator: string;

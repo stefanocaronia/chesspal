@@ -18,7 +18,7 @@ export interface GameActions
 }
 
 /**
- * The header, with how a game over ended (T-77), or that none goes on (D-77), or the AI's draw offer with the player's answer, the player's draw
+ * The header, with how a game over ended, or that none goes on (D-77), or the AI's draw offer with the player's answer, the player's draw
  * and resignation in a game going on (D-65), a new game once the page has the folder's, the command that turns the board round and says whether it is
  * turned, the switches of the sounds and the theme, and the gear of the settings (D-56).
  */
@@ -33,7 +33,7 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
     onNewGame?: () => void;
     /** Whether the new game is the next thing to do here, in the accent: in analysis, and between games while the player's card is folded away (D-77). */
     standOut?: boolean;
-    /** Brings a game played elsewhere to analyse, while none goes on (T-92). */
+    /** Brings a game played elsewhere to analyse, while none goes on. */
     onStudy?: () => void;
     flipped: boolean;
     onFlip: () => void;

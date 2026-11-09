@@ -1,4 +1,4 @@
-// The positional profile (D-19, T-12): pawns, files, bishops, outposts, space and centre, mobility, development, king safety, control, phase, draws and
+// The positional profile (D-19): pawns, files, bishops, outposts, space and centre, mobility, development, king safety, control, phase, draws and
 // the geometry of pawn endings, each a separate fact; never weighed, never summed.
 import { Chess, type Color, type PieceSymbol, type Square } from "chess.js";
 import { attacksOf, fileOf, type PieceLetter, rankOf } from "./facts.ts";

@@ -8,7 +8,7 @@ import { colourName } from "./view.ts";
 /** Who plays a move: the AI, or the player through the AI. */
 export type Mover = "ai" | "player";
 
-/** What comes with a move: the AI's comment, or the player's words from the board page, saved with it (T-65), and a draw offer (D-65). */
+/** What comes with a move: the AI's comment, or the player's words from the board page, saved with it, and a draw offer (D-65). */
 export interface WithMove
 {
     comment?: string;

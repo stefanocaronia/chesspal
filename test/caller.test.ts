@@ -13,7 +13,7 @@ afterEach(() => {
     }
 });
 
-describe("who makes a tool call (D-81, T-113)", () => {
+describe("who makes a tool call (D-81)", () => {
     it("takes Codex's model and effort from the call's metadata, given as an object or as JSON", async () => {
         const folder = scratch();
         const codex = { name: "codex-mcp-client", title: "Codex" };
@@ -35,7 +35,7 @@ describe("who makes a tool call (D-81, T-113)", () => {
         expect(await callerOf({ "claudecode/toolUseId": "toolu_2" }, claude, folder, 0)).toEqual({ annotator: "claude-haiku-5-5", effort: "low" });
     });
 
-    it("tells a call of the chat's from one of its agents', by the type Claude Code notes beside the agent's file, and nobody when it cannot tell (Priya, review of T-112)", async () => {
+    it("tells a call of the chat's from one of its agents', by the type Claude Code notes beside the agent's file, and nobody when it cannot tell (Priya)", async () => {
         const folder = scratch();
         const transcript = join(folder, "session.jsonl");
         const agents = join(folder, "session", "subagents");

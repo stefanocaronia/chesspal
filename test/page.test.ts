@@ -105,7 +105,7 @@ describe("the page's server", () => {
         expect((await served()).analysis).toBeUndefined();
     });
 
-    it("keeps a game the player brings to analyse and puts it in analysis, refusing a PGN it cannot read or a game going on (T-92)", async () => {
+    it("keeps a game the player brings to analyse and puts it in analysis, refusing a PGN it cannot read or a game going on", async () => {
         const folder = playerFolder();
         const page = await open(folder);
         const kept = "study/2026-11-02-153012.pgn";
@@ -127,7 +127,7 @@ describe("the page's server", () => {
         expect(await statusOf(folder)).not.toContain("In analysis");
     });
 
-    it("lists the analyses, opens one again by its name, and takes back a review exported from the page ready, without waking the chat (T-106)", async () => {
+    it("lists the analyses, opens one again by its name, and takes back a review exported from the page ready, without waking the chat", async () => {
         const folder = playerFolder();
         const page = await open(folder);
         const kept = "study/2026-11-02-153012.pgn";
@@ -168,7 +168,7 @@ describe("the page's server", () => {
         // With the model the AI played it with, which the list names it by (D-82).
         expect(JSON.parse((await get(page, "/api/analyses")).body)).toMatchObject([{ white: "Player", black: "AI", aiModel: { model: "claude-opus-5-5", effort: "xhigh" }, moves: 1, reviewed: false }]);
 
-        // A link of the page opens it to look at, the chat not asked to go over it; the game named as the archive keeps it (T-155).
+        // A link of the page opens it to look at, the chat not asked to go over it; the game named as the archive keeps it.
         const { game } = JSON.parse((await get(page, "/api/game")).body) as { game: { name: string; }; };
         expect(archivedGames(gameFolder(folder))).toEqual([game.name]);
         expect(await post(page, "/api/study", { game: anchorName(game.name), look: true })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
@@ -243,7 +243,7 @@ describe("the player's moves on the page", () => {
         await expect(run(folder, "ai_say", { text: "Nice bishop." }, other)).rejects.toThrow(changed);
         await expect(run(folder, "new_game", { ai_colour: "black", replace: true }, other)).rejects.toThrow(changed);
         // A chat whose server has just started, as a resumed one, was shown no game: it decides nothing before a tool shows it the game, but plays the player's
-        // move, whose answer shows it (T-129).
+        // move, whose answer shows it.
         const fresh = { ...testContext(folder), positionSeen: null };
         await expect(run(folder, "end_game", { result: "ai_resigns" }, fresh)).rejects.toThrow(changed);
         await expect(run(folder, "ai_say", { text: "Hello." }, fresh)).rejects.toThrow(changed);
@@ -278,7 +278,7 @@ describe("the player's moves on the page", () => {
         await expect(run(folder, "new_game", { ai_colour: "black", replace: true }, chat)).rejects.toThrow(changed);
     });
 
-    it("starts a new game with the colour, the level and the clock the player chose (T-58)", async () => {
+    it("starts a new game with the colour, the level and the clock the player chose", async () => {
         const folder = playerFolder();
         const page = await open(folder);
 
@@ -472,7 +472,7 @@ describe("the profiles on the page (D-23, D-45)", () => {
         expect((await served()).settings).toEqual({ theme: "dark", dots: false });
     });
 
-    it("says where the profiles are, as the file manager walks there from the player's own folder, and opens it there (T-119)", async () => {
+    it("says where the profiles are, as the file manager walks there from the player's own folder, and opens it there", async () => {
         const folder = playerFolder();
         const opens: string[] = [];
         const page = await open(folder, undefined, {
@@ -734,7 +734,7 @@ describe("the doorbell of the chat", () => {
         expect(await waiting).toBe(true);
     });
 
-    it("gives the page the clock, and rings the chat when a flag falls as the page reads the game (T-37)", async () => {
+    it("gives the page the clock, and rings the chat when a flag falls as the page reads the game", async () => {
         const folder = playerFolder();
         const base = testContext(folder);
         const start = base.now().getTime();

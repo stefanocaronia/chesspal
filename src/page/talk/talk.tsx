@@ -125,7 +125,7 @@ export function Marked({ text }: { text: string; })
     );
 }
 
-/** Where the pointer is among the squares and moves in the AI's words (T-111): the board lights that square up. */
+/** Where the pointer is among the squares and moves in the AI's words: the board lights that square up. */
 export const PointSquare = createContext<(square: string | undefined) => void>(() => undefined);
 
 // **a few words** the AI put in bold, as Markdown writes them.
@@ -135,8 +135,7 @@ const boldWords = /\*\*(.+?)\*\*/;
 const boardWords = /(?<![\p{L}\d])((?:\d+\.(?:\.\.)?\s?)?(?:O-O(?:-O)?|[KQRBN♔-♟]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN♔-♟])?)[+#]?[!?]{0,2})(?![\p{L}\d])/u;
 
 /**
- * What the colours drawn with a note or the coach's hint mean, the ones it uses, in the words of who drew them: the legend, for the player (D-69, Zoe, review
- * and playtest of T-112).
+ * What the colours drawn with a note or the coach's hint mean, the ones it uses, in the words of who drew them: the legend, for the player (D-69, Zoe).
  */
 export function Legend({ review, words }: { review: Pick<MoveReview, "arrows" | "squares">; words: Text["drawn"]; })
 {
@@ -237,7 +236,7 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
 }
 
 /**
- * The talk narrowed to a card beside the board (T-84): the Torretta above, the player below, each with their name and side written down the card, a ring on
+ * The talk narrowed to a card beside the board: the Torretta above, the player below, each with their name and side written down the card, a ring on
  * whoever moves and a dot on the Torretta when the AI spoke meanwhile.
  */
 export function TalkFaces({ name, aiPicture, you, picture, ai, player, aiMoves, playerMoves, unread, text }: {
@@ -247,7 +246,7 @@ export function TalkFaces({ name, aiPicture, you, picture, ai, player, aiMoves, 
     /** The player's name and picture. */
     you: string;
     picture: ComponentChildren;
-    /** The sides, none between games (T-110). */
+    /** The sides, none between games. */
     ai?: Side;
     player?: Side;
     aiMoves: boolean;

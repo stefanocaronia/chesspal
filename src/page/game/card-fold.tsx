@@ -1,5 +1,5 @@
 // The cards of the game's column the player folds to their title (Stefano): the opening, the helps, the moves and the chart of the game, each as this
-// browser remembers it, as the columns (T-84).
+// browser remembers it, as the columns.
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import type { Text } from "../text.ts";

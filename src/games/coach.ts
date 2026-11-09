@@ -13,9 +13,9 @@ export interface CoachJudgment
     readonly ply: number;
     readonly badge?: Badge;
     readonly note?: string;
-    /** The moves in SAN its note names that the player could play: the page shows it only once none is legal on their turn (Anatolij, review of T-112). */
+    /** The moves in SAN its note names that the player could play: the page shows it only once none is legal on their turn (Anatolij). */
     readonly held?: string[];
-    /** Only as shown, never kept: a held note the player's last move let go, which the card shows now (Zoe, playtest of T-112). */
+    /** Only as shown, never kept: a held note the player's last move let go, which the card shows now (Zoe). */
     readonly released?: true;
 }
 
@@ -89,7 +89,7 @@ export function coachWaitingSince(folder: string, current: CurrentGame, position
     return now;
 }
 
-/** Whether a coach has started on the game as it is now: until one has, the chat is told again to start it (Priya, playtest of T-112). */
+/** Whether a coach has started on the game as it is now: until one has, the chat is told again to start it (Priya). */
 export function coachStarted(folder: string, current: CurrentGame): boolean
 {
     return keptFor(folder, current).begun === current.game.record.moves.length;
@@ -111,8 +111,8 @@ export function startCoach(folder: string, current: CurrentGame): boolean
 
 /**
  * What the player may see of it in the game as it is: the judgments but those that name a move the player may play, held while the opponent is to move
- * too (Anatolij, review of T-112), and the hint only in its own position. A held one that the last pair of moves let go is marked, for the card to show it
- * now, however far back its move (Zoe, playtest of T-112).
+ * too (Anatolij), and the hint only in its own position. A held one that the last pair of moves let go is marked, for the card to show it
+ * now, however far back its move (Zoe).
  */
 export function coachShown({ judgments, hint, leads = [] }: CoachWords, { game, ai }: CurrentGame): CoachWords
 {
@@ -128,7 +128,7 @@ export function coachShown({ judgments, hint, leads = [] }: CoachWords, { game, 
 
 /**
  * The record with the coach's judgments in the comments of the moves they judge, as the analyst writes its own: for the game over. A move the analyst has
- * reviewed already keeps its review (Federico, review of T-112); the book's badge alone is no review, and stays under a note alone, as annotate_game keeps it.
+ * reviewed already keeps its review (Federico); the book's badge alone is no review, and stays under a note alone, as annotate_game keeps it.
  */
 export function withCoach(record: GameRecord, { judgments, leads = [] }: CoachWords): GameRecord
 {

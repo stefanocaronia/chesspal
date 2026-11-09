@@ -14,7 +14,7 @@ describe("the board's sounds", () => {
         expect(soundOf(after('[FEN "7k/8/6K1/8/8/8/8/5Q2 w - - 0 1"]\n\n1. Qf7 1/2-1/2'))).toBe("draw");
     });
 
-    it("sound a game ended without a move by how it ended: a resignation, a flag fallen, a draw agreed (T-100)", () => {
+    it("sound a game ended without a move by how it ended: a resignation, a flag fallen, a draw agreed", () => {
         expect(endSoundOf("resignation")).toBe("resign");
         expect(endSoundOf("time")).toBe("flag");
         expect(endSoundOf("agreement")).toBe("draw");

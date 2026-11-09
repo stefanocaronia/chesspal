@@ -37,17 +37,17 @@
     background-image: linear-gradient(var(--selected), var(--selected));
 }
 
-/* The king checkmated (T-77): its square red, over the last move's colour */
+/* The king checkmated: its square red, over the last move's colour */
 .square.mated {
     background-image: linear-gradient(var(--mated), var(--mated));
 }
 
-/* The player's marks with the right button (T-73): orange squares and arrows, gone at a left click */
+/* The player's marks with the right button: orange squares and arrows, gone at a left click */
 .square.marked {
     background-image: linear-gradient(var(--mark-square), var(--mark-square));
 }
 
-/* The square the player points at in the AI's words (T-111): a white ring with a dark edge, which reads on every board and over the rings the AI draws */
+/* The square the player points at in the AI's words: a white ring with a dark edge, which reads on every board and over the rings the AI draws */
 .square.pointed {
     outline: max(4px, 0.8cqw) solid #fff;
     outline-offset: calc(-1 * max(4px, 0.8cqw));
@@ -71,12 +71,12 @@
     opacity: 0.7;
 }
 
-/* The helps' arrows, seen while the player plays, show the pieces through them more (Stefano, T-142) */
+/* The helps' arrows, seen while the player plays, show the pieces through them more (Stefano) */
 .arrows.drawn {
     opacity: 0.5;
 }
 
-/* The round cap closes a shaft round the square's centre, as on Lichess: arrows off one square meet in one round knot, at any angle (Stefano, T-142) */
+/* The round cap closes a shaft round the square's centre, as on Lichess: arrows off one square meet in one round knot, at any angle (Stefano) */
 .arrows path {
     fill: none;
     stroke: var(--mark);
@@ -84,7 +84,7 @@
     stroke-linecap: round;
 }
 
-/* The helps' arrows, the AI's and the coach's, thinner than the player's own, on a thin edge: they read as the helps' (Stefano, T-142) */
+/* The helps' arrows, the AI's and the coach's, thinner than the player's own, on a thin edge: they read as the helps' (Stefano) */
 .arrows.drawn path {
     stroke-width: 0.14;
 }
@@ -125,7 +125,7 @@
     stroke-linejoin: round;
 }
 
-/* The AI's squares are rings (Zoe, T-40): the last move's fill and the player's marks stay seen under them */
+/* The AI's squares are rings (Zoe): the last move's fill and the player's marks stay seen under them */
 .square.noted::after {
     content: "";
     position: absolute;
@@ -150,7 +150,7 @@
     --ring: var(--drawn-blue);
 }
 
-/* Moving a piece (T-70, Zoe's design): dots for the legal moves, rings on captures, a gold edge on the square a dragged piece would land on */
+/* Moving a piece (Zoe's design): dots for the legal moves, rings on captures, a gold edge on the square a dragged piece would land on */
 .square.hint::before {
     content: "";
     position: absolute;
@@ -242,7 +242,7 @@
     transition-duration: 180ms;
 }
 
-/* A move not dragged slides from its square, in 12.5cqw a square, and a king in check rings like a bell struck (T-74) */
+/* A move not dragged slides from its square, in 12.5cqw a square, and a king in check rings like a bell struck */
 .square.slide {
     z-index: 1;
 }
@@ -261,7 +261,7 @@
     animation: taken 220ms step-end forwards;
 }
 
-/* A jump through the game (T-88): a piece no longer there fades, one that was not there appears */
+/* A jump through the game: a piece no longer there fades, one that was not there appears */
 .square .gone-piece .piece {
     animation: taken 220ms forwards;
 }
@@ -325,7 +325,7 @@
     }
 }
 
-/* The end of the game (T-77): the kings' badges and the loser's king laid down stay; the effects play once, when the game ends under the player's eyes */
+/* The end of the game: the kings' badges and the loser's king laid down stay; the effects play once, when the game ends under the player's eyes */
 /* The king laid down keeps its size and lies on the base the other pieces stand on, in the middle of its square: it turns about the point that puts it
    there, which each set's drawing places */
 .square.fallen .piece {
@@ -394,7 +394,7 @@
     background: #69727d;
 }
 
-/* A move's badge (D-69, T-41): 16px beside a move, a third of a square in the corner of its arrival, edged in white as the kings' badges */
+/* A move's badge (D-69): 16px beside a move, a third of a square in the corner of its arrival, edged in white as the kings' badges */
 .move-badge {
     flex: none;
     width: 16px;
@@ -414,7 +414,7 @@
     pointer-events: none;
 }
 
-/* With the king's badge on the same square, at the end, the move's stands beside it (Zoe, T-40) */
+/* With the king's badge on the same square, at the end, the move's stands beside it (Zoe) */
 .square:has(.badge) .move-badge {
     right: calc(2.5% + clamp(14px, 3.8cqw, 30px) + max(4px, 0.6cqw));
 }
@@ -601,7 +601,7 @@
     color: var(--light-square);
 }
 
-/* The square's name in the corner of the file, under the pointer or the piece dragged, in its place on the bottom rank, when the player turns it on (T-76): bottom
+/* The square's name in the corner of the file, under the pointer or the piece dragged, in its place on the bottom rank, when the player turns it on: bottom
    right, where no badge sits (Stefano); the help rows' names stay in line */
 .square .square-name {
     position: absolute;
@@ -663,7 +663,7 @@
     --piece-detail: color-mix(in oklab, var(--white-piece) var(--kept), var(--page));
 }
 
-/* Why a move was refused (T-11): a bubble over the square it went to, its tail on the square; a ring on the piece that forbids it */
+/* Why a move was refused: a bubble over the square it went to, its tail on the square; a ring on the piece that forbids it */
 .notice {
     --shift: -50%;
     position: absolute;
@@ -679,7 +679,7 @@
     margin: 0;
     padding: 8px 12px;
     border-radius: 7px;
-    /* Ink in both themes (T-91), as the arrows that explain */
+    /* Ink in both themes, as the arrows that explain */
     background: var(--explain-ink);
     color: #f4f6f9;
     font-size: 13.5px;
@@ -698,7 +698,7 @@
     border-top-color: var(--explain-ink);
 }
 
-/* The kind of reason (T-91): a light tile with the piece, a pin, a bar, castling; the player's king on red */
+/* The kind of reason: a light tile with the piece, a pin, a bar, castling; the player's king on red */
 .explain-icon {
     flex: none;
     display: grid;
@@ -772,7 +772,7 @@
     transform: translate(var(--shift), 8px);
 }
 
-/* Where the bubble hides neither the culprit nor the arrow's point (T-91, Zoe): under the whole board on a phone, beside the piece on a wide board */
+/* Where the bubble hides neither the culprit nor the arrow's point (Zoe): under the whole board on a phone, beside the piece on a wide board */
 .notice.under-board {
     top: 100cqw;
     transform: translate(var(--shift), 8px);
@@ -854,7 +854,7 @@
     }
 }
 
-/* The choice of the piece a pawn becomes (T-11): four round buttons in a column from its square, over a shade */
+/* The choice of the piece a pawn becomes: four round buttons in a column from its square, over a shade */
 .promotion {
     position: absolute;
     left: 0;

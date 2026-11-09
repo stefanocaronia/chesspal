@@ -48,7 +48,7 @@
     white-space: nowrap;
 }
 
-/* A player's clock, in Zoe's pill (T-37): the running one in the accent colour, red in the last seconds */
+/* A player's clock, in Zoe's pill: the running one in the accent colour, red in the last seconds */
 .player .clock {
     flex: none;
     padding: 4px 10px;
@@ -131,13 +131,13 @@
     margin-left: -3px;
 }
 
-/* The pieces taken are the set's small ones (T-94), whose colours and edges are their own */
+/* The pieces taken are the set's small ones, whose colours and edges are their own */
 .taken .piece {
     width: 20px;
     height: 20px;
 }
 
-/* Pawns comb tight; the other pieces show more of themselves, a pair of rooks or bishops two pieces still (Zoe, T-40) */
+/* Pawns comb tight; the other pieces show more of themselves, a pair of rooks or bishops two pieces still (Zoe) */
 .taken .piece + .piece {
     margin-left: -11px;
 }
@@ -203,7 +203,7 @@
     stroke-linecap: round;
 }
 
-/* The dialogs (D-23, D-45, D-48, T-92): the player's picture, which a click changes, their name, which opens the profiles, the wizard, the profiles, the new game and the analyses */
+/* The dialogs (D-23, D-45, D-48): the player's picture, which a click changes, their name, which opens the profiles, the wizard, the profiles, the new game and the analyses */
 .avatar.photo {
     clip-path: none;
     border-radius: 50%;
@@ -725,7 +725,7 @@
     display: none;
 }
 
-/* The note is the bubble's content: in the bubble's own ink, not the soft one of a side note (Zoe, T-40) */
+/* The note is the bubble's content: in the bubble's own ink, not the soft one of a side note (Zoe) */
 .move-note .note {
     display: block;
     margin-top: 4px;

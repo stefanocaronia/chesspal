@@ -1,4 +1,4 @@
-// How a game ended, as the page names it (T-77): by the board, or by a resignation or a draw agreed, which only the record's Termination tag says (D-37).
+// How a game ended, as the page names it: by the board, or by a resignation or a draw agreed, which only the record's Termination tag says (D-37).
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { Ending, Outcome } from "../../core/index.ts";
 
@@ -18,7 +18,7 @@ export function howEnded(outcome: Outcome, termination: string | undefined): How
         return "agreement";
     }
 
-    // A flag that fell (T-37): "Black lost on time", "Black ran out of time and White cannot mate".
+    // A flag that fell: "Black lost on time", "Black ran out of time and White cannot mate".
     if (/ (lost on|ran out of|won on) time\b|time forfeit|per tempo/i.test(termination ?? "")) {
         return "time";
     }

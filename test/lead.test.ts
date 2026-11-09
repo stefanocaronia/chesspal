@@ -37,7 +37,7 @@ describe("who is ahead, as the AI estimates it (D-90)", () => {
         const standings = standingsOf(plies);
 
         expect(standings.map(({ plies: at }) => at)).toEqual([1, 3, 5, 7]);
-        // The first pawns move the bar most, where a game between people turns (Anatolij and Zoe, review of T-148).
+        // The first pawns move the bar most, where a game between people turns (Anatolij and Zoe).
         expect(standings[0]!.share).toBeCloseTo(Math.tanh(0.06));
         expect(standings[1]!.share).toBeCloseTo(-Math.tanh(2));
         expect(standingsOf(pliesOf(readPgn("1. e4 {[%lead +1]} e5 {[%lead -3]} *")[0]!)).map(({ share }) => Math.round(((share + 1) / 2) * 100))).toEqual([60, 23]);
@@ -48,7 +48,7 @@ describe("who is ahead, as the AI estimates it (D-90)", () => {
         // During a game with the helps off the player sees none (D-78).
         expect(standingsOf(withoutReviews(plies)).map(({ plies: at }) => at)).toEqual([7]);
 
-        // A draw on the board stands even, in place of the AI's last figure, a mate it saw too (Anatolij and Federico, review of T-148).
+        // A draw on the board stands even, in place of the AI's last figure, a mate it saw too (Anatolij and Federico).
         const stalemate = pliesOf(readPgn("1. e4 {[%lead +0.3]} e5 {[%lead #1]} *")[0]!);
         expect(standingsOf(stalemate, true).map(({ plies: at, share, drawn }) => [at, share, drawn])).toEqual([[1, expect.closeTo(Math.tanh(0.06)), undefined], [2, 0, true]]);
     });

@@ -37,7 +37,7 @@ describe("a new game after one played in the chat (D-57)", () => {
         expect(() => startAgain(context)).not.toThrow();
     });
 
-    it("waits for it in Codex too, whose hook notes how chats start (T-104)", async () => {
+    it("waits for it in Codex too, whose hook notes how chats start", async () => {
         const codex = chatWith(longGame, "codex-mcp-client");
         await chatStarted(codex, "compact", after);
         expect(() => startAgain(codex)).toThrow(/\/clear/);

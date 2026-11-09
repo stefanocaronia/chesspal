@@ -131,7 +131,7 @@
     scrollbar-width: none;
 }
 
-/* The card's title, and on its right the icons held: the map and the board without its drawings (T-138) */
+/* The card's title, and on its right the icons held: the map and the board without its drawings */
 .helps-head {
     display: flex;
     align-items: center;
@@ -167,7 +167,7 @@
     display: none;
 }
 
-/* The same sign on both, so that on a phone, with no pointer, they read as lines that open (Zoe, review of T-112) */
+/* The same sign on both, so that on a phone, with no pointer, they read as lines that open (Zoe) */
 .helps-card .coach summary::after,
 .board-map .coach-hint summary::after {
     content: "▸";
@@ -391,7 +391,7 @@
     border-top: 1px solid var(--line);
 }
 
-/* A term with its meaning under the pointer, and under its line at a click or a tap (Rosa, T-117). */
+/* A term with its meaning under the pointer, and under its line at a click or a tap (Rosa). */
 .strategy-table .term {
     padding: 0;
     border: 0;
@@ -556,7 +556,7 @@
         display: none;
     }
 
-    /* The coach's hint under the board, its words under its line, the map on its right; the card keeps the judgments (Zoe, playtest of T-112) */
+    /* The coach's hint under the board, its words under its line, the map on its right; the card keeps the judgments (Zoe) */
     .board-map .coach-hint summary {
         padding: 6px 0;
     }

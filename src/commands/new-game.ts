@@ -211,7 +211,7 @@ const fenPattern = /^[pnbrqkPNBRQK1-8]+(?:\/[pnbrqkPNBRQK1-8]+){7}(?:\s|$)/;
 
 /**
  * Whether the chat must be cleared first: the last game begun, in any profile, was played in it at some length, and the host says how chats start (the hook
- * of Claude Code and Codex, T-85, T-104). Another profile does not clear the chat (D-66), nor a game another chat played, which this one was never shown (D-71).
+ * of Claude Code and Codex). Another profile does not clear the chat (D-66), nor a game another chat played, which this one was never shown (D-71).
  */
 function chatToClear(context: Context): boolean
 {

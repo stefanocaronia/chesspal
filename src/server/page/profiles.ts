@@ -1,5 +1,5 @@
 // The profiles on the board page (D-23, D-45, D-56): who plays and their picture, the first profile completed by the wizard (D-71), another put in use, the settings kept,
-// and the data folder they are in, opened in the system's file manager (T-119).
+// and the data folder they are in, opened in the system's file manager.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { isAbsolute, relative, sep } from "node:path";
@@ -20,7 +20,7 @@ export interface ProfilesShown
     readonly profile: ProfileShown;
     readonly profiles: ProfileShown[];
     readonly settings?: PageSettings;
-    /** The data folder as the player finds it, folder by folder from their own (T-119): OneDrive, Documenti, My Games, Chesspal. */
+    /** The data folder as the player finds it, folder by folder from their own: OneDrive, Documenti, My Games, Chesspal. */
     readonly dataFolder: readonly string[];
 }
 
@@ -188,7 +188,7 @@ async function settingsFromPage(request: IncomingMessage, response: ServerRespon
     sendJson(response, 200, { saved: true });
 }
 
-/** The data folder in the system's file manager (T-119): asked as JSON, which another site cannot send without the browser asking first. */
+/** The data folder in the system's file manager: asked as JSON, which another site cannot send without the browser asking first. */
 async function openDataFolder(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
     const asked = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;

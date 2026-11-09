@@ -14,7 +14,7 @@ export function analystRuns(context: Context): boolean
 
 /**
  * The game over, with the analyst agent that goes over it when the player wants, where it runs (D-89); over, the game from status and ai_say, which come after
- * its end: once it is in analysis, by the agent or the chat, or reviewed, the chat goes over that review and never starts the agent again (Stefano, T-133).
+ * its end: once it is in analysis, by the agent or the chat, or reviewed, the chat goes over that review and never starts the agent again (Stefano).
  */
 export function withAnalyst(summary: GameSummary, context: Context, over?: CurrentGame): GameSummary
 {
@@ -34,7 +34,7 @@ export function analystLine(game?: string): string
         + "page, which shows it at work; tell the player in a word, and when it ends go over the game with them from what it tells you.";
 }
 
-/** How the chat goes over a game the analyst agent has reviewed, or is reviewing: from that review, never with another agent (Stefano, T-133). */
+/** How the chat goes over a game the analyst agent has reviewed, or is reviewing: from that review, never with another agent (Stefano). */
 export function reviewedLine(game?: string): string
 {
     return "The analyst agent has gone over this game, or is at it: never start it again. When the player wants it gone over, go over it with them from what "
@@ -49,7 +49,7 @@ export function coachRuns(context: Context): boolean
 
 /**
  * Whether to start the coach after the player's own move has ended the game on the board, with the helps on: it judges that move too (D-88). Told again
- * until it starts, since a chat woken by the page may lose the line on its way to its words (Priya, playtest of T-112).
+ * until it starts, since a chat woken by the page may lose the line on its way to its words (Priya).
  */
 export function coachOnEnd(context: Context, folder: string, current: CurrentGame): boolean
 {
@@ -58,8 +58,8 @@ export function coachOnEnd(context: Context, folder: string, current: CurrentGam
 }
 
 /**
- * How to start the agents, in one message, the one that thinks first, since it needs the time (Priya, review of T-112), and that the player sees nothing of
- * them: their end needs no answer either. The end of the last move's agents, told just after, must not take their place (Priya, playtest of T-112).
+ * How to start the agents, in one message, the one that thinks first, since it needs the time (Priya), and that the player sees nothing of
+ * them: their end needs no answer either. The end of the last move's agents, told just after, must not take their place (Priya).
  */
 export function agentsLine(agents: readonly string[]): string
 {
@@ -76,7 +76,7 @@ export function agentsLine(agents: readonly string[]): string
         + `${prompt(second)}; start them even when an agent of the move before has just ended, and write nothing about them in the chat, now or when they end.`;
 }
 
-/** Whether the game over is gone over already: in analysis now, by the analyst agent or the chat, or reviewed, whatever the page opened since (Federico, T-133). */
+/** Whether the game over is gone over already: in analysis now, by the analyst agent or the chat, or reviewed, whatever the page opened since (Federico). */
 function goneOver(context: Context, over: CurrentGame): boolean
 {
     const folder = gameFolder(context.home());

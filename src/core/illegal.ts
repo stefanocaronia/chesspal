@@ -1,4 +1,4 @@
-// Why the board refuses a move, without judging anything (D-18): the page tells the player who tried it (T-11).
+// Why the board refuses a move, without judging anything (D-18): the page tells the player who tried it.
 import { Chess, type Color, type PieceSymbol, type Square } from "chess.js";
 import { fileOf, rankOf, squaresBetween } from "./facts.ts";
 

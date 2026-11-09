@@ -1,5 +1,5 @@
-// The board: eight ranks of squares from a FEN, one side at the bottom, Zoe's pieces (T-9), the ranks and files on the edge squares. The player moves
-// with two clicks or by dragging a piece, which lifts off the board, in Zoe's design (T-70).
+// The board: eight ranks of squares from a FEN, one side at the bottom, Zoe's pieces, the ranks and files on the edge squares. The player moves
+// with two clicks or by dragging a piece, which lifts off the board, in Zoe's design.
 import { useMemo, useRef } from "preact/hooks";
 import type { Badge as MoveBadge, DrawnArrow, DrawnSquare, Move, PieceLetter, Profile, Promotion, Side, Square } from "../../core/index.ts";
 import { BadgeIcon } from "../game/badges.tsx";
@@ -22,7 +22,7 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
     fen: string;
     bottom: Side;
     lastMove?: Move;
-    /** The squares the player points at in the AI's words (T-111) or in the helps' card (D-78). */
+    /** The squares the player points at in the AI's words or in the helps' card (D-78). */
     pointed?: readonly string[];
     /** The helps (D-78): a corner folded on each piece at risk, a dashed line for each pin. */
     helps?: HelpsView;
@@ -30,29 +30,29 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
     control?: Profile["control"];
     /**
      * The board without the arrows and the squares drawn on it, the AI's, the coach's and the player's, and without the helps' corners and pins' lines, while
-     * its button is held (Stefano, T-138).
+     * its button is held (Stefano).
      */
     bare?: boolean;
     /** The AI's badge on the last move, in a game in analysis (D-69): on the square it went to, by its name. */
     badge?: { badge: MoveBadge; name: string; };
     /** The arrows and squares the AI drew with its note on the move shown (D-69), under the player's own marks. */
     drawn?: { arrows?: readonly DrawnArrow[]; squares?: readonly DrawnSquare[]; };
-    /** The move after this position, while the player looks back (T-88): stepping back over it slides its pieces home. */
+    /** The move after this position, while the player looks back: stepping back over it slides its pieces home. */
     nextMove?: Move;
     /** Whether the position comes from a jump of more moves through the game, which shows it at once. */
     jumped?: boolean;
     check: boolean;
-    /** The game over, when this is its last position (T-77): the mated king's square turns red, the kings get their badges. */
+    /** The game over, when this is its last position: the mated king's square turns red, the kings get their badges. */
     end?: BoardEnd;
     player?: Side;
     selected?: string;
     targets: readonly Move[];
     dots: boolean;
-    /** Whether a square's name shows in its corner under the pointer or the piece dragged (T-76), as the player chose. */
+    /** Whether a square's name shows in its corner under the pointer or the piece dragged, as the player chose. */
     names: boolean;
-    /** Why a move was refused (T-11): a bubble over the square it went to, and a ring on the piece that forbids it. */
+    /** Why a move was refused: a bubble over the square it went to, and a ring on the piece that forbids it. */
     notice?: Notice;
-    /** A pawn on its way to the last rank (T-11): the four pieces it may become, over the square, until the player picks one or none. */
+    /** A pawn on its way to the last rank: the four pieces it may become, over the square, until the player picks one or none. */
     promotion?: { from: string; to: string; side: Side; };
     onSelect: (square: string | undefined) => void;
     onMove: (from: string, to: string) => void;
@@ -82,12 +82,12 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
         onRefuse,
         onPromote,
     });
-    // A new position slides the pieces of its move there, but for the one the player dragged, and shakes a king in check (T-74).
+    // A new position slides the pieces of its move there, but for the one the player dragged, and shakes a king in check.
     const before = useRef<string | undefined>(undefined);
     const motion = useMemo(() => {
         const was = before.current === undefined ? undefined : piecesOf(before.current);
         before.current = fen;
-        // A move played on the position before slides there, a step back over one slides it home; a jump through the game moves every piece to its place (T-88).
+        // A move played on the position before slides there, a step back over one slides it home; a jump through the game moves every piece to its place.
         const fresh = was !== undefined && jumped !== true && lastMove !== undefined && playedOn(was, pieces, lastMove);
         const undone = was !== undefined && jumped !== true && nextMove !== undefined && playedOn(pieces, was, nextMove);
         const moved = was === undefined
@@ -104,7 +104,7 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
     }, [fen]);
 
     // The arrows on the board, the AI's and the coach's under the player's, none while the board is bare; the helps' step aside while the player picks up
-    // a piece to move it (Stefano, T-142).
+    // a piece to move it (Stefano).
     const aiArrows = bare === true || selected !== undefined || drag !== undefined ? [] : drawn?.arrows ?? [];
     const ownArrows = bare === true ? [] : drawing === undefined ? marks.arrows : [...marks.arrows, drawing];
     // The bare board hides the helps' signs too, the corners on the pieces at risk and the pins' lines (Stefano).
@@ -230,7 +230,7 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
 
 /**
  * What the board says of a refused move, over the piece moved, or in its middle for a request refused; with the piece's letter, for the bubble's icon, and
- * what explains the move (T-91).
+ * what explains the move.
  */
 export interface Notice
 {
@@ -240,7 +240,7 @@ export interface Notice
     readonly explanation?: Explanation;
 }
 
-/** A game over as the board shows it (T-77): how it ended, who won, the player's side, and whether it ended a moment ago, which plays its effects. */
+/** A game over as the board shows it: how it ended, who won, the player's side, and whether it ended a moment ago, which plays its effects. */
 export interface BoardEnd
 {
     readonly how?: HowEnded;

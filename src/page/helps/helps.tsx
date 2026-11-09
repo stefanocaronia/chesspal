@@ -22,7 +22,7 @@ export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMa
     helps: HelpsView;
     /** The player's moves as the coach judged them: the last the AI has answered, and one a held note let go only now (D-88). */
     judged: readonly Ply[];
-    /** The coach's hint for the player's turn, folded until they open it (Anatolij, review of T-112). */
+    /** The coach's hint for the player's turn, folded until they open it (Anatolij). */
     hint?: CoachHint | undefined;
     hintOpen: boolean;
     onHint: (open: boolean) => void;
@@ -38,7 +38,7 @@ export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMa
     const [folded, toggleFold] = useCardFold("helps");
     const words = text.helpsCard;
 
-    // The hint closes with the card, so that its drawings never stay on the board without its words (Zoe, playtest of T-112).
+    // The hint closes with the card, so that its drawings never stay on the board without its words (Zoe).
     const fold = (): void => {
         if (!folded) {
             onHint(false);
@@ -80,7 +80,7 @@ export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMa
     );
 }
 
-/** The map's button (D-78), held to see the map: an icon, its tooltip saying how (Stefano, T-138); in the card's title, and on a phone under the board. */
+/** The map's button (D-78), held to see the map: an icon, its tooltip saying how (Stefano); in the card's title, and on a phone under the board. */
 export function MapButton({ mapping, onMap, text }: { mapping: boolean; onMap: (on: boolean) => void; text: Text; })
 {
     return (
@@ -94,8 +94,7 @@ export function MapButton({ mapping, onMap, text }: { mapping: boolean; onMap: (
 }
 
 /**
- * The button held to see the board bare, without the arrows and the squares the AI, the coach and the player drew on it, nor the helps' signs (Stefano,
- * T-138): an eye shut.
+ * The button held to see the board bare, without the arrows and the squares the AI, the coach and the player drew on it, nor the helps' signs (Stefano): an eye shut.
  */
 export function BareButton({ bare, onBare, text }: { bare: boolean; onBare: (on: boolean) => void; text: Text; })
 {
@@ -112,7 +111,7 @@ export function BareButton({ bare, onBare, text }: { bare: boolean; onBare: (on:
 
 /**
  * The coach's hint, a line that opens on its words and the legend of what it draws (D-88): in the helps' card, and on a phone under the board, beside the
- * map, where its drawings are in sight (Zoe, playtest of T-112).
+ * map, where its drawings are in sight (Zoe).
  */
 export function HintLine({ hint, open, onOpen, text }: { hint: CoachHint; open: boolean; onOpen: (open: boolean) => void; text: Text; })
 {
@@ -191,7 +190,7 @@ function Judged({ ply, text }: { ply: Ply; text: Text; })
 function Tactics({ helps, onPoint, text }: { helps: HelpsView; onPoint: (squares: readonly string[]) => void; text: Text; })
 {
     const words = text.helpsCard;
-    // A row lights its squares while the pointer is on it; a touch keeps them lit until the position changes, as a square in the AI's words (T-111).
+    // A row lights its squares while the pointer is on it; a touch keeps them lit until the position changes, as a square in the AI's words.
     const point = (squares: readonly string[]) => ({
         onPointerEnter: () => onPoint(squares),
         onPointerLeave: (event: PointerEvent) => event.pointerType === "mouse" && onPoint([]),
@@ -324,7 +323,7 @@ function Strategy({ profile, text }: { profile: Profile; text: Text; })
 {
     const words = text.helpsCard;
     const { draw, pawnEnding } = profile;
-    // A name's meaning shows under its line at a click or a tap, since a phone has no pointer for the title (Rosa, T-117).
+    // A name's meaning shows under its line at a click or a tap, since a phone has no pointer for the title (Rosa).
     const [explained, setExplained] = useState<StrategyRow | undefined>(undefined);
     const lines = strategyOf(profile);
     const notes = [

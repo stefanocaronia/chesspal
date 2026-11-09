@@ -13,7 +13,7 @@ export function PlayerPicture({ profile, size = 48 }: { profile: ProfileShown | 
     return profile?.avatar === undefined ? <PlainFace /> : <DrawnAvatar id={profile.avatar} size={size} />;
 }
 
-/** One of the drawn avatars, its colour behind it in the picture (T-102); named for a screen reader when `label` is given. */
+/** One of the drawn avatars, its colour behind it in the picture; named for a screen reader when `label` is given. */
 export function DrawnAvatar({ id, size, label }: { id: AvatarId; size: number; label?: string; })
 {
     return <img class="avatar drawn" src={`/page/avatars/${id}.webp`} width={size} height={size} alt={label ?? ""} decoding="async" />;

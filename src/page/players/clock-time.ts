@@ -1,4 +1,4 @@
-// The clock as the board page shows it (T-37): minutes and seconds, and tenths in the last seconds, as Lichess does.
+// The clock as the board page shows it: minutes and seconds, and tenths in the last seconds, as Lichess does.
 import { clockText } from "../../core/index.ts";
 
 /** Below this many milliseconds a clock shows tenths and turns red. */

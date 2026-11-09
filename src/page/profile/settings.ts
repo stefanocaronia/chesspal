@@ -1,10 +1,10 @@
-// The player's settings on the page (D-56): the look, the game's aids and the language, kept in the profile in use (T-19) and remembered by this browser.
+// The player's settings on the page (D-56): the look, the game's aids and the language, kept in the profile in use and remembered by this browser.
 
 /** The piece sets: our two, whose colours the player picks, and cburnett with its own (D-52). */
 export const pieceSets = ["nitida", "torretta", "cburnett"] as const;
 export type PieceSet = typeof pieceSets[number];
 
-/** The choices of each look, by the ids the style sheet knows; the first is the default (T-82). */
+/** The choices of each look, by the ids the style sheet knows; the first is the default. */
 export const looks = {
     board: ["azzurro", "verde", "noce", "ardesia", "grigio", "lavanda", "ciliegio", "menta", "carta"],
     pieces: ["classico", "avorio", "notte", "bordeaux"],
@@ -22,9 +22,9 @@ export interface Settings
     readonly pieces: string;
     readonly marks: string;
     readonly dots: boolean;
-    /** Whether a square's name shows in its corner under the pointer (T-76): off until the player turns it on (Stefano). */
+    /** Whether a square's name shows in its corner under the pointer: off until the player turns it on (Stefano). */
     readonly squareNames: boolean;
-    /** Whether the board says why a move is refused (T-11, D-18). */
+    /** Whether the board says why a move is refused (D-18). */
     readonly explain: boolean;
     /** Whether the moves of the opening book show its badge while the game goes on, as the AI's review shows it after. */
     readonly book: boolean;

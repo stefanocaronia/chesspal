@@ -123,7 +123,7 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "Nf3" });
         const helpsOn = await run(context, "status");
         expect(helpsOn).toContain("Helps on: the player wants to learn. Tell your intentions, never their best move;");
-        // No coach runs outside Claude Code: nobody judges the player's moves before the analyst (D-80, Priya, review of T-112).
+        // No coach runs outside Claude Code: nobody judges the player's moves before the analyst (D-80, Priya).
         expect(helpsOn).not.toContain("A coach");
         expect(Object.keys(command("ai_move").input.shape)).not.toContain("badge");
         await run(context, "ai_move", { move: "Nc6", plan: "p", comment: "c".repeat(500), arrows: ["Gc6d4"], squares: ["Re5"] });
@@ -417,7 +417,7 @@ describe("a game in chat", () => {
         expect(await run(context, "export", { format: "pgn" })).toContain("[%plan The queen's gambit.]");
     });
 
-    it("exports the moves alone, without comments or plans, for Lichess or chess.com (T-59)", async () => {
+    it("exports the moves alone, without comments or plans, for Lichess or chess.com", async () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "white" });
         await run(context, "ai_move", { move: "d4", plan: "The queen's gambit.", comment: "Into the centre." });
@@ -457,7 +457,7 @@ describe("a game in chat", () => {
             await run(context, "ai_move", { move: ai, plan: "p".repeat(200), comment: "c".repeat(200) });
         }
 
-        // About four characters a token, as Priya measures them (T-50).
+        // About four characters a token, as Priya measures them.
         expect((await run(context, "status")).length).toBeLessThan(600);
         expect(await run(context, "status")).toContain("\nBoard page: http://127.0.0.1:5870/\n");
     });

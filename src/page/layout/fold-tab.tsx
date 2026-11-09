@@ -1,4 +1,4 @@
-// The tab on a side column's outer edge, a drawer's handle, that slides the column under the board and pulls it out again (T-84).
+// The tab on a side column's outer edge, a drawer's handle, that slides the column under the board and pulls it out again.
 import { type Column, foldKeys } from "./folds.ts";
 
 /** The tab of a column: open, on the column's outer edge; folded, peeking out from under the board, with a dot when the AI spoke meanwhile. */

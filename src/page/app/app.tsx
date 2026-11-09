@@ -1,5 +1,5 @@
 // The page: the game of the player's folder, replayed with the chess core from its PGN (D-17), kept up to date as it changes, the player's moves (D-47) and
-// words (T-65), in Zoe's three columns (D-53): the talk, the board, the game, the side ones folded as the player likes (T-84).
+// words, in Zoe's three columns (D-53): the talk, the board, the game, the side ones folded as the player likes.
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
@@ -89,7 +89,7 @@ export function App({ start }: { start: Settings; })
     const { data: served, problem, offline, reload } = useServed(() => setDialog("new-game"));
     const [selected, setSelected] = useState<string | undefined>(undefined);
     const [refusal, setRefusal] = useState<Notice | undefined>(undefined);
-    // A pawn taken to the last rank waits for the player to choose what it becomes (T-11).
+    // A pawn taken to the last rank waits for the player to choose what it becomes.
     const [promoting, setPromoting] = useState<{ from: string; to: string; } | undefined>(undefined);
     const [flipped, setFlipped] = useState(false);
     const [folds, setFolds] = useState(startFolds);
@@ -147,26 +147,26 @@ export function App({ start }: { start: Settings; })
     }, [replayed, inBook, judged, coached]);
     const book = useOpeningBook(live.record.moves.length > 0);
     const opening = useMemo(() => book === undefined ? undefined : openingOf(live.record, book), [live, book]);
-    // The player's move shows at once, before the server has it: the game it sends next takes its place (T-70).
+    // The player's move shows at once, before the server has it: the game it sends next takes its place.
     const [pending, setPending] = useState<string | undefined>(undefined);
-    // The coach's hint for the position on the board, none once the player has moved, folded until they open it; a new hint comes folded (Zoe, review of T-112).
+    // The coach's hint for the position on the board, none once the player has moved, folded until they open it; a new hint comes folded (Zoe).
     const hint = pending === undefined && coached?.hint?.position === replayed.record.moves.length ? coached.hint : undefined;
     const hintKey = hint === undefined ? undefined : `${hint.position} ${hint.text}`;
     const [openHint, setOpenHint] = useState<string | undefined>(undefined);
     const hintOpen = hintKey !== undefined && openHint === hintKey;
     const openTheHint = (open: boolean): void => setOpenHint(open ? hintKey : undefined);
-    // The player may look back through the moves played (T-88): `viewing` how many are shown, undefined for the game as it is; a new move brings it back.
+    // The player may look back through the moves played: `viewing` how many are shown, undefined for the game as it is; a new move brings it back.
     const [viewing, setViewing] = useState<number | undefined>(undefined);
-    // The squares the player points at in the AI's words or the helps' card, lit on the board (T-111); the control map while it is held (D-78).
+    // The squares the player points at in the AI's words or the helps' card, lit on the board; the control map while it is held (D-78).
     const [pointed, setPointed] = useState<readonly string[]>(noSquares);
     const pointSquare = useMemo(() => (square: string | undefined) => setPointed(square === undefined ? noSquares : [square]), []);
     const [mapping, setMapping] = useState(false);
-    // The board without its drawings while their button is held (Stefano, T-138).
+    // The board without its drawings while their button is held (Stefano).
     const [bare, setBare] = useState(false);
     const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
     const next = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove, [live, viewing]);
     const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
-    // A square lit from the AI's words goes off with the position: a touch keeps it lit until then, a mouse until it leaves the word (T-111).
+    // A square lit from the AI's words goes off with the position: a touch keeps it lit until then, a mouse until it leaves the word.
     useEffect(() => setPointed(noSquares), [shown]);
     // With the helps on, the player sees all of Chesspal's facts, whatever the AI's level (D-79), in a game and in the analysis of one (Stefano).
     const analysing = studied !== undefined;
@@ -176,7 +176,7 @@ export function App({ start }: { start: Settings; })
     const standings = useMemo(() => (going && settings.helps) || analysing ? standingsOf(plies, drawnOnBoard) : undefined, [plies, drawnOnBoard, going, analysing, settings.helps]);
     useMapKey(helps !== undefined, setMapping);
     // A new move or a new game ends what the player was doing on the one before: the move sent, the look back, the choice of a promotion. The same game
-    // sent again, for the talk, the coach's words or the settings, leaves them where they are (Zoe, T-141); so does a review written on the game in analysis.
+    // sent again, for the talk, the coach's words or the settings, leaves them where they are (Zoe); so does a review written on the game in analysis.
     const gameKey = studied !== undefined ? studied.name : game === undefined || game === null ? game : `${game.started} ${game.pgn}`;
     useEffect(() => {
         setPending(undefined);
@@ -197,7 +197,7 @@ export function App({ start }: { start: Settings; })
             document.getElementById(`fold-${column}`)?.focus();
         }
 
-        // The hint folds away with the game's column, so that its drawings never stay on the board without its words (Zoe, playtest of T-112).
+        // The hint folds away with the game's column, so that its drawings never stay on the board without its words (Zoe).
         if (column === "game" && next !== "open") {
             setOpenHint(undefined);
         }
@@ -226,8 +226,8 @@ export function App({ start }: { start: Settings; })
     const step = (to: Step): void => goTo(stepped(to, at, total));
     useBrowseKeys(step, () => setFlipped(!flipped));
     const wheel = useWheelSteps(step);
-    // The move shown stays in the page's address, for a reload and a link to it (T-155); after the reset on a new game, which would undo the move it goes to. A
-    // game a link opens is there to look at: the analyst starts on the player's yes alone (D-89; Zoe and Federico, review of T-155).
+    // The move shown stays in the page's address, for a reload and a link to it; after the reset on a new game, which would undo the move it goes to. A
+    // game a link opens is there to look at: the analyst starts on the player's yes alone (D-89; Zoe and Federico).
     const playedName = game === undefined || game === null ? undefined : anchorName(game.name);
     useAnchor(
         { ready: served !== undefined, shown: studied !== undefined ? anchorName(studied.name) : idle ? undefined : playedName, played: playedName, going },
@@ -440,7 +440,7 @@ export function App({ start }: { start: Settings; })
         });
     };
 
-    // The new game starts from the choices of the game before; the first, from the level that suits the player (T-58).
+    // The new game starts from the choices of the game before; the first, from the level that suits the player.
     const level = suggestedLevel(played === null ? undefined : replayed.record, profile.level);
     const lastControl = game?.clock?.control;
     const lastClock = lastControl === undefined ? undefined : timeControlText(lastControl);
@@ -470,7 +470,7 @@ export function App({ start }: { start: Settings; })
             />
         );
 
-    // A game brought to analyse (T-92): the page shows it once the server has it in analysis; a refusal stays in the dialog.
+    // A game brought to analyse: the page shows it once the server has it in analysis; a refusal stays in the dialog.
     const studyGame = async (studied: Studied): Promise<string | undefined> => {
         const refused = await post("/api/study", studied, text, name);
 
@@ -659,13 +659,13 @@ export function App({ start }: { start: Settings; })
                             )
                             : null}
                     </div>
-                    {/* On a phone the steps of a game in analysis sit under the board, by the thumb (Zoe, T-40) */}
+                    {/* On a phone the steps of a game in analysis sit under the board, by the thumb (Zoe) */}
                     {studied === undefined ? null : (
                         <div class="board-steps">
                             <Steps shown={at} total={total} onStep={step} text={text} />
                         </div>
                     )}
-                    {/* On a phone the helps' map sits under the board too, turned on and off by a touch (D-78), and the coach's hint beside it, its drawings in sight (Zoe, playtest of T-112) */}
+                    {/* On a phone the helps' map sits under the board too, turned on and off by a touch (D-78), and the coach's hint beside it, its drawings in sight (Zoe) */}
                     {helps === undefined ? null : (
                         <div class="board-map">
                             <BareButton bare={bare} onBare={setBare} text={text} />
@@ -721,7 +721,7 @@ function pictureOf({ who }: StudiedSide, profile: ProfileShown, size: number, mo
 
 /**
  * Plays the sound of each move the game gains while the page watches it, the AI's and the player's, of its end without a move and of a draw offered:
- * none for a game loaded or begun again (T-71, T-100).
+ * none for a game loaded or begun again.
  */
 function useGameSounds(game: PageData["game"] | undefined, live: Game, on: boolean): void
 {
@@ -798,7 +798,7 @@ function isCommand(words: string): boolean
     return /^\s*\/[a-z]/i.test(words);
 }
 
-/** Saves a PGN file in the player's downloads: a game in analysis with its review, which the board page loads back ready (T-106), or the moves alone (T-59). */
+/** Saves a PGN file in the player's downloads: a game in analysis with its review, which the board page loads back ready, or the moves alone. */
 function download(pgn: string, name: string): void
 {
     const link = document.createElement("a");
@@ -822,7 +822,7 @@ function withMove(game: Game, move: string): Game
     return copy.play(move).played ? copy : game;
 }
 
-/** Whether a pawn's move takes it to the last rank, where the player chooses what it becomes (T-11). */
+/** Whether a pawn's move takes it to the last rank, where the player chooses what it becomes. */
 function promotes(piece: string | undefined, to: string): boolean
 {
     return (piece === "P" && to.endsWith("8")) || (piece === "p" && to.endsWith("1"));

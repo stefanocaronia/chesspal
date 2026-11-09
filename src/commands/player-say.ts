@@ -4,7 +4,7 @@ import { gameFolder } from "../profiles/index.ts";
 import { defineCommand } from "./registry.ts";
 import { say } from "./say.ts";
 
-/** The player's words to the AI, as the board page sends them (T-65): on the command line only, since the AI never writes for the player. */
+/** The player's words to the AI, as the board page sends them: on the command line only, since the AI never writes for the player. */
 export const playerSay = defineCommand({
     name: "player_say",
     description: "Writes the player's words to the AI, as the board page does: the AI reads them at its next call. "
