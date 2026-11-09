@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/commands/context.ts";
-import { aiModelIn, readPgn } from "../src/core/index.ts";
+import { aiHostIn, aiModelIn, aiNameOf, readPgn } from "../src/core/index.ts";
 import { aiModelOf, saveChatStart } from "../src/games/index.ts";
 import { gameFolder, profileFolder } from "../src/profiles/index.ts";
 import { createMcpServer, opponentOf, serverInstructions } from "../src/server/mcp.ts";
@@ -85,7 +85,7 @@ describe("the MCP server", () => {
         rmSync(context.folder, { recursive: true, force: true });
     });
 
-    it("notes the AI's model after its move has gone back, keeps the last one known, and writes it into the game's PGN at the end (D-82)", async () => {
+    it("notes the AI's model and host after its move has gone back, keeps the last one known, and writes them into the game's PGN at the end (D-82, D-97)", async () => {
         const context = testContext(mkdtempSync(join(tmpdir(), "chesspal-")));
         const heard = vi.fn();
         context.heard = heard;
@@ -119,6 +119,8 @@ describe("the MCP server", () => {
         expect(pgn).toContain('[AIModel "gpt-6-luna"]\n[AIEffort "low"]');
         // The page's analysis reads it back, for the AI's card.
         expect(aiModelIn(readPgn(pgn)[0]!)).toEqual({ model: "gpt-6-luna", effort: "low" });
+        // The host it played in, which names the AI in analysis whatever chat opens it later.
+        expect(aiHostIn(readPgn(pgn)[0]!)).toBe("test");
         rmSync(context.folder, { recursive: true, force: true });
     });
 
@@ -150,6 +152,14 @@ describe("the MCP server", () => {
         expect(opponentOf("codex-mcp-client")).toBe("Codex");
         expect(opponentOf("gemini-cli-mcp-client")).toBeUndefined();
         expect(opponentOf(undefined)).toBeUndefined();
+    });
+
+    it("names the AI of a game by its host, and of an older game without one by a Claude model (D-97)", () => {
+        expect(aiNameOf("Claude Code", "gpt-6-luna")).toBe("Claude");
+        expect(aiNameOf("codex-mcp-client")).toBe("Codex");
+        expect(aiNameOf(undefined, "claude-opus-5-5")).toBe("Claude");
+        expect(aiNameOf(undefined, "gpt-6-luna")).toBeUndefined();
+        expect(aiNameOf("gemini-cli-mcp-client", "gemini-3-pro")).toBeUndefined();
     });
 
     it("states every hint, since a missing one reads as the worst case", async () => {

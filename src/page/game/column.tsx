@@ -176,21 +176,27 @@ function GameCard({ plies, result, how, lit, started, move, toMove, bar, text }:
  */
 function OpeningCard({ opening, text }: { opening: Opening; text: Text; })
 {
-    const [folded, toggleFold] = useCardFold("opening");
+    const [foldedHere, toggleFold] = useCardFold("opening");
     const book = opening.inBook ? text.inBook : `${text.outOfBook} ${outOfBookMove(opening)}`;
+    // The family alone has nothing under it to fold: no button, no chevron (Stefano).
+    const foldable = opening.variation !== undefined || !opening.inBook;
+    const folded = foldable && foldedHere;
+    const title = (
+        <>
+            <span class={`book${opening.inBook ? "" : " out"}`} title={book} role="img" aria-label={book}>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 6.5C10 5 7 4.5 4 5V18C7 17.5 10 18 12 19.5C14 18 17 17.5 20 18V5C17 4.5 14 5 12 6.5ZM12 6.5V19.5" />
+                    {opening.inBook ? null : <path d="M3.5 3.5L20.5 20.5" />}
+                </svg>
+            </span>
+            <b>{opening.family}</b>
+        </>
+    );
 
     return (
         <section class={`card opening${folded ? " folded" : ""}`} aria-label={text.opening}>
             <h3 class="family">
-                <FoldButton folded={folded} onFold={toggleFold} text={text}>
-                    <span class={`book${opening.inBook ? "" : " out"}`} title={book} role="img" aria-label={book}>
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 6.5C10 5 7 4.5 4 5V18C7 17.5 10 18 12 19.5C14 18 17 17.5 20 18V5C17 4.5 14 5 12 6.5ZM12 6.5V19.5" />
-                            {opening.inBook ? null : <path d="M3.5 3.5L20.5 20.5" />}
-                        </svg>
-                    </span>
-                    <b>{opening.family}</b>
-                </FoldButton>
+                {foldable ? <FoldButton folded={folded} onFold={toggleFold} text={text}>{title}</FoldButton> : title}
             </h3>
             {folded || opening.variation === undefined ? null : <p class="variation">{opening.variation}</p>}
             {folded || opening.inBook ? null : <p class="out">{text.outOfBook} {outOfBookMove(opening)}</p>}

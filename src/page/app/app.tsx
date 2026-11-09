@@ -3,7 +3,9 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
+    aiHostIn,
     aiModelIn,
+    aiNameOf,
     annotatorOf,
     closingOf,
     Game,
@@ -134,6 +136,10 @@ export function App({ start }: { start: Settings; })
     const idle = phase === "idle";
     const tableSet = useMemo(() => new Game(), []);
     const live = idle ? tableSet : replayed;
+    // In analysis the AI is who played that game, as its PGN says, and the review's words are of who wrote them: never the chat open now (D-97).
+    const annotator = studied === undefined ? undefined : annotatorOf(live.record);
+    const playedAs = studied === undefined ? name : aiNameOf(aiHostIn(live.record), aiModelIn(live.record)?.model) ?? text.ai;
+    const analyst = annotator === undefined ? name : aiNameOf(annotator.annotator, annotator.annotator) ?? text.ai;
     const material = useMemo(() => materialOf(live.position.fen), [live]);
     const pieces = useMemo(() => piecesOf(live.position.fen), [live]);
     // While the game goes on, the book's first moves carry its badge, when the player wants it, as the AI's review gives it after (D-69).
@@ -172,7 +178,7 @@ export function App({ start }: { start: Settings; })
     // With the helps on, the player sees all of Chesspal's facts, whatever the AI's level (D-79), in a game and in the analysis of one (Stefano).
     const analysing = studied !== undefined;
     // Seen from the player's side (D-91): theirs in a game, in analysis the side the game names theirs, none when it names neither.
-    const you = analysing ? playerIn(studiedSides(live.record.tags, served?.profile.name ?? "", name, text.sides, served?.profile.accounts)) : game?.ai === undefined ? undefined : game.ai === "white" ? "black" : "white";
+    const you = analysing ? playerIn(studiedSides(live.record.tags, served?.profile.name ?? "", playedAs, text.sides, served?.profile.accounts)) : game?.ai === undefined ? undefined : game.ai === "white" ? "black" : "white";
     const helps = useMemo(() => (going || analysing) && settings.helps ? helpsOf(shown, you) : undefined, [shown, going, analysing, settings.helps, you]);
     // Who the AI saw ahead, the coach's with the helps on in a game and the analyst's in analysis, for the bar and the chart (D-90).
     const drawnOnBoard = live.outcome.over && live.outcome.result === "1/2-1/2";
@@ -314,7 +320,7 @@ export function App({ start }: { start: Settings; })
     const profile = served.profile;
     const picture = <PlayerPicture profile={profile} />;
     // In analysis the cards name the players of the game, the player's side at the bottom when they played it (D-69).
-    const sides = studied === undefined ? undefined : studiedSides(live.record.tags, profile.name, name, text.sides, profile.accounts);
+    const sides = studied === undefined ? undefined : studiedSides(live.record.tags, profile.name, playedAs, text.sides, profile.accounts);
 
     const player = sides?.bottom ?? (game === null || game.ai === "black" ? "white" : "black");
     const ai = player === "white" ? "black" : "white";
@@ -330,7 +336,6 @@ export function App({ start }: { start: Settings; })
     const drawn = hintOpen && hint !== undefined && viewing === undefined && (hint.arrows !== undefined || hint.squares !== undefined) ? hint : review;
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
     const closing = studied === undefined ? undefined : closingOf(live.record);
-    const annotator = studied === undefined ? undefined : annotatorOf(live.record);
     // In analysis the AI's card says who played that game, as its PGN keeps it (D-82), not who plays now.
     const playedBy = studied === undefined ? undefined : aiModelIn(live.record);
     const talk = game?.talk ?? served.talk ?? [];
@@ -564,7 +569,7 @@ export function App({ start }: { start: Settings; })
                                             {...(at === total && closing !== undefined ? { closing } : {})}
                                             {...(at === 0 && summary !== undefined ? { summary } : {})}
                                             {...(summary === undefined ? { reviewing: true } : {})}
-                                            name={name}
+                                            name={analyst}
                                             by={annotator}
                                             mood={mood}
                                             {...(settings.voice ? { voice: text.language } : {})}
@@ -719,7 +724,7 @@ export function App({ start }: { start: Settings; })
                             />
                         )}
                         {...(standings === undefined ? {} : { standings })}
-                        {...(studied === undefined ? {} : { analysis: summary === undefined ? { by: name } : { by: name, summary } })}
+                        {...(studied === undefined ? {} : { analysis: summary === undefined ? { by: analyst } : { by: analyst, summary } })}
                         shownPlies={at}
                         onShow={goTo}
                         onStep={step}

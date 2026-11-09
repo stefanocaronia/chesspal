@@ -4,7 +4,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, inputProblems, isBoolean, PositionChanged } from "../commands/index.ts";
-import { endOf, loadGame, noteAiModel } from "../games/index.ts";
+import { aiNameOf } from "../core/index.ts";
+import { endOf, loadGame, noteAiHost, noteAiModel } from "../games/index.ts";
 import { hasAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
@@ -23,6 +24,8 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
     // The server keeps what it told the chat, the instructions a tool gives once, and the position it showed: none yet (D-71).
     context.told ??= new Set();
     context.positionSeen ??= null;
+    // The host the chat runs in, as it introduced itself: it names the AI on the page and in the game's PGN (D-97).
+    context.host ??= () => server.server.getClientVersion()?.name;
 
     const forOneHost: { host: string; tool: { enable(): void; }; }[] = [];
 
@@ -79,15 +82,14 @@ export async function startMcpServer(context: Context = defaultContext(), list: 
     process.stdin.on("end", leave);
     process.stdin.on("close", leave);
     const server = createMcpServer(context, list);
-    context.host = () => server.server.getClientVersion()?.name;
     context.page = await pageOf(context, () => opponentOf(context.host?.()));
     await server.connect(new StdioServerTransport());
 }
 
-/** The opponent's name for the page, from the host's: Claude Code and the desktop app are Claude, Codex is Codex; another host is unnamed. */
+/** The opponent's name for the page, from the host's (D-97): another host than Claude's and Codex is unnamed. */
 export function opponentOf(host: string | undefined): string | undefined
 {
-    return /claude/i.test(host ?? "") ? "Claude" : /codex/i.test(host ?? "") ? "Codex" : undefined;
+    return aiNameOf(host);
 }
 
 /** The board page of the player's folder, served by this process for as long as the chat lasts (D-47); without it the game goes on in the chat. */
@@ -115,8 +117,8 @@ async function pageOf(context: Context, opponent: () => string | undefined): Pro
 }
 
 /**
- * Who played the AI's move, read once the move has gone back to the chat, and kept in memory (D-82): the AI's card on the page shows it, and the game's
- * PGN once it ends; a change shows from the next move. A host that ties no model to the call leaves the last one known.
+ * Who played the AI's move, its host and model, read once the move has gone back to the chat, and kept in memory (D-82, D-97): the AI's card on the
+ * page shows it, and the game's PGN once it ends; a change shows from the next move. A host that ties no model to the call leaves the last one known.
  */
 function noteTheAi(context: Context, caller: () => Promise<Caller | undefined>): void
 {
@@ -124,6 +126,12 @@ function noteTheAi(context: Context, caller: () => Promise<Caller | undefined>):
     setImmediate(() => {
         // Nothing that fails here may stop the server: the move is played and answered.
         caller().then((found) => {
+            const host = context.host?.();
+
+            if (host !== undefined && host.trim() !== "") {
+                noteAiHost(gameFolder(context.home()), host);
+            }
+
             if (found === undefined || found.hostOnly === true) {
                 return;
             }

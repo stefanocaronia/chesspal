@@ -160,6 +160,37 @@ export function aiModelIn(record: GameRecord): AiModel | undefined
     return signerOf(record.tags, ["AIModel", "AIEffort"]);
 }
 
+/** The record with the host the AI played it in (D-97); with none known, as it is. */
+export function withAiHost(record: GameRecord, host: string | undefined): GameRecord
+{
+    const named = host?.trim();
+    return named === undefined || named === "" ? record : { ...record, tags: { ...record.tags, AIHost: named } };
+}
+
+/** The host the AI played the game in, as its tags say (D-97); undefined without one. */
+export function aiHostIn(record: GameRecord): string | undefined
+{
+    const host = record.tags.AIHost?.trim();
+    return host === undefined || host === "" ? undefined : host;
+}
+
+/**
+ * The AI's name from its host: Claude Code and the desktop app are Claude, Codex is Codex; without a host it names, from the model, a Claude model is
+ * Claude (D-97). Undefined otherwise.
+ */
+export function aiNameOf(host: string | undefined, model?: string): string | undefined
+{
+    if (/claude/i.test(host ?? "")) {
+        return "Claude";
+    }
+
+    if (/codex/i.test(host ?? "")) {
+        return "Codex";
+    }
+
+    return /^claude/i.test(model?.trim() ?? "") ? "Claude" : undefined;
+}
+
 /** The record with the AI's word on the whole game, or its last word on the ending, in place of the one it had: each only when given. */
 export function withGameReview(record: GameRecord, { summary, closing }: { summary?: string; closing?: string; }): GameRecord
 {

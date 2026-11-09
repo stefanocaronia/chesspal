@@ -1,8 +1,8 @@
 // The finished games, as PGN in games/ (D-9, D-41), with the AI's plans for the analyst (D-21); and the games played elsewhere, kept to study in study/ (D-68).
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { type GameRecord, movesOnly, pgnDate, readPgn, withAiModel, writePgn } from "../core/index.ts";
-import { aiModelOf } from "./ai-model.ts";
+import { type GameRecord, movesOnly, pgnDate, readPgn, withAiHost, withAiModel, writePgn } from "../core/index.ts";
+import { aiHostOf, aiModelOf } from "./ai-model.ts";
 import { coachWords, withCoach } from "./coach.ts";
 import { type CurrentGame, endOf, loadGame } from "./current-game.ts";
 import { makeFolder, writeAtomically } from "./files.ts";
@@ -42,7 +42,7 @@ export function startOfNewGame(folder: string, now: Date, before?: CurrentGame):
 }
 
 /**
- * Writes the game to the archive, with the plans, how it ended and the AI's model last noted (D-82), and gives its name; the same game again rewrites the
+ * Writes the game to the archive, with the plans, how it ended and the AI's model and host last noted (D-82, D-97), and gives its name; the same game again rewrites the
  * same file.
  */
 export function archiveGame(folder: string, current: CurrentGame): string
@@ -52,7 +52,7 @@ export function archiveGame(folder: string, current: CurrentGame): string
 
     try {
         makeFolder(dirname(path));
-        writeAtomically(path, writePgn(withAiModel(endedRecord(folder, current), aiModelOf(folder))));
+        writeAtomically(path, writePgn(withAiHost(withAiModel(endedRecord(folder, current), aiModelOf(folder)), aiHostOf(folder))));
     } catch (error) {
         throw new Error(`Chesspal could not archive the game: ${(error as Error).message}`, { cause: error });
     }

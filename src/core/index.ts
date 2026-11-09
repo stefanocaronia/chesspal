@@ -19,8 +19,10 @@ export type { BishopFacts, CentreSquare, KingFacts, Outpost, PawnFacts, PawnSqua
 export { movesOnly } from "./record.ts";
 export type { Annotation, GameRecord, RecordedMove } from "./record.ts";
 export {
+    aiHostIn,
     type AiModel,
     aiModelIn,
+    aiNameOf,
     annotatorOf,
     arrowOf,
     type Badge,
@@ -38,6 +40,7 @@ export {
     reviewOf,
     squareOf,
     unreviewed,
+    withAiHost,
     withAiModel,
     withAnnotator,
     withGameReview,

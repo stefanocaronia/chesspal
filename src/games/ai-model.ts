@@ -1,4 +1,4 @@
-// Who plays as the AI (D-82): the model and effort the host tied to its last move, kept in this process's memory and never in a file, since only the
+// Who plays as the AI (D-82, D-97): the host, and the model and effort it tied to its last move, kept in this process's memory and never in a file, since only the
 // MCP server reads them; the command line knows none.
 import type { AiModel } from "../core/index.ts";
 
@@ -21,5 +21,18 @@ export function aiModelOf(folder: string): AiModel | undefined
     return models.get(folder);
 }
 
+/** Notes the host the AI plays in for the games of a folder, after its move (D-97), as the model. */
+export function noteAiHost(folder: string, host: string): void
+{
+    hosts.set(folder, host);
+}
+
+/** The host the AI played its last move in, for the games of a folder in this process; none on the command line, or before the AI's first move. */
+export function aiHostOf(folder: string): string | undefined
+{
+    return hosts.get(folder);
+}
+
 // By the game's folder, the profile's, where the games are archived.
 const models = new Map<string, AiModel>();
+const hosts = new Map<string, string>();
