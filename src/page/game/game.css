@@ -352,6 +352,18 @@
     padding: 2px 4px 0;
 }
 
+/* The title, and on its right the legend of the marks when no helps' card holds it (D-99) */
+.moves-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.moves-head .hold-button {
+    padding: 3px 6px;
+}
+
 /* Positioned, so that the moves' hidden names scroll with the list instead of stretching the page */
 .moves {
     position: relative;

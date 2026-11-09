@@ -6,9 +6,10 @@ import type { DrawColour, PieceLetter, Promotion, Side } from "../../core/index.
 import type { HelpsView, Tone } from "../helps/view.ts";
 import { Piece } from "../pieces/pieces.tsx";
 import type { Text } from "../text.ts";
-import type { BoardEnd, Notice } from "./board.tsx";
+import type { Notice } from "./board.tsx";
 import type { BubblePlace, ExplainKind } from "./explain.ts";
 import type { Drag } from "./pointer.ts";
+import type { BadgeKind } from "./signs.ts";
 
 /** The corner folded on a piece at risk, red on the player's and green on the other side's, in ink when no side is theirs (D-91); before its line in the card. */
 export function Notch({ tone }: { tone?: Tone; })
@@ -25,8 +26,11 @@ export function Notch({ tone }: { tone?: Tone; })
     );
 }
 
-/** The pushpin stuck in a pinned piece from the top left corner, its needle toward the piece, in the tone of its corner at risk (D-91); in ink in no side's. */
-export function Pushpin({ tone }: { tone: Tone; })
+/**
+ * The pushpin stuck in a pinned piece from the top left corner, its needle toward the piece, in the tone of its corner at risk (D-91); in ink in no side's;
+ * in the card's line, in its colour.
+ */
+export function Pushpin({ tone }: { tone?: Tone; })
 {
     return <Stuck kind="help-pin" shape={pushpin} tone={tone} />;
 }
@@ -236,54 +240,12 @@ export function Lifted({ drag, letter }: { drag: Drag; letter: string; })
     );
 }
 
-/** The kings' signs at the end, by their squares: the loser's king lies down when mated or resigning; both kings of a draw stand, the stalemated one stuck. */
-export function kingSigns(pieces: ReadonlyMap<string, string>, toMove: Side, end: BoardEnd): ReadonlyMap<string, KingSign>
-{
-    const kingOf = (side: Side): string | undefined => [...pieces].find(([, letter]) => letter === (side === "white" ? "K" : "k"))?.[0];
-    const signs = new Map<string, KingSign>();
-
-    const sign = (side: Side, badge: BadgeKind, classes: string): void => {
-        const square = kingOf(side);
-
-        if (square !== undefined) {
-            signs.set(square, { badge, classes });
-        }
-    };
-
-    if (end.winner === undefined) {
-        sign("white", "half", end.how === "stalemate" && toMove === "white" ? "drawn stalled" : "drawn");
-        sign("black", "half", end.how === "stalemate" && toMove === "black" ? "drawn stalled" : "drawn");
-        return signs;
-    }
-
-    const loser = end.winner === "white" ? "black" : "white";
-    sign(end.winner, "crown", "winner");
-
-    if (end.how === "checkmate" || end.how === "resignation") {
-        sign(loser, end.how === "checkmate" ? "mate" : "flag", "fallen");
-    }
-
-    return signs;
-}
-
-export const noSigns: ReadonlyMap<string, KingSign> = new Map();
-
 /** An arrow drawn with the right button, from one square to another; in a colour of its own when the AI drew it (D-69). */
 export interface Arrow
 {
     readonly from: string;
     readonly to: string;
     readonly colour?: DrawColour;
-}
-
-/** A king's badge at the end: the winner's crown, the mate or the flag of the loser, half a point each in a draw. */
-export type BadgeKind = "crown" | "mate" | "flag" | "half";
-
-/** What a king's square shows at the end: its badge, and how its king takes the end, laid down, standing in a draw, or stalemated. */
-export interface KingSign
-{
-    readonly badge: BadgeKind;
-    readonly classes: string;
 }
 
 /** An arrow as drawn: its shaft's path and its point's corners. */

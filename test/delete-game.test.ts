@@ -59,6 +59,8 @@ describe("a review taken off a record (D-92)", () => {
 1. e4 {[%clk 0:04:30]} e5 *`);
 
         expect(unreviewed(record!).tags).toMatchObject({ Annotator: "https://lichess.org/@/LesFrondes" });
+        // Nor is that Annotator who reviews it: the page names the AI analysing it, not Lichess.
+        expect(annotatorOf(record!)).toBeUndefined();
     });
 });
 

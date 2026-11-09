@@ -3,7 +3,7 @@
 import { type ComponentChildren, Fragment } from "preact";
 import { useState } from "preact/hooks";
 import type { PieceFacts, Profile, Side } from "../../core/index.ts";
-import { Notch, Skewer } from "../board/marks.tsx";
+import { Notch, Pushpin, Skewer } from "../board/marks.tsx";
 import { BadgeIcon, NoteIcon } from "../game/badges.tsx";
 import { FoldButton, useCardFold } from "../game/card-fold.tsx";
 import { Figurines } from "../game/move-list.tsx";
@@ -18,7 +18,7 @@ import { groupOf, type HelpsView, pinSquares, riskSquares, squaresOf, type Strat
  * its button or M is held, and the board without its drawings while their button is. A line under the pointer lights its squares on the board. Its title
  * folds it to the title and opens it again (Stefano).
  */
-export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMap, mapping, onBare, bare, text }: {
+export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMap, mapping, onBare, bare, legend, text }: {
     helps: HelpsView;
     /** The player's moves as the coach judged them: the last the AI has answered, and one a held note let go only now (D-88). */
     judged: readonly Ply[];
@@ -31,6 +31,8 @@ export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMa
     mapping: boolean;
     onBare: (held: boolean) => void;
     bare: boolean;
+    /** The legend of the marks on the board, after the map's buttons (D-99). */
+    legend: ComponentChildren;
     text: Text;
 })
 {
@@ -62,6 +64,7 @@ export function HelpsCard({ helps, judged, hint, hintOpen, onHint, onPoint, onMa
                 <span class="helps-tools">
                     <MapButton mapping={mapping} onMap={onMap} text={text} />
                     <BareButton bare={bare} onBare={onBare} text={text} />
+                    {legend}
                 </span>
             </div>
             {folded ? null : (
@@ -254,33 +257,26 @@ interface Pointing
     onPointerLeave: (event: PointerEvent) => void;
 }
 
-/** A line's sign: the corner of a piece at risk, a pin's link, the skewer of the board, a check's plus, the loose pieces' i; its colour is the line's. */
+/** A line's sign, as the board draws it: the corner of a piece at risk, the pushpin, the skewer; a check's plus, the loose pieces' i; its colour is the line's. */
 function LineIcon({ kind }: { kind: TacticLine["kind"]; })
 {
-    if (kind === "risk") {
-        return <Notch />;
+    switch (kind) {
+        case "risk":
+            return <Notch />;
+        case "pin":
+            return <Pushpin />;
+        case "skewer":
+            return <Skewer />;
+        case "loose":
+            return <InfoIcon />;
+        case "check":
+            return (
+                <RowIcon>
+                    <circle cx="8" cy="8" r="6.5" />
+                    <path d="M8 5v6M5 8h6" />
+                </RowIcon>
+            );
     }
-
-    if (kind === "skewer") {
-        return <Skewer />;
-    }
-
-    if (kind === "loose") {
-        return <InfoIcon />;
-    }
-
-    return (
-        <RowIcon>
-            {kind === "pin"
-                ? <path d="M6.5 9.5l3-3M7.5 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M8.5 11.5l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1" />
-                : (
-                    <>
-                        <circle cx="8" cy="8" r="6.5" />
-                        <path d="M8 5v6M5 8h6" />
-                    </>
-                )}
-        </RowIcon>
-    );
 }
 
 /** How many: the loose pieces by side, each after its pawn, the player's first (Zoe); the others in one number. */

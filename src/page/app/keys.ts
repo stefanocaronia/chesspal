@@ -1,5 +1,5 @@
-// The page's keys and wheel: [ and ] fold the side columns, M holds the helps' map (D-78), the arrows, Home and End step through the moves and f
-// and x turn the board, and the wheel over the board steps too.
+// The page's keys and wheel: [ and ] fold the side columns, M holds the helps' map (D-78), ? opens the legend (D-99), the arrows, Home and End step
+// through the moves and f and x turn the board, and the wheel over the board steps too.
 import { useEffect, useRef } from "preact/hooks";
 import { flipKeys, type Step, stepKeys } from "../game/browse.ts";
 import { type Column, foldKeys, gameUnderBoard, oneColumn } from "../layout/folds.ts";
@@ -63,6 +63,24 @@ export function useMapKey(helping: boolean, map: (held: boolean) => void): void
             window.removeEventListener("blur", away);
         };
     }, [helping]);
+}
+
+/** ? opens the legend of the marks on the board and closes it, while the page shows its ? (D-99). */
+export function useLegendKey(toggle: () => void): void
+{
+    useEffect(() => {
+        const press = (event: KeyboardEvent): void => {
+            const shown = [...document.querySelectorAll(".legend-button")].some((button) => button.getClientRects().length > 0);
+
+            if (shown && forThePage(event) && event.key === "?") {
+                event.preventDefault();
+                toggle();
+            }
+        };
+
+        window.addEventListener("keydown", press);
+        return () => window.removeEventListener("keydown", press);
+    });
 }
 
 /** The keys of Lichess and chess.com: the arrows, Home and End step through the moves, f and x turn the board round. */

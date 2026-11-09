@@ -8,9 +8,10 @@ import { type HelpsView, pinOn, riskOn, skewerOn } from "../helps/view.ts";
 import { Piece } from "../pieces/pieces.tsx";
 import type { Text } from "../text.ts";
 import { bubblePlace, type Explanation, keptSquares } from "./explain.ts";
-import { Arrows, Badge, Bubble, ControlCount, controlOf, kingSigns, Lifted, noSigns, Notch, PinsAndSkewers, PromotionChoice, Pushpin, Skewer } from "./marks.tsx";
+import { Arrows, Badge, Bubble, ControlCount, controlOf, Lifted, Notch, PinsAndSkewers, PromotionChoice, Pushpin, Skewer } from "./marks.tsx";
 import { backOf, motionOf, noMotion, playedOn, rearranged } from "./motion.ts";
 import { useBoardPointer } from "./pointer.ts";
+import { kingSigns, noSigns } from "./signs.ts";
 import { files, kingToMove, piecesOf } from "./squares.ts";
 
 /**

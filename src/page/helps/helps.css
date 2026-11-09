@@ -456,13 +456,15 @@
     fill: var(--card);
 }
 
-/* The skewer of the board, in the line's colour and without its halo */
+/* The pushpin and the skewer of the board, in the line's colour and without their halo */
+.help-rows .help-pin,
 .help-rows .help-skewer {
     left: 7px;
     top: 4px;
     height: 17px;
 }
 
+.help-rows .help-pin path,
 .help-rows .help-skewer path {
     fill: var(--row);
     stroke: none;

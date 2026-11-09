@@ -1,0 +1,203 @@
+/* The legend of the marks on the board (D-99): a ? beside the map's button, and under it the marks the board shows now, each as the board draws it */
+.marks-legend {
+    position: relative;
+    display: flex;
+}
+
+/* The ? in a ring, drawn in lines as the eye shut; lit while the legend is open */
+.legend-button svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.legend-button[aria-expanded="true"] {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+}
+
+/* Over the cards under it, the board in sight beside it; placed under its button by the page, since the cards clip what overflows them */
+.legend-panel {
+    position: fixed;
+    z-index: 20;
+    width: 300px;
+    max-width: calc(100vw - 32px);
+    overflow-y: auto;
+    padding: 10px 10px 8px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+    box-shadow: 0 8px 28px rgba(16, 28, 44, 0.22);
+    color: var(--ink);
+    font-size: 13.5px;
+    font-weight: normal;
+    text-align: left;
+}
+
+.legend-title {
+    margin: 0 0 6px 6px;
+    color: var(--soft);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.legend-none {
+    margin: 0 6px 4px;
+    color: var(--soft);
+}
+
+.legend-panel ul {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.legend-panel li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 30px;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
+.legend-panel li:hover {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* The marks in a column of their own, so that the names line up */
+.legend-mark {
+    flex: none;
+    display: flex;
+    justify-content: center;
+    width: 48px;
+}
+
+/* Names start with a capital, whoever's words they are */
+.legend-name::first-letter {
+    text-transform: uppercase;
+}
+
+.legend-name small {
+    margin-left: 6px;
+    color: var(--soft);
+    font-size: 12px;
+}
+
+/* A square of the board's dark colour, or two, under the marks the board draws on its squares */
+.legend-tile {
+    position: relative;
+    display: block;
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    background: var(--dark-square);
+}
+
+.legend-tile.wide {
+    width: 48px;
+}
+
+/* A square rung as the AI rings one: the arrival square when an arrow goes with it */
+.legend-ring {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 3px var(--ring), inset 0 0 0 4.5px rgba(255, 255, 255, 0.8);
+}
+
+.legend-ring.green {
+    --ring: var(--drawn-green);
+}
+
+.legend-ring.red {
+    --ring: var(--drawn-red);
+}
+
+.legend-ring.yellow {
+    --ring: var(--drawn-yellow);
+}
+
+.legend-ring.blue {
+    --ring: var(--drawn-blue);
+}
+
+/* The board's own marks, sized for a square of 24 pixels */
+.legend-tile .helps-layer,
+.legend-tile .arrows {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+}
+
+.legend-tile .help-notch {
+    width: 14px;
+    height: 14px;
+}
+
+.legend-tile .help-pin,
+.legend-tile .help-skewer {
+    height: 17px;
+}
+
+.legend-mark .move-badge {
+    width: 20px;
+    height: 20px;
+}
+
+.legend-mark .badge {
+    position: static;
+    width: 20px;
+    height: 20px;
+    font-size: 13px;
+    box-shadow: 0 0 0 1.5px #fff, 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.legend-mark .control-count {
+    position: static;
+    translate: none;
+    font-size: 12px;
+}
+
+/* On a phone the ? is the last on the right under the board, and the legend opens below the board's row, as wide as it, never over the board */
+.board-map .marks-legend {
+    position: static;
+    float: right;
+    margin-left: 8px;
+}
+
+.board-map .marks-legend .hold-button {
+    float: none;
+    margin-left: 0;
+}
+
+.legend-panel.under {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    width: auto;
+    max-width: none;
+}
+
+@media (max-width: 840px) {
+    .board-map {
+        position: relative;
+    }
+
+    .helps-card .marks-legend {
+        display: none;
+    }
+}

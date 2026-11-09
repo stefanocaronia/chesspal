@@ -27,8 +27,9 @@ import {
 import { PlayerPicture } from "../avatars/avatars.tsx";
 import { Thinker, Thought } from "../avatars/thought.tsx";
 import { Torretta } from "../avatars/torretta.tsx";
-import { Board, type Notice } from "../board/board.tsx";
+import { Board, type BoardEnd, type Notice } from "../board/board.tsx";
 import { explain } from "../board/explain.ts";
+import { kingSigns } from "../board/signs.ts";
 import { piecesOf } from "../board/squares.ts";
 import { type NewGameChoice, NewGameDialog } from "../dialogs/new-game.tsx";
 import { NameButton, PictureButton, PictureDialog, ProfilesDialog, Wizard } from "../dialogs/profiles.tsx";
@@ -48,6 +49,8 @@ import { FoldTab } from "../layout/fold-tab.tsx";
 import { type Column, nextFold, rememberFold, startFolds } from "../layout/folds.ts";
 import { type GameActions, Header } from "../layout/header.tsx";
 import { standingsOf } from "../lead/view.ts";
+import { MarksLegend } from "../legend/legend.tsx";
+import { legendOf } from "../legend/view.ts";
 import { ChosenSet } from "../pieces/pieces.tsx";
 import { ClockFace, PlayerCard } from "../players/card.tsx";
 import { signature } from "../players/model-name.ts";
@@ -57,7 +60,7 @@ import { endSoundOf, playSound, soundOf, wakeSounds } from "../sounds/sounds.ts"
 import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
 import { textFor } from "../text.ts";
 import { anchorName, useAnchor } from "./anchor.ts";
-import { useBrowseKeys, useFoldKeys, useMapKey, useWheelSteps } from "./keys.ts";
+import { useBrowseKeys, useFoldKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
 import { phaseOf, verdictOf } from "./phase.ts";
 import { type PageData, post, sendMessage, sendMove, useServed } from "./served.ts";
 
@@ -170,6 +173,9 @@ export function App({ start }: { start: Settings; })
     const [mapping, setMapping] = useState(false);
     // The board without its drawings while their button is held (Stefano).
     const [bare, setBare] = useState(false);
+    // The legend of the marks on the board, open until the player closes it (D-99).
+    const [legendOpen, setLegendOpen] = useState(false);
+    useLegendKey(() => setLegendOpen((open) => !open));
     const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
     const next = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove, [live, viewing]);
     const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
@@ -334,6 +340,32 @@ export function App({ start }: { start: Settings; })
     const review = reviewed?.review;
     // An open hint draws on the board as it is, in place of the last move's drawings.
     const drawn = hintOpen && hint !== undefined && viewing === undefined && (hint.arrows !== undefined || hint.squares !== undefined) ? hint : review;
+    const drawnByCoach = hint !== undefined && drawn === hint;
+    // The game over, when this is its last position: the kings' signs, on the board and in the legend.
+    const boardEnd: BoardEnd | undefined = ended && viewing === undefined && pending === undefined ? { how, winner, player, fresh: justEnded } : undefined;
+    // The legend has the marks the board shows: none of the helps' or the drawings while the board is bare (D-99).
+    const shownBare = bare && helps !== undefined;
+    const legendRows = legendOf({
+        ...(review?.badge === undefined || shown.lastMove === undefined ? {} : { badge: { badge: review.badge, square: shown.lastMove.to } }),
+        ...(helps === undefined || shownBare ? {} : { helps }),
+        ...(drawn === undefined || shownBare ? {} : { drawn }),
+        control: mapping && helps !== undefined,
+        ...(boardEnd === undefined ? {} : { ends: kingSigns(piecesOf(shown.position.fen), shown.position.turn, boardEnd) }),
+    });
+    // In a game the coach draws on the player's moves, the AI on its own.
+    const drawer = drawnByCoach || (going && reviewed?.side === player) ? text.legend.drawnByCoach : text.legend.drawnBy(analyst);
+    const legendAt = (under: boolean) => (
+        <MarksLegend
+            rows={legendRows}
+            open={legendOpen}
+            onOpen={setLegendOpen}
+            drawn={{ words: drawnByCoach ? text.helpsCard.drawn : text.drawn, by: drawer }}
+            onPoint={setPointed}
+            under={under}
+            text={text}
+        />
+    );
+    const legend = legendAt(false);
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
     const closing = studied === undefined ? undefined : closingOf(live.record);
     // In analysis the AI's card says who played that game, as its PGN keeps it (D-82), not who plays now.
@@ -661,7 +693,7 @@ export function App({ start }: { start: Settings; })
                             nextMove={next}
                             jumped={jumped}
                             check={shown.position.check}
-                            end={ended && viewing === undefined && pending === undefined ? { how, winner, player, fresh: justEnded } : undefined}
+                            end={boardEnd}
                             player={playerToMove && pending === undefined && viewing === undefined ? player : undefined}
                             selected={selected}
                             targets={selected === undefined || viewing !== undefined ? [] : live.legalMoves(selected as Square)}
@@ -694,6 +726,7 @@ export function App({ start }: { start: Settings; })
                     {/* On a phone the helps' map sits under the board too, turned on and off by a touch (D-78), and the coach's hint beside it, its drawings in sight (Zoe) */}
                     {helps === undefined ? null : (
                         <div class="board-map">
+                            {legendAt(true)}
                             <BareButton bare={bare} onBare={setBare} text={text} />
                             <MapButton mapping={mapping} onMap={setMapping} text={text} />
                             {hint === undefined || viewing !== undefined ? null : <HintLine hint={hint} open={hintOpen} onOpen={openTheHint} text={text} />}
@@ -720,9 +753,11 @@ export function App({ start }: { start: Settings; })
                                 mapping={mapping}
                                 onBare={setBare}
                                 bare={bare}
+                                legend={legend}
                                 text={text}
                             />
                         )}
+                        {...(helps === undefined && legendRows.length > 0 ? { legend } : {})}
                         {...(standings === undefined ? {} : { standings })}
                         {...(studied === undefined ? {} : { analysis: summary === undefined ? { by: analyst } : { by: analyst, summary } })}
                         shownPlies={at}

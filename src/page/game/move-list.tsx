@@ -1,6 +1,6 @@
 // The moves of the game beside the board, in pairs, with the pieces drawn as figures, the same in every language (D-50); the player looks back through them
 // with a click on one or with the buttons under them.
-import type { JSX } from "preact";
+import type { ComponentChildren, JSX } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { Side } from "../../core/index.ts";
 import { Figurine } from "../pieces/pieces.tsx";
@@ -14,7 +14,15 @@ import type { Ply } from "./plies.ts";
  * The moves numbered in pairs, the one the board shows marked (`shown`, how many moves it shows), and the result once the game is over; a click on a move
  * shows it. The list keeps its last move in sight, and the one shown while the player looks back.
  */
-export function MoveList({ plies, result, shown, onShow, text }: { plies: readonly Ply[]; result?: string; shown: number; onShow: (plies: number) => void; text: Text; })
+export function MoveList({ plies, result, shown, onShow, tools, text }: {
+    plies: readonly Ply[];
+    result?: string;
+    shown: number;
+    onShow: (plies: number) => void;
+    /** On the title's right: the legend of the marks on the board, when no helps' card holds it (D-99). */
+    tools?: ComponentChildren;
+    text: Text;
+})
 {
     const list = useRef<HTMLDivElement>(null);
     const [folded, toggleFold] = useCardFold("moves");
@@ -47,14 +55,17 @@ export function MoveList({ plies, result, shown, onShow, text }: { plies: readon
     // scrolls, and it stays in the page while folded, so that it keeps its move in sight.
     return (
         <section class={`card moves-card${folded ? " folded" : ""}`} aria-label={text.moves}>
-            <h3 class="card-title">
-                <FoldButton folded={folded} onFold={toggleFold} text={text}>
-                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M6 3H15L19 7V21H6ZM15 3V7H19M9 11H16M9 14.5H16M9 18H13" />
-                    </svg>
-                    {text.moves}
-                </FoldButton>
-            </h3>
+            <div class="moves-head">
+                <h3 class="card-title">
+                    <FoldButton folded={folded} onFold={toggleFold} text={text}>
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M6 3H15L19 7V21H6ZM15 3V7H19M9 11H16M9 14.5H16M9 18H13" />
+                        </svg>
+                        {text.moves}
+                    </FoldButton>
+                </h3>
+                {tools}
+            </div>
             <div ref={list} class="moves" hidden={folded}>
                 <ol>
                     {rows.map(({ number, white, black }) => (

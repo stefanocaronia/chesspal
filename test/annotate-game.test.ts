@@ -111,6 +111,14 @@ describe("annotate_game (D-69)", () => {
         expect(tags().Annotator).toBe("gpt-6-luna");
     });
 
+    it("signs over the Annotator of a game from elsewhere, though the host names no model", async () => {
+        const context = playerFolder();
+        await analyse(context, { pgn: `[Annotator "lichess.org"]\n${pgn}` });
+        await annotate({ ...context, caller: () => Promise.resolve({ annotator: "Claude Code", hostOnly: true }) }, { summary: "A short game." });
+
+        expect(readPgn(readFileSync(join(gameFolder(context.folder), kept), "utf8"))[0]!.tags.Annotator).toBe("Claude Code");
+    });
+
     it("keeps the arrows and squares a note draws as PGN's %cal and %csl, which a new review of the move replaces", async () => {
         const context = playerFolder();
         await analyse(context, { pgn });

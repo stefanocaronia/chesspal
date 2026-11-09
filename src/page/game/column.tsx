@@ -17,7 +17,7 @@ import { ResultTile } from "./result-tile.tsx";
  * The column, which the player folds with its tab; under the board, where three columns would leave the board small, always open. A game in analysis
  * (D-69) says above the moves that the AI is going over it, until its word on the whole game comes, which the talk shows.
  */
-export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, helps, standings, analysis, shownPlies, onShow, onStep, onDownload, onSaveMoves, onAnalyse, text }: {
+export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, helps, legend, standings, analysis, shownPlies, onShow, onStep, onDownload, onSaveMoves, onAnalyse, text }: {
     plies: readonly Ply[];
     result?: string;
     how?: HowEnded;
@@ -29,6 +29,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     opening?: Opening;
     /** The helps' card, under the opening, while the helps are on (D-78). */
     helps?: ComponentChildren;
+    /** The legend of the marks on the board in the moves' title, when no helps' card holds it (D-99). */
+    legend?: ComponentChildren;
     /** Who the AI saw ahead after the moves, with the helps on in a game and in analysis (D-90): the bar shows it, and in analysis the chart. */
     standings?: readonly Standing[];
     /** The game in analysis: who reviews it, and their word on the whole game, once written. */
@@ -68,7 +70,7 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                                 {text.reviewing(analysis.by)}
                             </p>
                         )}
-                        <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} text={text} />
+                        <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} tools={legend} text={text} />
                         {/* The saves and the analysis under the moves, over the buttons that step through them (Stefano). */}
                         {onDownload === undefined && onSaveMoves === undefined ? null : (
                             <div class="card analysis-actions">

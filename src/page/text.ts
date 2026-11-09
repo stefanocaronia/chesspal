@@ -1,8 +1,9 @@
 // The page's words in the player's language (D-32): Italian or English, from the browser's or as the settings say (D-56).
 import type { AiLevel, Badge, DrawColour, IllegalReason, Phase, PieceLetter, Side } from "../core/index.ts";
+import type { BadgeKind } from "./board/signs.ts";
 import type { Step } from "./game/browse.ts";
 import type { HowEnded } from "./game/ending.ts";
-import type { StrategyGroup, StrategyRow } from "./helps/view.ts";
+import type { StrategyGroup, StrategyRow, Tone } from "./helps/view.ts";
 import type { AvatarId, Level, RatingSite } from "./profile/profile.ts";
 
 /** The words of the page in one language. */
@@ -146,6 +147,7 @@ export interface Text
     readonly study: StudyText;
     /** The helps' card (D-78): the facts the AI sees at the game's level. */
     readonly helpsCard: HelpsCardText;
+    readonly legend: LegendText;
 }
 
 /** The words of the helps' card. */
@@ -210,6 +212,25 @@ export interface HelpsCardText
     readonly insufficient: string;
     pawnSquare(pawn: string, caught: boolean): string;
     opposition(side: Side): string;
+}
+
+/** The words of the legend of the marks on the board (D-99). */
+export interface LegendText
+{
+    readonly title: string;
+    readonly hint: string;
+    readonly none: string;
+    /** After a judgment's name, what it is. */
+    readonly badge: string;
+    /** A piece at risk, pinned or skewered: the player's, the other side's, or a side's when the page does not know theirs (D-91). */
+    sign(kind: "risk" | "pin" | "skewer", tone: Tone): string;
+    readonly pinLine: string;
+    readonly skewerLine: string;
+    /** After a colour's word, who drew it: the AI by its name, or the coach. */
+    drawnBy(name: string): string;
+    readonly drawnByCoach: string;
+    readonly control: string;
+    readonly ends: Readonly<Record<BadgeKind, string>>;
 }
 
 /** The words of the dialog that brings a game to analyse. */
@@ -418,7 +439,7 @@ const english: Text = {
     noGame: "No game yet: press + to start one, or ask for one in the chat.",
     foldCard: "Fold the card",
     openCard: "Open the card",
-    saveMoves: "Moves-only PGN",
+    saveMoves: "PGN",
     saveMovesHint: "The moves alone, to open on Lichess or chess.com",
     noGameNow: "No game in progress",
     analysing: "Analysis in progress",
@@ -683,6 +704,19 @@ const english: Text = {
         pawnSquare: (pawn, caught) => `The enemy king is ${caught ? "inside" : "outside"} the square of the pawn on ${pawn}`,
         opposition: (side) => `${side === "white" ? "White" : "Black"} has the opposition`,
     },
+    legend: {
+        title: "Marks on the board",
+        hint: "Marks on the board (?)",
+        none: "No marks on the board now",
+        badge: "the move's judgment",
+        sign: (kind, tone) => `${tone === "threat" ? "Your" : tone === "chance" ? "Opponent's" : "A"} ${{ risk: "piece at risk", pin: "pinned piece", skewer: "skewered piece" }[kind]}`,
+        pinLine: "The pin's line",
+        skewerLine: "The skewer's line",
+        drawnBy: (name) => `drawn by ${name}`,
+        drawnByCoach: "drawn by the coach",
+        control: "How many of White's pieces and of Black's reach the square",
+        ends: { crown: "Won", mate: "Checkmated", flag: "Resigned", half: "Draw, half a point each" },
+    },
 };
 
 const italian: Text = {
@@ -744,7 +778,7 @@ const italian: Text = {
     noGame: "Nessuna partita: premi + per iniziarne una, o chiedila nella chat.",
     foldCard: "Chiudi la scheda",
     openCard: "Apri la scheda",
-    saveMoves: "PGN solo mosse",
+    saveMoves: "PGN",
     saveMovesHint: "Solo le mosse, da aprire su Lichess o chess.com",
     noGameNow: "Nessuna partita in corso",
     analysing: "Analisi in corso",
@@ -1010,6 +1044,19 @@ const italian: Text = {
         insufficient: "Materiale insufficiente per dare matto",
         pawnSquare: (pawn, caught) => `Il re nemico è ${caught ? "dentro il" : "fuori dal"} quadrato del pedone in ${pawn}`,
         opposition: (side) => `L'opposizione è del ${side === "white" ? "Bianco" : "Nero"}`,
+    },
+    legend: {
+        title: "Segni sulla scacchiera",
+        hint: "Segni sulla scacchiera (?)",
+        none: "Nessun segno sulla scacchiera ora",
+        badge: "il giudizio della mossa",
+        sign: (kind, tone) => `${tone === "threat" ? "Tuo pezzo" : tone === "chance" ? "Pezzo avversario" : "Pezzo"} ${{ risk: "in pericolo", pin: "inchiodato", skewer: "infilato" }[kind]}`,
+        pinLine: "Linea dell'inchiodatura",
+        skewerLine: "Linea dell'infilata",
+        drawnBy: (name) => `disegnato da ${name}`,
+        drawnByCoach: "disegnato dall'allenatore",
+        control: "Quanti pezzi del Bianco e del Nero raggiungono la casa",
+        ends: { crown: "Ha vinto", mate: "Scacco matto", flag: "Ha abbandonato", half: "Patta, mezzo punto a testa" },
     },
 };
 

@@ -114,9 +114,8 @@ export function unreviewed(record: GameRecord): GameRecord
         return recordedMove(move.san, nags, withoutReview(move.comment).replace(/\s*\[%lead [^\]]*\]/g, "").trim());
     });
     const comment = withoutReview(record.comment);
-    // The signature is the AI's only on a game it reviewed: a game from elsewhere keeps its own Annotator.
-    const signedByAi = isReviewed(record) || record.moves.some((move) => reviewMark.test(move.comment ?? ""));
-    const tags = signedByAi ? Object.fromEntries(Object.entries(record.tags).filter(([name]) => name !== "Annotator" && name !== effortTag)) : record.tags;
+    // A game from elsewhere keeps its own Annotator.
+    const tags = carriesReview(record) ? Object.fromEntries(Object.entries(record.tags).filter(([name]) => name !== "Annotator" && name !== effortTag)) : record.tags;
     return comment === "" ? { tags, moves } : { tags, comment, moves };
 }
 
@@ -147,10 +146,13 @@ export function withAiModel(record: GameRecord, played: AiModel | undefined): Ga
     return played === undefined ? record : { ...record, tags: signed(record.tags, ["AIModel", "AIEffort"], played.model, played.effort) };
 }
 
-/** Who reviewed the game, as its tags say: the Annotator, and the effort when known; undefined without an Annotator. */
+/**
+ * Who reviewed the game, as its tags say: the Annotator, and the effort when known; undefined without an Annotator, or on a game the AI has not reviewed,
+ * whose Annotator is someone else's, such as Lichess's.
+ */
 export function annotatorOf(record: GameRecord): { annotator: string; effort?: string; } | undefined
 {
-    const found = signerOf(record.tags, ["Annotator", effortTag]);
+    const found = carriesReview(record) ? signerOf(record.tags, ["Annotator", effortTag]) : undefined;
     return found === undefined ? undefined : { annotator: found.model, ...(found.effort === undefined ? {} : { effort: found.effort }) };
 }
 
@@ -203,6 +205,18 @@ export function withGameReview(record: GameRecord, { summary, closing }: { summa
 // The effort has no tag of its own in PGN: Chesspal's sits beside the Annotator.
 const effortTag = "AnnotatorEffort";
 
+/**
+ * The game holds the AI's review: its word on the game, or a note or badge on a move, the book's badge apart, which Chesspal puts there when the analysis
+ * starts. Only then is the Annotator the AI's.
+ */
+function carriesReview(record: GameRecord): boolean
+{
+    return isReviewed(record) || record.moves.some((move) => {
+        const review = reviewOf(move.comment);
+        return review?.note !== undefined || (review?.badge !== undefined && review.badge !== "book");
+    });
+}
+
 /** A model and its effort as the tags say, each only when not blank; undefined without the model. */
 function signerOf(tags: Record<string, string>, [modelTag, modelEffortTag]: [string, string]): AiModel | undefined
 {
@@ -234,7 +248,6 @@ const judgmentNags = new Set([1, 2, 3, 4, 5, 6]);
 // The badges PGN has a NAG for: !! ! ?! ? ??.
 const nagOfBadge: Partial<Record<Badge, number>> = { brilliant: 3, great: 1, inaccuracy: 6, mistake: 2, blunder: 4 };
 const badgePattern = /\[%badge (\w+)\]/;
-const reviewMark = /\[%(badge|review) /;
 const notePattern = /\[%review ([^\]]*)\]/;
 const closingPattern = /\[%closing ([^\]]*)\]/;
 const arrowPattern = /\[%cal ([^\]]*)\]/;
