@@ -3,7 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { type AnyCommand, commands, version } from "chesspal";
 import { spawn } from "node:child_process";
-import { appendFileSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,7 +12,7 @@ import type { Context } from "../src/commands/context.ts";
 import { aiHostIn, aiModelIn, aiNameOf, readPgn } from "../src/core/index.ts";
 import { aiModelOf, saveChatStart } from "../src/games/index.ts";
 import { gameFolder, profileFolder } from "../src/profiles/index.ts";
-import { createMcpServer, opponentOf, serverInstructions } from "../src/server/mcp.ts";
+import { createMcpServer, lazyPage, opponentOf, serverInstructions } from "../src/server/mcp.ts";
 import { play, testContext } from "./commands.ts";
 
 let client: Client | undefined;
@@ -39,7 +39,7 @@ describe("the MCP server", () => {
 
     it("offers every command as a tool, with its description, but those of the command line alone", async () => {
         const { tools } = await (await connect()).listTools();
-        const offered = commands.filter((command) => command.cliOnly !== true && command.host === undefined);
+        const offered = commands.filter((command) => command.cliOnly !== true && command.hosts === undefined);
 
         expect(tools.map((tool) => tool.name)).toEqual(offered.map((command) => command.name));
         expect(tools[0]?.description).toBe(offered[0]?.description);
@@ -197,6 +197,48 @@ describe("the MCP server", () => {
         const { tools } = await (await connect()).listTools();
 
         expect(tools.every((tool) => !("$schema" in tool.inputSchema))).toBe(true);
+    });
+
+    it("keeps one of Chesspal's agents in Codex to its own tools, which Codex gives every tool (D-98)", async () => {
+        const home = mkdtempSync(join(tmpdir(), "chesspal-codex-"));
+        const before = process.env.CODEX_HOME;
+        process.env.CODEX_HOME = home;
+        const thread = "019a6b2e-1c40-7a3b-9e1f-2d4c5b6a7e90";
+        const started = new Date(Number.parseInt(thread.replaceAll("-", "").slice(0, 12), 16));
+        const day = join(home, "sessions", String(started.getFullYear()), String(started.getMonth() + 1).padStart(2, "0"), String(started.getDate()).padStart(2, "0"));
+        mkdirSync(day, { recursive: true });
+        writeFileSync(join(day, `rollout-2026-11-09T10-00-00-${thread}.jsonl`), JSON.stringify({ type: "session_meta", payload: { agent_role: "chesspal-coach" } }) + "\n");
+        const coach = { "x-codex-turn-metadata": { thread_source: "subagent", thread_id: thread } };
+
+        try {
+            const status = await (await connect(commands, testContext(home))).callTool({ name: "status", arguments: {}, _meta: coach });
+            expect(status.isError).toBe(true);
+            expect((status.content as { text: string; }[])[0]?.text).toBe("status is not yours to call: you work only with coach. Nothing changed.");
+            expect((await client?.callTool({ name: "status", arguments: {}, _meta: { "x-codex-turn-metadata": { thread_source: "user" } } }))?.isError).toBeUndefined();
+        } finally {
+            if (before === undefined) {
+                delete process.env.CODEX_HOME;
+            } else {
+                process.env.CODEX_HOME = before;
+            }
+
+            rmSync(home, { recursive: true, force: true });
+        }
+    });
+
+    it("starts the page once, before the chat's first call, and never for a Codex agent's (D-98)", async () => {
+        let started = 0;
+        const pageFirst = lazyPage(async () => {
+            started++;
+        });
+        const agent = { "x-codex-turn-metadata": { thread_source: "subagent" } };
+
+        await pageFirst(agent);
+        expect(started).toBe(0);
+        await Promise.all([pageFirst(undefined), pageFirst({ "x-codex-turn-metadata": { thread_source: "user" } })]);
+        expect(started).toBe(1);
+        await pageFirst(undefined);
+        expect(started).toBe(1);
     });
 });
 

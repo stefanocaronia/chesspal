@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Context } from "../src/commands/context.ts";
 import { clockStarted } from "../src/core/index.ts";
-import { loadGame, saveGame } from "../src/games/index.ts";
+import { loadGame, ponderingOn, saveGame, thoughtKey } from "../src/games/index.ts";
 import { setUpHosts } from "../src/host-files/host-files.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
@@ -52,16 +52,17 @@ describe("the AI thinking on the player's time (D-72)", () => {
         expect(await run(context, "player_move", { move: "d4" })).not.toContain("Thought on their time");
     });
 
-    it("tells the page when it starts thinking on a position and when it is done, before it waits", async () => {
-        const told: unknown[] = [];
+    it("notes on disk that it thinks on a position, from its first look until it waits, for the page in whatever process it runs", async () => {
         let time = new Date(2026, 10, 2, 15, 30, 12).getTime();
-        const context: Context = { ...playerFolder(), now: () => new Date(time), ponders: (position) => told.push(position) };
+        const context: Context = { ...playerFolder(), now: () => new Date(time) };
         await run(context, "new_game", { ai_colour: "black" });
-        const { started } = loadGame(gameFolder(context.folder))!;
+        const folder = gameFolder(context.folder);
+        const key = thoughtKey(loadGame(folder)!);
 
+        expect(ponderingOn(folder, key)).toBe(false);
         await run(context, "ponder");
-        await run(context, "ponder", { position: 0, reply: "e4" });
-        expect(told).toEqual([{ started, plies: 0 }]);
+        await run(context, "ponder", { position: 0, reply: "e4", move: "e5", why: "The centre." });
+        expect(ponderingOn(folder, key)).toBe(true);
 
         context.pause = (milliseconds) => {
             time += milliseconds;
@@ -69,7 +70,9 @@ describe("the AI thinking on the player's time (D-72)", () => {
         };
 
         await run(context, "ponder", { position: 0, done: true });
-        expect(told).toEqual([{ started, plies: 0 }, undefined]);
+        expect(ponderingOn(folder, key)).toBe(false);
+        // Its thoughts stay, for its next move.
+        expect(await run(context, "player_move", { move: "e4" })).toContain("Thought on their time by your model (legal, not checked): e5");
     });
 
     it("waits for the player's move: stop once they have moved, else still their move after a while", async () => {
@@ -84,6 +87,11 @@ describe("the AI thinking on the player's time (D-72)", () => {
 
         expect(await run(context, "ponder", { position: 0, done: true })).toBe("Still the player's move: call ponder {position: 0, done: true} again.");
         expect(time - new Date(2026, 10, 2, 15, 30, 12).getTime()).toBe(50_000);
+        // Codex hands its agent's code back to the model after 30 seconds: a call there waits less, and stays one turn of it (Priya).
+        context.host = () => "codex-mcp-client";
+        await run(context, "ponder", { position: 0, done: true });
+        expect(time - new Date(2026, 10, 2, 15, 30, 12).getTime()).toBe(75_000);
+        context.host = undefined;
 
         context.pause = async () => {
             context.pause = undefined;
@@ -93,7 +101,7 @@ describe("the AI thinking on the player's time (D-72)", () => {
         expect(await run(context, "ponder", { position: 0, done: true })).toBe("Stop now: the player has moved, or the game is over. End with one word.");
     });
 
-    it("tells the AI to start the agent after its move only in Claude Code, in a folder set up with it, by its level", async () => {
+    it("tells the AI to start the agent after its move only in Claude Code and Codex, in a folder set up with it, by its level", async () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "black" });
         await run(context, "player_move", { move: "e4" });
@@ -121,6 +129,13 @@ describe("the AI thinking on the player's time (D-72)", () => {
 
         expect(await run(club, "player_move", { move: "e5" })).toContain("\nThought on their time by a quicker model (legal, not checked): Nf3, Development.\n");
 
+        // Codex starts its own agents, which init writes for it too (D-98).
+        const codex = playerFolder();
+        setUpHosts(codex.folder, "linux");
+        await run(codex, "new_game", { ai_colour: "white", level: "club" });
+
+        expect(await run({ ...codex, host: () => "codex-mcp-client" }, "ai_move", { move: "e4", plan: "Centre." })).toContain("start the chesspal-ponder-quick agent");
+
         const mated = playerFolder();
         setUpHosts(mated.folder, "linux");
         await run(mated, "new_game", { ai_colour: "black" });
@@ -131,13 +146,13 @@ describe("the AI thinking on the player's time (D-72)", () => {
         expect(await run({ ...mated, host: () => "claude-code" }, "ai_move", { move: "Qh4", plan: "Mate." })).not.toContain("chesspal-ponder");
     });
 
-    it("is the agent's alone, offered to Claude Code alone, one thing a call", async () => {
+    it("is the agent's alone, offered to the hosts that run it, one thing a call", async () => {
         const command = commands.find((each) => each.name === "ponder");
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "black" });
 
         expect(command?.byAgents).toEqual(["chesspal-ponder-quick", "chesspal-ponder"]);
-        expect(command?.host).toBe("claude-code");
+        expect(command?.hosts).toEqual(["claude-code", "codex-mcp-client"]);
         await expect(run(context, "ponder", { position: 0, reply: "e4", say: "Hello." })).rejects.toThrow("One thing a call");
         await expect(run(context, "ponder", { position: 0, done: true, reply: "e4" })).rejects.toThrow("One thing a call");
         await expect(run(context, "ponder", { position: 0, reply: "e4", why: "No move." })).rejects.toThrow("Give your move with its why");

@@ -6,11 +6,11 @@ import { z } from "zod";
 import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, inputProblems, isBoolean, PositionChanged } from "../commands/index.ts";
 import { aiNameOf } from "../core/index.ts";
 import { endOf, loadGame, noteAiHost, noteAiModel } from "../games/index.ts";
-import { hasAgent } from "../host-files/index.ts";
+import { agentTools, hasAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { pagePorts } from "./bell.ts";
-import { allowedCaller, callerOf, callingAgent } from "./caller.ts";
+import { allowedCaller, callerOf, callingAgent, fromCodexAgent } from "./caller.ts";
 import { chatHasRead, startPage } from "./page/page.ts";
 
 /** What the host reads as the server starts, before any tool: where to begin, and the rule of every move (D-27). Short, since hosts may cut it. */
@@ -18,7 +18,7 @@ export const serverInstructions = "Chesspal keeps the chess for you: the rules, 
     + "chat. Every move goes through Chesspal's tools: never keep the board in your head or invent a position.";
 
 /** The MCP server for an AI host: every command of the registry as a tool, with its description and parameters (D-5). */
-export function createMcpServer(context: Context = defaultContext(), list: AnyCommand[] = commands): McpServer
+export function createMcpServer(context: Context = defaultContext(), list: AnyCommand[] = commands, beforeCall?: (meta: Record<string, unknown> | undefined) => Promise<void>): McpServer
 {
     const server = new McpServer({ name: "chesspal", version }, { instructions: serverInstructions });
     // The server keeps what it told the chat, the instructions a tool gives once, and the position it showed: none yet (D-71).
@@ -27,14 +27,25 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
     // The host the chat runs in, as it introduced itself: it names the AI on the page and in the game's PGN (D-97).
     context.host ??= () => server.server.getClientVersion()?.name;
 
-    const forOneHost: { host: string; tool: { enable(): void; }; }[] = [];
+    const forSomeHosts: { hosts: readonly string[]; tool: { enable(): void; }; }[] = [];
 
     for (const command of list.filter((each) => each.cliOnly !== true)) {
         const tool = server.registerTool(command.name, toolConfig(command), async (input: unknown, extra) => {
+            await beforeCall?.(extra._meta);
+            const codexAgent = fromCodexAgent(extra._meta);
+            const calling = command.byAgents !== undefined || codexAgent ? await callingAgent(extra._meta, context.folder) : undefined;
+
             // An agent's tool called by the chat, or by another agent, would give what only that agent may see (Priya).
-            if (command.byAgents !== undefined && !allowedCaller(await callingAgent(extra._meta, context.folder), command.byAgents)) {
+            if (command.byAgents !== undefined && !allowedCaller(calling, command.byAgents)) {
                 // It names no agent to start: the chat that asked would start one itself (Priya).
                 return { content: [{ type: "text", text: `${command.name} is not yours to call: the player reads what it gives on the board page. Nothing changed.` }], isError: true };
+            }
+
+            // Codex gives its agents every tool: one of Chesspal's keeps to its own, and never plays or talks for the opponent (D-98, Federico).
+            const own = calling !== undefined && "agent" in calling ? agentTools(calling.agent) : undefined;
+
+            if (codexAgent && own !== undefined && !own.includes(command.name)) {
+                return { content: [{ type: "text", text: `${command.name} is not yours to call: you work only with ${own.join(", ")}. Nothing changed.` }], isError: true };
             }
 
             // Each call knows who makes it, for the commands that write it down (D-81).
@@ -48,17 +59,17 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
             return result;
         });
 
-        if (command.host !== undefined) {
+        if (command.hosts !== undefined) {
             tool.disable();
-            forOneHost.push({ host: command.host, tool });
+            forSomeHosts.push({ hosts: command.hosts, tool });
         }
     }
 
-    // A tool for one host is offered once the host has said its name, before it lists the tools.
+    // A tool for some hosts is offered once the host has said its name, before it lists the tools.
     server.server.oninitialized = () => {
         const host = server.server.getClientVersion()?.name;
 
-        for (const { tool } of forOneHost.filter((each) => each.host === host)) {
+        for (const { tool } of forSomeHosts.filter((each) => host !== undefined && each.hosts.includes(host))) {
             tool.enable();
         }
     };
@@ -81,9 +92,27 @@ export async function startMcpServer(context: Context = defaultContext(), list: 
 
     process.stdin.on("end", leave);
     process.stdin.on("close", leave);
-    const server = createMcpServer(context, list);
-    context.page = await pageOf(context, () => opponentOf(context.host?.()));
+    const pageFirst = lazyPage(async () => {
+        context.page = await pageOf(context, () => opponentOf(context.host?.()));
+    });
+    const server = createMcpServer(context, list, pageFirst);
     await server.connect(new StdioServerTransport());
+}
+
+/**
+ * The board page started once, before the chat's first call, the status every chat opens with, which then gives its address: the process of a Codex
+ * agent, which has one of its own, starts none, which would stand beside the chat's and could keep the doorbell from it (D-98, Priya).
+ */
+export function lazyPage(start: () => Promise<void>): (meta: Record<string, unknown> | undefined) => Promise<void>
+{
+    let page: Promise<void> | undefined;
+
+    return async (meta) => {
+        if (!fromCodexAgent(meta)) {
+            page ??= start();
+            await page;
+        }
+    };
 }
 
 /** The opponent's name for the page, from the host's (D-97): another host than Claude's and Codex is unnamed. */
@@ -96,11 +125,10 @@ export function opponentOf(host: string | undefined): string | undefined
 async function pageOf(context: Context, opponent: () => string | undefined): Promise<string | undefined>
 {
     try {
-        const { url, heard, chatCalls, ponders, open, askNewGame } = await startPage(context, opponent);
+        const { url, heard, chatCalls, open, askNewGame } = await startPage(context, opponent);
         // Words the AI is given change no file: the pages hear of them from the commands.
         context.heard = heard;
         context.calls = chatCalls;
-        context.ponders = ponders;
         context.pageOpen = open;
         context.askNewGame = askNewGame;
 
@@ -194,7 +222,7 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
  */
 async function sharingAgent(command: AnyCommand, meta: Record<string, unknown> | undefined, context: Context): Promise<string | undefined>
 {
-    const agents = command.sharedWith?.filter((agent) => hasAgent(context.folder, agent)) ?? [];
+    const agents = command.sharedWith?.filter((agent) => hasAgent(context.folder, agent, context.host?.())) ?? [];
 
     if (agents.length === 0 || gameGoingOn(context)) {
         return undefined;

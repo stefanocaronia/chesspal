@@ -26,8 +26,8 @@ export interface Command<Schema extends z.ZodObject = z.ZodObject, Result = unkn
     byAgents?: readonly string[];
     /** The agents that call it besides the chat, as the analyst analyse_game (D-89): their calls leave the doorbell's record of what the chat has read as it was. */
     sharedWith?: readonly string[];
-    /** The only host the MCP server offers it to, by the client's name, as ponder to Claude Code: elsewhere its description would cost tokens for nothing. */
-    host?: string;
+    /** The only hosts the MCP server offers it to, by the client's name, as ponder to those that run agents: elsewhere its description would cost tokens for nothing. */
+    hosts?: readonly string[];
     /** Only the command line has it, as init: the MCP server leaves it out, and its description costs the AI no tokens. */
     cliOnly?: boolean;
     /** Fields the command line takes as positional arguments, in order. */

@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { boardText, drawingsText, moods, moodTag } from "../core/index.ts";
 import { commentWithPlan, talkLimits } from "../games/index.ts";
-import { coachAgent, hasAgent, ponderAgentFor } from "../host-files/index.ts";
+import { coachAgent, ponderAgentFor } from "../host-files/index.ts";
 import { gameFolder, helpsIn } from "../profiles/index.ts";
-import { agentsLine, coachRuns, withAnalyst } from "./agents.ts";
+import { agentRuns, agentsLine, coachRuns, withAnalyst } from "./agents.ts";
 import { closingLines, moveLines, shownMove } from "./answer-lines.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, squaresInput } from "./drawings.ts";
@@ -89,17 +89,13 @@ function refuseWithoutHelps(folder: string, { comment, arrows, squares }: { comm
 type Played = MovePlayed & { agents?: string[]; board?: true; };
 
 /**
- * The agents to start after the move, in Claude Code, in a folder init set up with them: the one that thinks for the AI while the game goes on (D-72), then
+ * The agents to start after the move, in Claude Code or Codex, in a folder init set up with them: the one that thinks for the AI while the game goes on (D-72), then
  * the coach with the helps on, which judges the player's move even when the AI's ends the game (D-88).
  */
 function agentsAfter(context: Context, folder: string, played: MovePlayed): string[]
 {
-    if (context.host?.() !== "claude-code") {
-        return [];
-    }
-
     const ponder = ponderAgentFor(played.game.level);
-    const thinks = played.game.end === undefined && hasAgent(context.folder, ponder);
+    const thinks = played.game.end === undefined && agentRuns(context, ponder);
     const coaches = helpsIn(folder) && coachRuns(context);
     return [...(thinks ? [ponder] : []), ...(coaches ? [coachAgent] : [])];
 }

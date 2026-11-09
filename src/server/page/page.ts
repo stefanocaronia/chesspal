@@ -21,8 +21,6 @@ export interface Page
     heard(): void;
     /** The chat calls a tool: the page hears it listens, and the AI's clock, held while nobody heard the player, starts now. */
     chatCalls(): void;
-    /** The AI starts thinking on the player's time, on a position, or is done (D-72): the page shows it. */
-    ponders(position: SeenPosition | undefined): void;
     /** Whether a browser has the page open now: one listens to the game's changes. */
     open(): boolean;
     /** Opens the New game window on every page open now, for the player to choose the game there: whether one was open. */
@@ -51,10 +49,6 @@ export async function startPage(context: Context, opponent: () => string | undef
                 url: `http://127.0.0.1:${served.port}/`,
                 heard: () => tellWatchers(served),
                 chatCalls: () => chatCalls(served),
-                ponders: (position) => {
-                    served.pondering = position;
-                    tellWatchers(served);
-                },
                 open: () => watchers.size > 0,
                 askNewGame: () => askNewGame(served),
                 close: () => closed(server, stopWatching),
@@ -77,8 +71,6 @@ export interface Served
     port: number;
     /** The folder was set up by an older init: the page asks the player to run it again. Read once, as init runs with the chat closed. */
     readonly outdated: boolean;
-    /** The position the AI thinks on during the player's time (D-72), until it is done; none else. */
-    pondering?: SeenPosition | undefined;
 }
 
 /**
@@ -263,9 +255,9 @@ function watchFolder(folder: string, heard: (name: string | null) => void): FSWa
     }
 }
 
-// The current game, what the coach wrote on it, the talk before the first, the game in analysis, the profile in use, and what a profile keeps (who plays, their picture, their settings); a folder's name, for a
-// profile made or gone.
-const watched = /^(?:game\.json|coach\.json|talk\.json|analysis\.json|active\.json|profile\.md|settings\.json|avatar\.\w+|[a-z0-9-]+)$/;
+// The current game, what the coach wrote on it, whether the AI thinks on the player's time, the talk before the first, the game in analysis, the profile
+// in use, and what a profile keeps (who plays, their picture, their settings); a folder's name, for a profile made or gone.
+const watched = /^(?:game\.json|coach\.json|thoughts\.json|talk\.json|analysis\.json|active\.json|profile\.md|settings\.json|avatar\.\w+|[a-z0-9-]+)$/;
 
 function fromHere(request: IncomingMessage, port: number, api: boolean): boolean
 {

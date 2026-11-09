@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { saveChatStart } from "../src/games/index.ts";
-import { allowedCaller, callerOf, callingAgent } from "../src/server/caller.ts";
+import { allowedCaller, callerOf, callingAgent, fromCodexAgent } from "../src/server/caller.ts";
 
 const folders: string[] = [];
 
@@ -58,6 +58,37 @@ describe("who makes a tool call (D-81)", () => {
         expect(allowedCaller({ agent: "general-purpose" }, ["chesspal-coach"])).toBe(false);
         expect(allowedCaller({ chat: true }, ["chesspal-coach"])).toBe(false);
         expect(allowedCaller(undefined, ["chesspal-coach"])).toBe(true);
+    });
+
+    it("tells Codex's chat from its agents, by the role each agent's session notes first, and an agent forked with the chat's turns as the chat (D-98)", async () => {
+        const home = scratch();
+        const before = process.env.CODEX_HOME;
+        process.env.CODEX_HOME = home;
+        const coach = "019a6b2e-1c40-7a3b-9e1f-2d4c5b6a7e80";
+        const forked = "019a6b2e-1c40-7a3b-9e1f-2d4c5b6a7e81";
+        const started = new Date(Number.parseInt(coach.replaceAll("-", "").slice(0, 12), 16));
+        const day = join(home, "sessions", String(started.getFullYear()), String(started.getMonth() + 1).padStart(2, "0"), String(started.getDate()).padStart(2, "0"));
+        mkdirSync(day, { recursive: true });
+        writeFileSync(join(day, `rollout-2026-11-09T10-00-00-${coach}.jsonl`), JSON.stringify({ type: "session_meta", payload: { agent_role: "chesspal-coach" } }) + "\n");
+        writeFileSync(join(day, `rollout-2026-11-09T10-00-00-${forked}.jsonl`), JSON.stringify({ type: "session_meta", payload: { forked_from_id: coach, agent_role: "chesspal-coach" } }) + "\n");
+        const by = (turn: Record<string, unknown>) => callingAgent({ "x-codex-turn-metadata": turn }, home, 0);
+
+        try {
+            expect(await by({ thread_source: "user", thread_id: coach })).toEqual({ chat: true });
+            expect(await by({ thread_source: "subagent", thread_id: coach })).toEqual({ agent: "chesspal-coach" });
+            expect(await by({ thread_source: "subagent", thread_id: forked })).toEqual({ chat: true });
+            expect(await by({ thread_source: "subagent", thread_id: "019a6b2e-1c40-7a3b-9e1f-2d4c5b6a7e89" })).toBeUndefined();
+            expect(await by({ thread_source: "subagent", thread_id: "not a thread" })).toBeUndefined();
+            expect(fromCodexAgent({ "x-codex-turn-metadata": { thread_source: "subagent" } })).toBe(true);
+            expect(fromCodexAgent({ "x-codex-turn-metadata": JSON.stringify({ thread_source: "user" }) })).toBe(false);
+            expect(fromCodexAgent(undefined)).toBe(false);
+        } finally {
+            if (before === undefined) {
+                delete process.env.CODEX_HOME;
+            } else {
+                process.env.CODEX_HOME = before;
+            }
+        }
     });
 
     it("names the host when nothing ties a model to the call, and nobody without a host", async () => {

@@ -54,10 +54,10 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         await expect(run(analyst, "analyse_game", { game: "games/2026-11-02-153012.pgn" })).rejects.toThrow("Stop now: this game has its review already.");
 
         // Without the agent, or in another host, the chat goes over it itself.
-        const codex = { ...playerFolder(), host: () => "codex-mcp-client" };
-        setUpHosts(codex.folder, "linux");
-        await mate(codex);
-        expect(await run(codex, "ai_move", { move: "Qh4", plan: "Mate." })).toContain("to go over this one (analyse_game). For another,");
+        const gemini = { ...playerFolder(), host: () => "gemini-cli-mcp-client" };
+        setUpHosts(gemini.folder, "linux");
+        await mate(gemini);
+        expect(await run(gemini, "ai_move", { move: "Qh4", plan: "Mate." })).toContain("to go over this one (analyse_game). For another,");
     });
 
     it("goes over the game the player brought on the board page", async () => {

@@ -55,6 +55,26 @@ export function waitingSince(folder: string, key: string, now: Date): Date
     return now;
 }
 
+/**
+ * Notes whether the AI thinks on the player's time in a position now, from its first look until it waits for their move, for the page's sign: in the file,
+ * since in Codex the agent that thinks has a process of its own (D-98).
+ */
+export function notePondering(folder: string, key: string, pondering: boolean): void
+{
+    const { pondering: before, ...kept } = keptAt(folder, key);
+
+    if ((before === true) !== pondering) {
+        write(folder, pondering ? { ...kept, pondering: true } : kept);
+    }
+}
+
+/** Whether the AI thinks on the player's time in a position now, as noted. */
+export function ponderingOn(folder: string, key: string): boolean
+{
+    const kept = read(folder);
+    return kept?.key === key && kept.pondering === true;
+}
+
 /** The most thoughts kept for a position: a few likely replies, not every legal one. */
 const mostThoughts = 8;
 
@@ -64,6 +84,7 @@ const thoughtsFile = z.object({
     key: z.string(),
     thoughts: z.array(z.object({ reply: z.string(), move: z.string(), why: z.string() })),
     since: z.iso.datetime().optional(),
+    pondering: z.boolean().optional(),
 });
 
 type ThoughtsFile = z.infer<typeof thoughtsFile>;

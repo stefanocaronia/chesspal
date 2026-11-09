@@ -1,15 +1,15 @@
-// The agents that work beside the chat in Claude Code: the analyst that goes over a game over (D-89) and the coach that judges the player's moves (D-88).
+// The agents that work beside the chat in Claude Code and Codex (D-98): the analyst that goes over a game over (D-89) and the coach that judges the player's moves (D-88).
 import { isReviewed } from "../core/index.ts";
 import { archivedGame, archivedName, coachStarted, type CurrentGame, gameInAnalysis } from "../games/index.ts";
-import { analystAgent, coachAgent, hasAgent } from "../host-files/index.ts";
+import { agentHosts, analystAgent, coachAgent, hasAgent } from "../host-files/index.ts";
 import { gameFolder, helpsIn } from "../profiles/index.ts";
 import type { Context } from "./context.ts";
 import type { GameSummary } from "./game-summary.ts";
 
-/** Whether an analyst agent goes over a game over when the player wants: in Claude Code, with its agent in the player's folder (D-89). */
+/** Whether an analyst agent goes over a game over when the player wants: in Claude Code or Codex, with its agent in the player's folder (D-89, D-98). */
 export function analystRuns(context: Context): boolean
 {
-    return context.host?.() === "claude-code" && hasAgent(context.folder, analystAgent);
+    return agentRuns(context, analystAgent);
 }
 
 /**
@@ -41,10 +41,17 @@ export function reviewedLine(game?: string): string
         + `it told you, or, in a chat without it, from its review on the board page, which analyse_game ${game === undefined ? "" : `{"game": "${game}"} `}gives.`;
 }
 
-/** Whether a coach judges the player's moves when the helps are on: in Claude Code, with its agent in the player's folder (D-80, D-88). */
+/** Whether a coach judges the player's moves when the helps are on: in Claude Code or Codex, with its agent in the player's folder (D-80, D-88, D-98). */
 export function coachRuns(context: Context): boolean
 {
-    return context.host?.() === "claude-code" && hasAgent(context.folder, coachAgent);
+    return agentRuns(context, coachAgent);
+}
+
+/** Whether one of Chesspal's agents runs beside this chat: in a host that starts agents, with its file in the player's folder. */
+export function agentRuns(context: Context, agent: string): boolean
+{
+    const host = context.host?.();
+    return host !== undefined && agentHosts.includes(host) && hasAgent(context.folder, agent, host);
 }
 
 /**

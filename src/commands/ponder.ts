@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Game, levelOf, moodAt, sees, timeLeft } from "../core/index.ts";
-import { type CurrentGame, currentPlan, endOf, keepThought, loadGame, talkLimits, type Thought, thoughtKey, waitingSince } from "../games/index.ts";
-import { ponderAgents } from "../host-files/index.ts";
+import { type CurrentGame, currentPlan, endOf, keepThought, loadGame, notePondering, talkLimits, type Thought, thoughtKey, waitingSince } from "../games/index.ts";
+import { agentHosts, isCodex, ponderAgents } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { positionLines } from "./answer-lines.ts";
 import { type GameSummary, summaryOf } from "./game-summary.ts";
@@ -32,7 +32,7 @@ interface Start
 
 /**
  * The AI's thinking on the player's time (D-72), for the agent that does it: the position, the view after a reply, its answer kept for its move, and its
- * words on the board page. Its calls are not the chat's: the doorbell still wakes the chat for the player's move. Offered to Claude Code alone, which runs the agent.
+ * words on the board page. Its calls are not the chat's: the doorbell still wakes the chat for the player's move. Offered to the hosts that run the agent (D-98).
  */
 export const ponder = defineCommand({
     name: "ponder",
@@ -51,7 +51,7 @@ export const ponder = defineCommand({
         done: z.boolean().optional().describe("true when you have no more replies to think on: it waits for the player's move"),
     }),
     byAgents: ponderAgents,
-    host: "claude-code",
+    hosts: agentHosts,
     run: async ({ position, reply, move, why, say, done = false }, context): Promise<Pondered> => {
         const folder = gameFolder(context.home());
         const current = toPonder(folder, context.now(), position);
@@ -65,7 +65,7 @@ export const ponder = defineCommand({
                 throw new Error("Give the position's number with it: call ponder {} first, which gives it. Nothing changed.");
             }
 
-            context.ponders?.({ started: current.started, plies: current.game.record.moves.length });
+            notePondering(folder, thoughtKey(current), true);
             return { start: startOf(current) };
         }
 
@@ -79,7 +79,7 @@ export const ponder = defineCommand({
         }
 
         if (done) {
-            context.ponders?.(undefined);
+            notePondering(folder, thoughtKey(current), false);
             return await waitForMove(folder, context, current);
         }
 
@@ -147,11 +147,12 @@ export const ponder = defineCommand({
  * Waits for the player's move, for an agent that works on their time (D-72, D-88): moved once `gone` says so, waited once the agent has waited long enough in
  * all since `since`, else still waiting after a while.
  */
-export async function waitForPlayer(context: { now: () => Date; pause?: (milliseconds: number) => Promise<void>; }, since: Date, gone: () => boolean): Promise<"moved" | "waited" | "waiting">
+export async function waitForPlayer(context: { now: () => Date; pause?: (milliseconds: number) => Promise<void>; host?: () => string | undefined; }, since: Date, gone: () => boolean): Promise<"moved" | "waited" | "waiting">
 {
     const pause = context.pause ?? ((milliseconds: number) => new Promise<void>((done) => setTimeout(done, milliseconds)));
     const start = context.now().getTime();
-    const end = Math.min(start + playerWait.most, since.getTime() + playerWait.inAll);
+    const most = isCodex(context.host?.()) ? playerWait.mostInCodex : playerWait.most;
+    const end = Math.min(start + most, since.getTime() + playerWait.inAll);
 
     while (context.now().getTime() < end) {
         await pause(playerWait.every);
@@ -161,7 +162,7 @@ export async function waitForPlayer(context: { now: () => Date; pause?: (millise
         }
     }
 
-    return end < start + playerWait.most ? "waited" : "waiting";
+    return end < start + most ? "waited" : "waiting";
 }
 
 /** The words of the AI's move for the player: its comment without the plan, the mood, the clock and the draw offer it carries. */
@@ -173,9 +174,10 @@ export function wordsOf(comment: string | undefined): string | undefined
 
 /**
  * How long one call waits for the player's move at most, under the minute a host may give a tool (Priya), how often it looks, and how long the agent
- * waits in all before it stops: a player who leaves the game open must not keep it asking (Priya).
+ * waits in all before it stops: a player who leaves the game open must not keep it asking (Priya). Codex hands its agent's code back to the model after 30
+ * seconds: a call shorter than that is one turn of the model, not several (Priya).
  */
-const playerWait = { most: 50_000, every: 500, inAll: 10 * 60_000 } as const;
+const playerWait = { most: 50_000, mostInCodex: 25_000, every: 500, inAll: 10 * 60_000 } as const;
 
 /** The game whose position the AI thinks on, read and never written: none once the player has moved, the game is over or their flag has fallen, or the position given is another. */
 function toPonder(folder: string, now: Date, position: number | undefined): CurrentGame | undefined

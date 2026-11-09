@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { type Badge, badges, Game, type GameRecord, leadText, levelOf, materialOf, type Move, type Side, withSanLetters } from "../core/index.ts";
 import { archiveCoached, coachWaitingSince, coachWords, type CurrentGame, endOf, keepHint, keepJudgment, keepLead, loadGame, startCoach } from "../games/index.ts";
-import { coachAgent } from "../host-files/index.ts";
+import { agentHosts, coachAgent } from "../host-files/index.ts";
 import { activeProfile, gameFolder, helpsIn } from "../profiles/index.ts";
 import { clockLine, clockSummaryOf } from "./clock.ts";
 import type { Context } from "./context.ts";
@@ -63,7 +63,7 @@ export const coach = defineCommand({
         done: z.boolean().optional().describe("true once you have kept your words, who is ahead always while the game goes on: it waits for the player's move"),
     }),
     byAgents: [coachAgent],
-    host: "claude-code",
+    hosts: agentHosts,
     run: async ({ game, position, ahead, badge, note, hint, arrows, squares, done = false }, context): Promise<Coached> => {
         const folder = gameFolder(context.home());
         const current = loadGame(folder);

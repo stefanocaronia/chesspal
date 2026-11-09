@@ -35,9 +35,11 @@ import {
     loadGame,
     loadTableTalk,
     playerPgn,
+    ponderingOn,
     saveGame,
     startAnalysis,
     talkLimits,
+    thoughtKey,
     wakesTheChat,
     WordsRefused,
 } from "../../games/index.ts";
@@ -395,7 +397,7 @@ function thinkingShown(served: Served, current: CurrentGame | undefined): { thin
         return served.bell.inTurn && onIt ? { thinking: "move" } : {};
     }
 
-    return served.pondering !== undefined && samePosition(served.pondering, position) ? { thinking: "ponder" } : {};
+    return ponderingOn(gameFolder(served.context.home()), thoughtKey(current)) ? { thinking: "ponder" } : {};
 }
 
 /**

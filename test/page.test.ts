@@ -8,7 +8,7 @@ import { type Context, withProfile } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import { PositionChanged } from "../src/commands/play-move.ts";
 import { status } from "../src/commands/status.ts";
-import { archivedGames, noteAiModel } from "../src/games/index.ts";
+import { archivedGames, noteAiModel, notePondering } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell.ts";
@@ -676,11 +676,14 @@ describe("the doorbell of the chat", () => {
 
         await run(folder, "ai_move", { move: "e4", plan: "The centre." }, context);
         expect(await thinking()).toBeUndefined();
-        page.ponders({ started, plies: 1 });
+        // The ponder agent notes it on disk, as in Codex, where it has a process of its own (D-98).
+        const games = gameFolder(context.home());
+        notePondering(games, `${started}#1`, true);
         expect(await thinking()).toBe("ponder");
-        page.ponders({ started, plies: 0 });
+        notePondering(games, `${started}#0`, true);
         expect(await thinking()).toBeUndefined();
-        page.ponders(undefined);
+        notePondering(games, `${started}#1`, true);
+        notePondering(games, `${started}#1`, false);
         expect(await thinking()).toBeUndefined();
     });
 

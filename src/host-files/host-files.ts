@@ -61,7 +61,7 @@ const markedBlock = /<!-- chesspal: (?!end)[^\n]*\n[\s\S]*?<!-- chesspal: end --
 /** What init writes for each host, missing or changed: what the player wrote there stays. */
 function hostChanges(folder: string, platform: string): FileChange[]
 {
-    const changes = [mcpFile(folder, platform), agentsFile(folder), claudeFile(folder), claudeSettingsFile(folder), ...ponderAgentChanges(folder), codexConfigFile(folder, platform), codexHooksFile(folder)];
+    const changes = [mcpFile(folder, platform), agentsFile(folder), claudeFile(folder), claudeSettingsFile(folder), ...agentChanges(folder), codexConfigFile(folder, platform), codexHooksFile(folder)];
     return changes.filter((change) => change !== undefined);
 }
 
@@ -71,8 +71,8 @@ function chesspalServer(platform: string): { command: string; args: string[]; }
     return platform === "win32" ? { command: "cmd", args: ["/c", "chesspal", "mcp"] } : { command: "chesspal", args: ["mcp"] };
 }
 
-/** Claude Code's agents that work on the player's time, thinking for the opponent and coaching, Chesspal's whole: written when they are missing or changed. */
-function ponderAgentChanges(folder: string): FileChange[]
+/** The agents of Claude Code and Codex, Chesspal's whole, whichever host the player has (Stefano): written when they are missing or changed. */
+function agentChanges(folder: string): FileChange[]
 {
     return agentFiles(folder).filter(({ path, text }) => textOf(path) !== text);
 }

@@ -43,7 +43,7 @@ describe("chesspal init", () => {
                 + "     Codex also asks about Chesspal's two hooks: choose Trust all.\n"
                 + "     They are small helpers that let it notice your moves on the board.\n"
                 + "  3. Say hello: the AI gives you the link to the board.\n\n"
-                + "  Updated 10 files.",
+                + "  Updated 14 files.",
         );
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${opponentInstructions()}\n<!-- chesspal: end -->\n`);
@@ -66,6 +66,15 @@ describe("chesspal init", () => {
             /^---\nname: chesspal-analyst\ndescription: .*never to answer the player\.\ntools: mcp__chesspal__analyse_game, mcp__chesspal__annotate_game, mcp__chesspal__look, mcp__chesspal__position\nmodel: inherit\n---\n\nYou are the player's chess analyst/s,
         );
         expect(analyst).toContain("\n- Each line of the analysis is a move");
+        // The same agents for Codex, whichever host the player has (D-98): no effort, and no model but the quick one's, so that the others play on the AI's own.
+        expect(text(chess, ".codex/agents/chesspal-ponder-quick.toml")).toMatch(
+            /^name = "chesspal-ponder-quick"\ndescription = ".*"\nmodel = "gpt-6-luna"\ndeveloper_instructions = '''\nYou are the player's chess opponent[\s\S]*\n'''\n$/,
+        );
+        expect(text(chess, ".codex/agents/chesspal-ponder.toml")).not.toContain("model =");
+        expect(text(chess, ".codex/agents/chesspal-coach.toml")).toMatch(/^name = "chesspal-coach"\ndescription = ".*never to answer the player\."\ndeveloper_instructions = '''\nYou are the player's chess coach/);
+        expect(text(chess, ".codex/agents/chesspal-analyst.toml")).toContain("\n- Each line of the analysis is a move");
+        // Codex gives an agent every tool: its own are named, which spares it a search (Priya).
+        expect(text(chess, ".codex/agents/chesspal-coach.toml")).toMatch(/\n\nYour tools: tools\.mcp__chesspal__coach\.\n'''\n$/);
     });
 
     it("starts the server through cmd on Windows", async () => {
@@ -89,7 +98,7 @@ describe("chesspal init", () => {
         writeFileSync(join(folder, ".codex", "config.toml"), 'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\nenv = { CHESSPAL_HOME = "D:/runs" }\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n');
         // Codex runs hooks that changed only once the player trusts them again.
         expect((await runCommandLine(["init"], testContext(folder))).output).toContain(
-            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 10 files.",
+            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 14 files.",
         );
 
         expect(json(folder, ".mcp.json")).toEqual({ mcpServers: { other: { command: "other" }, chesspal: { command: "chesspal", args: ["mcp"], env: { CHESSPAL_HOME: "D:/runs" } } } });
@@ -114,7 +123,7 @@ describe("chesspal init", () => {
         const output = (await runCommandLine(["init"], { ...testContext(folder), language: "it-IT" })).output;
 
         expect(output).toMatch(/^♜ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code o Codex in questa cartella\.\n/);
-        expect(output).toMatch(/\n\n {2}Aggiornati 10 file\.$/);
+        expect(output).toMatch(/\n\n {2}Aggiornati 14 file\.$/);
         expect(output).not.toContain("consentili di nuovo");
         expect((await runCommandLine(["init", "la mia scacchiera"], { ...testContext(folder), language: "it-IT" })).output).toContain(
             '  1. Entra nella cartella: cd "la mia scacchiera"\n     poi apri Claude Code (claude) o Codex (codex).\n',

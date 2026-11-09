@@ -1,6 +1,7 @@
 // Who makes a tool call (D-81): only what the host ties to that call, never what the AI says of itself nor a setting the chat may have changed.
 // Codex sends the model and the effort with each call; Claude Code writes them into the chat's transcript, on the line of the call.
 import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import type { Caller } from "../commands/index.ts";
 import { lastChatStart } from "../games/index.ts";
@@ -35,15 +36,22 @@ export async function callerOf(meta: Record<string, unknown> | undefined, client
     return client === undefined ? undefined : { annotator: client.title ?? client.name, hostOnly: true };
 }
 
-/** Who in Claude Code made a tool call: the chat itself, or one of its agents by its type. */
+/** Who in Claude Code or Codex made a tool call: the chat itself, or one of its agents by its type. */
 export type CallingAgent = { chat: true; } | { agent: string; };
 
 /**
- * Who in Claude Code made a tool call: the chat, when its line is in the chat's transcript, or the agent whose file has it, by the type Claude Code notes
- * beside that file (Priya). Undefined when it cannot be told: another host, no chat noted, no line, or no type.
+ * Who in Claude Code or Codex made a tool call: the chat, when its line is in the chat's transcript, or the agent whose file has it, by the type Claude Code
+ * notes beside that file (Priya); in Codex, as the call's metadata and the agent's own session say (D-98). Undefined when it cannot be told: another host,
+ * no chat noted, no line, or no type.
  */
 export async function callingAgent(meta: Record<string, unknown> | undefined, folder: string, wait = 50): Promise<CallingAgent | undefined>
 {
+    const turn = objectOf(meta?.["x-codex-turn-metadata"]);
+
+    if (turn !== undefined) {
+        return await codexCaller(turn, wait);
+    }
+
     const call = meta?.["claudecode/toolUseId"];
     const transcript = lastChatStart(folder)?.transcript;
     const found = typeof call === "string" && transcript !== undefined ? await foundCall(transcript, call, wait) : undefined;
@@ -58,6 +66,12 @@ export async function callingAgent(meta: Record<string, unknown> | undefined, fo
 
     const type = objectOf(textOf(found.file.replace(/\.jsonl$/, ".meta.json")))?.agentType;
     return typeof type === "string" ? { agent: type } : undefined;
+}
+
+/** Whether a call comes from one of Codex's agents, as its metadata say: its own process starts no board page (D-98). */
+export function fromCodexAgent(meta: Record<string, unknown> | undefined): boolean
+{
+    return objectOf(meta?.["x-codex-turn-metadata"])?.thread_source === "subagent";
 }
 
 /** Whether an agent's tool may answer this caller: one of its agents, or a caller that cannot be told, since the tool's description is the first guard. */
@@ -118,6 +132,100 @@ function callerIn(text: string, call: string): Caller | undefined
     }
 
     return undefined;
+}
+
+/**
+ * Who in Codex made a call: the chat, or an agent by the role its session notes first, before its first call (Priya). An agent started with the chat's
+ * own turns sees the opponent's plan, so it counts as the chat (D-88).
+ */
+async function codexCaller(turn: Record<string, unknown>, wait: number): Promise<CallingAgent | undefined>
+{
+    if (turn.thread_source !== "subagent") {
+        return turn.thread_source === "user" ? { chat: true } : undefined;
+    }
+
+    const thread = turn.thread_id;
+
+    if (typeof thread !== "string" || !/^[0-9a-f-]{36}$/i.test(thread)) {
+        return undefined;
+    }
+
+    const known = codexThreads.get(thread);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    for (let attempt = 0; attempt < codexAttempts; attempt++) {
+        const start = headOf(codexSession(thread));
+        const role = /"agent_role":"([^"]+)"/.exec(start)?.[1];
+
+        if (role !== undefined) {
+            const caller: CallingAgent = start.includes('"forked_from_id":"') ? { chat: true } : { agent: role };
+            codexThreads.set(thread, caller);
+            return caller;
+        }
+
+        await new Promise((done) => setTimeout(done, wait));
+    }
+
+    return undefined;
+}
+
+// Who each agent's thread is, read once: it never changes, and an agent calls a tool many times (Federico).
+const codexThreads = new Map<string, CallingAgent>();
+
+// The agent's session is written as it starts: a few tries are enough.
+const codexAttempts = 10;
+// Its first line holds Codex's long prompt, but the role comes in its first two kilobytes (Priya).
+const headBytes = 16 * 1024;
+
+/**
+ * The file of a Codex session by its thread: in the day's folder of its start, which its UUIDv7 holds, or the days beside it around midnight; none when
+ * it is not there.
+ */
+function codexSession(thread: string): string
+{
+    const started = Number.parseInt(thread.replaceAll("-", "").slice(0, 12), 16);
+    const sessions = join(process.env.CODEX_HOME ?? join(homedir(), ".codex"), "sessions");
+
+    for (const day of [0, -1, 1]) {
+        const date = new Date(started + day * 86_400_000);
+        const folder = join(sessions, String(date.getFullYear()), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0"));
+
+        try {
+            const name = readdirSync(folder).find((each) => each.endsWith(`-${thread}.jsonl`));
+
+            if (name !== undefined) {
+                return join(folder, name);
+            }
+        } catch {
+            // No session that day.
+        }
+    }
+
+    return "";
+}
+
+function headOf(file: string): string
+{
+    if (file === "") {
+        return "";
+    }
+
+    try {
+        const descriptor = openSync(file, "r");
+
+        try {
+            const buffer = Buffer.alloc(headBytes);
+            const read = readSync(descriptor, buffer, 0, headBytes, 0);
+            return buffer.subarray(0, read).toString("utf8");
+        } finally {
+            closeSync(descriptor);
+        }
+    } catch {
+        return "";
+    }
 }
 
 function withEffort(model: string, effort: unknown): Caller
