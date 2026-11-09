@@ -1,7 +1,7 @@
 // The player's settings on the page (D-56): the look, the game's aids and the language, kept in the profile in use and remembered by this browser.
 
-/** The piece sets: our two, whose colours the player picks, and cburnett with its own (D-52). */
-export const pieceSets = ["nitida", "torretta", "cburnett"] as const;
+/** The piece sets, all Chesspal's own, whose colours the player picks; a set no longer here falls back to the first (D-94). */
+export const pieceSets = ["nitida", "torretta", "capablanca"] as const;
 export type PieceSet = typeof pieceSets[number];
 
 /** The choices of each look, by the ids the style sheet knows; the first is the default. */

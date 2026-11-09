@@ -381,7 +381,7 @@ const english: Text = {
     names: {
         nitida: "Nitida",
         torretta: "Torretta",
-        cburnett: "cburnett",
+        capablanca: "Capablanca",
         azzurro: "Blue",
         verde: "Green",
         noce: "Walnut",
@@ -699,7 +699,7 @@ const italian: Text = {
     names: {
         nitida: "Nitida",
         torretta: "Torretta",
-        cburnett: "cburnett",
+        capablanca: "Capablanca",
         azzurro: "Azzurro",
         verde: "Verde",
         noce: "Noce",

@@ -81,7 +81,7 @@ npm test
 
 - The rules: [chess.js](https://github.com/jhlywa/chess.js), under the BSD 2-Clause license.
 - The openings' names: Lichess's [chess-openings](https://github.com/lichess-org/chess-openings), under CC0.
-- The pieces: the Torretta and Nitida sets are Chesspal's own; cburnett is by Colin M.L. Burnett, under the BSD 3-Clause license. [The piece sets' credits](https://github.com/stefanocaronia/chesspal/blob/main/src/page/pieces/CREDITS.md) name every author, licence and source.
+- The pieces: Nitida, Torretta and Capablanca are Chesspal's own, the last after the diagrams of Capablanca's *Chess Fundamentals* (1921), in the public domain; they are free to use under CC BY 4.0, crediting "Stefano Caronia, Chesspal". [The piece sets' credits](https://github.com/stefanocaronia/chesspal/blob/main/src/page/pieces/CREDITS.md).
 
 Chesspal ships only original or open-licensed content, and no GPL dependency.
 

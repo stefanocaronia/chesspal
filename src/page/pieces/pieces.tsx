@@ -1,4 +1,4 @@
-// The pieces, drawn from a set: one vector map with a symbol for each piece, wK to bP (D-49): Nitida, the Torretta (D-46) or cburnett (D-52), as the
+// The pieces, drawn from a set: one vector map with a symbol for each piece, wK to bP (D-49): Nitida, the Torretta (D-46), or Capablanca (D-94), as the
 // settings choose (D-56). The pieces taken and the moves show the set's small pieces: one silhouette each, in fixed colours (D-50).
 import { createContext } from "preact";
 import { useContext } from "preact/hooks";

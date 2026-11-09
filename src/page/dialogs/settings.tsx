@@ -68,12 +68,10 @@ export function SettingsPanel({ open, settings, onChange, onClose, text }: {
                         </div>
                     </div>
                     <div class="setting-group setting-pair">
-                        {settings.set === "cburnett" ? null : (
-                            <div>
-                                <p class="setting-label">{text.pieceColours}</p>
-                                <Swatches look="pieces" label={text.pieceColours} settings={settings} onPick={(id) => set("pieces", id)} text={text} />
-                            </div>
-                        )}
+                        <div>
+                            <p class="setting-label">{text.pieceColours}</p>
+                            <Swatches look="pieces" label={text.pieceColours} settings={settings} onPick={(id) => set("pieces", id)} text={text} />
+                        </div>
                         <div>
                             <p class="setting-label">{text.marksColour}</p>
                             <Swatches look="marks" label={text.marksColour} settings={settings} onPick={(id) => set("marks", id)} text={text} />

@@ -341,8 +341,8 @@
     --fallen-pivot: 52% 50.8%;
 }
 
-:root[data-set="cburnett"] {
-    --fallen-pivot: 50.2% 50.9%;
+:root[data-set="capablanca"] {
+    --fallen-pivot: 50% 52.5%;
 }
 
 .badge {
@@ -921,22 +921,9 @@
     background-color: color-mix(in oklab, var(--dark-square) 40%, var(--page));
 }
 
-/* The pieces fade toward the page and never turn see-through, so each side keeps one colour on every square; cburnett, which ignores the variables, loses
-   contrast instead, opaque as well */
+/* The pieces fade toward the page and never turn see-through, so each side keeps one colour on every square */
 .board-wrap.off .piece {
     --kept: 45%;
-}
-
-:root[data-set="cburnett"] .board-wrap.off .piece {
-    filter: grayscale(0.5) contrast(0.55);
-}
-
-:root[data-set="cburnett"] .board-wrap.off > .ended .piece {
-    filter: grayscale(0.3) contrast(0.8);
-}
-
-:root[data-set="cburnett"] .board-wrap.off > .ended .badge .piece {
-    filter: none;
 }
 
 .board-wrap.off .coordinate {
