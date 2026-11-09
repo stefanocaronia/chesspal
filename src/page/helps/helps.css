@@ -1,6 +1,6 @@
 /* The helps (D-78): their signs on the board, their card, the coach and the strategy's table */
 
-/* A piece at risk: a corner folded in ink, bottom left, the square's free corner */
+/* A piece at risk: a corner folded, bottom left, the square's free corner; in ink, or in the player's red and green (D-91) */
 .help-notch {
     position: absolute;
     left: 0;
@@ -27,6 +27,26 @@
 
 .help-notch circle {
     fill: var(--help-on);
+}
+
+/* From the player's side (D-91): red on their pieces at risk, green on the other side's, edged in ink inside a wider halo (Zoe) */
+.help-notch.threat path {
+    fill: var(--badge-blunder);
+}
+
+.help-notch.chance path {
+    fill: var(--badge-best);
+}
+
+.help-notch.threat path,
+.help-notch.chance path {
+    stroke-width: 1.6;
+}
+
+.help-notch path.edge {
+    fill: none;
+    stroke: var(--help-ink);
+    stroke-width: 0.5;
 }
 
 /* A pin: a thin dashed ink line from the pinner to what stands behind, under the arrows; without a head, never an arrow */
@@ -207,8 +227,7 @@
     color: var(--soft);
 }
 
-/* Each kind of fact in its colour, on its icon and as a light tint (Stefano): a piece at risk red, a pin orange, nothing at risk green, the checks blue, the
-   loose pieces grey */
+/* Each line in its colour, on its icon and as a light tint (Stefano): nothing at risk green, the strategy's notes in the accent */
 .help-rows li {
     --row: var(--soft);
     position: relative;
@@ -218,34 +237,115 @@
     background: color-mix(in srgb, var(--row) 10%, transparent);
 }
 
-.help-rows li.risk {
-    --row: var(--badge-blunder);
-}
-
-.help-rows li.pin {
-    --row: var(--badge-mistake);
-}
-
 .help-rows li.safe {
     --row: var(--badge-best);
     color: var(--ink);
-}
-
-.help-rows li.check {
-    --row: var(--accent);
 }
 
 .help-rows li.info {
     --row: var(--accent);
 }
 
-.help-rows li.points:hover {
-    background: color-mix(in srgb, var(--row) 24%, transparent);
-    color: var(--ink);
+/* A line of the tactics (D-91): red when it threatens the player, green when it is their chance, in the accent when no side is theirs; its icon says the kind */
+.help-rows li.help-line {
+    --row: var(--accent);
+    padding: 0;
 }
 
-.help-rows li.quiet {
+/* A threat also has a bar on its left, so that its shape says it where red and green look alike (Zoe) */
+.help-rows li.threat {
+    --row: var(--badge-blunder);
+    box-shadow: inset 3px 0 var(--row);
+}
+
+.help-rows li.chance {
+    --row: var(--badge-best);
+}
+
+.help-rows li.loose {
+    --row: var(--soft);
+}
+
+/* Its head, a button that opens it: the name in ink, then the count on the right and the sign of a line that opens, as the coach's (Zoe) */
+.help-rows .line-head {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+    padding: 3px 8px 3px 26px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.help-rows .line-head::after {
+    content: "▸";
+    color: var(--soft);
+}
+
+.help-rows .line-head[aria-expanded="true"]::after {
+    content: "▾";
+}
+
+/* A finger needs a taller line, and the whole of a strategy's name (Zoe) */
+@media (pointer: coarse) {
+    .help-rows .line-head {
+        padding-block: 7px;
+    }
+
+    .strategy-table .term {
+        display: block;
+        width: 100%;
+        padding: 6px 0;
+    }
+}
+
+.help-rows .line-head:hover,
+.help-rows li.open .line-head {
+    background: color-mix(in srgb, var(--row) 16%, transparent);
+}
+
+.help-rows .line-name {
+    flex: 1;
+}
+
+.help-rows .count {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The loose pieces' counts, each after its side's pawn (Zoe) */
+.help-rows .counts {
+    display: flex;
+    gap: 10px;
     font-size: 12px;
+}
+
+.help-rows .counts .figurine {
+    margin-right: 2px;
+}
+
+/* An opened line: its pieces, each lighting its squares under the pointer */
+.help-rows .line-details {
+    list-style: none;
+    margin: 0;
+    padding: 2px 8px 5px 26px;
+    font-size: 12.5px;
+}
+
+.help-rows .line-details li {
+    padding: 2px 4px;
+    background: none;
+}
+
+.help-rows .line-details li:hover {
+    background: color-mix(in srgb, var(--row) 16%, transparent);
+    color: var(--ink);
 }
 
 .help-rows .square-name {
@@ -412,6 +512,13 @@
     padding-bottom: 4px;
     font-size: 12px;
     font-style: italic;
+}
+
+/* Under the meaning, each side's squares or files (Stefano) */
+.strategy-table tr.meaning .listed {
+    display: block;
+    margin-top: 3px;
+    font-style: normal;
 }
 
 /* The table's groups under their figure, in the accent; the sides' heads with their pawn */

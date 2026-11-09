@@ -171,9 +171,17 @@ export interface HelpsCardText
     pinnedTo(letter: PieceLetter): string;
     pinnedBy(letter: PieceLetter): string;
     readonly nothingAtRisk: string;
-    /** The checks of a side: `toMove` its own, else the ones it would have if it moved. */
-    checks(side: Side, toMove: boolean): string;
+    /**
+     * A line of the tactics (D-91): a side's pieces at risk, its pinned pieces, or its checks (`toMove` its own, else the ones it would have if it moved),
+     * from the player's side when the page knows it.
+     */
+    line(kind: "risk" | "pin" | "check", side: Side, you: Side | undefined, toMove: boolean): string;
     readonly loose: string;
+    /** The loose pieces' counts, the player's and the other side's. */
+    readonly yours: string;
+    readonly theirs: string;
+    /** After the player's side in the strategy's head. */
+    readonly you: string;
     readonly white: string;
     readonly black: string;
     /** Each line of the strategy's table: its name, and what it means for whoever does not know the word (Rosa). */
@@ -573,8 +581,23 @@ const english: Text = {
         pinnedTo: (letter) => `pinned to the ${englishNames[letter]}`,
         pinnedBy: (letter) => `by the ${englishNames[letter]}`,
         nothingAtRisk: "No piece at risk, no pins.",
-        checks: (side, toMove) => `${side === "white" ? "White" : "Black"}'s checks${toMove ? "" : `, if it were ${side === "white" ? "White" : "Black"}'s move`}`,
+        line: (kind, side, you, toMove) => {
+            const name = side === "white" ? "White" : "Black";
+
+            if (you === undefined) {
+                return kind === "risk" ? `${name}'s pieces at risk` : kind === "pin" ? `${name}'s pinned pieces` : `${name}'s checks${toMove ? "" : `, if it were ${name}'s move`}`;
+            }
+
+            if (kind === "check") {
+                return side === you ? `Checks you ${toMove ? "can" : "could"} give` : `Checks the opponent ${toMove ? "can" : "could"} give you`;
+            }
+
+            return `${side === you ? "Your" : "The opponent's"} ${kind === "risk" ? "pieces at risk" : "pinned pieces"}`;
+        },
         loose: "Pieces neither attacked nor defended",
+        yours: "yours",
+        theirs: "the opponent's",
+        you: "(you)",
         white: "White",
         black: "Black",
         rows: {
@@ -857,13 +880,28 @@ const italian: Text = {
         attackers: "attaccanti",
         defenders: "difensori",
         undefended: "nessun difensore",
-        cheaper: "un attaccante vale meno",
+        cheaper: "un attaccante vale meno di lui",
         outnumbered: "più attaccanti che difensori",
         pinnedTo: (letter) => `davanti ${italianWith("a", letter)}`,
         pinnedBy: (letter) => italianWith("da", letter),
         nothingAtRisk: "Nessun pezzo in pericolo, nessuna inchiodatura.",
-        checks: (side, toMove) => `Scacchi del ${side === "white" ? "Bianco" : "Nero"}${toMove ? "" : ", se toccasse a lui"}`,
+        line: (kind, side, you, toMove) => {
+            const name = side === "white" ? "Bianco" : "Nero";
+
+            if (you === undefined) {
+                return kind === "risk" ? `Pezzi del ${name} in pericolo` : kind === "pin" ? `Pezzi del ${name} inchiodati` : `Scacchi del ${name}${toMove ? "" : ", se toccasse a lui"}`;
+            }
+
+            if (kind === "check") {
+                return side === you ? `Scacchi che ${toMove ? "puoi" : "potresti"} dare` : `Scacchi che l'avversario ${toMove ? "può" : "potrebbe"} darti`;
+            }
+
+            return `${side === you ? "I tuoi pezzi" : "I pezzi avversari"} ${kind === "risk" ? "in pericolo" : "inchiodati"}`;
+        },
         loose: "Pezzi né attaccati né difesi",
+        yours: "tuoi",
+        theirs: "avversari",
+        you: "(tu)",
         white: "Bianco",
         black: "Nero",
         rows: {

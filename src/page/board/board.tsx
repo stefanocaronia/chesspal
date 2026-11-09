@@ -4,7 +4,7 @@ import { useMemo, useRef } from "preact/hooks";
 import type { Badge as MoveBadge, DrawnArrow, DrawnSquare, Move, PieceLetter, Profile, Promotion, Side, Square } from "../../core/index.ts";
 import { BadgeIcon } from "../game/badges.tsx";
 import type { HowEnded } from "../game/ending.ts";
-import { atRiskOn, type HelpsView } from "../helps/view.ts";
+import { type HelpsView, riskOn } from "../helps/view.ts";
 import { Piece } from "../pieces/pieces.tsx";
 import type { Text } from "../text.ts";
 import { bubblePlace, type Explanation, keptSquares } from "./explain.ts";
@@ -165,6 +165,7 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
                             "--dx": columns.indexOf(from[0]!) - column,
                             "--dy": ranks.indexOf(Number(from[1])) - row,
                         };
+                        const risk = signsOfHelps === undefined ? undefined : riskOn(signsOfHelps, square);
                         return (
                             <div
                                 key={square}
@@ -198,7 +199,7 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
                                 {control === undefined ? null : <span class={`control-ground ${controlOf(control[square as Square])}`} aria-hidden="true" />}
                                 {piece === undefined ? null : <Piece key={moving ? fen : "still"} letter={piece} />}
                                 {sign === undefined ? null : <Badge kind={sign.badge} />}
-                                {signsOfHelps !== undefined && atRiskOn(signsOfHelps, square) ? <Notch /> : null}
+                                {risk === undefined ? null : <Notch tone={risk} />}
                                 {control === undefined ? null : <ControlCount counts={control[square as Square]} />}
                                 {badge === undefined || lastMove?.to !== square ? null : <BadgeIcon badge={badge.badge} title={badge.name} />}
                             </div>

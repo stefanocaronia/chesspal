@@ -8,6 +8,13 @@ export interface StudiedSide
     readonly who: "player" | "ai" | "other";
 }
 
+/** The player's side in a game in analysis: none when they played neither side, or both. */
+export function playerIn(sides: Record<Side, StudiedSide>): Side | undefined
+{
+    const white = sides.white.who === "player";
+    return white === (sides.black.who === "player") ? undefined : white ? "white" : "black";
+}
+
 /** Both sides of a game in analysis, and the one at the bottom: the player's, when one of them is, else White. */
 export function studiedSides(tags: Readonly<Record<string, string>>, you: string, ai: string, sides: Readonly<Record<Side, string>>): Record<Side, StudiedSide> & { bottom: Side; }
 {

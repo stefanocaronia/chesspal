@@ -30,7 +30,7 @@ import { piecesOf } from "../board/squares.ts";
 import { type NewGameChoice, NewGameDialog } from "../dialogs/new-game.tsx";
 import { NameButton, PictureButton, PictureDialog, ProfilesDialog, Wizard } from "../dialogs/profiles.tsx";
 import { SettingsPanel } from "../dialogs/settings.tsx";
-import { type StudiedSide, studiedSides } from "../dialogs/studied.ts";
+import { playerIn, type StudiedSide, studiedSides } from "../dialogs/studied.ts";
 import { type Studied, StudyDialog } from "../dialogs/study.tsx";
 import { BadgeCounts } from "../game/badges.tsx";
 import { type Step, stepped } from "../game/browse.ts";
@@ -170,7 +170,9 @@ export function App({ start }: { start: Settings; })
     useEffect(() => setPointed(noSquares), [shown]);
     // With the helps on, the player sees all of Chesspal's facts, whatever the AI's level (D-79), in a game and in the analysis of one (Stefano).
     const analysing = studied !== undefined;
-    const helps = useMemo(() => (going || analysing) && settings.helps ? helpsOf(shown) : undefined, [shown, going, analysing, settings.helps]);
+    // Seen from the player's side (D-91): theirs in a game, in analysis the side the game names theirs, none when it names neither.
+    const you = analysing ? playerIn(studiedSides(live.record.tags, served?.profile.name ?? "", name, text.sides)) : game?.ai === undefined ? undefined : game.ai === "white" ? "black" : "white";
+    const helps = useMemo(() => (going || analysing) && settings.helps ? helpsOf(shown, you) : undefined, [shown, going, analysing, settings.helps, you]);
     // Who the AI saw ahead, the coach's with the helps on in a game and the analyst's in analysis, for the bar and the chart (D-90).
     const drawnOnBoard = live.outcome.over && live.outcome.result === "1/2-1/2";
     const standings = useMemo(() => (going && settings.helps) || analysing ? standingsOf(plies, drawnOnBoard) : undefined, [plies, drawnOnBoard, going, analysing, settings.helps]);

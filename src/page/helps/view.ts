@@ -6,15 +6,31 @@ export interface HelpsView
 {
     /** Who moves: the checks are theirs, the other checks the other side's. */
     readonly toMove: Side;
+    /** The player's side, from which the helps are seen (D-91); none in the analysis of a game they did not play. */
+    readonly you: Side | undefined;
     /** Undefended first, then attacked by a cheaper piece, then outnumbered: three lists that never share a piece. */
     readonly atRisk: readonly PieceAtRisk[];
     readonly pins: readonly PinnedPiece[];
     readonly checks: readonly string[];
     readonly otherChecks: readonly string[];
     readonly loose: readonly PieceFacts[];
+    /** The tactics' lines of the card: the player's threats first, then their chances; by side, White first, when no side is theirs. */
+    readonly lines: readonly TacticLine[];
     /** The profile: the strategy and the control map. */
     readonly strategy: Profile;
+    /** The strategy's sides in their columns: the player's first, else White. */
+    readonly sides: readonly [Side, Side];
 }
+
+/** Whose a fact is to the player (D-91): a threat to them, a chance for them, or neither when the page does not know their side. */
+export type Tone = "threat" | "chance" | "neutral";
+
+/** A line of the tactics: one kind of fact of one side, its pieces at risk, its pinned pieces or the checks it gives; the loose pieces of both. */
+export type TacticLine =
+    | { readonly kind: "risk"; readonly side: Side; readonly tone: Tone; readonly items: readonly PieceAtRisk[]; }
+    | { readonly kind: "pin"; readonly side: Side; readonly tone: Tone; readonly items: readonly PinnedPiece[]; }
+    | { readonly kind: "check"; readonly side: Side; readonly tone: Tone; readonly toMove: boolean; readonly items: readonly string[]; }
+    | { readonly kind: "loose"; readonly tone: "neutral"; readonly items: readonly PieceFacts[]; };
 
 /** A piece at risk and why. */
 export interface PieceAtRisk
@@ -31,29 +47,66 @@ export interface PinnedPiece
     readonly to: PieceFacts;
 }
 
-/** The helps of a game's position, whatever the AI's level (D-79). */
-export function helpsOf(game: Game): HelpsView
+/** The helps of a game's position, whatever the AI's level (D-79), seen from the player's side when the page knows it (D-91). */
+export function helpsOf(game: Game, you?: Side): HelpsView
 {
     const facts = game.facts;
     const pieces = new Map(facts.pieces.map((piece) => [piece.square, piece]));
     const on = (square: Square): PieceFacts => pieces.get(square)!;
-    const atRisk = (squares: readonly Square[], why: PieceAtRisk["why"]): PieceAtRisk[] => squares.map((square) => ({ piece: on(square), why }));
+    const risks = (squares: readonly Square[], why: PieceAtRisk["why"]): PieceAtRisk[] => squares.map((square) => ({ piece: on(square), why }));
+    const toMove = game.position.turn;
+    const atRisk = [...risks(facts.undefended, "undefended"), ...risks(facts.attackedByCheaper, "cheaper"), ...risks(facts.outnumbered, "outnumbered")];
+    const pins = facts.pins.map((pin) => ({ piece: on(pin.square), by: on(pin.by), to: on(pin.to) }));
+    const checks = facts.checks;
+    const otherChecks = facts.otherChecks ?? [];
+    const loose = facts.loose.map(on);
 
     return {
-        toMove: game.position.turn,
-        atRisk: [...atRisk(facts.undefended, "undefended"), ...atRisk(facts.attackedByCheaper, "cheaper"), ...atRisk(facts.outnumbered, "outnumbered")],
-        pins: facts.pins.map((pin) => ({ piece: on(pin.square), by: on(pin.by), to: on(pin.to) })),
-        checks: facts.checks,
-        otherChecks: facts.otherChecks ?? [],
-        loose: facts.loose.map(on),
+        toMove,
+        you,
+        atRisk,
+        pins,
+        checks,
+        otherChecks,
+        loose,
+        lines: tacticLines({ toMove, atRisk, pins, checks, otherChecks, loose }, you),
         strategy: game.profile,
+        sides: you === "black" ? ["black", "white"] : ["white", "black"],
     };
 }
 
-/** Whether the helps mark a square's piece as at risk. */
-export function atRiskOn(helps: HelpsView, square: string): boolean
+/** How the helps mark a square's piece at risk (D-91): red when it is the player's, green when it is the other side's, in ink when no side is theirs. */
+export function riskOn(helps: HelpsView, square: string): Tone | undefined
 {
-    return helps.atRisk.some((risk) => risk.piece.square === square);
+    const risk = helps.atRisk.find((risk) => risk.piece.square === square);
+    return risk === undefined ? undefined : toneOf(risk.piece.side, helps.you);
+}
+
+/** The squares a line of the tactics lights on the board: its pieces, and those that attack or pin them; none for the checks. */
+export function squaresOf(line: TacticLine): readonly string[]
+{
+    switch (line.kind) {
+        case "risk":
+            return line.items.flatMap(riskSquares);
+        case "pin":
+            return line.items.flatMap(pinSquares);
+        case "check":
+            return [];
+        case "loose":
+            return line.items.map((piece) => piece.square);
+    }
+}
+
+/** A piece at risk and its attackers. */
+export function riskSquares(risk: PieceAtRisk): readonly string[]
+{
+    return [risk.piece.square, ...risk.piece.attackers];
+}
+
+/** A pinned piece, the one that pins it and the one behind it. */
+export function pinSquares(pin: PinnedPiece): readonly string[]
+{
+    return [pin.piece.square, pin.by.square, pin.to.square];
 }
 
 /** A line of the strategy's table: one fact of the profile for each side. */
@@ -114,6 +167,41 @@ const cells = {
     castled: castlingOf,
     kingAttacks: (side: SideProfile): StrategyCell => side.king?.attacksNear ?? 0,
 };
+
+// The tactics' lines that have something: with the player's side, their pieces at risk and pinned and the other side's checks, then the same the other way
+// round; without it, White's then Black's; the loose pieces last.
+function tacticLines(facts: Pick<HelpsView, "toMove" | "atRisk" | "pins" | "checks" | "otherChecks" | "loose">, you: Side | undefined): TacticLine[]
+{
+    const sideLines = (side: Side): TacticLine[] => [
+        { kind: "risk", side, tone: toneOf(side, you), items: facts.atRisk.filter((risk) => risk.piece.side === side) },
+        { kind: "pin", side, tone: toneOf(side, you), items: facts.pins.filter((pin) => pin.piece.side === side) },
+    ];
+    const checkLine = (side: Side): TacticLine => ({
+        kind: "check",
+        side,
+        tone: you === undefined ? "neutral" : side === you ? "chance" : "threat",
+        toMove: side === facts.toMove,
+        items: side === facts.toMove ? facts.checks : facts.otherChecks,
+    });
+    // The player's threats are their pieces' troubles and the other side's checks; their chances the other way round.
+    const lines = you === undefined
+        ? [...sideLines("white"), checkLine("white"), ...sideLines("black"), checkLine("black")]
+        : [...sideLines(you), checkLine(otherSide(you)), ...sideLines(otherSide(you)), checkLine(you)];
+
+    const loose: TacticLine = { kind: "loose", tone: "neutral", items: facts.loose };
+    return [...lines, loose].filter((line) => line.items.length > 0);
+}
+
+function otherSide(side: Side): Side
+{
+    return side === "white" ? "black" : "white";
+}
+
+// A piece's trouble is a threat to its side's player and a chance for the other.
+function toneOf(side: Side, you: Side | undefined): Tone
+{
+    return you === undefined ? "neutral" : side === you ? "threat" : "chance";
+}
 
 function castlingOf(side: SideProfile): StrategyCell
 {

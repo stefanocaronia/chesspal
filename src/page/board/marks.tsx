@@ -2,20 +2,22 @@
 // bubble of a refused move, the choice of a promotion and the piece lifted off the board.
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { DrawColour, PieceLetter, Promotion, Side } from "../../core/index.ts";
-import type { HelpsView } from "../helps/view.ts";
+import type { HelpsView, Tone } from "../helps/view.ts";
 import { Piece } from "../pieces/pieces.tsx";
 import type { Text } from "../text.ts";
 import type { BoardEnd, Notice } from "./board.tsx";
 import type { BubblePlace, ExplainKind } from "./explain.ts";
 import type { Drag } from "./pointer.ts";
 
-/** The corner folded in ink on a piece at risk: on the board, and before its line in the card. */
-export function Notch()
+/** The corner folded on a piece at risk, red on the player's and green on the other side's, in ink when no side is theirs (D-91); before its line in the card. */
+export function Notch({ tone }: { tone?: Tone; })
 {
     return (
-        <span class="help-notch" aria-hidden="true">
+        <span class={tone === undefined ? "help-notch" : `help-notch ${tone}`} aria-hidden="true">
             <svg viewBox="0 0 10 10">
                 <path d="M0.5 0.5V9.5H9.5Z" />
+                {/* A coloured corner is edged in ink inside its halo, as a sticker, so that the green reads on a green board too (Zoe) */}
+                {tone === undefined ? null : <path class="edge" d="M0.5 0.5V9.5H9.5Z" />}
                 <circle cx="2.9" cy="7.1" r="1.1" />
             </svg>
         </span>

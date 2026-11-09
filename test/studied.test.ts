@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readPgn } from "../src/core/index.ts";
-import { studiedSides } from "../src/page/dialogs/studied.ts";
+import { playerIn, studiedSides } from "../src/page/dialogs/studied.ts";
 import { pliesOf } from "../src/page/game/plies.ts";
 
 const sides = { white: "White", black: "Black" };
@@ -18,6 +18,15 @@ describe("a game in analysis on the page (D-69)", () => {
             black: { name: "Black", who: "other" },
             bottom: "white",
         });
+    });
+
+    it("knows the player's side only when they played one side of it (D-91)", () => {
+        const playerOf = (tags: Record<string, string>) => playerIn(studiedSides(tags, "Stefano", "Claude", sides));
+
+        expect(playerOf({ White: "AI", Black: "Player" })).toBe("black");
+        expect(playerOf({ White: "Stefano", Black: "Seba" })).toBe("white");
+        expect(playerOf({ White: "Ann", Black: "Bob" })).toBeUndefined();
+        expect(playerOf({ White: "Stefano", Black: "Player" })).toBeUndefined();
     });
 
     it("gives each move the AI's badge and note, apart from the words of its comment", () => {
