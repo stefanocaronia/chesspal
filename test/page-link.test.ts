@@ -107,6 +107,8 @@ describe("the board page's address for a player who has not opened it", () => {
         expect(page.open()).toBe(false);
 
         const listening = get(new URL("/api/events", page.url));
+        // Closing it before the answer arrives makes the request fail with "socket hang up": expected here.
+        listening.on("error", () => undefined);
         await until(() => page.open());
         listening.destroy();
         await until(() => !page.open());
