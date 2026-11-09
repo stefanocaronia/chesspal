@@ -49,6 +49,74 @@
     stroke-width: 0.5;
 }
 
+/* A pinned piece: a pushpin stuck in it from the top left corner, in the notch's colours and on its halo; it takes the place of the rank's number there.
+   A skewered piece, the one in front: a skewer stuck in it the same way, beside the pushpin when the piece is pinned too */
+.help-pin,
+.help-skewer {
+    position: absolute;
+    left: 1px;
+    top: 1px;
+    z-index: 2;
+    display: block;
+    height: clamp(15px, 3.6cqw, 26px);
+    aspect-ratio: 18.5 / 22.5;
+    pointer-events: none;
+}
+
+.help-pin svg,
+.help-skewer svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.help-pin path,
+.help-skewer path {
+    fill: var(--help-ink);
+    stroke: var(--help-halo);
+    stroke-width: 2.6;
+    stroke-linejoin: round;
+    paint-order: stroke;
+}
+
+.help-pin.threat path {
+    fill: var(--badge-blunder);
+}
+
+.help-pin.chance path {
+    fill: var(--badge-best);
+}
+
+/* The skewer's stick stays in ink and its beads take the tone, so that it reads apart from the pushpin (Stefano) */
+.help-skewer circle {
+    stroke: var(--help-ink);
+    stroke-width: 0.9;
+}
+
+.help-skewer.threat circle {
+    fill: var(--badge-blunder);
+}
+
+.help-skewer.chance circle {
+    fill: var(--badge-best);
+}
+
+.help-pin path.edge,
+.help-skewer path.edge {
+    fill: none;
+    stroke: var(--help-ink);
+    stroke-width: 1;
+}
+
+.square:has(> .help-pin) > .help-skewer {
+    left: clamp(9px, 3cqw, 22px);
+}
+
+.square:has(> .help-pin, > .help-skewer) > .coordinate.rank {
+    visibility: hidden;
+}
+
 /* A pin: a thin dashed ink line from the pinner to what stands behind, under the arrows; without a head, never an arrow */
 .helps-layer {
     position: absolute;
@@ -71,6 +139,11 @@
     stroke-width: 0.065;
     stroke-dasharray: 0.16 0.12;
     stroke-linecap: round;
+}
+
+/* A skewer's line: a dash and a dot, beads on its stick, so that it reads apart from a pin's even dashes */
+.helps-layer .skewer line:not(.halo) {
+    stroke-dasharray: 0.22 0.11 0 0.11;
 }
 
 /* The map (Zoe, after the round): every square on one neutral ground, then light where only White reaches, dark where only Black does, half and half
@@ -381,6 +454,18 @@
 
 .help-rows .help-notch circle {
     fill: var(--card);
+}
+
+/* The skewer of the board, in the line's colour and without its halo */
+.help-rows .help-skewer {
+    left: 7px;
+    top: 4px;
+    height: 17px;
+}
+
+.help-rows .help-skewer path {
+    fill: var(--row);
+    stroke: none;
 }
 
 .help-rows .row-icon {

@@ -4,11 +4,11 @@ import { useMemo, useRef } from "preact/hooks";
 import type { Badge as MoveBadge, DrawnArrow, DrawnSquare, Move, PieceLetter, Profile, Promotion, Side, Square } from "../../core/index.ts";
 import { BadgeIcon } from "../game/badges.tsx";
 import type { HowEnded } from "../game/ending.ts";
-import { type HelpsView, riskOn } from "../helps/view.ts";
+import { type HelpsView, pinOn, riskOn, skewerOn } from "../helps/view.ts";
 import { Piece } from "../pieces/pieces.tsx";
 import type { Text } from "../text.ts";
 import { bubblePlace, type Explanation, keptSquares } from "./explain.ts";
-import { Arrows, Badge, Bubble, ControlCount, controlOf, kingSigns, Lifted, noSigns, Notch, Pins, PromotionChoice } from "./marks.tsx";
+import { Arrows, Badge, Bubble, ControlCount, controlOf, kingSigns, Lifted, noSigns, Notch, PinsAndSkewers, PromotionChoice, Pushpin, Skewer } from "./marks.tsx";
 import { backOf, motionOf, noMotion, playedOn, rearranged } from "./motion.ts";
 import { useBoardPointer } from "./pointer.ts";
 import { files, kingToMove, piecesOf } from "./squares.ts";
@@ -166,6 +166,9 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
                             "--dy": ranks.indexOf(Number(from[1])) - row,
                         };
                         const risk = signsOfHelps === undefined ? undefined : riskOn(signsOfHelps, square);
+                        // A pinned piece's pushpin and a skewered one's skewer go with their lines, so not over the control map.
+                        const pin = signsOfHelps === undefined || control !== undefined ? undefined : pinOn(signsOfHelps, square);
+                        const skewer = signsOfHelps === undefined || control !== undefined ? undefined : skewerOn(signsOfHelps, square);
                         return (
                             <div
                                 key={square}
@@ -200,6 +203,8 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
                                 {piece === undefined ? null : <Piece key={moving ? fen : "still"} letter={piece} />}
                                 {sign === undefined ? null : <Badge kind={sign.badge} />}
                                 {risk === undefined ? null : <Notch tone={risk} />}
+                                {pin === undefined ? null : <Pushpin tone={pin} />}
+                                {skewer === undefined ? null : <Skewer tone={skewer} />}
                                 {control === undefined ? null : <ControlCount counts={control[square as Square]} />}
                                 {badge === undefined || lastMove?.to !== square ? null : <BadgeIcon badge={badge.badge} title={badge.name} />}
                             </div>
@@ -207,7 +212,9 @@ export function Board({ fen, bottom, lastMove, pointed, helps, control, bare, ba
                     })
                 )}
                 {/* Inside the board, under the corners of the pieces at risk */}
-                {signsOfHelps === undefined || signsOfHelps.pins.length === 0 || control !== undefined ? null : <Pins pins={signsOfHelps.pins} at={centreOf} />}
+                {signsOfHelps === undefined || signsOfHelps.pins.length + signsOfHelps.skewers.length === 0 || control !== undefined
+                    ? null
+                    : <PinsAndSkewers pins={signsOfHelps.pins} skewers={signsOfHelps.skewers} at={centreOf} />}
             </div>
             <Arrows arrows={aiArrows} at={centreOf} occupied={(square) => pieces.has(square)} />
             <Arrows arrows={ownArrows} at={centreOf} />

@@ -174,12 +174,14 @@ export interface HelpsCardText
     /** A pin, after the pinned piece: the piece behind it, then the one that pins it, each with its article. */
     pinnedTo(letter: PieceLetter): string;
     pinnedBy(letter: PieceLetter): string;
+    /** A skewer, after the piece in front: the piece behind it; then the one that skewers it, as `pinnedBy`. */
+    skeweredBefore(letter: PieceLetter): string;
     readonly nothingAtRisk: string;
     /**
-     * A line of the tactics (D-91): a side's pieces at risk, its pinned pieces, or its checks (`toMove` its own, else the ones it would have if it moved),
-     * from the player's side when the page knows it.
+     * A line of the tactics (D-91): a side's pieces at risk, pinned or skewered, or its checks (`toMove` its own, else the ones it would have if it
+     * moved), from the player's side when the page knows it.
      */
-    line(kind: "risk" | "pin" | "check", side: Side, you: Side | undefined, toMove: boolean): string;
+    line(kind: "risk" | "pin" | "skewer" | "check", side: Side, you: Side | undefined, toMove: boolean): string;
     readonly loose: string;
     /** The loose pieces' counts, the player's and the other side's. */
     readonly yours: string;
@@ -627,19 +629,21 @@ const english: Text = {
         outnumbered: "more attackers than defenders",
         pinnedTo: (letter) => `pinned to the ${englishNames[letter]}`,
         pinnedBy: (letter) => `by the ${englishNames[letter]}`,
+        skeweredBefore: (letter) => `ahead of the ${englishNames[letter]}`,
         nothingAtRisk: "No piece at risk, no pins.",
         line: (kind, side, you, toMove) => {
             const name = side === "white" ? "White" : "Black";
+            const pieces = { risk: "pieces at risk", pin: "pinned pieces", skewer: "skewered pieces" };
 
             if (you === undefined) {
-                return kind === "risk" ? `${name}'s pieces at risk` : kind === "pin" ? `${name}'s pinned pieces` : `${name}'s checks${toMove ? "" : `, if it were ${name}'s move`}`;
+                return kind === "check" ? `${name}'s checks${toMove ? "" : `, if it were ${name}'s move`}` : `${name}'s ${pieces[kind]}`;
             }
 
             if (kind === "check") {
                 return side === you ? `Checks you ${toMove ? "can" : "could"} give` : `Checks the opponent ${toMove ? "can" : "could"} give you`;
             }
 
-            return `${side === you ? "Your" : "The opponent's"} ${kind === "risk" ? "pieces at risk" : "pinned pieces"}`;
+            return `${side === you ? "Your" : "The opponent's"} ${pieces[kind]}`;
         },
         loose: "Pieces neither attacked nor defended",
         yours: "yours",
@@ -953,19 +957,21 @@ const italian: Text = {
         outnumbered: "più attaccanti che difensori",
         pinnedTo: (letter) => `davanti ${italianWith("a", letter)}`,
         pinnedBy: (letter) => italianWith("da", letter),
+        skeweredBefore: (letter) => `con dietro ${italianThe[letter]}`,
         nothingAtRisk: "Nessun pezzo in pericolo, nessuna inchiodatura.",
         line: (kind, side, you, toMove) => {
             const name = side === "white" ? "Bianco" : "Nero";
+            const what = { risk: "in pericolo", pin: "inchiodati", skewer: "infilati" };
 
             if (you === undefined) {
-                return kind === "risk" ? `Pezzi del ${name} in pericolo` : kind === "pin" ? `Pezzi del ${name} inchiodati` : `Scacchi del ${name}${toMove ? "" : ", se toccasse a lui"}`;
+                return kind === "check" ? `Scacchi del ${name}${toMove ? "" : ", se toccasse a lui"}` : `Pezzi del ${name} ${what[kind]}`;
             }
 
             if (kind === "check") {
                 return side === you ? `Scacchi che ${toMove ? "puoi" : "potresti"} dare` : `Scacchi che l'avversario ${toMove ? "può" : "potrebbe"} darti`;
             }
 
-            return `${side === you ? "I tuoi pezzi" : "I pezzi avversari"} ${kind === "risk" ? "in pericolo" : "inchiodati"}`;
+            return `${side === you ? "I tuoi pezzi" : "I pezzi avversari"} ${what[kind]}`;
         },
         loose: "Pezzi né attaccati né difesi",
         yours: "tuoi",

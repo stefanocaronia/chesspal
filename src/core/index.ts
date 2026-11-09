@@ -2,7 +2,7 @@
 export { boardText, figurinesOf } from "./board-text.ts";
 export { canMate, clockAfterMove, clockOfComment, clockStarted, clockTag, clockText, startClock, timeControlOf, timeControlOfTag, timeControlTag, timeControlText, timeLeft } from "./clock.ts";
 export type { Clock, TimeControl } from "./clock.ts";
-export type { Facts, PieceFacts, PieceLetter, Pin } from "./facts.ts";
+export type { Facts, PieceFacts, PieceLetter, Pin, Skewer } from "./facts.ts";
 export { Game, withSanLetters } from "./game.ts";
 export type { Ending, Move, Outcome, Played, Position, Promotion, Refusal, Side, Square } from "./game.ts";
 export type { Illegal, IllegalReason } from "./illegal.ts";

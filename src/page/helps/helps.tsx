@@ -3,7 +3,7 @@
 import { type ComponentChildren, Fragment } from "preact";
 import { useState } from "preact/hooks";
 import type { PieceFacts, Profile, Side } from "../../core/index.ts";
-import { Notch } from "../board/marks.tsx";
+import { Notch, Skewer } from "../board/marks.tsx";
 import { BadgeIcon, NoteIcon } from "../game/badges.tsx";
 import { FoldButton, useCardFold } from "../game/card-fold.tsx";
 import { Figurines } from "../game/move-list.tsx";
@@ -206,7 +206,7 @@ function Tactics({ helps, opened, onOpen, onPoint, text }: {
 {
     const words = text.helpsCard;
     const point = pointing(onPoint);
-    const calm = !helps.lines.some((line) => line.kind === "risk" || line.kind === "pin");
+    const calm = !helps.lines.some((line) => line.kind === "risk" || line.kind === "pin" || line.kind === "skewer");
 
     return (
         <ul class="help-rows">
@@ -254,11 +254,15 @@ interface Pointing
     onPointerLeave: (event: PointerEvent) => void;
 }
 
-/** A line's sign: the corner of a piece at risk, a pin's link, a check's plus, the loose pieces' i; its colour is the line's. */
+/** A line's sign: the corner of a piece at risk, a pin's link, the skewer of the board, a check's plus, the loose pieces' i; its colour is the line's. */
 function LineIcon({ kind }: { kind: TacticLine["kind"]; })
 {
     if (kind === "risk") {
         return <Notch />;
+    }
+
+    if (kind === "skewer") {
+        return <Skewer />;
     }
 
     if (kind === "loose") {
@@ -329,6 +333,18 @@ function LineDetails({ line, helps, point, text }: { line: TacticLine; helps: He
                         <li key={pin.piece.square} {...point(pinSquares(pin))}>
                             {text.piece(pin.piece.piece, pin.piece.side)} <Squares squares={[pin.piece.square]} /> {words.pinnedTo(pin.to.piece)} <Squares squares={[pin.to.square]} />, {words.pinnedBy(pin.by.piece)}{" "}
                             <Squares squares={[pin.by.square]} />
+                        </li>
+                    ))}
+                </ul>
+            );
+        case "skewer":
+            return (
+                <ul class="line-details">
+                    {line.items.map((skewer) => (
+                        <li key={skewer.piece.square} {...point(pinSquares(skewer))}>
+                            {text.piece(skewer.piece.piece, skewer.piece.side)} <Squares squares={[skewer.piece.square]} /> {words.skeweredBefore(skewer.to.piece)} <Squares squares={[skewer.to.square]} />, {words.pinnedBy(skewer.by.piece)}
+                            {" "}
+                            <Squares squares={[skewer.by.square]} />
                         </li>
                     ))}
                 </ul>

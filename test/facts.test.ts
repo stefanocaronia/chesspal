@@ -48,6 +48,20 @@ describe("the facts of a position", () => {
         expect(from("2k5/2q5/8/8/8/2B5/8/1KR5 w - - 0 1").facts.pins).toEqual([]);
     });
 
+    it("finds the skewers: a king, queen or rook that must move, with a piece of its side behind it taken with gain, as Anatolij defines them", () => {
+        // The king on d5 must move, and the bishop takes the queen behind it.
+        expect(from("8/5q2/8/3k4/8/1B6/8/6K1 b - - 0 1").facts.skewers).toEqual([{ square: "d5", by: "b3", to: "f7" }]);
+        // The rook behind the king is defended by the knight, and the queen is worth more than it: no skewer, until the knight goes.
+        expect(from("r2k3Q/8/1n6/8/8/8/8/6K1 b - - 0 1").facts.skewers).toEqual([]);
+        expect(from("r2k3Q/8/8/8/8/8/8/6K1 b - - 0 1").facts.skewers).toEqual([{ square: "d8", by: "h8", to: "a8" }]);
+        // The rook in front is defended and attacked by a rook worth as much: it need not move.
+        expect(from("6k1/8/8/4p3/1b1r3R/8/8/6K1 b - - 0 1").facts.skewers).toEqual([]);
+        // The rook on d2 is pinned to its king: it attacks the queen on d5 no more.
+        expect(from("3r2k1/8/8/3q4/1b6/8/3R4/4K3 w - - 0 1").facts.skewers).toEqual([]);
+        // The rook on a8 is defended only by the queen in front of it, which leaves the line when it moves.
+        expect(from("r7/7k/8/q7/8/8/1K6/R7 b - - 0 1").facts.skewers).toEqual([{ square: "a5", by: "a1", to: "a8" }]);
+    });
+
     it("lets a piece pinned to its king attack and defend only along the pin's line, though it still gives check", () => {
         // The queen on e7 is pinned by the rook on e1: it defends neither the bishop on b4 nor the knight on f6.
         const { pieces } = from("rnb1k2r/pp2qppp/2p2n2/8/1b3B2/2NQ4/PPP2PPP/3RR1K1 w kq - 0 12").facts;

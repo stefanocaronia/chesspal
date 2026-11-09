@@ -1,4 +1,4 @@
-// What a position shows, computed without judging it (D-19, D-26): who attacks and defends each piece, what is at risk, the pins, the checks, the moves of each piece.
+// What a position shows, computed without judging it (D-19, D-26): who attacks and defends each piece, what is at risk, the pins and skewers, the checks, the moves of each piece.
 import { Chess, type Color, type PieceSymbol, type Square } from "chess.js";
 import type { Move, Side } from "./game.ts";
 
@@ -30,6 +30,20 @@ export interface Pin
     readonly to: Square;
 }
 
+/**
+ * A king, queen or rook attacked by a bishop, rook or queen with a piece of its side worth less behind it on the line, when the front piece must move (it
+ * is the king, the attacker is worth less, or it is undefended) and the attacker is worth less than the piece behind or that piece is undefended without
+ * counting the front piece (Anatolij).
+ */
+export interface Skewer
+{
+    /** The piece in front, attacked. */
+    readonly square: Square;
+    readonly by: Square;
+    /** The piece behind it. */
+    readonly to: Square;
+}
+
 /** The facts of a position: data for the AI and the page, never a judgment (D-19). */
 export interface Facts
 {
@@ -46,6 +60,7 @@ export interface Facts
     /** Pieces neither attacked nor defended, kings left out: the first targets of a tactic. */
     readonly loose: readonly Square[];
     readonly pins: readonly Pin[];
+    readonly skewers: readonly Skewer[];
     /** The checks of the side to move, in SAN. */
     readonly checks: readonly string[];
     /** The checks the other side would have if it were to move; left out when the side to move is in check, since it could not be. */
@@ -135,6 +150,7 @@ function computed(chess: Chess, legal: readonly Move[]): Facts
     const relativePins = placed.filter((piece) => piece.type === "q" || piece.type === "r").flatMap((target) =>
         pinsTo(chess, target).filter((pin) => valueAt(pin.by) < values[target.type] || factsAt.get(target.square)?.defenders.length === 0)
     );
+    const skewers = placed.filter((piece) => piece.type === "k" || piece.type === "q" || piece.type === "r").flatMap((front) => skewersOf(chess, front, factsAt));
     const king = pieces.find((piece) => piece.piece === "K" && piece.side === sideOf(turn));
     const facts: Facts = {
         pieces,
@@ -144,6 +160,7 @@ function computed(chess: Chess, legal: readonly Move[]): Facts
         outnumbered: defended.filter((piece) => !byCheaper.includes(piece) && piece.attackers.length > piece.defenders.length).map((piece) => piece.square),
         loose: officers.filter((piece) => piece.attackers.length === 0 && piece.defenders.length === 0).map((piece) => piece.square),
         pins: [...kingPins, ...relativePins].sort((left, right) => compare(left.square, right.square)),
+        skewers: skewers.sort((left, right) => compare(left.square, right.square)),
         checks: legal.filter((move) => /[+#]$/.test(move.san)).map((move) => move.san),
     };
 
@@ -237,6 +254,39 @@ function pinsTo(chess: Chess, target: Placed): Pin[]
     }
 
     return pins;
+}
+
+/**
+ * The skewers of a king, queen or rook: a rook, bishop or queen that attacks it as the facts count, and a piece of its side worth less right behind it.
+ * The piece behind is counted without the front one among its defenders: the front piece leaves the line when it moves (Anatolij).
+ */
+function skewersOf(chess: Chess, front: Placed, factsAt: ReadonlyMap<Square, PieceFacts>): Skewer[]
+{
+    const skewers: Skewer[] = [];
+    const facts = factsAt.get(front.square)!;
+
+    for (const [fileStep, rankStep, slider] of lines) {
+        const by = rayFrom(front.square, fileStep, rankStep).find((square) => chess.get(square) !== undefined);
+        const to = rayFrom(front.square, -fileStep, -rankStep).find((square) => chess.get(square) !== undefined);
+        const attacker = by === undefined ? undefined : chess.get(by);
+        const behind = to === undefined ? undefined : chess.get(to);
+
+        if (
+            attacker === undefined || behind === undefined || attacker.color === front.color || behind.color !== front.color
+            || (attacker.type !== slider && attacker.type !== "q") || values[behind.type] >= values[front.type] || !facts.attackers.includes(by!)
+        ) {
+            continue;
+        }
+
+        const mustMove = front.type === "k" || values[attacker.type] < values[front.type] || facts.defenders.length === 0;
+        const behindDefended = factsAt.get(to!)!.defenders.some((square) => square !== front.square);
+
+        if (mustMove && (values[attacker.type] < values[behind.type] || !behindDefended)) {
+            skewers.push({ square: front.square, by: by!, to: to! });
+        }
+    }
+
+    return skewers;
 }
 
 /** The pawn that can be taken en passant, and the square a pawn takes it on; none without an en passant square. */

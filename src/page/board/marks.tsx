@@ -1,5 +1,6 @@
-// What the board draws over its squares and pieces: the kings' badges at the end, the arrows, the helps' corners and pins, the control map's counts, the
+// What the board draws over its squares and pieces: the kings' badges at the end, the arrows, the helps' corners, pins and skewers, the control map's counts, the
 // bubble of a refused move, the choice of a promotion and the piece lifted off the board.
+import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { DrawColour, PieceLetter, Promotion, Side } from "../../core/index.ts";
 import type { HelpsView, Tone } from "../helps/view.ts";
@@ -21,6 +22,25 @@ export function Notch({ tone }: { tone?: Tone; })
                 <circle cx="2.9" cy="7.1" r="1.1" />
             </svg>
         </span>
+    );
+}
+
+/** The pushpin stuck in a pinned piece from the top left corner, its needle toward the piece, in the tone of its corner at risk (D-91); in ink in no side's. */
+export function Pushpin({ tone }: { tone: Tone; })
+{
+    return <Stuck kind="help-pin" shape={pushpin} tone={tone} />;
+}
+
+/**
+ * The skewer stuck in the skewered piece, the one in front, as the pushpin in a pinned one (D-91): a stick in ink with a big bead and a small one in the tone,
+ * as the piece in front and the cheaper one behind it, so that it reads apart from the pushpin, all in the tone (Stefano); in the card's line, in its colour.
+ */
+export function Skewer({ tone }: { tone?: Tone; })
+{
+    return (
+        <Stuck kind="help-skewer" shape={skewer} tone={tone}>
+            {tone === undefined || tone === "neutral" ? null : skewerBeads.map(({ y, radius }) => <circle key={y} cx="12" cy={y} r={radius} />)}
+        </Stuck>
     );
 }
 
@@ -87,19 +107,27 @@ export function Arrows({ arrows, at, explain, occupied }: {
     );
 }
 
-/** Each pin as a dashed line from the pinning piece through the pinned one to what stands behind it (D-78), over a halo that reads on every board. */
-export function Pins({ pins, at }: { pins: HelpsView["pins"]; at: (square: string) => [number, number]; })
+/**
+ * Each pin as a dashed line from the pinning piece through the pinned one to what stands behind it (D-78), and each skewer as a dash-dot one, beads on its stick, over
+ * a halo that reads on every board. A pin and a skewer on the same stretch of a line stand apart on its two sides, so that both read.
+ */
+export function PinsAndSkewers({ pins, skewers, at }: { pins: HelpsView["pins"]; skewers: HelpsView["skewers"]; at: (square: string) => [number, number]; })
 {
+    const lines = [...pins.map((line) => ({ kind: "pin", line, other: skewers })), ...skewers.map((line) => ({ kind: "skewer", line, other: pins }))];
+
     return (
         <svg class="helps-layer" viewBox="0 0 8 8" aria-hidden="true">
-            {pins.map((pin) => {
+            {lines.map(({ kind, line, other }) => {
                 // The line stops short of both ends, as an explaining arrow does: it hides neither piece, nor the corner of a pinner at risk.
-                const [x0, y0] = towards(at(pin.by.square), at(pin.to.square), pinTrim);
-                const [x1, y1] = towards(at(pin.to.square), at(pin.by.square), pinTrim);
+                const [startX, startY] = towards(at(line.by.square), at(line.to.square), pinTrim);
+                const [endX, endY] = towards(at(line.to.square), at(line.by.square), pinTrim);
+                const shift = other.some((each) => sharedSquares(each, line) > 1) ? (kind === "pin" ? 1 : -1) * sharedLineShift : 0;
+                const [dx, dy] = across([startX, startY], [endX, endY], shift);
+                const ends = { x1: startX + dx, y1: startY + dy, x2: endX + dx, y2: endY + dy };
                 return (
-                    <g key={`${pin.by.square}${pin.piece.square}`} class="pin">
-                        <line class="halo" x1={x0} y1={y0} x2={x1} y2={y1} />
-                        <line x1={x0} y1={y0} x2={x1} y2={y1} />
+                    <g key={`${kind} ${line.by.square}${line.piece.square}`} class={kind}>
+                        <line class="halo" {...ends} />
+                        <line {...ends} />
                     </g>
                 );
             })}
@@ -291,6 +319,40 @@ function ArrowGroup({ shapes, edged }: { shapes: readonly ArrowShape[]; edged: b
     );
 }
 
+/**
+ * A sign stuck in a piece from its square's top left corner, tilted toward the piece; edged in ink when coloured (Zoe). Its box holds the tilted sign and
+ * its halo only, so that it sits in the corner (Stefano).
+ */
+function Stuck({ kind, shape, tone, children }: { kind: string; shape: string; tone: Tone | undefined; children?: ComponentChildren; })
+{
+    return (
+        <span class={tone === undefined ? kind : `${kind} ${tone}`} aria-hidden="true">
+            <svg viewBox="2 0.5 18.5 22.5">
+                <g transform="rotate(-32 12 12)">
+                    <path d={shape} />
+                    {tone === undefined || tone === "neutral" ? null : <path class="edge" d={shape} />}
+                    {children}
+                </g>
+            </svg>
+        </span>
+    );
+}
+
+/** How many of their three squares a pin and a skewer share: two when they lie on the same stretch of a line. */
+function sharedSquares(one: HelpsView["pins"][number], other: HelpsView["pins"][number]): number
+{
+    const squares = [one.by.square, one.piece.square, one.to.square];
+    return [other.by.square, other.piece.square, other.to.square].filter((square) => squares.includes(square)).length;
+}
+
+/** A step of the given length across a line, always to the same side of it whichever way the line runs. */
+function across(start: readonly [number, number], end: readonly [number, number], distance: number): [number, number]
+{
+    const length = Math.hypot(end[0] - start[0], end[1] - start[1]);
+    const way = end[0] < start[0] || (end[0] === start[0] && end[1] < start[1]) ? -1 : 1;
+    return [-(end[1] - start[1]) / length * distance * way, (end[0] - start[0]) / length * distance * way];
+}
+
 /** A point `distance` squares from `point` toward `target`. */
 function towards(point: readonly [number, number], target: readonly [number, number], distance: number): [number, number]
 {
@@ -324,11 +386,23 @@ function ExplainIcon({ kind, piece }: { kind: ExplainKind; piece: string; })
 
 const promotionPieces: readonly Promotion[] = ["q", "n", "r", "b"];
 
+// A pushpin standing up, as the bubble's pin: its cap, its body widening into the collar, and its needle. Tilted less than a diagonal, so it never lies along a pin's line.
+const pushpin = "M8.6 2.2H15.4Q16.6 2.2 16.6 3.4V4.6Q16.6 5.8 15.4 5.8H14.8V9.4L18.4 13.1V14.9H13V20L12 22.6L11 20V14.9H5.6V13.1L9.2 9.4V5.8H8.6Q7.4 5.8 7.4 4.6V3.4Q7.4 2.2 8.6 2.2Z";
+
+// A skewer standing up, in the pushpin's box: a round end, a big bead, a small one, a stretch of stick between them, and its point.
+const skewer = "M10.9 2.6A1.1 1.1 0 0 1 13.1 2.6V3.75A4.2 4.2 0 0 1 13.1 11.85V13A3.1 3.1 0 0 1 13.1 18.8V20.2L12 23.4L10.9 20.2V18.8A3.1 3.1 0 0 1 10.9 13V11.85A4.2 4.2 0 0 1 10.9 3.75Z";
+
+// The skewer's beads, on its stick: the big one and the small one, as its shape draws them.
+const skewerBeads = [{ y: 7.8, radius: 4.2 }, { y: 15.9, radius: 3.1 }];
+
 // How much an arrow that explains is cut, in squares: off the culprit at its start, and before an occupied square at its point.
 const explainTrim = { start: 0.36, end: 0.4 };
 
 // How much a pin's line is cut at each end, in squares.
 const pinTrim = 0.35;
+
+// How far a pin and a skewer on the same stretch of a line stand off it, each on its side, in squares: a little more than a line with its halo.
+const sharedLineShift = 0.08;
 
 // An arrow's head, in squares: how long, and how far each side of its line.
 const arrowHead = { length: 0.42, width: 0.3 };

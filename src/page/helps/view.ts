@@ -11,6 +11,7 @@ export interface HelpsView
     /** Undefended first, then attacked by a cheaper piece, then outnumbered: three lists that never share a piece. */
     readonly atRisk: readonly PieceAtRisk[];
     readonly pins: readonly PinnedPiece[];
+    readonly skewers: readonly SkeweredPiece[];
     readonly checks: readonly string[];
     readonly otherChecks: readonly string[];
     readonly loose: readonly PieceFacts[];
@@ -25,10 +26,11 @@ export interface HelpsView
 /** Whose a fact is to the player (D-91): a threat to them, a chance for them, or neither when the page does not know their side. */
 export type Tone = "threat" | "chance" | "neutral";
 
-/** A line of the tactics: one kind of fact of one side, its pieces at risk, its pinned pieces or the checks it gives; the loose pieces of both. */
+/** A line of the tactics: one kind of fact of one side, its pieces at risk, pinned or skewered, or the checks it gives; the loose pieces of both. */
 export type TacticLine =
     | { readonly kind: "risk"; readonly side: Side; readonly tone: Tone; readonly items: readonly PieceAtRisk[]; }
     | { readonly kind: "pin"; readonly side: Side; readonly tone: Tone; readonly items: readonly PinnedPiece[]; }
+    | { readonly kind: "skewer"; readonly side: Side; readonly tone: Tone; readonly items: readonly SkeweredPiece[]; }
     | { readonly kind: "check"; readonly side: Side; readonly tone: Tone; readonly toMove: boolean; readonly items: readonly string[]; }
     | { readonly kind: "loose"; readonly tone: "neutral"; readonly items: readonly PieceFacts[]; };
 
@@ -47,6 +49,9 @@ export interface PinnedPiece
     readonly to: PieceFacts;
 }
 
+/** A skewered piece: the piece in front, the one that skewers it, and the one behind it. */
+export type SkeweredPiece = PinnedPiece;
+
 /** The helps of a game's position, whatever the AI's level (D-79), seen from the player's side when the page knows it (D-91). */
 export function helpsOf(game: Game, you?: Side): HelpsView
 {
@@ -57,6 +62,7 @@ export function helpsOf(game: Game, you?: Side): HelpsView
     const toMove = game.position.turn;
     const atRisk = [...risks(facts.undefended, "undefended"), ...risks(facts.attackedByCheaper, "cheaper"), ...risks(facts.outnumbered, "outnumbered")];
     const pins = facts.pins.map((pin) => ({ piece: on(pin.square), by: on(pin.by), to: on(pin.to) }));
+    const skewers = facts.skewers.map((skewer) => ({ piece: on(skewer.square), by: on(skewer.by), to: on(skewer.to) }));
     const checks = facts.checks;
     const otherChecks = facts.otherChecks ?? [];
     const loose = facts.loose.map(on);
@@ -66,10 +72,11 @@ export function helpsOf(game: Game, you?: Side): HelpsView
         you,
         atRisk,
         pins,
+        skewers,
         checks,
         otherChecks,
         loose,
-        lines: tacticLines({ toMove, atRisk, pins, checks, otherChecks, loose }, you),
+        lines: tacticLines({ toMove, atRisk, pins, skewers, checks, otherChecks, loose }, you),
         strategy: game.profile,
         sides: you === "black" ? ["black", "white"] : ["white", "black"],
     };
@@ -82,13 +89,28 @@ export function riskOn(helps: HelpsView, square: string): Tone | undefined
     return risk === undefined ? undefined : toneOf(risk.piece.side, helps.you);
 }
 
-/** The squares a line of the tactics lights on the board: its pieces, and those that attack or pin them; none for the checks. */
+/** How the helps mark a square's pinned piece: in the tone of a piece at risk, red when it is the player's, green when it is the other side's (D-91). */
+export function pinOn(helps: HelpsView, square: string): Tone | undefined
+{
+    const pin = helps.pins.find((pin) => pin.piece.square === square);
+    return pin === undefined ? undefined : toneOf(pin.piece.side, helps.you);
+}
+
+/** How the helps mark a square's skewered piece, the one in front: in the tone of a piece at risk, as a pinned one (D-91). */
+export function skewerOn(helps: HelpsView, square: string): Tone | undefined
+{
+    const skewer = helps.skewers.find((skewer) => skewer.piece.square === square);
+    return skewer === undefined ? undefined : toneOf(skewer.piece.side, helps.you);
+}
+
+/** The squares a line of the tactics lights on the board: its pieces, and those that attack, pin or skewer them; none for the checks. */
 export function squaresOf(line: TacticLine): readonly string[]
 {
     switch (line.kind) {
         case "risk":
             return line.items.flatMap(riskSquares);
         case "pin":
+        case "skewer":
             return line.items.flatMap(pinSquares);
         case "check":
             return [];
@@ -103,7 +125,7 @@ export function riskSquares(risk: PieceAtRisk): readonly string[]
     return [risk.piece.square, ...risk.piece.attackers];
 }
 
-/** A pinned piece, the one that pins it and the one behind it. */
+/** A pinned or skewered piece, the one that pins or skewers it and the one behind it. */
 export function pinSquares(pin: PinnedPiece): readonly string[]
 {
     return [pin.piece.square, pin.by.square, pin.to.square];
@@ -168,13 +190,14 @@ const cells = {
     kingAttacks: (side: SideProfile): StrategyCell => side.king?.attacksNear ?? 0,
 };
 
-// The tactics' lines that have something: with the player's side, their pieces at risk and pinned and the other side's checks, then the same the other way
-// round; without it, White's then Black's; the loose pieces last.
-function tacticLines(facts: Pick<HelpsView, "toMove" | "atRisk" | "pins" | "checks" | "otherChecks" | "loose">, you: Side | undefined): TacticLine[]
+// The tactics' lines that have something: with the player's side, their pieces at risk, pinned and skewered and the other side's checks, then the same the
+// other way round; without it, White's then Black's; the loose pieces last.
+function tacticLines(facts: Pick<HelpsView, "toMove" | "atRisk" | "pins" | "skewers" | "checks" | "otherChecks" | "loose">, you: Side | undefined): TacticLine[]
 {
     const sideLines = (side: Side): TacticLine[] => [
         { kind: "risk", side, tone: toneOf(side, you), items: facts.atRisk.filter((risk) => risk.piece.side === side) },
         { kind: "pin", side, tone: toneOf(side, you), items: facts.pins.filter((pin) => pin.piece.side === side) },
+        { kind: "skewer", side, tone: toneOf(side, you), items: facts.skewers.filter((skewer) => skewer.piece.side === side) },
     ];
     const checkLine = (side: Side): TacticLine => ({
         kind: "check",

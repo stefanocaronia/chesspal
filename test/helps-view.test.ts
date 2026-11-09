@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game, readPgn } from "../src/core/index.ts";
-import { helpsOf, riskOn, squaresOf, strategyOf } from "../src/page/helps/view.ts";
+import { helpsOf, pinOn, riskOn, skewerOn, squaresOf, strategyOf } from "../src/page/helps/view.ts";
 
 // White's knight on f3 pinned to its queen by the bishop on g4, which h3 attacks undefended.
 const pinned = game("1. e4 e5 2. Nf3 d6 3. Bc4 Bg4 4. Nc3 Nc6 5. h3 *");
@@ -15,6 +15,13 @@ describe("the helps on the page (D-78, D-79)", () => {
             by: expect.objectContaining({ square: "g4", piece: "B", side: "black" }),
             to: expect.objectContaining({ square: "d1", piece: "Q", side: "white" }),
         });
+        expect(helps.skewers).toEqual([]);
+        // The king on d5 must move, and the bishop on b3 takes the queen behind it.
+        expect(helpsOf(game('[FEN "8/5q2/8/3k4/8/1B6/8/6K1 b - - 0 1"]\n\n*')).skewers).toEqual([{
+            piece: expect.objectContaining({ square: "d5", piece: "K" }),
+            by: expect.objectContaining({ square: "b3", piece: "B" }),
+            to: expect.objectContaining({ square: "f7", piece: "Q" }),
+        }]);
         expect(helps.strategy).toBe(pinned.profile);
         expect(helps.strategy.control.e4).toBeDefined();
     });
@@ -61,6 +68,29 @@ describe("the helps from the player's side (D-91)", () => {
         expect(helps.lines.every((line) => line.items.length > 0)).toBe(true);
         expect(riskOn(helps, "g4")).toBe("chance");
         expect(riskOn(helpsOf(pinned, "black"), "g4")).toBe("threat");
+    });
+
+    it("mark a pinned piece in the tone of whose it is, and no other piece", () => {
+        expect(pinOn(helpsOf(pinned, "white"), "f3")).toBe("threat");
+        expect(pinOn(helpsOf(pinned, "black"), "f3")).toBe("chance");
+        expect(pinOn(helpsOf(pinned), "f3")).toBe("neutral");
+        expect(pinOn(helpsOf(pinned, "white"), "g4")).toBeUndefined();
+        expect(pinOn(helpsOf(pinned, "white"), "d1")).toBeUndefined();
+    });
+
+    it("mark a skewered piece, the one in front, in the tone of whose it is, and give its skewer a line of the tactics", () => {
+        // The rook on a1 skewers the queen on a5, with the rook on a8 behind it.
+        const skewered = game('[FEN "r7/7k/8/q7/8/8/1K6/R7 b - - 0 1"]\n\n*');
+        const helps = helpsOf(skewered, "white");
+        const line = helps.lines.find((line) => line.kind === "skewer")!;
+
+        expect(line).toMatchObject({ kind: "skewer", side: "black", tone: "chance" });
+        expect(squaresOf(line)).toEqual(["a5", "a1", "a8"]);
+        expect(skewerOn(helps, "a5")).toBe("chance");
+        expect(skewerOn(helpsOf(skewered, "black"), "a5")).toBe("threat");
+        expect(skewerOn(helpsOf(skewered), "a5")).toBe("neutral");
+        expect(skewerOn(helps, "a8")).toBeUndefined();
+        expect(skewerOn(helps, "a1")).toBeUndefined();
     });
 
     it("count among the pieces at risk one with more attackers than defenders, though taking it may lose material (Anatolij)", () => {
