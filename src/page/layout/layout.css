@@ -114,6 +114,18 @@
     white-space: nowrap;
 }
 
+/* The player's picture, round and borderless, at the end of the header: it opens the menu of the players */
+.top .player {
+    border-color: transparent;
+    border-radius: 50%;
+    padding: 0;
+}
+
+.top .player:hover,
+.top .player:focus-visible {
+    box-shadow: 0 0 0 2px var(--line);
+}
+
 /* The header's chip when no game goes on: neutral, not the accent, with a pause sign (D-77) */
 .verdict.idle {
     background: var(--card);
@@ -416,6 +428,114 @@
     left: -4px;
 }
 
+/* The AI thinks: a cloud at the Torretta's top left corner, by its battlements, its trail towards the antenna (Zoe). Filled in the accent on its move, as
+   the clock that runs; outlined and quieter on the player's time (D-72). Shape tells them apart, not colour; a halo of the card keeps it off the Torretta. */
+.thinker {
+    position: relative;
+    display: inline-grid;
+    flex: none;
+}
+
+/* Its trail clear of the battlements' corner, which the halo would bite */
+.thought {
+    position: absolute;
+    top: -8px;
+    left: -10px;
+    width: 24px;
+    height: 20px;
+    overflow: visible;
+    animation: thought-in 150ms ease-out;
+}
+
+.face .thought {
+    top: -8px;
+    left: -6px;
+    width: 20px;
+    height: 16px;
+    clip-path: none;
+}
+
+/* On the folded talk's tab, at its outer corner below the dot: the rest of the tab is under the board. No trail, with no Torretta to point at; it would
+   read as a second dot */
+.fold-tab .thought {
+    top: auto;
+    bottom: -8px;
+    left: -12px;
+    width: 20px;
+    height: 16px;
+}
+
+.fold-tab .thought circle.cloud {
+    display: none;
+}
+
+.thought .cloud {
+    paint-order: stroke;
+    stroke: var(--card);
+    stroke-width: 3;
+}
+
+.thought.move .cloud {
+    fill: var(--accent);
+}
+
+.thought.move .dot {
+    fill: var(--on-accent);
+    animation: thought-dot 1.2s ease-in-out infinite;
+}
+
+/* In order from the left: nth-of-type would count the trail, a circle too */
+.thought.move .dot + .dot {
+    animation-delay: 0.2s;
+}
+
+.thought.move .dot + .dot + .dot {
+    animation-delay: 0.4s;
+}
+
+.thought.ponder .cloud {
+    fill: var(--card);
+    stroke: var(--soft);
+    stroke-width: 1.8;
+}
+
+.thought.ponder .dot {
+    fill: var(--soft);
+    animation: thought-breath 3s ease-in-out infinite;
+}
+
+@keyframes thought-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes thought-dot {
+    0%,
+    100% {
+        opacity: 0.35;
+    }
+
+    40% {
+        opacity: 1;
+    }
+}
+
+@keyframes thought-breath {
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* Still dots: the shape alone tells the two apart */
+@media (prefers-reduced-motion: reduce) {
+    .thought,
+    .thought.move .dot,
+    .thought.ponder .dot {
+        animation: none;
+    }
+}
+
 /* A long name or model goes to its ellipsis instead of widening the page on a phone (Zoe). Each side's talk has half the column at most:
    past it, its words scroll; the box and the cards never give way. */
 .ai-block,
@@ -668,5 +788,47 @@
 
     .app:has(.talk.studied) .side .steps {
         display: none;
+    }
+}
+
+/* The player's folder was set up by an older Chesspal: a strip at the foot of the window until they run init again */
+.outdated {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    z-index: 15;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--warn-back);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.45;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
+}
+
+/* On a phone the header's first line holds the Torretta, which stands for the name, and every button down to the player's picture, a little closer */
+@media (max-width: 420px) {
+    .top {
+        column-gap: 4px;
+    }
+
+    .top .title {
+        display: none;
+    }
+
+    .top .torretta {
+        margin-right: auto;
+    }
+
+    .top .command,
+    .top .icon-button {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        justify-content: center;
     }
 }

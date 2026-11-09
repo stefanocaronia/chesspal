@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { z } from "zod";
 import { endOf } from "../games/index.ts";
 import {
+    type Accounts,
     activateProfile,
     activeProfile,
     createProfile,
@@ -47,38 +48,41 @@ export const profiles = defineCommand({
     format: ({ profiles, active }) => profiles.map((profile) => `${profile.id === active ? "*" : " "} ${profile.id}: ${playerText(profile)}`).join("\n"),
 });
 
-/** A new profile, put in use once the game going on has ended; the one Chesspal made at the first start, while new, becomes it, game and all (D-71). */
+/**
+ * A new profile, put in use unless asked not to; while a game goes on it is made all the same and waits, the player in use staying. The one Chesspal made at
+ * the first start, while new, becomes it, game and all (D-71).
+ */
 export const newProfile = defineCommand({
     name: "new_profile",
-    description: "Makes a player's profile and puts it in use: their games, picture and page settings go in profiles/<id>/ of Chesspal's data folder; the "
-        + "profile Chesspal made at the first start becomes this one, its folder renamed, while nobody has completed it. Example: chesspal new_profile Anna --level regular "
-        + "--rating 1450 --site lichess.",
+    description: "Makes a player's profile and puts it in use, unless --use false or a game is going on: their games, picture and page settings go in "
+        + "profiles/<id>/ of Chesspal's data folder; the profile Chesspal made at the first start becomes this one, its folder renamed, while nobody has completed "
+        + "it. Example: chesspal new_profile Anna --level regular --rating 1450 --site lichess.",
     input: z.object({
         name: z.string().trim().min(1).max(nameLimit).regex(/^[^\p{Cc}]+$/u, "one line of text").describe("the player's name"),
         level: z.enum(levels).optional().describe("how they play: learning, casual, regular or tournament"),
         rating: z.int().min(ratingLimits.lowest).max(ratingLimits.highest).optional().describe("their rating, with site"),
         site: z.enum(ratingSites).optional().describe("where the rating comes from: lichess, chess.com or fide"),
         avatar: z.enum(drawnAvatars).optional().describe(`a drawn avatar: ${drawnAvatars.join(", ")}`),
+        use: z.boolean().optional().describe("false to make it without putting it in use"),
     }),
     cliOnly: true,
     positionals: ["name"],
-    run: ({ name, level, rating, site, avatar }, context): PlayerProfile => {
+    run: ({ name, level, rating, site, avatar, use }, context): PlayerProfile & { readonly inUse: boolean; } => {
         if ((rating === undefined) !== (site === undefined)) {
             throw new Error("Give the rating and its site together, such as --rating 1450 --site lichess, or neither. Nothing changed.");
         }
 
-        if (activeProfile(context.home()).new !== true) {
-            refuseWhilePlaying(context);
-        }
-
-        return createProfile(context.home(), {
+        const first = activeProfile(context.home()).new === true;
+        const inUse = first || (use !== false && !isPlaying(context));
+        const profile = createProfile(context.home(), {
             name,
             ...(level === undefined ? {} : { level }),
             ...(rating === undefined || site === undefined ? {} : { rating: { value: rating, site } }),
             ...(avatar === undefined ? {} : { avatar }),
-        });
+        }, inUse);
+        return { ...profile, inUse };
     },
-    format: (profile) => `Profile ${profile.id} made, and in use: ${playerText(profile)}.`,
+    format: (profile) => `Profile ${profile.id} made${profile.inUse ? ", and in use" : ", not in use"}: ${playerText(profile)}.`,
 });
 
 /** Another profile put in use, once the game going on has ended. */
@@ -126,6 +130,26 @@ export const setAvatar = defineCommand({
     format: ({ profile, avatar }) => `The picture of ${profile} is ${avatar}.`,
 });
 
+/** The player's names on Lichess and chess.com, by which the games they load are theirs (D-93): each one given is written, an empty one goes. */
+export const setAccounts = defineCommand({
+    name: "set_accounts",
+    description: "Sets the player's names on Lichess and chess.com in the profile in use, by which a game loaded from there is theirs; an empty name removes it. "
+        + "Example: chesspal set_accounts --lichess anna_k --chesscom AnnaK.",
+    input: z.object({
+        lichess: accountName().optional().describe("the player's name on Lichess"),
+        chesscom: accountName().optional().describe("the player's name on chess.com"),
+    }),
+    cliOnly: true,
+    idempotent: true,
+    run: (names, context): PlayerProfile => {
+        const profile = activeProfile(context.home());
+        const lichess = names.lichess ?? profile.accounts?.lichess ?? "";
+        const chesscom = names.chesscom ?? profile.accounts?.chesscom ?? "";
+        return updateProfile(context.home(), profile.id, { accounts: { ...(lichess === "" ? {} : { lichess }), ...(chesscom === "" ? {} : { chesscom }) } });
+    },
+    format: (profile) => `${profile.id} is ${accountsText(profile.accounts)}.`,
+});
+
 /** A drawn avatar chosen for a profile: the player's own image goes, or it would still show. */
 export function chooseDrawnAvatar(context: Context, id: string, avatar: DrawnAvatar): void
 {
@@ -146,11 +170,15 @@ export function playerLine(context: Context): string | undefined
 /** Throws while a game goes on in the profile in use. */
 function refuseWhilePlaying(context: Context): void
 {
-    const current = gameAt(gameFolder(context.home()), context.now());
-
-    if (current !== undefined && endOf(current.game) === undefined) {
+    if (isPlaying(context)) {
         throw new GameGoingOn();
     }
+}
+
+function isPlaying(context: Context): boolean
+{
+    const current = gameAt(gameFolder(context.home()), context.now());
+    return current !== undefined && endOf(current.game) === undefined;
 }
 
 const levelText: Readonly<Record<Level, string>> = { learning: "has just learned", casual: "plays now and then", regular: "plays often", tournament: "plays tournaments" };
@@ -159,6 +187,18 @@ const siteText: Readonly<Record<RatingSite, string>> = { "lichess": "Lichess", "
 function playerText({ name, level, rating }: PlayerProfile): string
 {
     return [name, ...(level === undefined ? [] : [levelText[level]]), ...(rating === undefined ? [] : [`${siteText[rating.site]} ${rating.value}`])].join(", ");
+}
+
+/** A name on Lichess or chess.com: their letters, digits, underscores and hyphens; empty to remove it. */
+function accountName(): z.ZodString
+{
+    return z.string().trim().max(nameLimit).regex(/^[\w-]*$/, "A name on Lichess or chess.com has only letters, digits, underscores and hyphens.");
+}
+
+function accountsText(accounts: Accounts | undefined): string
+{
+    const named = [...(accounts?.lichess === undefined ? [] : [`${accounts.lichess} on Lichess`]), ...(accounts?.chesscom === undefined ? [] : [`${accounts.chesscom} on chess.com`])];
+    return named.length === 0 ? "on neither Lichess nor chess.com" : named.join(" and ");
 }
 
 function imageFile(path: string): Buffer

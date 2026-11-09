@@ -100,7 +100,8 @@ describe("the MCP server", () => {
         await client.callTool({ name: "ai_move", arguments: { move: "e4", plan: "Take the centre." }, _meta: codex("gpt-6-luna", "low") });
         await vi.waitFor(() => expect(aiModelOf(folder)).toEqual({ model: "gpt-6-luna", effort: "low" }));
 
-        expect(heard).toHaveBeenCalledTimes(1);
+        // Once for each position the chat saw, new and after its move, and once for the model.
+        expect(heard).toHaveBeenCalledTimes(3);
 
         await client.callTool({ name: "player_move", arguments: { move: "e5" } });
         // A move refused, and a host that ties no model to the call, leave the model known.

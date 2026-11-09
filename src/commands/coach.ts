@@ -19,7 +19,7 @@ import { colourName, compactView, materialText, riskLine } from "./view.ts";
 type Coached =
     | { stop: "moved" | "waited" | "helps" | "started"; }
     | { start: string[]; }
-    | { kept: Place; then: "wait" | "moved" | "over"; saved: string[]; hintLeft: boolean; }
+    | { kept: Place; then: "lead" | "wait" | "moved" | "over"; saved: string[]; hintLeft: boolean; }
     | { waiting: Place; };
 
 /** The game, by its key, and the position in it the coach works on. */
@@ -40,7 +40,7 @@ export const coach = defineCommand({
     name: "coach",
     description: "For the chesspal-coach agent only, never from the chat: Chesspal's answers say when to start it. coach {} gives the player's move to judge and the position "
         + "they are to move in; coach {game, position, ahead, badge, note, hint, arrows, squares} keeps who is ahead there, while the game goes on, and your judgment and your hint, "
-        + "each only when there is something to say; coach {game, position, done: true} waits for their move. Whenever it says stop, stop. "
+        + "each only when there is something to say; coach {game, position, done: true} waits for their move, once who is ahead is kept. Whenever it says stop, stop. "
         + 'Example: coach {game: "t3k9qa", position: 24, ahead: -0.8, badge: "mistake", note: "It leaves the d5 pawn without a defender.", hint: "Look at what defends their king now."}.',
     input: z.object({
         game: z.string().optional().describe("the game's key, as coach {} gives it"),
@@ -60,7 +60,7 @@ export const coach = defineCommand({
                 + "Y yellow: a line; G green: a good idea",
         ),
         squares: squaresInput.describe("only with a hint: squares to mark on the board as it is now: Rf2; colours as for arrows"),
-        done: z.boolean().optional().describe("true once you have kept your words: it waits for the player's move"),
+        done: z.boolean().optional().describe("true once you have kept your words, who is ahead always while the game goes on: it waits for the player's move"),
     }),
     byAgents: [coachAgent],
     host: "claude-code",
@@ -104,6 +104,11 @@ export const coach = defineCommand({
             throw new Error(`Keep your words first, then call ${call(place, "done: true")} alone. Nothing changed.`);
         }
 
+        // The bar on the page needs who is ahead in every position the player is to move in while the game goes on (D-90, Stefano).
+        if (leadMissing(folder, current, position)) {
+            throw new Error(`Who is ahead is still missing here: first ${aheadCall(place)}, then ${call(place, "done: true")}. Nothing changed.`);
+        }
+
         const since = coachWaitingSince(folder, current, position, context.now());
         const waited = await waitForPlayer(context, since, () => !theirTurn(loadGame(folder), place));
         return waited === "waiting" ? { waiting: place } : { stop: waited };
@@ -131,10 +136,17 @@ export const coach = defineCommand({
     },
 });
 
-/** What a call kept, and what comes next: wait for the player's move, or stop, as they have moved or the game is over, with the hint that came too late. */
+/**
+ * What a call kept, and what comes next: who is ahead when it is still missing, then wait for the player's move; or stop, as they have moved or the game is
+ * over, with the hint that came too late.
+ */
 function keptText({ kept, then, saved, hintLeft }: Extract<Coached, { kept: Place; }>): string
 {
     const what = saved.length === 0 ? "nothing" : saved.join(", ");
+
+    if (then === "lead") {
+        return `Kept on the board page: ${what}. Who is ahead is still missing: now ${aheadCall(kept)}, then ${call(kept, "done: true")} alone.`;
+    }
 
     if (then === "wait") {
         return `Kept on the board page: ${what}. Now call ${call(kept, "done: true")} alone.`;
@@ -150,6 +162,19 @@ function keptText({ kept, then, saved, hintLeft }: Extract<Coached, { kept: Plac
 function call({ game, position }: Place, rest: string): string
 {
     return `coach {game: "${game}", position: ${position}, ${rest}}`;
+}
+
+/** The call that gives who is ahead, with how to write it. */
+function aheadCall(place: Place): string
+{
+    return `call ${call(place, "ahead")}, in pawns from White's side (1.5, -3, 0) or a mate you see ("#3" White's, "#-3" Black's)`;
+}
+
+/** Whether who is ahead is still to give in a position the player is to move in, while the game goes on. */
+function leadMissing(folder: string, current: CurrentGame, position: number): boolean
+{
+    const { leads = [] } = coachWords(folder, current);
+    return endOf(current.game) === undefined && sideToMoveAt(current, position) !== current.ai && !leads.some((lead) => lead.position === position);
 }
 
 /** The game's short key, from its start: the coach names the game it works on, so that its words never go to the next one. */
@@ -371,7 +396,11 @@ function keep(folder: string, current: CurrentGame, place: Place, { ahead, badge
         return { kept: place, then: "over", saved, hintLeft };
     }
 
-    return { kept: place, then: toMove ? "wait" : "moved", saved, hintLeft };
+    if (!toMove) {
+        return { kept: place, then: "moved", saved, hintLeft };
+    }
+
+    return { kept: place, then: leadMissing(folder, current, position) ? "lead" : "wait", saved, hintLeft };
 }
 
 /** Whether the player is still to move in the position the coach works on, in the same game going on. */

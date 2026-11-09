@@ -52,6 +52,26 @@ describe("the AI thinking on the player's time (D-72)", () => {
         expect(await run(context, "player_move", { move: "d4" })).not.toContain("Thought on their time");
     });
 
+    it("tells the page when it starts thinking on a position and when it is done, before it waits", async () => {
+        const told: unknown[] = [];
+        let time = new Date(2026, 10, 2, 15, 30, 12).getTime();
+        const context: Context = { ...playerFolder(), now: () => new Date(time), ponders: (position) => told.push(position) };
+        await run(context, "new_game", { ai_colour: "black" });
+        const { started } = loadGame(gameFolder(context.folder))!;
+
+        await run(context, "ponder");
+        await run(context, "ponder", { position: 0, reply: "e4" });
+        expect(told).toEqual([{ started, plies: 0 }]);
+
+        context.pause = (milliseconds) => {
+            time += milliseconds;
+            return Promise.resolve();
+        };
+
+        await run(context, "ponder", { position: 0, done: true });
+        expect(told).toEqual([{ started, plies: 0 }, undefined]);
+    });
+
     it("waits for the player's move: stop once they have moved, else still their move after a while", async () => {
         let time = new Date(2026, 10, 2, 15, 30, 12).getTime();
         const context = { ...playerFolder(), now: () => new Date(time) };

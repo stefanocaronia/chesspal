@@ -269,21 +269,23 @@ describe("the profiles' commands", () => {
         expect(() => refuseOtherGame(chat, gameFolder(context.folder))).not.toThrow();
     });
 
-    it("refuse to change profile while a game goes on in the one in use, but complete the one Chesspal made with its game", async () => {
+    it("refuse to change profile while a game goes on in the one in use, but add a player who waits, and complete the one Chesspal made with its game", async () => {
         const context = contextIn(playerFolder());
         await run(context, "new_game", { ai_colour: "black" });
         await run(context, "new_profile", { name: "Anna" });
 
         expect(await run(context, "status")).toContain("Game: you play Black");
-        await expect(run(context, "new_profile", { name: "Bruno" })).rejects.toThrow("A game is going on in this profile");
+        expect(await run(context, "new_profile", { name: "Bruno" })).toBe("Profile bruno made, not in use: Bruno.");
+        expect(activeProfile(context.folder).id).toBe("anna");
 
         await run(context, "end_game", { result: "player_resigns" });
-        await run(context, "new_profile", { name: "Bruno" });
+        expect(await run(context, "new_profile", { name: "Carla", use: false })).toBe("Profile carla made, not in use: Carla.");
+        expect(await run(context, "use_profile", { profile: "bruno" })).toBe("Profile bruno in use: Bruno.");
         await run(context, "new_game", { ai_colour: "white" });
 
         await expect(run(context, "use_profile", { profile: "anna" })).rejects.toThrow("A game is going on in this profile");
         expect(await run(context, "use_profile", { profile: "bruno" })).toBe("Profile bruno in use: Bruno.");
-        expect(await run(context, "profiles")).toBe("  anna: Anna\n* bruno: Bruno");
+        expect(await run(context, "profiles")).toBe("  anna: Anna\n* bruno: Bruno\n  carla: Carla");
     });
 
     it("set the picture: a drawn avatar in place of the player's image, or their image from a file", async () => {
@@ -299,6 +301,22 @@ describe("the profiles' commands", () => {
         expect(ownImage(context.folder, "anna")).toBeUndefined();
         expect(activeProfile(context.folder).avatar).toBe("owl");
         await expect(run(context, "set_avatar", { avatar: "missing.png" })).rejects.toThrow("cannot be read");
+    });
+
+    it("set the names on Lichess and chess.com: each one given written, the other kept, an empty one removed, the rest of profile.md as it was", async () => {
+        const context = contextIn(playerFolder());
+        await run(context, "new_profile", { name: "Anna", level: "regular" });
+        const file = join(profileFolder(context.folder, "anna"), "profile.md");
+        writeFileSync(file, readFileSync(file, "utf8").replace("---\n", "---\nclub: Roma\n") + "My notes.\n");
+
+        expect(await run(context, "set_accounts", { lichess: " anna_k ", chesscom: "AnnaK" })).toBe("anna is anna_k on Lichess and AnnaK on chess.com.");
+        expect(await run(context, "set_accounts", { chesscom: "" })).toBe("anna is anna_k on Lichess.");
+        expect(activeProfile(context.folder)).toMatchObject({ name: "Anna", level: "regular", accounts: { lichess: "anna_k" } });
+        expect(readFileSync(file, "utf8")).toMatch(/club: "?Roma"?\n[\s\S]*---\nMy notes\.\n$/);
+
+        await expect(run(context, "set_accounts", { lichess: "anna k" })).rejects.toThrow("only letters, digits, underscores and hyphens");
+        expect(await run(context, "set_accounts", { lichess: "" })).toBe("anna is on neither Lichess nor chess.com.");
+        expect(activeProfile(context.folder).accounts).toBeUndefined();
     });
 });
 

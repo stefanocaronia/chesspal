@@ -23,6 +23,7 @@ import {
     writePgn,
 } from "../../core/index.ts";
 import { PlayerPicture } from "../avatars/avatars.tsx";
+import { Thinker, Thought } from "../avatars/thought.tsx";
 import { Torretta } from "../avatars/torretta.tsx";
 import { Board, type Notice } from "../board/board.tsx";
 import { explain } from "../board/explain.ts";
@@ -286,6 +287,7 @@ export function App({ start }: { start: Settings; })
             onSound={() => change({ ...settings, sound: !sound })}
             onTheme={switchTheme}
             onSettings={() => setSetting(true)}
+            {...(served === undefined ? {} : { profile: served.profile, onProfile: () => setDialog("profiles") })}
         />
     );
 
@@ -337,6 +339,13 @@ export function App({ start }: { start: Settings; })
     const clock = going ? game?.clock : undefined;
     // No chat hears the player: the page says where to wake it, and the AI's clock waits, as the server holds it.
     const asleep = served.listening === false && !offline;
+    // What the AI thinks on, a cloud at the Torretta's corner (Zoe): only in a game going on, and never while no chat hears the player, which the note says.
+    const thinking = going && !asleep && !offline && studied === undefined ? served.thinking : undefined;
+    const thinker = (size: number): ComponentChildren => (
+        <Thinker thinking={thinking} words={text.thinking}>
+            <Torretta size={size} mood={mood} />
+        </Thinker>
+    );
     // The clocks wait for the player from the game's start: when the AI moves first, a button gives it the start; else the player's first move does (Stefano).
     const clockWaits = clock?.waiting === true && !ended && studied === undefined && viewing === undefined && live.position.turn === ai;
     const clockOf = (side: Side): ComponentChildren =>
@@ -461,7 +470,8 @@ export function App({ start }: { start: Settings; })
         sides === undefined ? null : (
             <PlayerCard
                 place={place}
-                picture={pictureOf(sides[side], profile, 48, mood)}
+                // The player changes their picture in analysis too, from their own side's card.
+                picture={sides[side].who === "player" ? <PictureButton profile={profile} onOpen={() => setDialog("picture")} text={text} /> : pictureOf(sides[side], profile, 48, mood)}
                 name={sides[side].name}
                 signed={sides[side].who === "ai" && playedBy !== undefined ? signature(playedBy.model, playedBy.effort) : undefined}
                 side={side}
@@ -492,7 +502,7 @@ export function App({ start }: { start: Settings; })
                     open={dialog === "profiles"}
                     profiles={served.profiles}
                     active={profile}
-                    playing={going}
+                    locked={going ? text.profile.whilePlaying : undefined}
                     dataFolder={served.dataFolder}
                     onClose={() => setDialog(undefined)}
                     text={text}
@@ -500,13 +510,14 @@ export function App({ start }: { start: Settings; })
                 <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
                 <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} you={profile.name} accounts={profile.accounts} ai={name} text={text} />
                 {offline ? <p class="offline" role="alert">{text.offline(name)}</p> : null}
+                {served.outdated === true ? <p class="outdated" role="status">{text.outdated(name)}</p> : null}
                 <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`} inert={offline}>
                     {header}
                     {sides === undefined
                         ? (
                             <TalkFaces
                                 name={name}
-                                aiPicture={<Torretta size={40} mood={mood} />}
+                                aiPicture={thinker(40)}
                                 you={profile.name}
                                 picture={picture}
                                 {...(idle ? {} : { ai, player })}
@@ -530,7 +541,14 @@ export function App({ start }: { start: Settings; })
                                 text={text}
                             />
                         )}
-                    <FoldTab column="talk" folded={folds.talk === "folded"} label={text.talk} unread={(unread || asleep) && folds.talk === "folded"} onFold={fold} />
+                    <FoldTab
+                        column="talk"
+                        folded={folds.talk === "folded"}
+                        label={thinking === undefined || folds.talk !== "folded" ? text.talk : `${text.talk}: ${text.thinking[thinking]}`}
+                        unread={(unread || asleep) && folds.talk === "folded"}
+                        {...(thinking === undefined || folds.talk !== "folded" ? {} : { mark: <Thought thinking={thinking} words={text.thinking} /> })}
+                        onFold={fold}
+                    />
                     <FoldTab column="game" folded={folds.game === "folded"} label={text.game} onFold={fold} />
                     <span class="visually-hidden" aria-live="polite">{unread ? text.wrote(name) : ""}</span>
                     <div class={sides === undefined ? "talk" : "talk studied"} id="talk">
@@ -545,6 +563,7 @@ export function App({ start }: { start: Settings; })
                                             {...(shownOpening === undefined ? {} : { opening: shownOpening })}
                                             {...(at === total && closing !== undefined ? { closing } : {})}
                                             {...(at === 0 && summary !== undefined ? { summary } : {})}
+                                            {...(summary === undefined ? { reviewing: true } : {})}
                                             name={name}
                                             by={annotator}
                                             mood={mood}
@@ -562,7 +581,7 @@ export function App({ start }: { start: Settings; })
                                     <section class="ai-block" aria-label={name}>
                                         <PlayerCard
                                             place="ai"
-                                            picture={<Torretta size={48} mood={mood} />}
+                                            picture={thinker(48)}
                                             name={name}
                                             signed={signed}
                                             side={idle ? undefined : ai}

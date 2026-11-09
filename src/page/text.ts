@@ -104,8 +104,12 @@ export interface Text
     clearChat(name: string): string;
     /** The page lost its server, which lives in the host's chat: where to write to bring it back. */
     offline(name: string): string;
+    /** The player's folder was set up by an older Chesspal. */
+    outdated(name: string): string;
     /** The page is served, but no chat hears the player (never started, or just cleared): where to write to wake it; its clock waits. */
     asleep(name: string): string;
+    /** The thought cloud on the Torretta, by what the AI thinks on: its move, or on the player's time (D-72). */
+    thinking: { readonly move: string; readonly ponder: string; };
     /** The button that starts the clocks, which wait for the player from the game's start. */
     readonly startClocks: string;
     /** A command such as /clear written in the page's talk, which is for the host's window. */
@@ -305,6 +309,10 @@ export interface ProfileText
     readonly yourPicture: string;
     readonly avatars: Readonly<Record<AvatarId, string>>;
     readonly whilePlaying: string;
+    /** The empty field of a name on Lichess or chess.com. */
+    readonly username: string;
+    /** On the fields of the names on Lichess and chess.com: what they are for. */
+    readonly accountTitle: string;
     readonly badImage: string;
 }
 
@@ -468,8 +476,10 @@ const english: Text = {
     canGo: "a legal move",
     boardLabel: (turn, lastMove) => `Chessboard, ${english.toMove(turn)}${lastMove === undefined ? "" : `, last move ${lastMove}`}`,
     clearChat: (name) => `Before a new game, clear your chat with ${name}: in the window where you opened ${name}, not here, write /clear, then a message such as "new game". A clean chat plays faster.`,
+    outdated: (name) => `Chesspal has been updated, but this folder still has its old files: close the chat with ${name}, run chesspal init in this folder, and open a new chat.`,
     offline: (name) => `${name} is not connected. Write it a message in the window where you opened ${name}, not in this page's chat: the page connects again by itself.`,
     startClocks: "Start",
+    thinking: { move: "Thinking about its move", ponder: "Thinking while you play" },
     asleep: (name) => `${name} is not listening: write a message, such as "hi", in the window where you opened ${name}, not here. Its clock waits until it answers.`,
     commandHere: (name) => `/clear and the other commands go in the window where you opened ${name}, not here.`,
     refused: {
@@ -544,6 +554,8 @@ const english: Text = {
         yourPicture: "Your picture: change it",
         avatars: { "short-hair": "Short hair", bun: "Bun", glasses: "Glasses", beanie: "Beanie", beard: "Beard", curls: "Curls", moustache: "Moustache", "silver-bob": "Silver bob", cat: "Cat", owl: "Owl" },
         whilePlaying: "Finish the game, or resign, before changing player.",
+        username: "your username",
+        accountTitle: "With your name there, a game you load from there knows which side is yours.",
         badImage: "That picture won't open: try another photo (the ones from a phone usually work).",
     },
     start: {
@@ -789,8 +801,10 @@ const italian: Text = {
     boardLabel: (turn, lastMove) => `Scacchiera, ${italian.toMove(turn)}${lastMove === undefined ? "" : `, ultima mossa ${lastMove}`}`,
     clearChat: (name) =>
         `Prima di una nuova partita azzera la conversazione con ${name}: nella finestra dove hai aperto ${name}, non qui, scrivi /clear e poi un messaggio, per esempio "nuova partita". Con la chat pulita l'AI gioca più veloce.`,
+    outdated: (name) => `Chesspal è stato aggiornato, ma questa cartella ha ancora i file di prima: chiudi la chat con ${name}, esegui chesspal init in questa cartella e apri una chat nuova.`,
     offline: (name) => `${name} è scollegato. Scrivigli un messaggio nella finestra dove hai aperto ${name}, non nella chat di questa pagina: la pagina si ricollega da sola.`,
     startClocks: "Inizia",
+    thinking: { move: "Sta pensando alla sua mossa", ponder: "Pensa mentre giochi tu" },
     asleep: (name) => `${name} non ti sta ascoltando: scrivi un messaggio, per esempio "ciao", nella finestra dove hai aperto ${name}, non qui. Il suo orologio aspetta che risponda.`,
     commandHere: (name) => `/clear e gli altri comandi vanno scritti nella finestra dove hai aperto ${name}, non qui.`,
     refused: {
@@ -866,6 +880,8 @@ const italian: Text = {
         yourPicture: "La tua immagine: cambiala",
         avatars: { "short-hair": "Capelli corti", bun: "Chignon", glasses: "Occhiali", beanie: "Berretto", beard: "Barba", curls: "Ricci", moustache: "Baffi", "silver-bob": "Caschetto grigio", cat: "Gatto", owl: "Gufo" },
         whilePlaying: "Finisci la partita, o abbandona, prima di cambiare giocatore.",
+        username: "il tuo nome utente",
+        accountTitle: "Col tuo nome lì, una partita che carichi da lì sa qual è la tua parte.",
         badImage: "Questa immagine non si apre: prova con un'altra foto (quelle del telefono di solito vanno bene).",
     },
     start: {

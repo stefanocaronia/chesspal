@@ -16,7 +16,7 @@ import { playerMove } from "./player-move.ts";
 import { playerSay } from "./player-say.ts";
 import { ponder } from "./ponder.ts";
 import { position } from "./position.ts";
-import { newProfile, profiles, setAvatar, useProfile } from "./profiles.ts";
+import { newProfile, profiles, setAccounts, setAvatar, useProfile } from "./profiles.ts";
 import type { AnyCommand } from "./registry.ts";
 import { status } from "./status.ts";
 import { studyGames } from "./study-games.ts";
@@ -25,15 +25,15 @@ import { studyGames } from "./study-games.ts";
 export { aiMove } from "./ai-move.ts";
 export { analyseGame } from "./analyse-game.ts";
 export { gameAt } from "./clock.ts";
-export { type Caller, type Context, defaultContext } from "./context.ts";
+export { type Caller, type Context, defaultContext, type SeenPosition } from "./context.ts";
 export { deleteGame } from "./delete-game.ts";
 export { deleteReview } from "./delete-review.ts";
 export { answerDraw, DrawRefused, offerDraw } from "./draw-offer.ts";
 export { endGame } from "./end-game.ts";
 export { ChatNotClear, newGame, startNewGame } from "./new-game.ts";
 export { bookOpening, bookPlies } from "./opening-book.ts";
-export { playMove, PositionChanged, positionIn } from "./play-move.ts";
-export { chooseDrawnAvatar, GameGoingOn, newProfile, useProfile } from "./profiles.ts";
+export { playMove, PositionChanged, positionIn, samePosition } from "./play-move.ts";
+export { chooseDrawnAvatar, GameGoingOn, newProfile, setAccounts, useProfile } from "./profiles.ts";
 export { type AnyCommand, baseType, type Command, commandLineFieldProblem, inputProblems, isBoolean, isList, takesNumbers } from "./registry.ts";
 export { say } from "./say.ts";
 export { gameToStudy, namedGame } from "./study.ts";
@@ -63,4 +63,5 @@ export const commands: AnyCommand[] = [
     newProfile,
     useProfile,
     setAvatar,
+    setAccounts,
 ];

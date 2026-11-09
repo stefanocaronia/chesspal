@@ -1,7 +1,25 @@
 // The game on the page: the game it shows, and the player's moves and words, new games, clocks, draws and resignations (D-65) and games brought to
 // analyse, each done as the chat's tools do it, with the doorbell rung for the chat.
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { analyseGame, answerDraw, bookPlies, ChatNotClear, type Context, DrawRefused, endGame, gameAt, gameToStudy, namedGame, newGame, offerDraw, playMove, say, startNewGame } from "../../commands/index.ts";
+import {
+    analyseGame,
+    answerDraw,
+    bookPlies,
+    ChatNotClear,
+    type Context,
+    DrawRefused,
+    endGame,
+    gameAt,
+    gameToStudy,
+    namedGame,
+    newGame,
+    offerDraw,
+    playMove,
+    samePosition,
+    say,
+    type SeenPosition,
+    startNewGame,
+} from "../../commands/index.ts";
 import { clockStarted, type GameRecord, isReviewed, writePgn } from "../../core/index.ts";
 import {
     aiModelOf,
@@ -352,9 +370,32 @@ function sendGame(response: ServerResponse, served: Served): void
         opponent: served.opponent(),
         ...(aiModel === undefined ? {} : { aiModel }),
         listening: served.bell.listening,
+        ...thinkingShown(served, current),
+        ...(served.outdated ? { outdated: true } : {}),
         ...profilesShown(served.context.home()),
     };
     send(response, 200, json, JSON.stringify(body));
+}
+
+/**
+ * What the AI thinks on now, for the page's sign: its move, while the chat is in a turn the doorbell woke it for or on the position it is to move in; the
+ * player's time, while the ponder agent thinks, before it waits for their move (D-72). Never the coach's, which is not the opponent (D-88).
+ */
+function thinkingShown(served: Served, current: CurrentGame | undefined): { thinking?: "move" | "ponder"; }
+{
+    if (current === undefined || endOf(current.game) !== undefined) {
+        return {};
+    }
+
+    const position: SeenPosition = { started: current.started, plies: current.game.record.moves.length };
+
+    if (current.game.position.turn === current.ai) {
+        const seen = served.context.positionSeen;
+        const onIt = served.bell.woke || (seen !== undefined && seen !== null && samePosition(seen, position));
+        return served.bell.inTurn && onIt ? { thinking: "move" } : {};
+    }
+
+    return served.pondering !== undefined && samePosition(served.pondering, position) ? { thinking: "ponder" } : {};
 }
 
 /**

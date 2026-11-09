@@ -35,11 +35,13 @@ export function AiWords({ words, newestFirst, voice }: { words: readonly string[
  * The AI's word on the move shown of a game in analysis (D-69), in a bubble that points down at the Torretta beside the AI's name: the move, its badge by name,
  * and its note when it wrote one; read out as the player steps through the game. The Torretta and the name stay when the move has no word.
  */
-export function AiNote({ ply, opening, closing, summary, name, by, mood, voice, text }: {
+export function AiNote({ ply, opening, closing, summary, reviewing, name, by, mood, voice, text }: {
     ply?: Ply;
     opening?: Opening;
     closing?: string;
     summary?: string;
+    /** The AI is still reviewing the game: the Torretta says so too. */
+    reviewing?: true;
     name: string;
     /** Who made the analysis, signed under the Torretta (D-81); none in a game no host signed. */
     by?: { annotator: string; effort?: string; } | undefined;
@@ -95,6 +97,14 @@ export function AiNote({ ply, opening, closing, summary, name, by, mood, voice, 
                     <Marked text={closing} />
                 </p>
             )}
+            {reviewing === true
+                ? (
+                    <p class="say reviewing">
+                        <span class="spinner" aria-hidden="true" />
+                        {text.reviewing(name)}
+                    </p>
+                )
+                : null}
             <p class="who">
                 <Torretta size={36} mood={mood} />
                 <span class="signed">

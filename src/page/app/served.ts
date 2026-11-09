@@ -2,6 +2,7 @@
 // there, refused in the player's language.
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { AiModel, Clock, Side } from "../../core/index.ts";
+import type { Thinking } from "../avatars/thought.tsx";
 import type { CoachShown, TalkLine } from "../game/plies.ts";
 import type { ProfileShown } from "../profile/profile.ts";
 import type { ServerRefusal, Text } from "../text.ts";
@@ -98,6 +99,10 @@ export interface PageData
     readonly aiModel?: AiModel;
     /** Whether a chat hears the player: in a turn, or waiting for the doorbell. */
     readonly listening?: boolean;
+    /** What the AI thinks on now: its move, or on the player's time (D-72); none else. */
+    readonly thinking?: Thinking;
+    /** The player's folder was set up by an older Chesspal: init must run there again. */
+    readonly outdated?: true;
     readonly profile: ProfileShown;
     readonly profiles: readonly ProfileShown[];
     readonly settings?: object;

@@ -42,6 +42,8 @@ export interface NewProfile
     readonly site: RatingSite;
     readonly avatar?: AvatarId;
     readonly photo?: File;
+    /** False to make it without putting it in use, while a game goes on. */
+    readonly use?: boolean;
 }
 
 /** A request the server refused: its words, and its code when the page says it in the player's language. */
@@ -57,8 +59,8 @@ export function imageAddress(profile: ProfileShown): string | undefined
     return profile.image === undefined ? undefined : `/api/profile/image?profile=${encodeURIComponent(profile.id)}&v=${encodeURIComponent(profile.image)}`;
 }
 
-/** Makes a profile and puts it in use, with the photo after it, made small first so that a photo that cannot be read makes no profile: the refusal, or undefined. */
-export async function makeProfile({ name, level, rating, site, avatar, photo }: NewProfile): Promise<Refused | undefined>
+/** Makes a profile, in use unless `use` is false, with the photo after it, made small first so that a photo that cannot be read makes no profile: the refusal, or undefined. */
+export async function makeProfile({ name, level, rating, site, avatar, photo, use }: NewProfile): Promise<Refused | undefined>
 {
     const image = photo === undefined ? undefined : await shrunk(photo).catch(() => undefined);
 
@@ -66,7 +68,7 @@ export async function makeProfile({ name, level, rating, site, avatar, photo }: 
         return badImage;
     }
 
-    const answer = await post("/api/profile/new", jsonOf({ name: name.trim(), level, ...(rating === undefined ? {} : { rating, site }), ...(avatar === undefined ? {} : { avatar }) }));
+    const answer = await post("/api/profile/new", jsonOf({ name: name.trim(), level, ...(rating === undefined ? {} : { rating, site }), ...(avatar === undefined ? {} : { avatar }), ...(use === false ? { use } : {}) }));
 
     if ("refused" in answer) {
         return answer.refused;
@@ -85,6 +87,12 @@ export async function useProfile(id: string): Promise<Refused | undefined>
 export async function chooseAvatar(profile: string, avatar: AvatarId): Promise<Refused | undefined>
 {
     return refusalOf(await post(forProfile("/api/profile/avatar", profile), jsonOf({ avatar })));
+}
+
+/** The player's names on Lichess and chess.com for the profile the page shows, an empty one removed: the server's refusal, or undefined. */
+export async function saveAccounts(profile: string, accounts: { readonly lichess: string; readonly chesscom: string; }): Promise<Refused | undefined>
+{
+    return refusalOf(await post(forProfile("/api/profile/accounts", profile), jsonOf({ lichess: accounts.lichess.trim(), chesscom: accounts.chesscom.trim() })));
 }
 
 /** Opens the data folder in the system's file manager, where the page runs: the server's refusal, or undefined. */

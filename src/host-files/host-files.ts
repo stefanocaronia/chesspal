@@ -1,6 +1,6 @@
 // What `chesspal init` writes in a player's folder for each AI host: the opponent's instructions, the MCP server, the hooks and the agents.
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { makeFolder, writeAtomically } from "../games/index.ts";
 import { agentFiles, instructions } from "./agents.ts";
 
@@ -12,8 +12,7 @@ import { agentFiles, instructions } from "./agents.ts";
 export function setUpHosts(folder: string, platform: string): string[]
 {
     makeFolder(folder);
-    const changes = [mcpFile(folder, platform), agentsFile(folder), claudeFile(folder), claudeSettingsFile(folder), ...ponderAgentChanges(folder), codexConfigFile(folder, platform), codexHooksFile(folder)];
-    const written = changes.filter((change) => change !== undefined);
+    const written = hostChanges(folder, platform);
 
     for (const { path, text } of written) {
         makeFolder(join(path, ".."));
@@ -21,6 +20,19 @@ export function setUpHosts(folder: string, platform: string): string[]
     }
 
     return written.map(({ path }) => path);
+}
+
+/**
+ * The files an older init wrote in a folder, or left out, that this version would write otherwise, by their paths in it: the AI and the page then ask the
+ * player to run init again. None in a folder init never set up.
+ */
+export function outdatedHostFiles(folder: string, platform: string): string[]
+{
+    if (!markedBlock.test(textOf(join(folder, "AGENTS.md")) ?? "")) {
+        return [];
+    }
+
+    return hostChanges(folder, platform).map(({ path }) => relative(folder, path));
 }
 
 /** Where Codex reads a folder's hooks, which it runs only once the player trusts them. */
@@ -45,6 +57,13 @@ interface FileChange
 const startMark = "<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->";
 const endMark = "<!-- chesspal: end -->";
 const markedBlock = /<!-- chesspal: (?!end)[^\n]*\n[\s\S]*?<!-- chesspal: end -->/;
+
+/** What init writes for each host, missing or changed: what the player wrote there stays. */
+function hostChanges(folder: string, platform: string): FileChange[]
+{
+    const changes = [mcpFile(folder, platform), agentsFile(folder), claudeFile(folder), claudeSettingsFile(folder), ...ponderAgentChanges(folder), codexConfigFile(folder, platform), codexHooksFile(folder)];
+    return changes.filter((change) => change !== undefined);
+}
 
 /** How a host starts the server: on Windows through cmd, which finds npm's shim. */
 function chesspalServer(platform: string): { command: string; args: string[]; }

@@ -36,6 +36,8 @@ export interface Context
     heard?: () => void;
     /** Told when the chat calls a tool, before it runs: the board page hears the chat listens, and the AI's clock, held while nobody did, starts. */
     calls?: () => void;
+    /** Told when the AI starts thinking on the player's time (D-72), with the position, and when it is done: the board page shows it. */
+    ponders?: (position: SeenPosition | undefined) => void;
     /** The game the chat saw when its last tool ended, its folder and its stamp: the doorbell wakes it only for a game changed since. */
     seen?: string | undefined;
     /**

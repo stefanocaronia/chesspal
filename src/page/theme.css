@@ -42,6 +42,10 @@
     --torretta-ponder: #8f9a8a;
     /* The badges of the moves (D-69): white signs, dark on the yellow one; each disc at least 3:1 with its sign */
     --badge-ink: #fff;
+    /* How a game went for the player, in the Analysis window's list: the colours of the move badges (D-69) */
+    --result-win: var(--badge-best);
+    --result-loss: var(--badge-blunder);
+    --result-draw: var(--badge-note);
     --badge-note: #7b8794;
     --badge-brilliant: #0f9a9e;
     --badge-great: #2f74c8;

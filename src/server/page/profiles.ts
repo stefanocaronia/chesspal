@@ -3,8 +3,23 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { isAbsolute, relative, sep } from "node:path";
-import { chooseDrawnAvatar, GameGoingOn, inputProblems, newProfile, useProfile } from "../../commands/index.ts";
-import { activeProfile, drawnAvatars, imageTypes, listProfiles, ownImage, ownImageStamp, type PageSettings, type PlayerProfile, profileSettings, saveOwnImage, saveProfileSettings, sentImageLimit, settingsOf } from "../../profiles/index.ts";
+import { chooseDrawnAvatar, GameGoingOn, inputProblems, newProfile, setAccounts, useProfile } from "../../commands/index.ts";
+import {
+    activeProfile,
+    drawnAvatars,
+    imageTypes,
+    listProfiles,
+    ownImage,
+    ownImageStamp,
+    type PageSettings,
+    type PlayerProfile,
+    profileFolder,
+    profileSettings,
+    saveOwnImage,
+    saveProfileSettings,
+    sentImageLimit,
+    settingsOf,
+} from "../../profiles/index.ts";
 import { bodyOf, bytesOf, isJson, jsonOf, type Refused, runRoute, send, sendJson } from "./http.ts";
 import type { Served } from "./page.ts";
 
@@ -20,7 +35,7 @@ export interface ProfilesShown
     readonly profile: ProfileShown;
     readonly profiles: ProfileShown[];
     readonly settings?: PageSettings;
-    /** The data folder as the player finds it, folder by folder from their own: OneDrive, Documenti, My Games, Chesspal. */
+    /** Where the player's games are, folder by folder from their own: OneDrive, Documenti, My Games, Chesspal, profiles, stefano. */
     readonly dataFolder: readonly string[];
 }
 
@@ -31,7 +46,7 @@ export function profilesShown(root: string, userFolder = homedir()): ProfilesSho
     const profiles = listProfiles(root).map((profile) => shown(root, profile));
     const settings = profileSettings(root, active.id);
     const profile = profiles.find(({ id }) => id === active.id)!;
-    const dataFolder = foldersOf(root, userFolder);
+    const dataFolder = foldersOf(playerFolder(root), userFolder);
     return settings === undefined ? { profile, profiles, dataFolder } : { profile, profiles, settings, dataFolder };
 }
 
@@ -54,6 +69,7 @@ const routes: Readonly<Record<string, Route>> = {
     "POST /api/profile/new": newProfileFromPage,
     "POST /api/profile/use": useProfileFromPage,
     "POST /api/profile/avatar": drawnAvatarFromPage,
+    "POST /api/profile/accounts": accountsFromPage,
     "POST /api/profile/image": imageFromPage,
     "GET /api/profile/image": sendImage,
     "POST /api/settings": settingsFromPage,
@@ -120,7 +136,31 @@ async function drawnAvatarFromPage(request: IncomingMessage, response: ServerRes
     sendJson(response, 200, { avatar: drawn });
 }
 
-/** The player's own image for the profile the page shows, as the page made it from their photo: a PNG, JPEG or WebP of 1 MB at most. */
+/** The player's names on Lichess and chess.com for the profile the page shows (D-93), in a game or in analysis too: they change only which side is theirs. */
+async function accountsFromPage(request: IncomingMessage, response: ServerResponse, served: Served, url: URL): Promise<void>
+{
+    const body = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;
+    const input = setAccounts.input.safeParse(body ?? {});
+    const profile = profileInUse(served, url, response);
+
+    if (profile === undefined) {
+        return;
+    }
+
+    if (body === undefined || !input.success) {
+        const problems = input.success ? "" : ` ${inputProblems("set_accounts", input.error.issues, body ?? {}, (name) => name)}`;
+        sendJson(response, 400, { error: `Send the names as JSON, {"lichess": "…", "chesscom": "…"}.${problems}` });
+        return;
+    }
+
+    const { accounts } = await setAccounts.run(input.data, served.context);
+    sendJson(response, 200, { accounts: accounts ?? {} });
+}
+
+/**
+ * The player's own image for a profile, as the page made it from their photo: a PNG, JPEG or WebP of 1 MB at most. The one in use, or one just added while a
+ * game goes on, which waits for it to end.
+ */
 async function imageFromPage(request: IncomingMessage, response: ServerResponse, served: Served, url: URL): Promise<void>
 {
     const type = request.headers["content-type"] ?? "";
@@ -132,7 +172,7 @@ async function imageFromPage(request: IncomingMessage, response: ServerResponse,
     }
 
     const bytes = await bytesOf(request, sentImageLimit);
-    const profile = profileInUse(served, url, response);
+    const profile = profileNamed(served, url, response);
 
     if (profile === undefined) {
         return;
@@ -204,7 +244,7 @@ async function openDataFolder(request: IncomingMessage, response: ServerResponse
         return;
     }
 
-    if (!(await open(served.context.home()))) {
+    if (!(await open(playerFolder(served.context.home())))) {
         sendJson(response, 500, { error: "No file manager could open the data folder: the page shows its path." });
         return;
     }
@@ -229,10 +269,33 @@ function profileInUse(served: Served, url: URL, response: ServerResponse): Playe
     return undefined;
 }
 
+/** The profile the request names (?profile=), in use or not: the page names it on purpose. */
+function profileNamed(served: Served, url: URL, response: ServerResponse): PlayerProfile | undefined
+{
+    const id = url.searchParams.get("profile");
+    const profile = listProfiles(served.context.home()).find((one) => one.id === id);
+
+    if (profile === undefined) {
+        sendJson(response, 404, { error: `There is no profile ${id ?? "named"}: load the page again.` });
+    }
+
+    return profile;
+}
+
 function shown(root: string, profile: PlayerProfile): ProfileShown
 {
     const image = ownImageStamp(root, profile.id);
     return image === undefined ? profile : { ...profile, image };
+}
+
+/**
+ * Where the player in use keeps their games, those played and those loaded: their profile's folder; the data folder while the first profile is new, since
+ * its folder takes the player's name once they complete it (D-71).
+ */
+function playerFolder(root: string): string
+{
+    const active = activeProfile(root);
+    return active.new === true ? root : profileFolder(root, active.id);
 }
 
 /** A folder's names from the user's own folder, as the file manager walks there; from its drive or root when it is elsewhere. */

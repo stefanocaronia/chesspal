@@ -51,7 +51,7 @@ export function Analyses({ onStudy, onLoad, you, accounts, ai, text }: {
         const named = namedSides(item, you, accounts, ai, text);
         // How it went only for the player's own games: played here, or loaded and named by their name on the site (D-93).
         const played = item.name.startsWith("games/") ? named.you : accountSide(tagsOf(item), accounts);
-        const outcome = played === undefined ? undefined : outcomeOf(item.result, played, words);
+        const outcome = played === undefined ? undefined : outcomeOf(item.result, played);
         return { item, named, outcome };
     });
     const found = searched(rows, query, ({ item, named, outcome }) => searchText(item, named.sides, outcome, text));
@@ -103,13 +103,11 @@ export function Analyses({ onStudy, onLoad, you, accounts, ai, text }: {
                                             <span class="meta">
                                                 {[dayOf(item.date, text.language), words.moves(item.moves), item.opening].filter((part) => part !== undefined).join(" · ")}
                                             </span>
-                                            <span class={item.reviewed ? "state reviewed" : "state"}>
-                                                {item.reviewed ? [words.reviewed, by(item)].filter((part) => part !== undefined).join(" · ") : words.unreviewed}
-                                            </span>
+                                            {item.reviewed ? <Reviewed by={by(item)} words={words} /> : null}
                                         </span>
                                         <span class="score">
                                             <b>{scoreOf(item.result)}</b>
-                                            {outcome === undefined ? null : <small>{outcome}</small>}
+                                            {outcome === undefined ? <span /> : <OutcomeBadge outcome={outcome} words={words} />}
                                         </span>
                                     </button>
                                     <span class="row-actions">
@@ -285,12 +283,42 @@ function namedSides(item: AnalysisItem, you: string, accounts: Accounts | undefi
 }
 
 /** What the search looks through in a row: who played, the models, the date, the opening and its variation, how it went and whether it is reviewed. */
-function searchText(item: AnalysisItem, sides: string, outcome: string | undefined, text: Text): string
+function searchText(item: AnalysisItem, sides: string, outcome: Outcome | undefined, text: Text): string
 {
     const words = text.study;
     const state = item.reviewed ? words.reviewed : words.unreviewed;
-    return [sides, item.aiModel?.model, by(item), item.annotator?.model, dayOf(item.date, text.language), item.opening, scoreOf(item.result), outcome, state].join(" ");
+    const went = outcome === undefined ? undefined : words.outcome[outcome];
+    return [sides, item.aiModel?.model, by(item), item.annotator?.model, dayOf(item.date, text.language), item.opening, scoreOf(item.result), went, state].join(" ");
 }
+
+/** How a game went for the player, as chess.com marks it: a green square with a plus, a red one with a minus, a grey one with an equals sign. */
+function OutcomeBadge({ outcome, words }: { outcome: Outcome; words: StudyText; })
+{
+    return (
+        <svg class={`outcome ${outcome}`} viewBox="0 0 16 16" role="img" aria-label={words.outcome[outcome]}>
+            <title>{words.outcome[outcome]}</title>
+            <rect width="16" height="16" rx="4" />
+            <path d={outcomeSigns[outcome]} />
+        </svg>
+    );
+}
+
+/** A game the AI reviewed: its speech bubble, and the model that wrote the review when the tags say it. */
+function Reviewed({ by, words }: { by: string | undefined; words: StudyText; })
+{
+    return (
+        <span class="state reviewed" title={by === undefined ? words.reviewed : `${words.reviewed}: ${by}`}>
+            <svg class="icon" viewBox="0 0 24 24" role="img" aria-label={words.reviewed}>
+                <path d="M5 5H19V15.5H11L7 19.5V15.5H5Z" />
+            </svg>
+            {by === undefined ? null : <span>{by}</span>}
+        </span>
+    );
+}
+
+type Outcome = "won" | "lost" | "drawn";
+
+const outcomeSigns: Readonly<Record<Outcome, string>> = { won: "M5 8h6M8 5v6", lost: "M5 8h6", drawn: "M5 6.5h6M5 9.5h6" };
 
 /** The tags of a game listed that name its sides. */
 function tagsOf(item: AnalysisItem): Record<string, string>
@@ -311,13 +339,13 @@ function scoreOf(result: string): string
 }
 
 /** How a game went for the player: won, lost or drawn; nothing for a game without a result. */
-function outcomeOf(result: string, you: "white" | "black", words: StudyText): string | undefined
+function outcomeOf(result: string, you: "white" | "black"): Outcome | undefined
 {
     if (result === "1/2-1/2") {
-        return words.outcome.drawn;
+        return "drawn";
     }
 
-    return result === "1-0" || result === "0-1" ? (result === "1-0") === (you === "white") ? words.outcome.won : words.outcome.lost : undefined;
+    return result === "1-0" || result === "0-1" ? (result === "1-0") === (you === "white") ? "won" : "lost" : undefined;
 }
 
 /** A PGN date, 2026.11.04, as the player reads it: «4 nov», with the year when it is not this one. */

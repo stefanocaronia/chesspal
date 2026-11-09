@@ -67,7 +67,9 @@ describe("annotate_game (D-69)", () => {
         expect(gameInAnalysis(gameFolder(context.folder))?.game).toBe(kept);
 
         // The book's moves without a note of the AI's are named, for the AI to give each a word in the player's language.
-        const book = (moves: string): string => `\nThe book's moves ${moves} have no note of yours: the page shows the book's English name there. A short note on each, in the player's words, takes its place.`;
+        const book = (moves: string): string =>
+            `\nThe book's moves ${moves} have no note of yours: the page shows the book's English name there. A short note on each, in the player's words, takes its place.`
+            + "\nWho is ahead is still missing after 1. 1... 2. 2... 3. 3...: give it with ahead, for the page's bar and chart.";
         const notes = [{ move: "3...", badge: "blunder", note: "leaves f7 to the queen" }, { move: "4.Qxf7#", badge: "best" }];
         expect(await annotate(context, { notes, summary: "A short game: Black missed the threat on f7." }))
             .toBe(`Kept in ${kept}: 2 moves marked and your word on the game. The board page shows them.${book("1. 1... 2. 2... 3.")}`);
@@ -133,9 +135,8 @@ describe("annotate_game (D-69)", () => {
         const context = playerFolder();
         await analyse(context, { pgn });
 
-        // Once the review gives who is ahead, the answer names the moves still without it but the mate, which the board says; a review without it, as
-        // those before D-90, is not asked for it (Priya).
-        expect(await annotate(context, { notes: [{ move: "1.", badge: "book" }] })).not.toContain("Who is ahead");
+        // The answer names the moves still without who is ahead but the mate, which the board says, also to a review that gives none, as those before D-90.
+        expect(await annotate(context, { notes: [{ move: "1.", badge: "book" }] })).toContain("Who is ahead is still missing after 1. 1... 2. 2... 3. 3...: give it with ahead");
         expect(await annotate(context, { ahead: { "1.": 0.3 } })).toMatch(
             /: who is ahead after 1 move\. [\s\S]*\nWho is ahead is still missing after 1\.\.\. 2\. 2\.\.\. 3\. 3\.\.\.: give it with ahead, for the page's bar and chart\.$/,
         );
@@ -205,7 +206,8 @@ describe("annotate_game (D-69)", () => {
         expect(await annotate(context, { game: "2026-11-02-153012", notes: [{ move: "1...", badge: "book" }] }))
             .toBe(
                 "Kept in games/2026-11-02-153012.pgn: 1 move marked. The board page shows them.\nThe book's move 1... has no note of yours: the page shows the book's English name "
-                    + "there. A short note on each, in the player's words, takes its place.",
+                    + "there. A short note on each, in the player's words, takes its place.\nWho is ahead is still missing after 1. 1...: give it with ahead, for the page's bar "
+                    + "and chart.",
             );
         expect(gameInAnalysis(gameFolder(context.folder))?.game).toBe("games/2026-11-02-153012.pgn");
         expect(await analyse(context, {})).toMatch(/in the book to the end: those moves have the book badge[^\n]*\n[\s\S]*\n1\.\.\.d5: at risk: undefended White Pe4; your plan: open the centre$/);

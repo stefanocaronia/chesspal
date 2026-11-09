@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
-import { opponentInstructions } from "../src/host-files/index.ts";
+import { opponentInstructions, outdatedHostFiles } from "../src/host-files/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -120,6 +120,18 @@ describe("chesspal init", () => {
             '  1. Entra nella cartella: cd "la mia scacchiera"\n     poi apri Claude Code (claude) o Codex (codex).\n',
         );
         expect((await runCommandLine(["init"], { ...testContext(folder), language: "fr-FR" })).output).toMatch(/^♜ Chesspal is ready in .*: nothing to change\n/);
+    });
+
+    it("finds the files an older init wrote, and status tells the AI to have the player run it again", async () => {
+        const folder = playerFolder();
+        expect(outdatedHostFiles(folder, "linux")).toEqual([]);
+        await runCommandLine(["init"], testContext(folder));
+        expect(outdatedHostFiles(folder, "linux")).toEqual([]);
+        const coach = join(".claude", "agents", "chesspal-coach.md");
+        writeFileSync(join(folder, coach), "an older coach\n");
+        expect(outdatedHostFiles(folder, "linux")).toEqual([coach]);
+        const { output } = await runCommandLine(["status"], testContext(folder));
+        expect(output).toContain(`This folder was set up by an older Chesspal (${coach}): tell the player, in their language, to close this chat, run "chesspal init" in this folder`);
     });
 
     it("refuses a settings file that is not JSON, and says how to fix it", async () => {

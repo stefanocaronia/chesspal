@@ -65,6 +65,7 @@ export const ponder = defineCommand({
                 throw new Error("Give the position's number with it: call ponder {} first, which gives it. Nothing changed.");
             }
 
+            context.ponders?.({ started: current.started, plies: current.game.record.moves.length });
             return { start: startOf(current) };
         }
 
@@ -78,6 +79,7 @@ export const ponder = defineCommand({
         }
 
         if (done) {
+            context.ponders?.(undefined);
             return await waitForMove(folder, context, current);
         }
 

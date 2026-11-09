@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "../games/index.ts";
-import { coachAgent } from "../host-files/index.ts";
+import { coachAgent, outdatedHostFiles } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { agentsLine, analystLine, analystRuns, coachOnEnd, coachRuns, reviewedLine, withAnalyst } from "./agents.ts";
@@ -38,6 +38,8 @@ interface Status
     fromBefore?: true;
     /** The coach to start, once, for the player's move that ended the game (D-88). */
     coach?: true;
+    /** The files an older init wrote in the player's folder, which this version would write otherwise. */
+    outdated?: string[];
 }
 
 /** What Chesspal sees now, the first call of a chat: a dashboard under 150 tokens while the player is to move, with the next step. */
@@ -55,7 +57,8 @@ export const status = defineCommand({
         const folder = gameFolder(context.home());
         const player = playerLine(context);
         const speech = speechOf(folder, context.language);
-        const status: Status = { version, folder, ...(player === undefined ? {} : { player }), ...(speech === undefined ? {} : { speech }) };
+        const outdated = outdatedHostFiles(context.folder, context.platform);
+        const status: Status = { version, folder, ...(player === undefined ? {} : { player }), ...(speech === undefined ? {} : { speech }), ...(outdated.length === 0 ? {} : { outdated }) };
 
         if (context.page !== undefined) {
             status.page = context.page;
@@ -106,9 +109,10 @@ export const status = defineCommand({
 
         return status;
     },
-    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words = [], analysis, fromBefore, coach }) =>
+    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words = [], analysis, fromBefore, coach, outdated }) =>
         [
             `Chesspal ${version}. Folder: ${folder}`,
+            ...(outdated === undefined ? [] : [outdatedLine(outdated)]),
             ...(page === undefined ? [] : [pageLine(page, pageClosed === true)]),
             ...(player === undefined ? [] : [player]),
             ...(speech === undefined ? [] : [speechLine(speech)]),
@@ -117,6 +121,13 @@ export const status = defineCommand({
             ...(analysis === undefined ? [] : [analysisLine(analysis)]),
         ].join("\n"),
 });
+
+/** An older init's files in the player's folder: the player runs init again, with the chat closed, since the host reads them as a chat starts. */
+function outdatedLine(files: readonly string[]): string
+{
+    return `This folder was set up by an older Chesspal (${files.join(", ")}): tell the player, in their language, to close this chat, run "chesspal init" `
+        + "in this folder and open a new chat. Until then the agents and your instructions are the old ones.";
+}
 
 // The game going on as a chat starts: the player may have come back for it, or want another.
 const fromBeforeLine = "A game from before this chat is going on: ask the player whether to go on with it. For a new one, " + newGameStep;

@@ -311,7 +311,8 @@
     line-height: 1.45;
 }
 
-.review.waiting {
+.review.waiting,
+.say.reviewing {
     display: flex;
     align-items: center;
     gap: 8px;

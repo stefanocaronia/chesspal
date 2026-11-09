@@ -86,9 +86,6 @@ export const annotateGame = defineCommand({
             moves[index] = reviewed(moves[index]!, { ...(kept === undefined ? {} : { badge: kept }), ...(note === undefined ? {} : { note }), ...drawingsOf(arrows, squares) });
         }
 
-        // A review written before D-90 is not asked for who is ahead unless this call starts giving it (Priya).
-        const estimating = estimates.length > 0 || moves.some((move) => leadOf(move.comment) !== undefined);
-
         for (const [move, lead] of estimates) {
             const index = indexIn(studied.record, move, "ahead");
             moves[index] = withLead(moves[index]!, leadFrom(lead));
@@ -115,7 +112,8 @@ export const annotateGame = defineCommand({
             closing: closing !== undefined,
             bookUnnoted,
             estimated: estimates.length,
-            unestimated: estimating ? unestimatedMoves(marked, numbers) : [],
+            // Asked every time, of an older review too: an analyst whose instructions predate the estimates learns of them here.
+            unestimated: unestimatedMoves(marked, numbers),
         };
     },
     format: ({ game, marked, summary, closing, bookUnnoted, estimated, unestimated }) => {

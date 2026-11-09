@@ -94,10 +94,11 @@ export function opponentOf(host: string | undefined): string | undefined
 async function pageOf(context: Context, opponent: () => string | undefined): Promise<string | undefined>
 {
     try {
-        const { url, heard, chatCalls, open, askNewGame } = await startPage(context, opponent);
+        const { url, heard, chatCalls, ponders, open, askNewGame } = await startPage(context, opponent);
         // Words the AI is given change no file: the pages hear of them from the commands.
         context.heard = heard;
         context.calls = chatCalls;
+        context.ponders = ponders;
         context.pageOpen = open;
         context.askNewGame = askNewGame;
 

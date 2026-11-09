@@ -1,8 +1,10 @@
 // The page's header: the Torretta and the name, the word on a game over or on the AI's draw offer, the player's draw and resignation, then the commands for
-// the board, the sounds, the theme and the settings.
+// the board, the sounds, the theme and the settings, and the player's picture.
 import type { ComponentChildren } from "preact";
 import type { VerdictKind } from "../app/phase.ts";
+import { PlayerPicture } from "../avatars/avatars.tsx";
 import { Torretta } from "../avatars/torretta.tsx";
+import type { ProfileShown } from "../profile/profile.ts";
 import type { Text } from "../text.ts";
 
 /** What the player may do in a game going on (D-65): offer a draw on their turn, answer the AI's offer, resign. */
@@ -22,7 +24,7 @@ export interface GameActions
  * and resignation in a game going on (D-65), a new game once the page has the folder's, the command that turns the board round and says whether it is
  * turned, the switches of the sounds and the theme, and the gear of the settings (D-56).
  */
-export function Header({ text, verdict, kind, who, actions, onNewGame, standOut = false, onStudy, flipped, onFlip, sound, onSound, onTheme, onSettings }: {
+export function Header({ text, verdict, kind, who, actions, onNewGame, standOut = false, onStudy, flipped, onFlip, sound, onSound, onTheme, onSettings, profile, onProfile }: {
     text: Text;
     verdict?: string;
     /** What the verdict is about, which gives its chip a colour and an icon. */
@@ -41,6 +43,9 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
     onSound: () => void;
     onTheme: () => void;
     onSettings: () => void;
+    /** Who plays: their picture opens the menu of the players, in every phase. */
+    profile?: ProfileShown;
+    onProfile?: () => void;
 })
 {
     return (
@@ -101,6 +106,18 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
                     <path d="M9.72 5.38L10.19 2.67L13.81 2.67L14.28 5.38L15.07 5.71L17.31 4.12L19.88 6.69L18.29 8.93L18.62 9.72L21.33 10.19L21.33 13.81L18.62 14.28L18.29 15.07L19.88 17.31L17.31 19.88L15.07 18.29L14.28 18.62L13.81 21.33L10.19 21.33L9.72 18.62L8.93 18.29L6.69 19.88L4.12 17.31L5.71 15.07L5.38 14.28L2.67 13.81L2.67 10.19L5.38 9.72L5.71 8.93L4.12 6.69L6.69 4.12L8.93 5.71Z" />
                 </Icon>
             </button>
+            {profile === undefined || onProfile === undefined ? null : (
+                <button
+                    class="icon-button player"
+                    type="button"
+                    title={`${profile.name}: ${text.profile.profiles}`}
+                    aria-label={`${profile.name}: ${text.profile.profiles}`}
+                    aria-haspopup="dialog"
+                    onClick={onProfile}
+                >
+                    <PlayerPicture profile={profile} size={28} />
+                </button>
+            )}
         </header>
     );
 }

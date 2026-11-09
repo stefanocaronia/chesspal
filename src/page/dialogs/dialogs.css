@@ -564,12 +564,14 @@ h3 + .switch {
     border-color: var(--accent);
 }
 
+/* As tall with the reviewed line as without it, so that the rows keep one height */
 .analyses .reopen {
     display: flex;
     flex: 1;
     align-items: center;
     gap: 12px;
     min-width: 0;
+    min-height: 65px;
     padding: 8px 4px 8px 8px;
     border: 0;
     background: none;
@@ -648,29 +650,66 @@ h3 + .switch {
     text-overflow: ellipsis;
 }
 
+/* A game reviewed: the AI's speech bubble in the accent, and the model that wrote it; a game still to review has nothing (Zoe) */
 .analyses .state.reviewed {
-    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 5px;
 }
 
-/* The score in a column of its own, right-aligned with tabular figures, so that it does not move from row to row */
+.analyses .state .icon {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    stroke: var(--accent);
+    stroke-width: 1.75;
+}
+
+.analyses .state span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The score with tabular figures, and how it went for the player as chess.com marks it, in columns that do not move from row to row */
 .analyses .score {
     display: grid;
+    grid-template-columns: auto 16px;
     flex: none;
     justify-items: end;
-    align-content: center;
-    min-width: 46px;
+    align-items: center;
+    gap: 6px;
+    min-width: 62px;
     padding-right: 4px;
     line-height: 1.2;
+}
+
+.analyses .outcome {
+    width: 16px;
+    height: 16px;
+}
+
+.analyses .outcome path {
+    fill: none;
+    stroke: var(--badge-ink);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+.analyses .outcome.won rect {
+    fill: var(--result-win);
+}
+
+.analyses .outcome.lost rect {
+    fill: var(--result-loss);
+}
+
+.analyses .outcome.drawn rect {
+    fill: var(--result-draw);
 }
 
 .analyses .score b {
     font-size: 15px;
     font-variant-numeric: tabular-nums;
-}
-
-.analyses .score small {
-    color: var(--soft);
-    font-size: 12px;
 }
 
 .analyses .row-actions {
@@ -826,7 +865,7 @@ h3 + .switch {
     }
 
     .analyses .score {
-        min-width: 40px;
+        min-width: 56px;
         padding-right: 0;
     }
 
@@ -1048,6 +1087,49 @@ h3 + .switch {
     flex: none;
     width: 32px;
     height: 32px;
+}
+
+/* The names on Lichess and chess.com of the player in use, under their line: the site, the name, a tick once saved (D-93) */
+.dialog .accounts {
+    display: grid;
+    grid-template-columns: auto 1fr 18px;
+    align-items: center;
+    gap: 6px 10px;
+    margin: -4px 0 12px;
+}
+
+.accounts label {
+    display: contents;
+}
+
+.accounts span {
+    color: var(--soft);
+    font-size: 14px;
+}
+
+.accounts input {
+    min-width: 0;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--page);
+    color: var(--ink);
+    font: inherit;
+    font-size: 15px;
+}
+
+.accounts input:invalid {
+    border-color: var(--low-time);
+}
+
+.accounts .in-use {
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+}
+
+.accounts .problem {
+    grid-column: 1 / -1;
 }
 
 .dialog .new-profile {

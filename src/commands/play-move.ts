@@ -118,7 +118,8 @@ export function refuseOtherGame(context: Context, folder: string): void
     }
 }
 
-function samePosition(one: SeenPosition, other: SeenPosition): boolean
+/** Whether two positions a chat may see are the same: the same game, as many plies. */
+export function samePosition(one: SeenPosition, other: SeenPosition): boolean
 {
     return one.started === other.started && one.plies === other.plies;
 }

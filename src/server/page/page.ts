@@ -3,8 +3,9 @@
 import { type FSWatcher, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { join } from "node:path";
-import { type Context, positionIn } from "../../commands/index.ts";
+import { type Context, positionIn, samePosition, type SeenPosition } from "../../commands/index.ts";
 import { gameStamp } from "../../games/index.ts";
+import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { Bell, bellProbe, pagePorts } from "../bell.ts";
 import { analysesOf, answerAnalyses } from "./analyses.ts";
@@ -20,6 +21,8 @@ export interface Page
     heard(): void;
     /** The chat calls a tool: the page hears it listens, and the AI's clock, held while nobody heard the player, starts now. */
     chatCalls(): void;
+    /** The AI starts thinking on the player's time, on a position, or is done (D-72): the page shows it. */
+    ponders(position: SeenPosition | undefined): void;
     /** Whether a browser has the page open now: one listens to the game's changes. */
     open(): boolean;
     /** Opens the New game window on every page open now, for the player to choose the game there: whether one was open. */
@@ -35,7 +38,8 @@ export async function startPage(context: Context, opponent: () => string | undef
 {
     const { folder } = context;
     const watchers = new Set<ServerResponse>();
-    const served: Served = { folder, context, opponent, bell: new Bell(() => hasNews(context), () => tellWatchers(served)), watchers, port: 0 };
+    const outdated = outdatedHostFiles(folder, context.platform).length > 0;
+    const served: Served = { folder, context, opponent, bell: new Bell(() => hasNews(context), () => tellWatchers(served)), watchers, port: 0, outdated };
     const server = createServer((request, response) => answer(request, response, served));
 
     for (const port of [...pagePorts(folder), 0]) {
@@ -47,6 +51,10 @@ export async function startPage(context: Context, opponent: () => string | undef
                 url: `http://127.0.0.1:${served.port}/`,
                 heard: () => tellWatchers(served),
                 chatCalls: () => chatCalls(served),
+                ponders: (position) => {
+                    served.pondering = position;
+                    tellWatchers(served);
+                },
                 open: () => watchers.size > 0,
                 askNewGame: () => askNewGame(served),
                 close: () => closed(server, stopWatching),
@@ -67,6 +75,10 @@ export interface Served
     readonly bell: Bell;
     readonly watchers: Set<ServerResponse>;
     port: number;
+    /** The folder was set up by an older init: the page asks the player to run it again. Read once, as init runs with the chat closed. */
+    readonly outdated: boolean;
+    /** The position the AI thinks on during the player's time (D-72), until it is done; none else. */
+    pondering?: SeenPosition | undefined;
 }
 
 /**
@@ -81,11 +93,23 @@ export function chatHasRead(context: Context, showed: boolean): void
         return;
     }
 
+    const before = context.positionSeen;
+
     try {
         context.positionSeen = positionIn(gameFolder(context.home()));
     } catch {
         context.positionSeen = null;
     }
+
+    // The chat on another position may now be thinking on its move: the page hears it, which no file tells when no bell woke the chat.
+    if (!sameSeen(before, context.positionSeen)) {
+        context.heard?.();
+    }
+}
+
+function sameSeen(one: SeenPosition | null | undefined, other: SeenPosition | null | undefined): boolean
+{
+    return one === other || (one !== undefined && one !== null && other !== undefined && other !== null && samePosition(one, other));
 }
 
 /** Sends each request where it belongs: the profiles, the game, the page's files, the analyses, the events and the doorbell. */

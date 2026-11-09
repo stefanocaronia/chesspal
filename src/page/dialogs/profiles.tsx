@@ -17,6 +17,7 @@ import {
     type RatingSite,
     ratingSites,
     type Refused,
+    saveAccounts,
     sendPhoto,
     useProfile,
 } from "../profile/profile.ts";
@@ -116,13 +117,16 @@ export function PictureDialog({ open, profile, onClose, text }: { open: boolean;
     );
 }
 
-/** The menu of the players, open while `open`: another put in use, or a new one made, never while a game goes on. */
-export function ProfilesDialog({ open, profiles, active, playing, dataFolder, onClose, text }: {
+/**
+ * The menu of the players, open while `open`: another put in use, never while a game goes on, or a new one made, which waits for it to end; and the names of the one in
+ * use on Lichess and chess.com (D-93).
+ */
+export function ProfilesDialog({ open, profiles, active, locked, dataFolder, onClose, text }: {
     open: boolean;
     profiles: readonly ProfileShown[];
     active: ProfileShown;
-    /** A game goes on: the profile stays until it ends. */
-    playing: boolean;
+    /** Why the profile stays the one in use for now: a game goes on. */
+    locked?: string;
     /** Where the profiles are, folder by folder. */
     dataFolder: readonly string[];
     onClose: () => void;
@@ -153,7 +157,7 @@ export function ProfilesDialog({ open, profiles, active, playing, dataFolder, on
             onClose={onClose}
             text={text}
         >
-            {making ? <ProfileForm text={text} submit={text.profile.create} onMade={onClose} /> : (
+            {making ? <ProfileForm text={text} submit={text.profile.create} use={locked === undefined} onMade={onClose} /> : (
                 <>
                     <p class="note">{text.profile.eachOwn}</p>
                     <div class="profile-list" role="radiogroup" aria-label={text.profile.profiles}>
@@ -165,7 +169,7 @@ export function ProfilesDialog({ open, profiles, active, playing, dataFolder, on
                                 role="radio"
                                 title={profile.name}
                                 aria-checked={profile.id === active.id}
-                                disabled={playing && profile.id !== active.id}
+                                disabled={locked !== undefined && profile.id !== active.id}
                                 onClick={() => use(profile.id)}
                             >
                                 <PlayerPicture profile={profile} size={32} />
@@ -174,8 +178,9 @@ export function ProfilesDialog({ open, profiles, active, playing, dataFolder, on
                             </button>
                         ))}
                     </div>
-                    {playing ? <p class="note">{text.profile.whilePlaying}</p> : null}
-                    <button class="command new-profile" type="button" disabled={playing} onClick={() => setMaking(true)}>{text.profile.newProfile}</button>
+                    <AccountsForm key={`${active.id} ${String(open)}`} profile={active} text={text} />
+                    {locked === undefined ? null : <p class="note">{locked}</p>}
+                    <button class="command new-profile" type="button" onClick={() => setMaking(true)}>{text.profile.newProfile}</button>
                     {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
                     <DataFolder folders={dataFolder} text={text} />
                 </>
@@ -183,6 +188,59 @@ export function ProfilesDialog({ open, profiles, active, playing, dataFolder, on
         </Dialog>
     );
 }
+
+/** The player's names on Lichess and chess.com, each saved once changed, with a tick beside it: a game loaded from there with that name is theirs (D-93). */
+function AccountsForm({ profile, text }: { profile: ProfileShown; text: Text; })
+{
+    const words = text.profile;
+    const [names, setNames] = useState({ lichess: profile.accounts?.lichess ?? "", chesscom: profile.accounts?.chesscom ?? "" });
+    const [saved, setSaved] = useState<AccountSite | undefined>(undefined);
+    const [problem, setProblem] = useState<string | undefined>(undefined);
+
+    const save = (site: AccountSite, field: HTMLInputElement): void => {
+        // A name the sites would not give stays in its field, marked, until it reads.
+        if (!field.validity.valid) {
+            setSaved(undefined);
+            return;
+        }
+
+        const changed = { ...names, [site]: field.value.trim() };
+        setNames(changed);
+        setSaved(undefined);
+        void saveAccounts(profile.id, changed).then((refused) => {
+            setProblem(refused === undefined ? undefined : refusalText(refused, text));
+            setSaved(refused === undefined ? site : undefined);
+        });
+    };
+
+    return (
+        <div class="accounts">
+            {accountSites.map((site) => (
+                <label key={site} title={words.accountTitle}>
+                    <span>{siteNames[site]}</span>
+                    <input
+                        type="text"
+                        // Not bound to the names saved: a name the sites would not give stays as typed, marked.
+                        defaultValue={names[site]}
+                        aria-label={siteNames[site]}
+                        placeholder={words.username}
+                        maxLength={nameLimit}
+                        pattern="\s*[\w\-]*\s*"
+                        autocomplete="off"
+                        spellcheck={false}
+                        onChange={(event) => save(site, event.currentTarget)}
+                    />
+                    {saved === site ? checkIcon : <span class="tick" />}
+                </label>
+            ))}
+            {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
+        </div>
+    );
+}
+
+const accountSites = ["lichess", "chesscom"] as const;
+type AccountSite = (typeof accountSites)[number];
+const siteNames: Readonly<Record<AccountSite, string>> = { lichess: "Lichess", chesscom: "Chess.com" };
 
 /** Where the games are, as the file manager walks there, and a button that opens it there. */
 function DataFolder({ folders, text }: { folders: readonly string[]; text: Text; })
@@ -222,7 +280,7 @@ function DataFolder({ folders, text }: { folders: readonly string[]; text: Text;
 }
 
 /** The form that makes a profile and puts it in use: the wizard's, with the system's account as a suggestion, and the menu's for another player. */
-function ProfileForm({ text, submit, suggestion, onMade }: { text: Text; submit: string; suggestion?: string; onMade: () => void; })
+function ProfileForm({ text, submit, suggestion, use = true, onMade }: { text: Text; submit: string; suggestion?: string; use?: boolean; onMade: () => void; })
 {
     const words = text.profile;
     const [name, setName] = useState("");
@@ -238,7 +296,7 @@ function ProfileForm({ text, submit, suggestion, onMade }: { text: Text; submit:
         event.preventDefault();
         setBusy(true);
         const value = rating.trim() === "" ? undefined : Number(rating);
-        void makeProfile({ name, level, site, ...(value === undefined ? {} : { rating: value }), ...(photo === undefined ? { avatar } : { photo }) }).then((refused) => {
+        void makeProfile({ name, level, site, ...(value === undefined ? {} : { rating: value }), ...(photo === undefined ? { avatar } : { photo }), use }).then((refused) => {
             setBusy(false);
             setProblem(refused === undefined ? undefined : refusalText(refused, text));
 

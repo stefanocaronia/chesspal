@@ -52,9 +52,12 @@ export interface PlayerProfile extends ProfileFields
     readonly id: string;
     /** Made by Chesspal at the first start, until the player completes it: the board page's wizard does (D-71). */
     readonly new?: true;
-    /** The player's names on Lichess and chess.com, written by hand in profile.md, by which the games they load are theirs (D-93). */
+    /** The player's names on Lichess and chess.com, written in profile.md by hand or from the page, by which the games they load are theirs (D-93). */
     readonly accounts?: Accounts;
 }
+
+/** What may change in a profile: what the player tells of themselves, and their names on the sites, each one written whole. */
+export type ProfileChanges = Partial<ProfileFields> & { readonly accounts?: Accounts; };
 
 /** The profiles in the data folder, by their folders' names. */
 export function listProfiles(root: string): PlayerProfile[]
@@ -94,10 +97,10 @@ export function profileFolder(root: string, id: string): string
 }
 
 /**
- * Makes a profile, its folder named from the player's name, and puts it in use; the one Chesspal made, while new, becomes it instead, with its games, and
- * its folder takes the player's name too (D-71).
+ * Makes a profile, its folder named from the player's name, and puts it in use unless told not to; the one Chesspal made, while new, becomes it instead,
+ * with its games, and its folder takes the player's name too (D-71).
  */
-export function createProfile(root: string, fields: ProfileFields): PlayerProfile
+export function createProfile(root: string, fields: ProfileFields, use = true): PlayerProfile
 {
     const id = activeId(root);
 
@@ -115,7 +118,7 @@ export function createProfile(root: string, fields: ProfileFields): PlayerProfil
         made = freeId(root, slugOf(fields.name));
     }
 
-    return fillProfile(root, made, fields, false);
+    return fillProfile(root, made, fields, false, use);
 }
 
 /** Every profile's folder, where games may be. */
@@ -138,7 +141,7 @@ export function activateProfile(root: string, id: string): PlayerProfile
 }
 
 /** Changes what a profile says of the player, keeping the rest of profile.md as it was written: its other fields and the text below them. */
-export function updateProfile(root: string, id: string, changes: Partial<ProfileFields>): PlayerProfile
+export function updateProfile(root: string, id: string, changes: ProfileChanges): PlayerProfile
 {
     writeProfile(root, id, changes);
     return readProfile(root, id);
@@ -196,12 +199,15 @@ function claimed(root: string, id: string): boolean
     }
 }
 
-/** Writes a profile in the folder this call claimed and puts it in use; on a failure the folder goes, which holds nothing of another's. */
-function fillProfile(root: string, id: string, fields: ProfileFields, made: boolean): PlayerProfile
+/** Writes a profile in the folder this call claimed and puts it in use when asked; on a failure the folder goes, which holds nothing of another's. */
+function fillProfile(root: string, id: string, fields: ProfileFields, made: boolean, use = true): PlayerProfile
 {
     try {
         writeProfile(root, id, made ? { ...fields, new: true } : fields);
-        writeActive(root, id);
+
+        if (use) {
+            writeActive(root, id);
+        }
     } catch (error) {
         rmSync(profileFolder(root, id), { recursive: true, force: true });
         throw error;
@@ -292,7 +298,7 @@ function accountsIn(fields: Readonly<Record<string, string>>): { accounts?: Acco
 }
 
 // Writes the fields that change, and keeps the others as the file has them, even those this version does not read.
-function writeProfile(root: string, id: string, changes: Partial<ProfileFields> & { readonly new?: boolean; }): void
+function writeProfile(root: string, id: string, changes: ProfileChanges & { readonly new?: boolean; }): void
 {
     const { fields, body } = readFrontMatter(profileText(root, id));
     const written: Record<string, string | number | undefined> = { ...fields };
@@ -312,6 +318,11 @@ function writeProfile(root: string, id: string, changes: Partial<ProfileFields> 
 
     if ("avatar" in changes) {
         written.avatar = changes.avatar;
+    }
+
+    if ("accounts" in changes) {
+        written.lichess = changes.accounts?.lichess;
+        written.chesscom = changes.accounts?.chesscom;
     }
 
     if ("new" in changes) {

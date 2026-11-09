@@ -118,7 +118,8 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         await expect(run(context, "coach", { game, position: 0, badge: "good" })).rejects.toThrow("There is no move of the player's to judge here");
 
         expect(await run(context, "coach", { ...at, badge: "best", note: "Nf3 next attacks e5.", hint: "The e5 pawn has one defender.", squares: ["R e5"] })).toBe(
-            `Kept on the board page: your judgment, your hint. Now call coach {game: "${game}", position: 2, done: true} alone.`,
+            `Kept on the board page: your judgment, your hint. Who is ahead is still missing: now call coach {game: "${game}", position: 2, ahead}, in pawns from White's side `
+                + `(1.5, -3, 0) or a mate you see ("#3" White's, "#-3" Black's), then coach {game: "${game}", position: 2, done: true} alone.`,
         );
 
         const folder = gameFolder(context.home());
@@ -135,6 +136,9 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
 
         expect(await run(context, "status")).not.toMatch(/Nf3 next|one defender/);
         expect(await run(context, "player_move", { move: "Nf3" })).not.toMatch(/Nf3 next|one defender/);
+        // Without who is ahead it never waits, even once the player has moved: the chart wants that position too (Stefano).
+        await expect(run(context, "coach", { ...at, done: true })).rejects.toThrow(`Who is ahead is still missing here: first call coach {game: "${game}", position: 2, ahead}`);
+        expect(await run(context, "coach", { ...at, ahead: 0.3 })).toBe("Kept: who is ahead, White ahead by 0.3; the player has moved. Stop now: end with one word.");
         expect(await run(context, "coach", { ...at, done: true })).toBe("Stop now: the player has moved, or the game is over. End with one word.");
         expect(await run(context, "coach", { ...at, note: "Late, still kept.", hint: "Late." })).toBe(
             "Kept: your judgment; the player has moved, so your hint is not kept. Stop now: end with one word.",
@@ -205,6 +209,8 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
             return Promise.resolve();
         };
 
+        await expect(run(context, "coach", { game, position: 2, done: true })).rejects.toThrow("Who is ahead is still missing here");
+        await run(context, "coach", { game, position: 2, ahead: 0.3 });
         expect(await run(context, "coach", { game, position: 2, done: true })).toBe(`Still the player's move: call coach {game: "${game}", position: 2, done: true} again.`);
 
         helps(context, false);
