@@ -24,7 +24,7 @@ This file is about **developing** Chesspal. The instructions for **playing** are
 | `instructions/` | the opponent's instructions, which `chesspal init` installs in a player's folder | yes | yes |
 | `data/` | Lichess's openings, which the build turns into an index by position | yes | built into `dist/` |
 | `scripts/` | the build's scripts | yes | no |
-| `docs/` | the README's screenshot | yes | no |
+| `docs/` | `structure.md`, what each folder and module holds, what it depends on and where new code goes, changed with every folder added, moved or removed; the README's screenshot | yes | no |
 | `test/` | tests, benches and demos | yes | no |
 | `tmp/` | scratch output | no | no |
 
@@ -71,6 +71,8 @@ Clean, compact, ordered code that is easy to understand.
 **Design first**
 - Think the architecture before writing code: which module owns the change, its public API, its dependencies. For anything non-trivial, propose the design to the maintainer and wait for approval.
 - Each module (a folder under `src/`, such as `core/`) does one job, exposes a small API from its `index.ts` and depends only on what is below it: never on commands, the CLI or the server. Commands are the glue between modules.
+- The concerns stay apart, MVC where it fits: the model (`core/`, `games/`, `profiles/`) holds the data and the rules, the views (the page, the CLI's output) only show, the commands take the input and call the model. The model knows neither.
+- Readable by a person: someone who opens the project without an AI finds their way, with folders of plain names, a shallow tree, files of reasonable size and no wiring that only a search can follow.
 - SOLID: one responsibility per module and function; add behaviour with new modules and commands instead of bending working ones; inject what comes from outside (randomness, time, folders) through `Context`.
 - No over-engineering: the simplest code that solves today's need, with no speculative options, layers or abstractions.
 
@@ -84,8 +86,9 @@ Clean, compact, ordered code that is easy to understand.
 - Extract a function when a block becomes complex or is needed twice; prefer well-named functions to sections marked by comments.
 - Clear, descriptive names; no abbreviations or cryptic names (`context`, not `ctx`; `square`, not `sq`), except loop indexes.
 - camelCase for variables, functions and constants; PascalCase for types, interfaces and classes, without an `I` prefix; no underscores or hyphens in identifiers. File names in kebab-case.
+- Folders, not prefixes: the code is split into subfolders by area, and a folder groups the files of one part (`page/board/`). Its files do not repeat its name (`board/pointer.ts`, not `board/board-pointer.ts` or `board-pointer.ts` loose in `page/`), but for its main file, which may bear it (`board/board.tsx`). Each folder is a module that exposes its API from its `index.ts`, and the others import only from it.
 - Public API first in a file, private helpers below it.
-- Let TypeScript infer local types; annotate parameters and return types of exported functions.
+- Let TypeScript infer local types; annotate parameters and return types of exported functions, Preact components excepted (they return JSX).
 - Relative imports use the `.ts` extension; the build rewrites them to `.js`.
 - Comments in English, one or two lines at most: the code should explain itself. A one-line `/** */` on exported functions and types when the name is not enough.
 - Error messages say what went wrong and how to fix it: an AI reads them.
