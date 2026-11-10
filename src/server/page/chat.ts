@@ -1,4 +1,6 @@
 // What the page knows of the chat, and what it runs commands with: its own context, as the command line's, since the chat's refusals are the chat's (D-71).
+// The table knows the chat attached to it from what the chat tells it (D-104).
+import { z } from "zod";
 import type { Context, SeenPosition } from "../../commands/index.ts";
 
 /**
@@ -57,4 +59,60 @@ export function pageContext(chat: Context): Context
 export function asTheChatSees(context: Context, chat: ChatSeen): Context
 {
     return { ...context, host: () => chat.host(), positionSeen: chat.positionSeen };
+}
+
+/** What a chat says of itself as it attaches to the table (D-104): its version, its session, its folder, its host, and whether its folder needs init again. */
+export const chatAttach = z.object({
+    version: z.string(),
+    session: z.string().nullable(),
+    folder: z.string(),
+    host: z.string().optional(),
+    outdated: z.boolean(),
+});
+export type ChatAttach = z.infer<typeof chatAttach>;
+
+/**
+ * What the chat attached to the table tells it after each tool, and when the page has news no file holds (`news`): what it saw, the words it was given,
+ * its host, and the AI's model and host, which the table notes for a game that ends on the page (D-82, D-97).
+ */
+export const chatCopy = z.object({
+    token: z.string(),
+    seen: z.string().optional(),
+    positionSeen: z.object({ started: z.string().optional(), plies: z.int().min(0) }).nullable().optional(),
+    given: z.array(z.string()),
+    host: z.string().optional(),
+    aiModel: z.object({ model: z.string(), effort: z.string().optional() }).optional(),
+    aiHost: z.string().optional(),
+    news: z.boolean(),
+});
+export type ChatCopy = z.infer<typeof chatCopy>;
+
+/** The chat attached to the table: the token of its requests, what it said as it attached, and its last copy, with the words given as a set. */
+export interface Attached
+{
+    readonly token: string;
+    readonly chat: ChatAttach;
+    copy: ChatCopy | undefined;
+    given: ReadonlySet<string>;
+}
+
+/** The chat attached to the table as the page reads it; nobody's while none is: no words given, no game or position seen, no host. */
+export function attachedSeen(attached: () => Attached | undefined): ChatSeen
+{
+    const none = new Set<string>();
+    return {
+        get given()
+        {
+            return attached()?.given ?? none;
+        },
+        get seen()
+        {
+            return attached()?.copy?.seen;
+        },
+        get positionSeen()
+        {
+            return attached()?.copy?.positionSeen;
+        },
+        host: () => attached()?.copy?.host ?? attached()?.chat.host,
+    };
 }

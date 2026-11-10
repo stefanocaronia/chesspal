@@ -4,9 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Context } from "../src/commands/index.ts";
+import { tableFolder } from "../src/home/index.ts";
 import { pageAt, pagePorts } from "../src/server/bell.ts";
 import { startPage } from "../src/server/page/page.ts";
-import { openTable, processLauncher, startTable, type Table, tableFolder, type TableLauncher, type TableTimes } from "../src/server/table/index.ts";
+import { openTable, processLauncher, startTable, type Table, type TableLauncher, type TableTimes } from "../src/server/table/index.ts";
 import { version } from "../src/version.ts";
 import { testContext } from "./commands.ts";
 

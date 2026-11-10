@@ -21,10 +21,22 @@ export function aiModelOf(folder: string): AiModel | undefined
     return models.get(folder);
 }
 
-/** Notes the host the AI plays in for the games of a folder, after its move (D-97), as the model. */
-export function noteAiHost(folder: string, host: string): void
+/** Notes the host the AI plays in for the games of a folder, after its move (D-97), as the model. Whether it changed. */
+export function noteAiHost(folder: string, host: string): boolean
 {
+    if (hosts.get(folder) === host) {
+        return false;
+    }
+
     hosts.set(folder, host);
+    return true;
+}
+
+/** Forgets who played as the AI for the games of a folder: the chat that did has left the table (D-104), and the next may be another. */
+export function forgetTheAi(folder: string): void
+{
+    models.delete(folder);
+    hosts.delete(folder);
 }
 
 /** The host the AI played its last move in, for the games of a folder in this process; none on the command line, or before the AI's first move. */

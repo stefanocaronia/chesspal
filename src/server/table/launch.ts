@@ -1,12 +1,11 @@
 // `chesspal` alone (D-104): the table's page opened in the browser, the table started first, apart from the terminal, when none of this version answers.
 import { spawn } from "node:child_process";
-import { request } from "node:http";
 import { styleText } from "node:util";
 import { type Context, speaksItalian } from "../../commands/index.ts";
+import { tableFolder } from "../../home/index.ts";
 import { version } from "../../version.ts";
-import { pageAt, pagePorts, samePath } from "../bell.ts";
 import { openInBrowser } from "./browser.ts";
-import { tableFolder } from "./table.ts";
+import { askToQuit, tableAt } from "./table.ts";
 
 /** What opening the table does outside this process: start the table apart, open the browser, wait. The tests give their own. */
 export interface TableLauncher
@@ -71,29 +70,6 @@ export function processLauncher(platform: string, command: string[] = [...proces
 // A table answers within ten seconds of its start, an older one quitting first, looked for every tenth of a second.
 const startWait = 10_000;
 const every = 100;
-
-/** The table of a folder that answers on its ports, the lowest of them: its address, port and version. Its ports are asked together. */
-async function tableAt(folder: string): Promise<{ url: string; port: number; version: string | undefined; } | undefined>
-{
-    const ports = pagePorts(folder);
-    const said = await Promise.all(ports.map(pageAt));
-    const index = said.findIndex((one) => one?.table === true && samePath(one.folder, folder));
-    const port = ports[index];
-    return port === undefined ? undefined : { url: `http://127.0.0.1:${port}/`, port, version: said[index]?.version };
-}
-
-/** Asks the table at a port to quit; it answers before it goes, and a table that cannot be reached is gone already. */
-function askToQuit(port: number): Promise<void>
-{
-    return new Promise((done) => {
-        const asked = request({ host: "127.0.0.1", port, path: "/api/table/quit", method: "POST", headers: { "Content-Type": "application/json" }, agent: false }, (response) => {
-            response.resume();
-            response.on("end", () => done());
-        });
-        asked.on("error", () => done());
-        asked.end("{}");
-    });
-}
 
 /** What `chesspal` says to the player, in their language (D-32): Italian or English. */
 interface LaunchWords

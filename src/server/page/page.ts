@@ -4,26 +4,37 @@ import { type FSWatcher, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { join } from "node:path";
 import { type Context, positionIn, samePosition, type SeenPosition } from "../../commands/index.ts";
+import { aiNameOf } from "../../core/index.ts";
 import { gameStamp, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { Bell, bellProbe, pagePorts } from "../bell.ts";
+import { Bell, bellProbe, pagePorts, type TableChat } from "../bell.ts";
 import { analysesOf, answerAnalyses } from "./analyses.ts";
-import { type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";
+import { answerChat } from "./attach.ts";
+import { type Attached, attachedSeen, type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";
+import { askNewGame, keepPosted, tellWatchers } from "./events.ts";
 import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls } from "./game.ts";
 import { isJson, json, send, sendJson } from "./http.ts";
 import { answerProfiles } from "./profiles.ts";
 
-/** The page of a player's folder, served: its address, how to tell it the AI was given words, which change no file, and how to stop it. */
+/**
+ * The page of a player's folder, served by the chat's process or by the table it is attached to (D-104): its address, how to tell it what the chat does
+ * and was given, which change no file, and how to stop it.
+ */
 export interface Page
 {
     readonly url: string;
+    /** The page has news no file holds: words the AI was given, which it shows read (D-53), the position the chat moves on, the AI's model (D-82). */
     heard(): void;
     /** The chat calls a tool: the page hears it listens, and the AI's clock, held while nobody heard the player, starts now. */
-    chatCalls(): void;
+    chatCalls(): void | Promise<void>;
+    /** A tool of the chat's has ended: the table gets a copy of what the chat saw; the chat's own page reads it from the chat. */
+    toolEnded(): void;
     /** Whether a browser has the page open now: one listens to the game's changes. */
     open(): boolean;
+    /** Whether the page is in use: open in a browser, or, on the table, with a chat attached. */
+    inUse(): boolean;
     /** Opens the New game window on every page open now, for the player to choose the game there: whether one was open. */
     askNewGame(): boolean;
     close(): Promise<void>;
@@ -45,24 +56,24 @@ export interface TableEnd
 
 /**
  * Serves the page of the context's folder on 127.0.0.1, on a port of its own when free, else on any free one, where the doorbell cannot find it; the
- * table's on its own ports alone, which keep two tables apart. The page names the opponent as the host does, once it has connected; the doorbell knows
- * from the context what the chat has read of the player's words.
+ * table's on its own ports alone, which keep two tables apart. The page reads the chat from the context in the chat's process, and on the table from
+ * what the chat attached to it tells it (D-104); it names the opponent as the chat's host does. The doorbell knows what the chat has read.
  */
-export async function startPage(context: Context, { opponent = () => undefined, table }: PageOptions = {}): Promise<Page>
+export async function startPage(context: Context, options: PageOptions = {}): Promise<Page>
 {
     const { folder } = context;
+    const { table } = options;
     const watchers = new Set<ServerResponse>();
-    const outdated = outdatedHostFiles(folder, context.platform).length > 0;
-    const chat = chatSeenOf(context);
+    const chat = table === undefined ? chatSeenOf(context) : attachedSeen(() => served.attached);
     const served: Served = {
         folder,
         context: pageContext(context),
         chat,
-        opponent,
-        bell: new Bell(() => hasNews(context, chat), () => tellWatchers(served)),
+        opponent: options.opponent ?? (() => aiNameOf(chat.host())),
+        bell: new Bell(() => hasNews(context, chat), () => tellWatchers(watchers)),
         watchers,
         port: 0,
-        outdated,
+        outdated: outdatedHostFiles(folder, context.platform).length > 0,
         ...(table === undefined ? {} : { table }),
     };
     const server = createServer((request, response) => answer(request, response, served));
@@ -75,10 +86,12 @@ export async function startPage(context: Context, { opponent = () => undefined, 
             const stopWatching = watchGame(served);
             return {
                 url: `http://127.0.0.1:${served.port}/`,
-                heard: () => tellWatchers(served),
+                heard: () => tellWatchers(watchers),
                 chatCalls: () => chatCalls(served),
+                toolEnded: () => undefined,
                 open: () => watchers.size > 0,
-                askNewGame: () => askNewGame(served),
+                inUse: () => watchers.size > 0 || served.attached !== undefined,
+                askNewGame: () => askNewGame(watchers),
                 close: () => closed(server, stopWatching),
             };
         }
@@ -98,16 +111,21 @@ export interface Served
     readonly folder: string;
     /** What the page runs its commands with: never the chat's own (D-71). */
     readonly context: Context;
-    /** What the page reads of the chat: the words it was given, the game and the position it saw, its host. */
+    /** What the page reads of the chat: the words it was given, the game and the position it saw, its host; on the table, the attached chat's, or nobody's. */
     readonly chat: ChatSeen;
     readonly opponent: () => string | undefined;
     readonly bell: Bell;
     readonly watchers: Set<ServerResponse>;
     port: number;
-    /** The folder was set up by an older init: the page asks the player to run it again. Read once, as init runs with the chat closed. */
-    readonly outdated: boolean;
+    /**
+     * The chat's folder was set up by an older init: the page asks the player to run it again. Read once, as init runs with the chat closed; on the table,
+     * as the chat attached to it says it.
+     */
+    outdated: boolean;
     /** The table that serves the page, when one does (D-104). */
     readonly table?: TableEnd;
+    /** The chat attached to the table, while one is. */
+    attached?: Attached;
 }
 
 /**
@@ -118,22 +136,23 @@ export function chatHasRead(context: Context, showed: boolean): void
 {
     context.seen = gameSeen(context);
 
-    if (!showed) {
-        return;
+    if (showed) {
+        const before = context.positionSeen;
+
+        try {
+            context.positionSeen = positionIn(gameFolder(context.home()));
+        } catch {
+            context.positionSeen = null;
+        }
+
+        // The chat on another position may now be thinking on its move: the page hears it, which no file tells when no bell woke the chat.
+        if (!sameSeen(before, context.positionSeen)) {
+            context.heard?.();
+        }
     }
 
-    const before = context.positionSeen;
-
-    try {
-        context.positionSeen = positionIn(gameFolder(context.home()));
-    } catch {
-        context.positionSeen = null;
-    }
-
-    // The chat on another position may now be thinking on its move: the page hears it, which no file tells when no bell woke the chat.
-    if (!sameSeen(before, context.positionSeen)) {
-        context.heard?.();
-    }
+    // The table the chat is attached to reads it from a copy (D-104).
+    context.toolEnded?.();
 }
 
 function sameSeen(one: SeenPosition | null | undefined, other: SeenPosition | null | undefined): boolean
@@ -154,9 +173,15 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         return;
     }
 
-    served.table?.used();
+    // A probe is no use of the table: a chat on its own page looks for it after each tool, and the hooks look for theirs.
+    if (!(path === "/api/bell" && url.searchParams.has("probe"))) {
+        served.table?.used();
+    }
 
-    if (answerProfiles(request, response, url, served) || answerGame(request, response, url, served) || answerAnalyses(request, response, url, served)) {
+    const answered = answerProfiles(request, response, url, served) || answerGame(request, response, url, served) || answerAnalyses(request, response, url, served)
+        || answerChat(request, response, url, served);
+
+    if (answered) {
         return;
     }
 
@@ -184,16 +209,27 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
     } else if (path === "/api/analyses") {
         send(response, 200, json, JSON.stringify(analysesOf(served.context.home())));
     } else if (path === "/api/events") {
-        keepPosted(request, response, served);
+        keepPosted(request, response, served.watchers);
     } else if (path === "/api/bell") {
         if (url.searchParams.has("probe")) {
-            send(response, 200, json, JSON.stringify(bellProbe(served.folder, served.watchers.size > 0, served.table !== undefined)));
+            send(response, 200, json, JSON.stringify(bellProbe(served.folder, served.watchers.size > 0, tableChat(served))));
         } else {
             served.bell.listen(request, response);
         }
     } else {
         sendFile(response, path);
     }
+}
+
+/** The chat at the table, as its probe says it: none on a page a chat serves itself. */
+function tableChat(served: Served): TableChat | undefined
+{
+    if (served.table === undefined) {
+        return undefined;
+    }
+
+    const chat = served.attached?.chat;
+    return chat === undefined ? { session: null } : { session: chat.session, chat: chat.folder };
 }
 
 /**
@@ -219,32 +255,6 @@ ${tableTalkStamp(folder) ?? ""}`;
     }
 }
 
-/** A page that waits to hear the game has changed: a stream of events, one "changed" for each change, after which the page reads the game again. */
-function keepPosted(request: IncomingMessage, response: ServerResponse, served: Served): void
-{
-    response.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
-    response.write(": posted\n\n");
-    served.watchers.add(response);
-    request.on("close", () => served.watchers.delete(response));
-}
-
-/** The pages open now open their New game window; whether there was one. */
-function askNewGame(served: Served): boolean
-{
-    for (const watcher of served.watchers) {
-        watcher.write("data: new-game\n\n");
-    }
-
-    return served.watchers.size > 0;
-}
-
-function tellWatchers(served: Served): void
-{
-    for (const watcher of served.watchers) {
-        watcher.write("data: changed\n\n");
-    }
-}
-
 /**
  * Watches the data folder, its profiles and the profile in use for changes to the game and the profiles, whoever makes them (the AI's tools, another chat,
  * the CLI, a hand edit): the pages hear of them. Each folder is watched on its own, never its whole tree, and watched again after each change, since the
@@ -266,7 +276,7 @@ function watchGame(served: Served): () => void
             waiting = setTimeout(() => {
                 waiting = undefined;
                 watchAll();
-                tellWatchers(served);
+                tellWatchers(served.watchers);
             }, 30);
         }
     };

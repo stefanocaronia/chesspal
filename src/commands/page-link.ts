@@ -12,18 +12,18 @@ export function pageInvite(context: Context, started: string | undefined): strin
 {
     const page = closedPage(context);
 
-    if (page === undefined || context.told === undefined || context.told.has(inviteKey(started))) {
+    if (page === undefined || context.told === undefined || context.told.has(inviteKey(context, started))) {
         return undefined;
     }
 
-    context.told.add(inviteKey(started));
+    context.told.add(inviteKey(context, started));
     return page;
 }
 
 /** Notes the board page's address given for a game, by status or new_game: a move in the chat does not give it again (Priya, round of D-85). */
 export function pageGiven(context: Context, started: string): void
 {
-    context.told?.add(inviteKey(started));
+    context.told?.add(inviteKey(context, started));
 }
 
 /** The line that has the AI invite the player to the board page from the chat. */
@@ -38,7 +38,8 @@ export function pageLine(url: string, closed: boolean): string
     return closed ? `Board page: ${url}, open in no browser: give the player this address before anything else.` : `Board page: ${url}`;
 }
 
-function inviteKey(started: string | undefined): string
+// Once a game and an address: a page that moved, to a table or from one, is given again (Priya).
+function inviteKey(context: Context, started: string | undefined): string
 {
-    return `page invite ${started ?? ""}`;
+    return `page invite ${started ?? ""} ${context.page ?? ""}`;
 }

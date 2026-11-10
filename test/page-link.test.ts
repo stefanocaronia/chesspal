@@ -97,6 +97,16 @@ describe("the board page's address for a player who has not opened it", () => {
         expect(await said(playerMove, { move: "Nf3" }, resumed)).not.toContain("invite the player");
     });
 
+    it("invites again in the same game once the page has moved to another address, as when the table the chat was at is gone", async () => {
+        const context: Context = { ...testContext(playerFolder()), page: url, pageOpen: () => false, told: new Set() };
+        await said(newGame, { ai_colour: "black", from: start }, context);
+        await said(playerMove, { move: "e4" }, context);
+        await said(aiMove, { move: "e5", plan: "Hold the centre." }, context);
+        context.page = "http://127.0.0.1:5871/";
+
+        expect(await said(playerMove, { move: "Nf3" }, context)).toContain("invite the player, in a few words, to open http://127.0.0.1:5871/;");
+    });
+
     it("never asks on the command line, where no page is served", async () => {
         expect(await said(status, {}, testContext(playerFolder()))).not.toContain("Board page");
     });

@@ -1,4 +1,5 @@
-// The MCP server an AI host starts: every command as a tool (D-5), and the board page served for as long as the chat lasts (D-47).
+// The MCP server an AI host starts: every command as a tool (D-5), and the board page: the table's, which the chat attaches to, or one it serves itself
+// for as long as it lasts (D-47, D-104).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -11,7 +12,8 @@ import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { pagePorts } from "./bell.ts";
 import { allowedCaller, callerOf, type CallingAgent, callingAgent, fromCodexAgent } from "./caller.ts";
-import { chatHasRead, startPage } from "./page/page.ts";
+import { chatHasRead, type Page, startPage } from "./page/page.ts";
+import { attachTable, tableToJoin } from "./table/index.ts";
 
 /**
  * What the host reads as the server starts, before any tool: the lines that start a chat, `instructions` then `status`, and the rule of every move (D-27,
@@ -32,34 +34,8 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
     const forSomeHosts: { hosts: readonly string[]; tool: { enable(): void; }; }[] = [];
 
     for (const command of list.filter((each) => each.cliOnly !== true)) {
-        const tool = server.registerTool(command.name, toolConfig(command), async (input: unknown, extra) => {
-            await beforeCall?.(extra._meta);
-            const codexAgent = fromCodexAgent(extra._meta);
-            const calling = command.byAgents !== undefined || codexAgent ? await callingAgent(extra._meta, context.folder) : undefined;
-
-            // An agent's tool called by the chat, or by another agent, would give what only that agent may see (Priya).
-            if (command.byAgents !== undefined && !allowedCaller(calling, command.byAgents)) {
-                // It names no agent to start: the chat that asked would start one itself (Priya).
-                return { content: [{ type: "text", text: `${command.name} is not yours to call: the player reads what it gives on the board page. Nothing changed.` }], isError: true };
-            }
-
-            // Codex gives its agents every tool: one of Chesspal's keeps to its own, and never plays or talks for the opponent (D-98, Federico).
-            const own = calling !== undefined && "agent" in calling ? agentTools(calling.agent) : undefined;
-
-            if (codexAgent && own !== undefined && !own.includes(command.name)) {
-                return { content: [{ type: "text", text: `${command.name} is not yours to call: you work only with ${own.join(", ")}. Nothing changed.` }], isError: true };
-            }
-
-            // Each call knows who makes it, for the commands that write it down (D-81).
-            const caller = () => callerOf(extra._meta, server.server.getClientVersion(), context.folder);
-            const result = await track(runTool(command, input, context, caller, extra._meta));
-
-            if (command === aiMove && result.isError !== true) {
-                noteTheAi(context, caller);
-            }
-
-            return result;
-        });
+        // A call runs from its start, the page started before it too: the server that leaves waits for it.
+        const tool = server.registerTool(command.name, toolConfig(command), (input: unknown, extra) => track(callTool(command, input, context, server, extra._meta, beforeCall)));
 
         if (command.hosts !== undefined) {
             tool.disable();
@@ -94,24 +70,39 @@ export async function startMcpServer(context: Context = defaultContext(), list: 
 
     process.stdin.on("end", leave);
     process.stdin.on("close", leave);
-    const pageFirst = lazyPage(async () => {
-        context.page = await pageOf(context, () => opponentOf(context.host?.()));
+    let page: Page | undefined;
+    // The page served before, of its own, closes when the chat goes to a table.
+    const pageFirst = lazyPage(async (again) => {
+        await page?.close();
+        page = await pageOf(context, () => opponentOf(context.host?.()), again);
+        context.page = page?.url;
     });
     const server = createMcpServer(context, list, pageFirst);
     await server.connect(new StdioServerTransport());
 }
 
 /**
- * The board page started once, before the chat's first call, the status every chat opens with, which then gives its address: the process of a Codex
+ * The board page started once, before the chat's first call, the status every chat opens with, which then gives its address; started `again` when the
+ * table the chat was attached to is lost, at once, off the AI's clock, or at the next call when a table to go to has come (D-104). The process of a Codex
  * agent, which has one of its own, starts none, which would stand beside the chat's and could keep the doorbell from it (D-98, Priya).
  */
-export function lazyPage(start: () => Promise<void>): (meta: Record<string, unknown> | undefined) => Promise<void>
+export function lazyPage(start: (again: (now?: boolean) => void) => Promise<void>): (meta: Record<string, unknown> | undefined) => Promise<void>
 {
     let page: Promise<void> | undefined;
 
+    const begin = (): Promise<void> => {
+        // What an earlier start asks is no reason to drop the page this one serves.
+        const started: Promise<void> = start((now = false) => {
+            if (page === started) {
+                page = now ? begin() : undefined;
+            }
+        });
+        return started;
+    };
+
     return async (meta) => {
         if (!fromCodexAgent(meta)) {
-            page ??= start();
+            page ??= begin();
             await page;
         }
     };
@@ -123,27 +114,58 @@ export function opponentOf(host: string | undefined): string | undefined
     return aiNameOf(host);
 }
 
-/** The board page of the player's folder, served by this process for as long as the chat lasts (D-47); without it the game goes on in the chat. */
-async function pageOf(context: Context, opponent: () => string | undefined): Promise<string | undefined>
+/**
+ * The board page of the player's folder: the table's, when one of this version takes the chat (D-104), else served by this process, which looks for a
+ * table after each tool; without it the game goes on in the chat. It starts `again`: at once when the table is lost, at the next call when one is found.
+ */
+async function pageOf(context: Context, opponent: () => string | undefined, again: (now?: boolean) => void): Promise<Page | undefined>
 {
     try {
-        const { url, heard, chatCalls, open, askNewGame } = await startPage(context, { opponent });
+        const table = await attachTable(context, () => again(true));
+        const page = table ?? await startPage(context, { opponent });
         // Words the AI is given change no file: the pages hear of them from the commands.
-        context.heard = heard;
-        context.calls = chatCalls;
-        context.pageOpen = open;
-        context.askNewGame = askNewGame;
+        context.heard = page.heard;
+        context.calls = page.chatCalls;
+        context.toolEnded = table === undefined ? lookForTable(context, again) : page.toolEnded;
+        context.pageOpen = page.open;
+        context.askNewGame = page.askNewGame;
 
-        if (!pagePorts(context.folder).includes(Number(new URL(url).port))) {
-            process.stderr.write(`The board page is at ${url}, off its usual ports: the doorbell cannot find it, so moves on the page do not wake the chat.\n`);
+        if (table === undefined && !pagePorts(context.folder).includes(Number(new URL(page.url).port))) {
+            process.stderr.write(`The board page is at ${page.url}, off its usual ports: the doorbell cannot find it, so moves on the page do not wake the chat.\n`);
         }
 
-        return url;
+        return page;
     } catch (error) {
         // The host keeps what the server writes on stderr in its logs.
         process.stderr.write(`${(error as Error).message}\n`);
         return undefined;
     }
+}
+
+/**
+ * After each tool of a chat that serves its own page, a look for a table of its version with no chat at it, off the AI's clock: one started since, by
+ * `chesspal` or the icon, takes the chat at its next tool, and its page then closes (Priya).
+ */
+function lookForTable(context: Context, again: () => void): () => void
+{
+    let looking = false;
+
+    return () => {
+        if (looking) {
+            return;
+        }
+
+        looking = true;
+        setImmediate(() => {
+            void tableToJoin(context).then((found) => {
+                looking = false;
+
+                if (found) {
+                    again();
+                }
+            });
+        });
+    };
 }
 
 /**
@@ -156,21 +178,56 @@ function noteTheAi(context: Context, caller: () => Promise<Caller | undefined>):
     setImmediate(() => {
         // Nothing that fails here may stop the server: the move is played and answered.
         caller().then((found) => {
+            const folder = gameFolder(context.home());
             const host = context.host?.();
+            const hostChanged = host !== undefined && host.trim() !== "" && noteAiHost(folder, host);
+            const modelChanged = found !== undefined && found.hostOnly !== true
+                && noteAiModel(folder, { model: found.annotator, ...(found.effort === undefined ? {} : { effort: found.effort }) });
 
-            if (host !== undefined && host.trim() !== "") {
-                noteAiHost(gameFolder(context.home()), host);
-            }
-
-            if (found === undefined || found.hostOnly === true) {
-                return;
-            }
-
-            if (noteAiModel(gameFolder(context.home()), { model: found.annotator, ...(found.effort === undefined ? {} : { effort: found.effort }) })) {
+            // The pages, and the table the chat is attached to, hear of it now: the move's copy went before (Federico).
+            if (hostChanged || modelChanged) {
                 context.heard?.();
             }
         }).catch(() => undefined);
     });
+}
+
+/** A tool called: the page started first, at the chat's first call; refused to an agent it is not for (D-89, D-98); and who played as the AI noted after a move. */
+async function callTool(
+    command: AnyCommand,
+    input: unknown,
+    context: Context,
+    server: McpServer,
+    meta: Record<string, unknown> | undefined,
+    beforeCall?: (meta: Record<string, unknown> | undefined) => Promise<void>,
+): Promise<CallToolResult>
+{
+    await beforeCall?.(meta);
+    const codexAgent = fromCodexAgent(meta);
+    const calling = command.byAgents !== undefined || codexAgent ? await callingAgent(meta, context.folder) : undefined;
+
+    // An agent's tool called by the chat, or by another agent, would give what only that agent may see (Priya).
+    if (command.byAgents !== undefined && !allowedCaller(calling, command.byAgents)) {
+        // It names no agent to start: the chat that asked would start one itself (Priya).
+        return { content: [{ type: "text", text: `${command.name} is not yours to call: the player reads what it gives on the board page. Nothing changed.` }], isError: true };
+    }
+
+    // Codex gives its agents every tool: one of Chesspal's keeps to its own, and never plays or talks for the opponent (D-98, Federico).
+    const own = calling !== undefined && "agent" in calling ? agentTools(calling.agent) : undefined;
+
+    if (codexAgent && own !== undefined && !own.includes(command.name)) {
+        return { content: [{ type: "text", text: `${command.name} is not yours to call: you work only with ${own.join(", ")}. Nothing changed.` }], isError: true };
+    }
+
+    // Each call knows who makes it, for the commands that write it down (D-81).
+    const caller = () => callerOf(meta, server.server.getClientVersion(), context.folder);
+    const result = await runTool(command, input, context, caller, meta);
+
+    if (command === aiMove && result.isError !== true) {
+        noteTheAi(context, caller);
+    }
+
+    return result;
 }
 
 // The tool calls still running, which the server waits for before it leaves.
@@ -202,7 +259,7 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
 
     try {
         if (chat) {
-            context.calls?.();
+            await context.calls?.();
         }
 
         const run = calling !== undefined && "run" in calling ? calling.run : undefined;

@@ -3,7 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { posix, win32 } from "node:path";
+import { join, posix, win32 } from "node:path";
 
 /** What the data folder is found from: the environment, the system, the user's own folder, and where the system says Documents is. */
 export interface System
@@ -32,6 +32,12 @@ export function dataFolder(system: System = thisSystem()): string
     }
 
     return posix.join(system.platform === "darwin" ? posix.join(system.home, "Documents") : xdgDocuments(system), "Chesspal");
+}
+
+/** The table's folder inside the data folder: one for every profile, where the chats the table opens start (D-104). */
+export function tableFolder(home: string): string
+{
+    return join(home, "table");
 }
 
 // Where Windows keeps Documents for this user, as Explorer's known folder does: the registry names it, with variables such as %USERPROFILE%.

@@ -241,6 +241,30 @@ describe("the MCP server", () => {
         await pageFirst(undefined);
         expect(started).toBe(1);
     });
+
+    it("starts the page again at the next call when asked, and at once when the table is lost; never for what an earlier start asks", async () => {
+        const agains: ((now?: boolean) => void)[] = [];
+        const pageFirst = lazyPage(async (again) => {
+            agains.push(again);
+        });
+
+        await pageFirst(undefined);
+        agains[0]!();
+        expect(agains).toHaveLength(1);
+        await pageFirst(undefined);
+        expect(agains).toHaveLength(2);
+
+        agains[1]!(true);
+        expect(agains).toHaveLength(3);
+        await pageFirst(undefined);
+        expect(agains).toHaveLength(3);
+
+        // The pages started before are no longer the one served.
+        agains[0]!(true);
+        agains[1]!();
+        await pageFirst(undefined);
+        expect(agains).toHaveLength(3);
+    });
 });
 
 /** A server started as a host starts it, in the player's folder, speaking on its standard input and output. */

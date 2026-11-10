@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { get, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
 import { writeAtomically } from "../games/index.ts";
+import { dataFolder, tableFolder } from "../home/index.ts";
 import { version } from "../version.ts";
 
 /** What the chat hears from the doorbell: one line for whatever the player did, never what, only where to read it. */
@@ -106,6 +107,17 @@ export class Bell
         });
     }
 
+    /** The chat left the table (D-104): its process ended, and nobody is in a turn or waits for the bell; a ring no hook heard is no longer news for anyone. */
+    chatLeft(): void
+    {
+        this.busy = false;
+        this.woken = false;
+        this.pending = false;
+        this.listener?.end("dismissed");
+        this.listener = undefined;
+        this.changed();
+    }
+
     private tellIf(changed: boolean): void
     {
         if (changed) {
@@ -116,11 +128,19 @@ export class Bell
 
 /**
  * Whose page answers at a port, for the hook to find its own: the chat's session, the player's folder, whether a browser has the page open, Chesspal's
- * version, and whether the table serves it (D-104), which has no chat and no session, even when started from a chat's terminal.
+ * version, and whether the table serves it (D-104), with the session and the folder of the chat attached to it, never its own process's.
  */
-export function bellProbe(folder: string, open = false, table = false): BellProbe
+export function bellProbe(folder: string, open = false, table?: TableChat): BellProbe
 {
-    return { session: table ? null : process.env.CLAUDE_CODE_SESSION_ID ?? null, folder: resolve(folder), open, version, ...(table ? { table } : {}) };
+    const session = table === undefined ? process.env.CLAUDE_CODE_SESSION_ID ?? null : table.session;
+    return { session, folder: resolve(folder), open, version, ...(table === undefined ? {} : { table: true, ...(table.chat === undefined ? {} : { chat: table.chat }) }) };
+}
+
+/** The chat attached to the table, as its probe says it: its session, null for none or for Codex, and its folder; neither while no chat is attached. */
+export interface TableChat
+{
+    session: string | null;
+    chat?: string;
 }
 
 /** What a page says of itself at `/api/bell?probe`. */
@@ -131,6 +151,8 @@ export interface BellProbe
     open: boolean;
     version?: string;
     table?: true;
+    /** The folder of the chat attached to the table. */
+    chat?: string;
 }
 
 /** What the page at a port of this computer says of itself; undefined when none answers there. */
@@ -190,14 +212,19 @@ export async function waitForBell(input: string, ports?: number[]): Promise<bool
 /** What the hook heard at the page of its chat, in its folder: the bell, or why not. */
 export type BellHeard = { folder: string; rang: true; } | { folder: string; rang: false; why: string; };
 
-/** Waits at the page of the hook's chat, as waitForBell does, and says what it heard. */
+/**
+ * Waits at the page of the hook's chat, as waitForBell does, and says what it heard. The chat may be attached to the table (D-104), beside another chat
+ * of its folder that serves its own page: the table is one more page to choose from, unless the ports to try are given (Priya).
+ */
 export async function bellHeard(input: string, ports?: number[]): Promise<BellHeard>
 {
     const hook = hookInput(input);
     const folder = chatFolder(hook);
     const tried = ports ?? pagePorts(folder);
-    const probes = await Promise.all(tried.map(async (port) => ({ port, said: await pageAt(port) })));
-    const ours = probes.flatMap(({ port, said }) => (said !== undefined && samePath(said.folder, folder) ? [{ port, said }] : []));
+    const [probes, table] = await Promise.all([Promise.all(tried.map(async (port) => ({ port, said: await pageAt(port) }))), ports === undefined ? tableOf(folder, hook.session) : undefined]);
+    const pages = probes.flatMap(({ port, said }) => (said !== undefined && samePath(said.folder, folder) ? [{ port, said }] : []));
+    // A chat opened in the table's own folder finds the table among the pages of its folder already.
+    const ours = table === undefined || pages.some(({ port }) => port === table.port) ? pages : [...pages, table];
     const port = chatPage(ours, hook.session)?.port;
 
     if (port === undefined) {
@@ -213,6 +240,57 @@ export async function bellHeard(input: string, ports?: number[]): Promise<BellHe
 
 // How long a port may take to say whose page it is: one of this computer answers at once.
 const probeWait = 1000;
+
+/**
+ * The table, when the chat attached to it is the hook's: of its folder, or of its session; none when the data folder cannot be found, or no table has
+ * this chat. Finding the data folder costs some tens of milliseconds on Windows, off the AI's clock: the hook waits after the turn.
+ */
+async function tableOf(folder: string, session: string | undefined): Promise<{ port: number; said: BellProbe; } | undefined>
+{
+    let ports: number[];
+
+    try {
+        ports = pagePorts(tableFolder(serverHome(folder) ?? dataFolder()));
+    } catch {
+        return undefined;
+    }
+
+    const probes = await Promise.all(ports.map(async (port) => ({ port, said: await pageAt(port) })));
+    return probes.find((one): one is { port: number; said: BellProbe; } => one.said?.table === true && ((one.said.chat !== undefined && samePath(one.said.chat, folder)) || (session !== undefined && one.said.session === session)));
+}
+
+/**
+ * The data folder the chat's server is given in its folder's settings, as CHESSPAL_HOME in a playtest: the hook runs in the host's environment, not the
+ * server's (Federico). Claude Code's .mcp.json first, then Codex's config.
+ */
+function serverHome(folder: string): string | undefined
+{
+    const chosen = [claudeHome(folder), codexHome(folder)].find((one) => one !== undefined && one.trim() !== "");
+    return chosen === undefined ? undefined : resolve(chosen.trim());
+}
+
+function claudeHome(folder: string): string | undefined
+{
+    try {
+        const config = JSON.parse(readFileSync(join(folder, ".mcp.json"), "utf8")) as { mcpServers?: { chesspal?: { env?: { CHESSPAL_HOME?: unknown; }; }; }; };
+        const home = config.mcpServers?.chesspal?.env?.CHESSPAL_HOME;
+        return typeof home === "string" ? home : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+// The setting as init keeps it in Codex's table: a basic string, whose escapes are JSON's for a path, or a literal one.
+function codexHome(folder: string): string | undefined
+{
+    try {
+        const config = readFileSync(join(folder, ".codex", "config.toml"), "utf8");
+        const [, basic, literal] = /\bCHESSPAL_HOME\s*=\s*(?:("(?:[^"\\]|\\.)*")|'([^']*)')/.exec(config) ?? [];
+        return basic === undefined ? literal : JSON.parse(basic) as string;
+    } catch {
+        return undefined;
+    }
+}
 
 // The log of Codex's hooks that heard no bell, in the chat's folder: its last lines only.
 const silenceLog = "listen.log";
@@ -263,13 +341,14 @@ function chatPage(pages: { port: number; said: BellProbe; }[], session: string |
 function probeOf(said: string | undefined): BellProbe | undefined
 {
     try {
-        const parsed = said === undefined ? undefined : JSON.parse(said) as { session?: unknown; folder?: unknown; open?: unknown; version?: unknown; table?: unknown; };
+        const parsed = said === undefined ? undefined : JSON.parse(said) as { session?: unknown; folder?: unknown; open?: unknown; version?: unknown; table?: unknown; chat?: unknown; };
         return parsed === undefined || typeof parsed.folder !== "string" ? undefined : {
             session: typeof parsed.session === "string" ? parsed.session : null,
             folder: parsed.folder,
             open: parsed.open === true,
             ...(typeof parsed.version === "string" ? { version: parsed.version } : {}),
             ...(parsed.table === true ? { table: true as const } : {}),
+            ...(typeof parsed.chat === "string" ? { chat: parsed.chat } : {}),
         };
     } catch {
         return undefined;

@@ -35,7 +35,9 @@ export interface Context
     /** Told when the board page has news that no file holds: words the AI was given, which it shows read (D-53), and the AI's model (D-82). */
     heard?: () => void;
     /** Told when the chat calls a tool, before it runs: the board page hears the chat listens, and the AI's clock, held while nobody did, starts. */
-    calls?: () => void;
+    calls?: () => void | Promise<void>;
+    /** Told when a tool of the chat's has ended: the table the chat is attached to gets a copy of what it saw, else the chat looks for one (D-104). */
+    toolEnded?: () => void;
     /** The game the chat saw when its last tool ended, its folder and its stamp: the doorbell wakes it only for a game changed since. */
     seen?: string | undefined;
     /**

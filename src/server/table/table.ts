@@ -1,7 +1,8 @@
-// The table (D-104): the board page served in a process of its own, with no chat, on a folder of the data folder that is one for every profile; it
-// closes by itself once no browser has had the page open for a while.
-import { join } from "node:path";
+// The table (D-104): the board page served in a process of its own, on a folder of the data folder that is one for every profile, which a chat attaches
+// to; it closes by itself once no browser has had the page open, and no chat been attached, for a while.
+import { request } from "node:http";
 import type { Context } from "../../commands/index.ts";
+import { tableFolder } from "../../home/index.ts";
 import { setUpHosts } from "../../host-files/index.ts";
 import { pageAt, pagePorts, samePath } from "../bell.ts";
 import { type Page, startPage } from "../page/page.ts";
@@ -10,30 +11,33 @@ import { type Page, startPage } from "../page/page.ts";
 export interface Table
 {
     readonly url: string;
-    /** Settled once the table has closed: by itself, asked by a newer Chesspal, or by close. */
+    /** Settled once the table has closed: by itself, asked by another Chesspal version, or by close. */
     readonly closed: Promise<void>;
     close(): Promise<void>;
 }
 
-/** How long the table stays with no page open before it closes, and how often it looks, in milliseconds. */
+/** How long the table stays unused before it closes, and how often it looks, in milliseconds. */
 export interface TableTimes
 {
     readonly idle: number;
     readonly every: number;
 }
 
-/** Five minutes with no browser, looked at every fifteen seconds (D-104). */
+/** Five minutes with no browser and no chat, looked at every fifteen seconds (D-104). */
 export const tableTimes: TableTimes = { idle: 5 * 60_000, every: 15_000 };
 
-/** The table's folder, inside the data folder: where the chats it opens start, whoever's profile is in use (D-71, D-104). */
-export function tableFolder(home: string): string
+/** A table that answers on its ports: its address, port and version, and the folder of the chat attached to it, when one is. */
+export interface TableFound
 {
-    return join(home, "table");
+    readonly url: string;
+    readonly port: number;
+    readonly version: string | undefined;
+    readonly chat: string | undefined;
 }
 
 /**
  * Starts the table on the context's data folder, its folder set up as init does: undefined when another table started at the same time took a lower port,
- * since a table's ports are its lock. It closes once no page has been open, and no request come, for `times.idle`.
+ * since a table's ports are its lock. It closes once no page has been open, no chat attached and no request come, for `times.idle`.
  */
 export async function startTable(context: Context, times: TableTimes = tableTimes): Promise<Table | undefined>
 {
@@ -71,6 +75,42 @@ export async function startTable(context: Context, times: TableTimes = tableTime
     };
 }
 
+/** The table of a folder that answers on its ports, the lowest of them; its ports are asked together. */
+export async function tableAt(folder: string): Promise<TableFound | undefined>
+{
+    const ports = pagePorts(folder);
+    const said = await Promise.all(ports.map(pageAt));
+    const index = said.findIndex((one) => one?.table === true && samePath(one.folder, folder));
+    const port = ports[index];
+    return port === undefined ? undefined : { url: `http://127.0.0.1:${port}/`, port, version: said[index]?.version, chat: said[index]?.chat };
+}
+
+/** Asks the table at a port to quit; it answers before it goes, and a table that cannot be reached, or does not answer within a second or so, is let be. */
+export function askToQuit(port: number): Promise<void>
+{
+    return new Promise((done) => {
+        const asked = request({ host: "127.0.0.1", port, path: "/api/table/quit", method: "POST", headers: { "Content-Type": "application/json" }, agent: false }, (response) => {
+            response.resume();
+            response.on("end", () => done());
+        });
+        asked.setTimeout(quitWait, () => asked.destroy());
+        asked.on("error", () => done());
+        asked.end("{}");
+    });
+}
+
+// A table answers at once: one stuck must not hold the chat's first tool, nor `chesspal`.
+const quitWait = 1_500;
+
+/** Whether a version is older than another, part by part: 0.2.4 is older than 0.10.0. */
+export function isOlder(one: string, other: string): boolean
+{
+    const parts = (version: string): number[] => version.split(/[.+-]/).slice(0, 3).map((part) => Number.parseInt(part, 10) || 0);
+    const [mine, theirs] = [parts(one), parts(other)];
+    const differs = mine.findIndex((part, index) => part !== theirs[index]);
+    return differs !== -1 && mine[differs]! < theirs[differs]!;
+}
+
 /** Whether a table of the same folder answers on a lower port than this one's: the other won, and this one goes. */
 async function lostTo(url: string, folder: string): Promise<boolean>
 {
@@ -81,13 +121,13 @@ async function lostTo(url: string, folder: string): Promise<boolean>
 }
 
 /**
- * Looks every `times.every` whether a browser has the page open, which uses the table, and quits once it has been unused for `times.idle`: the page that
- * `chesspal` opens counts from its first request. The timer keeps the process alive till then.
+ * Looks every `times.every` whether a browser has the page open or a chat is attached, which uses the table, and quits once it has been unused for
+ * `times.idle`: the page that `chesspal` opens counts from its first request. The timer keeps the process alive till then.
  */
 function closeWhenIdle(page: Page, unusedFor: () => number, used: () => void, times: TableTimes, quit: () => void): NodeJS.Timeout
 {
     return setInterval(() => {
-        if (page.open()) {
+        if (page.inUse()) {
             used();
         } else if (unusedFor() >= times.idle) {
             quit();
