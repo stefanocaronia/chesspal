@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { type IncomingMessage, request } from "node:http";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -11,10 +10,12 @@ import { activeProfile, saveProfileSettings } from "../src/profiles/index.ts";
 import type { TableChats } from "../src/server/page/table.ts";
 import { hostArgs, startMessage } from "../src/server/table/hosts/hosts.ts";
 import { type HostLaunch, runHost } from "../src/server/table/hosts/play.ts";
-import { askAgain, askedAgain, leaveSeat, takeSeat } from "../src/server/table/hosts/seat.ts";
+import { askAgain, askedAgain, leaveSeat, refreshSeat, seatTaken, seatTimes, takeSeat } from "../src/server/table/hosts/seat.ts";
 import { terminals } from "../src/server/table/hosts/terminal.ts";
 import { hostLaunch, startTable, type Table, terminalChats } from "../src/server/table/index.ts";
 import { testContext } from "./commands.ts";
+import { sent } from "./http.ts";
+import { onFreePorts } from "./ports.ts";
 
 const folders: string[] = [];
 const tables: Table[] = [];
@@ -86,8 +87,11 @@ describe("a chat the table opens", () => {
         // Only the chat in the table's folder, and only while chesspal play holds its seat, starts again.
         const table = tableFolder(context.home());
         mkdirSync(table, { recursive: true });
+        expect(chats.holds(table)).toBe(false);
         expect(chats.relaunch(table)).toBe(false);
         takeSeat(table, { pid: process.pid, host: "claude" });
+        expect(chats.holds(bin)).toBe(false);
+        expect(chats.holds(table)).toBe(true);
         expect(chats.relaunch(bin)).toBe(false);
         expect(chats.relaunch(table)).toBe(true);
         expect(askedAgain(table, process.pid)).toBe(true);
@@ -104,44 +108,70 @@ describe("a chat the table opens", () => {
 });
 
 describe("the seat chesspal play takes at the table", () => {
-    it("is one play process's at a time, while it is alive, and the table asks that one alone to start its host again", () => {
+    it("is one play process's at a time, and the table asks that one alone to start its host again", () => {
         // The table's folder, which the first play makes.
         const folder = join(temporary(), "table");
-        const alive = (pid: number): boolean => pid !== 3;
 
-        expect(askAgain(folder, alive)).toBe(false);
-        takeSeat(folder, { pid: 1, host: "claude" }, alive);
-        expect(() => takeSeat(folder, { pid: 2, host: "codex" }, alive)).toThrow("A chat in claude already plays at the table, in another window: play there, or close it, then try again.");
+        expect(askAgain(folder)).toBe(false);
+        takeSeat(folder, { pid: 1, host: "claude" });
+        expect(() => takeSeat(folder, { pid: 2, host: "codex" })).toThrow("A chat in claude already plays at the table, in another window: play there, or close it, then try again.");
+        expect(seatTaken(folder)).toBe(true);
         expect(askedAgain(folder, 1)).toBe(false);
-        expect(askAgain(folder, alive)).toBe(true);
+        expect(askAgain(folder)).toBe(true);
         expect(askedAgain(folder, 2)).toBe(false);
         expect(askedAgain(folder, 1)).toBe(true);
         // The request is taken once.
         expect(askedAgain(folder, 1)).toBe(false);
 
         leaveSeat(folder, 2);
-        expect(askAgain(folder, alive)).toBe(true);
+        expect(askAgain(folder)).toBe(true);
         leaveSeat(folder, 1);
-        expect(askAgain(folder, alive)).toBe(false);
+        expect(askAgain(folder)).toBe(false);
     });
 
-    it("goes to a new play process when the one before it is gone, its request with it", () => {
+    it("is held while its play process refreshes it, and goes to the next one when it stops, whatever process takes its id, the request left with it", () => {
         const folder = temporary();
-        takeSeat(folder, { pid: 3, host: "claude" }, () => true);
-        askAgain(folder, () => true);
-        takeSeat(folder, { pid: 4, host: "claude" }, (pid) => pid !== 3);
+        takeSeat(folder, { pid: 3, host: "claude" });
+        askAgain(folder);
+        const later = new Date(Date.now() + seatTimes.heldFor);
 
+        expect(seatTaken(folder, later)).toBe(false);
+        refreshSeat(folder, 4, later);
+        expect(askAgain(folder, later)).toBe(false);
+        refreshSeat(folder, 3, later);
+        expect(seatTaken(folder, later)).toBe(true);
+
+        const after = new Date(later.getTime() + seatTimes.heldFor);
+        takeSeat(folder, { pid: 4, host: "codex" }, after);
         expect(askedAgain(folder, 4)).toBe(false);
         expect(askedAgain(folder, 3)).toBe(false);
     });
 
-    it("has its host ended, with what it started, and started again when the table asks; a host that ends by itself ends the play", async () => {
+    it("has its host ended and started again when the table asks; a host that ends by itself ends the play", async () => {
         const folder = temporary();
-        const host = (code: string): HostLaunch => ({ program: process.execPath, args: ["-e", code], folder, env: process.env, shell: false });
         let asked = 0;
 
-        expect(await runHost(host("setTimeout(() => process.exit(7), 60000)"), () => ++asked === 2, process.platform, 20)).toEqual({ code: expect.any(Number), again: true });
-        expect(await runHost(host("process.exit(3)"), () => false, process.platform, 20)).toEqual({ code: 3, again: false });
+        expect(await runHost(nodeHost(folder, "setTimeout(() => process.exit(7), 60000)"), () => ++asked === 2, process.platform, 20)).toEqual({ code: expect.any(Number), again: true });
+        expect(await runHost(nodeHost(folder, "process.exit(3)"), () => false, process.platform, 20)).toEqual({ code: 3, again: false });
+    }, 15_000);
+
+    it.runIf(process.platform === "win32")("ends on Windows the whole tree the host started, its MCP server among them", async () => {
+        const folder = temporary();
+        const pidFile = join(folder, "grandchild.pid");
+        const grandchild = `const fs = require("node:fs"); fs.writeFileSync(${JSON.stringify(`${pidFile}.part`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${pidFile}.part`)}, ${
+            JSON.stringify(pidFile)
+        }); setTimeout(() => undefined, 60000);`;
+        const host = `require("node:child_process").spawn(process.execPath, ["-e", ${JSON.stringify(grandchild)}], { stdio: "ignore" }); setTimeout(() => undefined, 60000);`;
+
+        expect(await runHost(nodeHost(folder, host), () => existsSync(pidFile), "win32", 20)).toMatchObject({ again: true });
+        expect(await gone(Number(readFileSync(pidFile, "utf8")))).toBe(true);
+    }, 15_000);
+
+    it.runIf(process.platform !== "win32")("kills a host that does not end when asked", async () => {
+        const host = nodeHost(temporary(), "process.on('SIGTERM', () => undefined); setInterval(() => undefined, 1000);");
+        let asked = 0;
+
+        expect(await runHost(host, () => ++asked === 2, process.platform, 20)).toMatchObject({ again: true });
     }, 15_000);
 });
 
@@ -150,12 +180,12 @@ describe("the table's page, with no chat at it", () => {
         const { table, opened } = await tableWith(fakeChats());
         const origin = new URL(table.url).origin;
 
-        expect((await getGame(table.url)).table).toEqual({ chat: false, hosts: fakeHosts, opening: false });
+        expect((await getGame(table.url)).table).toEqual({ chat: false, hosts: fakeHosts });
         expect(await openChat(table.url, "claude")).toMatchObject({ status: 403 });
         expect(await openChat(table.url, "codex", origin)).toMatchObject({ status: 400 });
         expect(await openChat(table.url, "claude", origin)).toEqual({ status: 200, body: { opened: true } });
         expect(opened).toEqual(["claude"]);
-        expect((await getGame(table.url)).table).toMatchObject({ opening: true });
+        expect((await getGame(table.url)).table).toMatchObject({ opening: "chat" });
         expect(await openChat(table.url, "claude", origin)).toMatchObject({ status: 409 });
         expect(opened).toEqual(["claude"]);
     });
@@ -165,9 +195,17 @@ describe("the table's page, with no chat at it", () => {
         const origin = new URL(table.url).origin;
 
         expect(await openChat(table.url, "claude", origin)).toEqual({ status: 200, body: { opened: false } });
-        expect((await getGame(table.url)).table).toMatchObject({ opening: false });
+        expect((await getGame(table.url)).table).not.toHaveProperty("opening");
         expect(await openChat(table.url, "claude", origin)).toMatchObject({ status: 200 });
         expect(opened).toEqual(["claude", "claude"]);
+    });
+
+    it("shows a chat opening while chesspal play holds the seat, as at a trust prompt longer than the wait, and opens no other", async () => {
+        const { table, opened } = await tableWith(fakeChats(true, true));
+
+        expect((await getGame(table.url)).table).toMatchObject({ opening: "chat" });
+        expect(await openChat(table.url, "claude", new URL(table.url).origin)).toMatchObject({ status: 409 });
+        expect(opened).toEqual([]);
     });
 });
 
@@ -176,16 +214,16 @@ const fakeHosts = [
     { name: "codex", installed: false, models: [], efforts: [], command: "chesspal play codex" },
 ];
 
-/** Chats that open no terminal: the hosts asked for, and whether each opened. */
-function fakeChats(opens = true): { chats: TableChats; opened: string[]; }
+/** Chats that open no terminal: the hosts asked for, and whether each opened; whether chesspal play holds the seat. */
+function fakeChats(opens = true, held = false): { chats: TableChats; opened: string[]; }
 {
     const opened: string[] = [];
-    return { chats: { hosts: () => fakeHosts, open: (host) => Promise.resolve(opened.push(host) > 0 && opens), relaunch: () => false }, opened };
+    return { chats: { hosts: () => fakeHosts, open: (host) => Promise.resolve(opened.push(host) > 0 && opens), holds: () => held, relaunch: () => false }, opened };
 }
 
 async function tableWith({ chats, opened }: { chats: TableChats; opened: string[]; }): Promise<{ table: Table; opened: string[]; }>
 {
-    const table = await startTable(homeContext("linux"), { idle: 60_000, every: 1_000 }, chats);
+    const table = await onFreePorts(() => startTable(homeContext("linux"), { idle: 60_000, every: 1_000 }, chats));
 
     if (table === undefined) {
         throw new Error("The table did not start: another one holds its ports.");
@@ -195,25 +233,39 @@ async function tableWith({ chats, opened }: { chats: TableChats; opened: string[
     return { table, opened };
 }
 
-function getGame(url: string): Promise<{ table?: unknown; }>
+async function getGame(url: string): Promise<{ table?: unknown; }>
 {
-    return fetch(new URL("/api/game", url)).then((response) => response.json() as Promise<{ table?: unknown; }>);
+    return JSON.parse((await sent(new URL("/api/game", url))).text) as { table?: unknown; };
 }
 
 /** Asks the table for a chat, as a browser would, with the page's origin when given: the answer's status and body. */
-function openChat(url: string, host: string, origin?: string): Promise<{ status: number | undefined; body: unknown; }>
+async function openChat(url: string, host: string, origin?: string): Promise<{ status: number; body: unknown; }>
 {
-    return new Promise((done) => {
-        const headers = { "Content-Type": "application/json", ...(origin === undefined ? {} : { Origin: origin }) };
-        const asked = request(new URL("/api/table/chat", url), { method: "POST", headers }, (response: IncomingMessage) => {
-            let text = "";
-            response.on("data", (chunk: Buffer) => {
-                text += chunk.toString("utf8");
-            });
-            response.on("end", () => done({ status: response.statusCode, body: JSON.parse(text) as unknown }));
-        });
-        asked.end(JSON.stringify({ host }));
-    });
+    const headers = { "Content-Type": "application/json", ...(origin === undefined ? {} : { Origin: origin }) };
+    const answer = await sent(new URL("/api/table/chat", url), { method: "POST", headers, body: JSON.stringify({ host }) });
+    return { status: answer.status, body: JSON.parse(answer.text) as unknown };
+}
+
+/** A Node script run as a host, in the folder given. */
+function nodeHost(folder: string, code: string): HostLaunch
+{
+    return { program: process.execPath, args: ["-e", code], folder, env: process.env, shell: false };
+}
+
+/** Whether a process is gone, within two seconds. */
+async function gone(pid: number): Promise<boolean>
+{
+    for (let tries = 0; tries < 20; tries++) {
+        try {
+            process.kill(pid, 0);
+        } catch {
+            return true;
+        }
+
+        await new Promise((done) => setTimeout(done, 100));
+    }
+
+    return false;
 }
 
 /** A context on a temporary data folder, with the real time, which the table's opening is measured with. */

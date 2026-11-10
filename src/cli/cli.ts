@@ -3,9 +3,8 @@ import { runCommandLine } from "./command-line.ts";
 
 const args = process.argv.slice(2);
 
-// "chesspal" alone opens the table's page, "chesspal open" too as the icon runs it, "chesspal table" is the table itself, "chesspal icon" puts its icon
-// on the desktop and "chesspal play claude" starts a chat at the table (D-104); "chesspal mcp" turns the process into a server for an AI host, "chesspal
-// listen" into the doorbell of Claude Code, or of Codex with --codex, "chesspal chat" notes how the chat started; everything else is a command.
+// The table's own words (D-104): alone or open, its page; table, icon, play <host>. The host's: mcp, its server; listen, its doorbell; chat, how the chat
+// started. Everything else is a command.
 if (args.length === 0) {
     await openTableHere(true);
 } else if (args.length === 1 && args[0] === "open") {

@@ -50,7 +50,7 @@ import { asTheChatSees } from "./chat.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
-import { relaunchChat, tableShown } from "./table.ts";
+import { chatToRelaunch, relaunchChat, tableShown } from "./table.ts";
 
 /** Answers the page's requests about the game: true when the request was one. */
 export function answerGame(request: IncomingMessage, response: ServerResponse, url: URL, served: Served): boolean
@@ -198,7 +198,7 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
 {
     const asked = 'Send the new game as JSON: {"ai_colour": "black", "level": "club", "clock": "10+5"}, each one optional; no clock for a game without one.';
     const body = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;
-    let relaunched = false;
+    let relaunching = false;
 
     if (body === undefined) {
         send(response, isJson(request) ? 400 : 415, json, JSON.stringify({ error: asked }));
@@ -215,15 +215,16 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
         }
 
         // The game starts from the page, open: its clocks wait for the player's Start there. A chat the table starts again is clean: no /clear is asked.
-        relaunched = relaunchChat(served);
-        const sight = relaunched ? served.context : asTheChatSees(served.context, served.chat);
+        relaunching = chatToRelaunch(served);
+        const sight = relaunching ? served.context : asTheChatSees(served.context, served.chat);
         rerunIfChanged(() => startNewGame(input.data, { ...sight, pageOpen: () => true }, "page"));
     } catch (error) {
         send(response, 409, json, JSON.stringify(refusalFrom(error)));
         return;
     }
 
-    if (!relaunched) {
+    // A seat lost meanwhile leaves the chat as it is: the doorbell tells it.
+    if (!(relaunching && relaunchChat(served))) {
         served.bell.ring();
     }
 

@@ -18,18 +18,22 @@ export interface ChatHost
 }
 
 /**
- * How the table opens a chat: the hosts it offers, and a terminal with one of them, whether one opened; and how it starts again the chat of a folder,
- * whether `chesspal play` holds it.
+ * How the table opens a chat: the hosts it offers, and a terminal with one of them, whether one opened; whether `chesspal play` holds the chat of a folder,
+ * and how it is asked to start it again.
  */
 export interface TableChats
 {
     hosts(): readonly ChatHost[];
     open(host: string): Promise<boolean>;
+    holds(folder: string): boolean;
     relaunch(folder: string): boolean;
 }
 
-/** What the table's page shows of its chat: whether one is at the table, and the hosts it can open one in. */
-export function tableShown(served: Served): { table?: { chat: boolean; hosts: readonly ChatHost[]; opening: boolean; }; }
+/** A chat opening at the table: one the page asked for, or the one started again for a new game. */
+export type Opening = "chat" | "again";
+
+/** What the table's page shows of its chat: whether one is at the table, the hosts it can open one in, and one opening. */
+export function tableShown(served: Served): { table?: { chat: boolean; hosts: readonly ChatHost[]; opening?: Opening; }; }
 {
     const { table } = served;
 
@@ -37,7 +41,8 @@ export function tableShown(served: Served): { table?: { chat: boolean; hosts: re
         return {};
     }
 
-    return { table: { chat: served.attached !== undefined, hosts: table.chats?.hosts() ?? [], opening: opening(served) } };
+    const now = opening(served);
+    return { table: { chat: served.attached !== undefined, hosts: table.chats?.hosts() ?? [], ...(now === undefined ? {} : { opening: now }) } };
 }
 
 /** Answers the table's own routes, under /api/table/; false for any other, and for every request to a page a chat serves itself. */
@@ -63,20 +68,27 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
 }
 
 /**
- * Starts the chat at the table again, clean, for a new game (D-57), when `chesspal play` holds it, it waits for the bell, no analyst of it is at work and it
- * has seen a game: one that only greeted the player stays. Whether it does; the pages then show it opening.
+ * Whether a new game starts the chat at the table again, clean (D-57): `chesspal play` holds it, it waits for the bell, no analyst of it is at work, and it
+ * has seen a game; one that only greeted the player stays.
  */
-export function relaunchChat(served: Served): boolean
+export function chatToRelaunch(served: Served): boolean
 {
     const { attached, bell } = served;
     const stopped = bell.listening && !bell.inTurn;
     const analysing = gameInAnalysis(gameFolder(served.context.home()))?.analyst !== undefined;
+    return attached !== undefined && stopped && !analysing && served.chat.positionSeen?.started !== undefined && served.table?.chats?.holds(attached.chat.folder) === true;
+}
 
-    if (attached === undefined || !stopped || analysing || served.chat.positionSeen?.started === undefined || served.table?.chats?.relaunch(attached.chat.folder) !== true) {
+/** Asks `chesspal play` to start the chat at the table again, once the new game has started: whether it was asked; the pages then show it opening. */
+export function relaunchChat(served: Served): boolean
+{
+    const folder = served.attached?.chat.folder;
+
+    if (folder === undefined || served.table?.chats?.relaunch(folder) !== true) {
         return false;
     }
 
-    noteOpening(served);
+    noteOpening(served, "again");
     return true;
 }
 
@@ -96,36 +108,47 @@ async function openChat(request: IncomingMessage, response: ServerResponse, serv
         sendJson(response, 403, { error: "Only the table's own page opens a chat." });
     } else if (offered === undefined || served.table?.chats === undefined) {
         sendJson(response, 400, { error: `Name a host the table offers and this computer has: ${served.table?.chats?.hosts().filter((one) => one.installed).map((one) => one.name).join(", ") || "none"}.` });
-    } else if (served.attached !== undefined || opening(served)) {
+    } else if (served.attached !== undefined || opening(served) !== undefined) {
         sendJson(response, 409, { error: "A chat is at the table, or opening: play there." });
     } else {
-        const at = noteOpening(served);
-        const opened = await served.table.chats.open(offered.name);
+        const opened = noteOpening(served, "chat");
+        const started = await served.table.chats.open(offered.name);
 
-        if (!opened && served.chatOpened === at) {
+        if (!started && served.chatOpened === opened) {
             served.chatOpened = undefined;
         }
 
-        sendJson(response, 200, { opened });
+        sendJson(response, 200, { opened: started });
         tellWatchers(served.watchers);
     }
 }
 
-// The pages show a chat opening from now until it attaches; one that has not by then lets them open another. When it was noted.
-function noteOpening(served: Served): number
+// The pages show a chat opening from now until it attaches; one that has not by then lets them open another. The opening noted.
+function noteOpening(served: Served, how: Opening): { at: number; how: Opening; }
 {
-    const at = served.context.now().getTime();
-    served.chatOpened = at;
+    const opened = { at: served.context.now().getTime(), how };
+    served.chatOpened = opened;
     tellWatchers(served.watchers);
     setTimeout(() => {
-        if (served.chatOpened === at) {
+        if (served.chatOpened === opened) {
             tellWatchers(served.watchers);
         }
     }, openingFor).unref();
-    return at;
+    return opened;
 }
 
-function opening(served: Served): boolean
+// A chat opening, with none at the table: one noted lately, or one chesspal play holds the seat for, as at a trust prompt longer than the wait.
+function opening(served: Served): Opening | undefined
 {
-    return served.attached === undefined && served.chatOpened !== undefined && served.context.now().getTime() - served.chatOpened < openingFor;
+    const { attached, chatOpened, context } = served;
+
+    if (attached !== undefined) {
+        return undefined;
+    }
+
+    if (chatOpened !== undefined && context.now().getTime() - chatOpened.at < openingFor) {
+        return chatOpened.how;
+    }
+
+    return served.table?.chats?.holds(context.folder) === true ? "chat" : undefined;
 }

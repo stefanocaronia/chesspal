@@ -10,6 +10,7 @@ import { startPage } from "../src/server/page/page.ts";
 import { openTable, processLauncher, startTable, type Table, type TableLauncher, type TableTimes } from "../src/server/table/index.ts";
 import { version } from "../src/version.ts";
 import { testContext } from "./commands.ts";
+import { onFreePorts } from "./ports.ts";
 
 const folders: string[] = [];
 const tables: Table[] = [];
@@ -25,8 +26,7 @@ afterEach(async () => {
 
 describe("the table", () => {
     it("serves the page on the table's folder, set up as init does, and says so to the probe, with its version and no chat's session", async () => {
-        const context = homeContext();
-        const table = await started(context);
+        const { context, table } = await freshTable();
         const said = await pageAt(portOf(table.url));
 
         expect(pagePorts(tableFolder(context.home()))).toContain(portOf(table.url));
@@ -36,15 +36,19 @@ describe("the table", () => {
     });
 
     it("closes when another table of the same folder started at the same time has a lower port: the ports are the lock", async () => {
-        const context = homeContext();
-        await started(context);
+        const { context, table } = await freshTable();
+        const second = await startTable(context, patient);
 
-        expect(await startTable(context, patient)).toBeUndefined();
+        if (second !== undefined) {
+            tables.push(second);
+        }
+
+        // Unless another test's page left a port below the first one's meanwhile, where the second one rightly stays.
+        expect(second === undefined || portOf(second.url) < portOf(table.url)).toBe(true);
     });
 
     it("closes by itself once no browser has had the page open for a while, and stays while one has", async () => {
-        const context = homeContext();
-        const table = await started(context, hasty);
+        const { table } = await freshTable(hasty);
         const events = await listening(table.url);
         await new Promise((done) => setTimeout(done, 400));
 
@@ -73,8 +77,7 @@ describe("the table", () => {
     });
 
     it("quits when another Chesspal version asks it to; a chat's page has no such route", async () => {
-        const context = homeContext();
-        const table = await started(context);
+        const { context, table } = await freshTable();
         const page = await startPage(testContext(context.home()));
 
         expect(await post(page.url, "/api/table/quit")).toBe(405);
@@ -173,6 +176,15 @@ async function started(context: Context, times = patient): Promise<Table>
 
     tables.push(table);
     return table;
+}
+
+/** A table on a data folder of its own, with a port free. */
+function freshTable(times = patient): Promise<{ context: Context; table: Table; }>
+{
+    return onFreePorts(async () => {
+        const context = homeContext();
+        return { context, table: await started(context, times) };
+    });
 }
 
 /** A launcher that starts the table in this process, and opens no browser: the addresses it was asked to open, and how many tables it started. */

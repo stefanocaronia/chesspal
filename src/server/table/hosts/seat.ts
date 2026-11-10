@@ -1,6 +1,6 @@
 // The seat `chesspal play` takes at the table (D-104): the play process notes itself in the table's folder while its host runs, one at a time, and the table
 // asks it there to start its host again, a clean chat for a new game (D-57).
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomically } from "../../../games/index.ts";
 
@@ -11,10 +11,13 @@ export interface Seat
     readonly host: string;
 }
 
-/** Takes the seat for this play process, over a request left for one before it; it throws while another one, alive, holds it. */
-export function takeSeat(folder: string, seat: Seat, alive: (pid: number) => boolean = isAlive): void
+/**
+ * Takes the seat for this play process, over a request left for one before it; it throws while another one holds it. A seat is held while its play
+ * refreshes it: one closed with its window, or stopped, lets it go within `heldFor`, whatever process takes its id after it.
+ */
+export function takeSeat(folder: string, seat: Seat, now: Date = new Date()): void
 {
-    const held = seatHeld(folder, alive);
+    const held = seatHeld(folder, now);
 
     if (held !== undefined && held.pid !== seat.pid) {
         throw new Error(`A chat in ${held.host} already plays at the table, in another window: play there, or close it, then try again.`);
@@ -26,6 +29,14 @@ export function takeSeat(folder: string, seat: Seat, alive: (pid: number) => boo
     writeAtomically(join(folder, seatFile), `${JSON.stringify(seat)}\n`);
 }
 
+/** Tells the table this play process still holds the seat; nothing when it lost it. */
+export function refreshSeat(folder: string, pid: number, now: Date = new Date()): void
+{
+    if (seatIn(folder)?.pid === pid) {
+        utimesSync(join(folder, seatFile), now, now);
+    }
+}
+
 /** Leaves the seat, when this play process still holds it. */
 export function leaveSeat(folder: string, pid: number): void
 {
@@ -34,10 +45,16 @@ export function leaveSeat(folder: string, pid: number): void
     }
 }
 
-/** Asks the play process in the seat to start its host again: whether one alive holds it, and was asked. */
-export function askAgain(folder: string, alive: (pid: number) => boolean = isAlive): boolean
+/** Whether a play process holds the seat. */
+export function seatTaken(folder: string, now: Date = new Date()): boolean
 {
-    const held = seatHeld(folder, alive);
+    return seatHeld(folder, now) !== undefined;
+}
+
+/** Asks the play process in the seat to start its host again: whether one holds it, and was asked. */
+export function askAgain(folder: string, now: Date = new Date()): boolean
+{
+    const held = seatHeld(folder, now);
 
     if (held === undefined) {
         return false;
@@ -59,13 +76,17 @@ export function askedAgain(folder: string, pid: number): boolean
     return asked;
 }
 
+/** How often a play process refreshes its seat, and how long the seat stays held without it. */
+export const seatTimes = { refresh: 5_000, heldFor: 15_000 };
+
 const seatFile = "play.json";
 const againFile = "play-again.json";
 
-function seatHeld(folder: string, alive: (pid: number) => boolean): Seat | undefined
+function seatHeld(folder: string, now: Date): Seat | undefined
 {
     const seat = seatIn(folder);
-    return seat !== undefined && alive(seat.pid) ? seat : undefined;
+    const refreshed = statSync(join(folder, seatFile), { throwIfNoEntry: false })?.mtimeMs;
+    return seat !== undefined && refreshed !== undefined && now.getTime() - refreshed < seatTimes.heldFor ? seat : undefined;
 }
 
 function seatIn(folder: string): Seat | undefined
@@ -80,16 +101,5 @@ function jsonIn(path: string): unknown
         return JSON.parse(readFileSync(path, "utf8")) as unknown;
     } catch {
         return undefined;
-    }
-}
-
-// Signal 0 only asks whether the process is there; EPERM says it is, another user's.
-function isAlive(pid: number): boolean
-{
-    try {
-        process.kill(pid, 0);
-        return true;
-    } catch (error) {
-        return (error as NodeJS.ErrnoException).code === "EPERM";
     }
 }

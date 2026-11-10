@@ -112,12 +112,12 @@ export interface PageData
     readonly dataFolder: readonly string[];
 }
 
-/** The table's chat, as its page shows it (D-104). */
+/** The table's chat, as its page shows it (D-104): one opening is one the page asked for, or the one started again for a new game. */
 export interface TableShown
 {
     readonly chat: boolean;
     readonly hosts: readonly ChatHost[];
-    readonly opening: boolean;
+    readonly opening?: "chat" | "again";
 }
 
 /** A host the table opens a chat in: whether it is installed, the models and efforts offered, and the command to type in a terminal instead. */

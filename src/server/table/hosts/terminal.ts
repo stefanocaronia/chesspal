@@ -47,7 +47,7 @@ export function terminals(folder: string, command: readonly string[], platform: 
     });
 }
 
-/** A word for cmd.exe's line: in double quotes when it holds a space or a character cmd reads outside them; a path on Windows holds no quote. */
+/** A word for cmd.exe's line, in double quotes when it holds a space or & | < > ^ ( ); cmd reads % and ! even inside them, which our words never hold. */
 export function cmdQuoted(word: string): string
 {
     return /[\s&|<>^()!%]/.test(word) ? `"${word}"` : word;

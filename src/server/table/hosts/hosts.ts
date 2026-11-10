@@ -42,9 +42,8 @@ export function startMessage(language: string | undefined): string
 }
 
 /**
- * The host's arguments for a chat: the start message, then the choices the host knows, each left out when it is not one of them. Claude Code takes the
- * message first, or an option such as --mcp-config takes it as its own; Codex takes it last, where a word such as "resume" is no subcommand, and is kept
- * from its update screen, which an Enter would accept.
+ * The start message and the choices the host knows: first for Claude Code, whose options may take the word after; last for Codex, where "resume" is no
+ * subcommand, kept from its update screen, which an Enter would accept.
  */
 export function hostArgs(host: HostName, message: string, choice: HostChoice = {}): string[]
 {

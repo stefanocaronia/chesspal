@@ -6,23 +6,21 @@ Play chess against an AI on a real board, or learn with one.
 
 ## Get started
 
-You need [Node.js](https://nodejs.org) 22.13 or newer and an AI agent on your computer, [Claude Code](https://code.claude.com/docs/en/setup) or [Codex](https://developers.openai.com/codex): see [what you need](#what-you-need). Open a new terminal, after installing Node.js (one opened before does not find `npm`), and type:
+You need [Node.js](https://nodejs.org) 22.13 or newer and an AI agent on your computer, [Claude Code](https://code.claude.com/docs/en/setup) or [Codex](https://developers.openai.com/codex), signed in with your own subscription: see [what you need](#what-you-need).
+
+Open a terminal, the window where you type commands, after installing Node.js: one opened before does not find `npm`. On Windows, open Command Prompt (press Start, type `cmd`, press Enter): PowerShell, on a new computer, refuses npm's commands with "running scripts is disabled on this system", until you type `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` there once and answer yes. On macOS, open Terminal. Then type:
 
 ```bash
 npm install -g chesspal
-chesspal init chess
-cd chess
-claude
+chesspal
 ```
 
 - `npm install -g` installs the `chesspal` command for the whole computer, where your agent finds it.
-- `chesspal init chess` makes the folder `chess` to play in. Any name will do; your games are kept [elsewhere](#where-your-games-are).
-- `claude` opens Claude Code in that folder (in the Claude desktop app, choose the folder in the Code tab). With Codex, type `codex`, and when it asks about Chesspal's two hooks, choose **Trust all and continue**.
-- The first time, your agent asks whether you trust the folder: say yes.
+- `chesspal` opens the board page in your browser. The first time, it offers an icon on your desktop and in your menu of programs: with it, you open the board with a double click, with no terminal.
+- The first time, the board page asks who you are: fill it in and press **Start playing**.
+- Press **Claude Code** or **Codex**: the AI opens in a terminal of its own, at the table; keep it open while you play. The first time, it asks whether you trust the folder: choose **Yes** with the arrow keys and press Enter. With Codex, when it asks about Chesspal's two hooks, choose **Trust all and continue**; on Windows, it also offers to set up its sandbox: choose the first option, and answer yes when Windows asks for permission.
 
-Then **say hello**. The AI answers with the link to the board page: open it in your browser, tell it who you are, and ask for a game. You choose your colour, the clock and the AI's level, and play on the board.
-
-On Windows, use Command Prompt (press Start, type `cmd`, press Enter). PowerShell, on a new computer, refuses npm's commands with "running scripts is disabled on this system"; there, type `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and answer yes, or use Command Prompt. Codex on Windows also offers to set up its sandbox the first time: choose the first option, and answer yes when Windows asks for permission.
+Then press **New game**: you choose your colour, the clock and the AI's level, and play on the board. Talk with the AI on the board page or in its terminal.
 
 ## What it does
 
@@ -46,9 +44,10 @@ Chesspal works with any agent that supports MCP tools and can work with the file
 
 ## Good to know
 
-- **For the next game**, type `/clear` in the chat or start a new one: a long chat makes the AI slower and costs you more.
+- **For the next game**, press New game: the AI the board page opened starts again with a clean chat by itself, once it has stopped working. In a chat you opened yourself, type `/clear` first: a long chat makes the AI slower and costs you more.
+- **To play in a folder of your own**, as with the Claude desktop app, type `chesspal init chess`, then open your agent in the folder `chess` and say hello: the AI answers with the link to the board page. Any name will do; your games are kept [elsewhere](#where-your-games-are).
 - **A move written in the chat** counts too: `e4`, `Nf3`, in the international notation (K Q R B N in every language), or in words.
-- **To update**, close the chat, run `npm install -g chesspal` again, then `chesspal init` in your folder: it updates its own lines and keeps what you wrote there. In Codex, allow the hooks again when it says so.
+- **To update**, close the AI's terminal, run `npm install -g chesspal` again, then `chesspal`. In a folder of your own, run `chesspal init` there too: it updates its own lines and keeps what you wrote there. In Codex, allow the hooks again when it says so.
 
 ## Where your games are
 

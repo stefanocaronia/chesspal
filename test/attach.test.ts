@@ -10,7 +10,7 @@ import type { Context } from "../src/commands/index.ts";
 import { newGame, startNewGame } from "../src/commands/new-game.ts";
 import { status } from "../src/commands/status.ts";
 import { aiNameOf } from "../src/core/index.ts";
-import { loadGame, noteAiModel, saveTableTalk, type TableTalk, talkLine } from "../src/games/index.ts";
+import { loadGame, noteAiModel, saveTableTalk, startAnalysis, type TableTalk, talkLine } from "../src/games/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { bellHeard, pageAt, pagePorts } from "../src/server/bell.ts";
@@ -19,6 +19,8 @@ import type { TableChats } from "../src/server/page/table.ts";
 import { attachTable, startTable, type Table } from "../src/server/table/index.ts";
 import { version } from "../src/version.ts";
 import { testContext } from "./commands.ts";
+import { sent } from "./http.ts";
+import { onFreePorts } from "./ports.ts";
 
 const folders: string[] = [];
 const tables: Table[] = [];
@@ -131,8 +133,7 @@ describe("a chat at the table", () => {
     });
 
     it("loses a table that takes it and then stops answering, within seconds, and its tool goes on", async () => {
-        const home = temporary();
-        const frozen = await fakeTable(home, version, "frozen");
+        const { home, fake: frozen } = await fakeTableOn(version, "frozen");
         let lost = 0;
 
         try {
@@ -150,8 +151,7 @@ describe("a chat at the table", () => {
     }, 10_000);
 
     it("stays at a table that failed one request, and loses one that no longer knows it", async () => {
-        const home = temporary();
-        const failing = await fakeTable(home, version, "fails");
+        const { home, fake: failing } = await fakeTableOn(version, "fails");
         let lost = 0;
 
         try {
@@ -167,8 +167,7 @@ describe("a chat at the table", () => {
             failing.server.closeAllConnections();
         }
 
-        const other = temporary();
-        const forgetting = await fakeTable(other, version, "forgets");
+        const { home: other, fake: forgetting } = await fakeTableOn(version, "forgets");
         let forgotten = 0;
 
         try {
@@ -184,8 +183,7 @@ describe("a chat at the table", () => {
     });
 
     it("asks again on a new connection when the table has just closed the one kept, and stays", async () => {
-        const home = temporary();
-        const dropping = await fakeTable(home, version, "drops-kept");
+        const { home, fake: dropping } = await fakeTableOn(version, "drops-kept");
         let lost = 0;
 
         try {
@@ -267,9 +265,16 @@ describe("a chat at the table", () => {
     });
 
     it("asks an older table to quit, and leaves a newer one be: either way it serves its own page", async () => {
-        const home = temporary();
-        const older = await fakeTable(home, "0.0.1");
-        const newer = await fakeTable(home, "99.0.0");
+        const { home, older, newer } = await onFreePorts(async () => {
+            const { home, fake: older } = await fakeTableOn("0.0.1");
+
+            try {
+                return { home, older, newer: await fakeTable(home, "99.0.0") };
+            } catch (error) {
+                older.server.close();
+                throw error;
+            }
+        });
 
         try {
             expect(await attachTable(chatOn(home), () => undefined)).toBeUndefined();
@@ -319,9 +324,8 @@ describe("a chat at the table", () => {
 
 describe("a new game at the table", () => {
     it("starts again the chat chesspal play holds once it waits for the bell, having seen a game; one in a turn hears the bell instead", async () => {
-        const relaunched: string[] = [];
-        const chats: TableChats = { hosts: () => [], open: () => Promise.resolve(false), relaunch: (folder) => relaunched.push(folder) > 0 };
-        const { home, table } = await tableOn(temporary(), chats);
+        const { chats, relaunched } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
         const chat = { ...chatOn(home), host: () => "claude-code" };
         const page = await attached(chat);
         const before = process.env.CHESSPAL_HOME;
@@ -346,35 +350,78 @@ describe("a new game at the table", () => {
             expect(await newGameAt(table.url)).toBe(200);
             expect(relaunched).toEqual([chat.folder]);
 
-            // The chat ends: the pages show the next one opening, and the bell never rang for it.
+            // The chat ends: the pages show it starting again, and the bell never rang for it.
             await page.close();
             expect(await hook).toMatchObject({ rang: false });
-            expect(await gameShown(table.url)).toMatchObject({ table: { chat: false, opening: true } });
+            expect(await gameShown(table.url)).toMatchObject({ table: { chat: false, opening: "again" } });
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
+    it("leaves a chat that has only greeted the player, or whose analyst is at work: the bell tells it", async () => {
+        const { chats, relaunched } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            // It greeted the player and waits for the bell, having seen no game.
+            const greeted = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(async () => (await gameShown(table.url)).listening === true);
+
+            expect(await newGameAt(table.url)).toBe(200);
+            expect(await greeted).toMatchObject({ rang: true });
+
+            // It saw the game, and its analyst works on another.
+            chat.positionSeen = { started: loadGame(gameFolder(home))!.started, plies: 0 };
+            startAnalysis(gameFolder(home), "games/2026-11-01-100000.pgn", new Date(), { analyst: { game: "games/2026-11-01-100000.pgn", run: "a-run", since: new Date().toISOString() } });
+            // Woken by the bell, it thinks on its move until its hook waits again.
+            const analysing = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(async () => {
+                const shown = await gameShown(table.url);
+                return shown.listening === true && shown.thinking === undefined;
+            });
+
+            expect(await newGameAt(table.url)).toBe(200);
+            expect(await analysing).toMatchObject({ rang: true });
+            expect(relaunched).toEqual([]);
         } finally {
             restore("CHESSPAL_HOME", before);
         }
     });
 });
 
+/** The chats of a table where chesspal play holds the seat: the folders whose chat it was asked to start again. */
+function playChats(): { chats: TableChats; relaunched: string[]; }
+{
+    const relaunched: string[] = [];
+    return { chats: { hosts: () => [], open: () => Promise.resolve(false), holds: () => true, relaunch: (folder) => relaunched.push(folder) > 0 }, relaunched };
+}
+
 /** A new game asked from the table's page, as its window sends it: the answer's status. */
 async function newGameAt(url: string): Promise<number>
 {
-    const response = await fetch(new URL("/api/new", url), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai_colour: "white" }) });
-    await response.body?.cancel();
-    return response.status;
+    return (await sent(new URL("/api/new", url), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai_colour: "white" }) })).status;
 }
 
-/** A table on a temporary data folder, with the real time, and the chats it opens when given. */
-async function tableOn(home = temporary(), chats?: TableChats): Promise<{ home: string; table: Table; }>
+/** A table on the data folder given, else on a temporary one, with the real time, and the chats it opens when given. */
+async function tableOn(home?: string, chats?: TableChats): Promise<{ home: string; table: Table; }>
 {
-    const table = await startTable(homeContext(home), { idle: 60_000, every: 10 }, chats);
+    const start = async (folder: string): Promise<{ home: string; table: Table; }> => {
+        const table = await startTable(homeContext(folder), { idle: 60_000, every: 10 }, chats);
 
-    if (table === undefined) {
-        throw new Error("The table did not start: another one holds its ports.");
-    }
+        if (table === undefined) {
+            throw new Error("The table did not start: another one holds its ports.");
+        }
 
-    tables.push(table);
-    return { home, table };
+        tables.push(table);
+        return { home: folder, table };
+    };
+
+    return home === undefined ? onFreePorts(() => start(temporary())) : start(home);
 }
 
 /** A chat in a folder of its own, on the data folder given. */
@@ -499,18 +546,21 @@ async function fakeTable(home: string, other: string, chat?: FakeChat): Promise<
         }
     }
 
-    throw new Error("Every port of the table is taken.");
+    throw new Error("The table's ports are taken by other programs.");
 }
 
-function gameShown(url: string): Promise<{ opponent?: string; listening?: boolean; thinking?: string; talk?: { heard?: string; }[]; aiModel?: { model: string; }; table?: unknown; }>
+/** A fake table on a data folder of its own, with a port free. */
+function fakeTableOn(other: string, chat?: FakeChat): Promise<{ home: string; fake: Awaited<ReturnType<typeof fakeTable>>; }>
 {
-    return new Promise((done, failed) => {
-        get(new URL("/api/game", url), (response) => {
-            let text = "";
-            response.on("data", (chunk: Buffer) => (text += String(chunk)));
-            response.on("end", () => done(JSON.parse(text) as never));
-        }).on("error", failed);
+    return onFreePorts(async () => {
+        const home = temporary();
+        return { home, fake: await fakeTable(home, other, chat) };
     });
+}
+
+async function gameShown(url: string): Promise<{ opponent?: string; listening?: boolean; thinking?: string; talk?: { heard?: string; }[]; aiModel?: { model: string; }; table?: unknown; }>
+{
+    return JSON.parse((await sent(new URL("/api/game", url))).text) as never;
 }
 
 /** A browser listening to the page's changes, told of each. */

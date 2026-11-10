@@ -125,6 +125,7 @@ export interface Text
         readonly effort: string;
         asHost(host: string): string;
         readonly opening: string;
+        again(name: string): string;
         readonly failed: string;
         readonly typeIt: string;
     };
@@ -533,12 +534,13 @@ const english: Text = {
     asleepInAnalysis: (name) => `${name} is not listening: write to it in the window where you opened it, not here.`,
     table: {
         label: "Open a chat",
-        noChat: (name) => `${name} is not at the table: open a chat, which starts in a terminal of its own.`,
+        noChat: (name) => `To play with ${name}, open its chat: it starts in a window of its own, to keep open.`,
         install: (name) => `To play with ${name}, install Claude Code or Codex, then open this page again.`,
         model: "Model",
         effort: "Effort",
         asHost: (host) => `as set in ${host}`,
-        opening: "Opening the chat… If it asks whether you trust the folder, choose Yes with the arrow keys and press Enter.",
+        opening: "Opening the chat… In the terminal, if it asks whether you trust the folder, choose Yes with the arrow keys and press Enter.",
+        again: (name) => `${name} starts again with a clean chat for the new game…`,
         failed: "The terminal did not open: type the command below in a terminal.",
         typeIt: "Or type in a terminal:",
     },
@@ -890,12 +892,13 @@ const italian: Text = {
     asleepInAnalysis: (name) => `${name} non ti sta ascoltando: scrivigli nella finestra dove l'hai aperto, non qui.`,
     table: {
         label: "Apri una chat",
-        noChat: (name) => `${name} non è al tavolo: apri una chat, che parte in un terminale tutto suo.`,
+        noChat: (name) => `Per giocare con ${name}, apri la sua chat: parte in una finestra a parte, da tenere aperta.`,
         install: (name) => `Per giocare con ${name}, installa Claude Code o Codex, poi apri di nuovo questa pagina.`,
         model: "Modello",
         effort: "Ragionamento",
         asHost: (host) => `come è impostato in ${host}`,
-        opening: "Apro la chat… Se ti chiede se ti fidi della cartella, scegli Yes con le frecce e premi Invio.",
+        opening: "Apro la chat… Nel terminale, se ti chiede se ti fidi della cartella, scegli Yes con le frecce e premi Invio.",
+        again: (name) => `${name} riparte con una chat pulita per la nuova partita…`,
         failed: "Il terminale non si è aperto: scrivi il comando qui sotto in un terminale.",
         typeIt: "Oppure scrivi in un terminale:",
     },

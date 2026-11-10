@@ -17,7 +17,7 @@ import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls } from "./game.ts";
 import { json, send } from "./http.ts";
 import { answerProfiles } from "./profiles.ts";
-import { answerTable, type TableChats } from "./table.ts";
+import { answerTable, type Opening, type TableChats } from "./table.ts";
 
 /**
  * The page of a player's folder, served by the chat's process or by the table it is attached to (D-104): its address, how to tell it what the chat does
@@ -132,7 +132,7 @@ export interface Served
     /** The chat attached to the table, while one is. */
     attached?: Attached;
     /** When the table last opened a chat from the page, which has not attached yet: no second one meanwhile. */
-    chatOpened?: number | undefined;
+    chatOpened?: { readonly at: number; readonly how: Opening; } | undefined;
 }
 
 /**

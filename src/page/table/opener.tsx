@@ -12,7 +12,7 @@ export function ChatOpener({ table, settings, onChange, name, text }: { table: T
     const [failed, setFailed] = useState(false);
     const words = text.table;
     const installed = table.hosts.filter((host) => host.installed && host.name in choiceKeys);
-    const busy = sending || table.opening;
+    const busy = sending || table.opening !== undefined;
 
     const open = async (host: string): Promise<void> => {
         setSending(true);
@@ -21,6 +21,11 @@ export function ChatOpener({ table, settings, onChange, name, text }: { table: T
         setSending(false);
         setFailed(!opened);
     };
+
+    // The chat started again for a new game needs nothing of the player.
+    if (table.opening === "again") {
+        return <p class="asleep" role="status">{words.again(name)}</p>;
+    }
 
     if (installed.length === 0) {
         return <p class="asleep" role="status">{words.install(name)}</p>;

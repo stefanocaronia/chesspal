@@ -9,7 +9,7 @@ import { setUpHosts } from "../../../host-files/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
 import { programPath } from "./find.ts";
 import { choiceIn, hostArgs, type HostName, startMessage } from "./hosts.ts";
-import { askedAgain, leaveSeat, takeSeat } from "./seat.ts";
+import { askedAgain, leaveSeat, refreshSeat, seatTimes, takeSeat } from "./seat.ts";
 import { cmdQuoted } from "./terminal.ts";
 
 /** What `chesspal play` starts: the host's program, its arguments, folder and environment, and whether it needs cmd, as a .cmd shim does on Windows. */
@@ -23,19 +23,36 @@ export interface HostLaunch
 }
 
 /**
- * Runs the host in the table's folder, set up as init does, in this terminal, until it ends: its exit code. It holds the table's seat meanwhile, and starts
- * the host again, clean, with the choices of the page, when the table asks for a new game (D-57). Ctrl+C is the host's, which stops its turn with it:
- * this process ignores it, or the terminal would close with the chat. It throws when the host is not installed, or another chat holds the seat.
+ * Runs the host in the table's folder, in this terminal, until it ends: its exit code; started again, clean, when the table asks for a new game (D-57).
+ * Ctrl+C is the host's: this process ignores it, or the terminal would close with the chat.
  */
 export async function playHost(context: Context, host: HostName): Promise<number>
 {
     const folder = tableFolder(context.home());
     takeSeat(folder, { pid: process.pid, host });
     process.on("SIGINT", () => undefined);
+    // A window closed with its X ends this process without its finally: the seat goes first.
+    process.on("SIGHUP", () => {
+        leaveSeat(folder, process.pid);
+        process.exit(129);
+    });
+    const terminal = savedTerminal(context.platform);
+    let refreshed = Date.now();
+
+    const asked = (): boolean => {
+        if (Date.now() - refreshed >= seatTimes.refresh) {
+            refreshed = Date.now();
+            refreshSeat(folder, process.pid);
+        }
+
+        return askedAgain(folder, process.pid);
+    };
 
     try {
         for (;;) {
-            const ran = await runHost(hostLaunch(context, host), () => askedAgain(folder, process.pid)).catch((error: unknown) => {
+            // A request left from a second click while the host before was ending is not for this one.
+            askedAgain(folder, process.pid);
+            const ran = await runHost(hostLaunch(context, host), asked, context.platform).catch((error: unknown) => {
                 throw new Error(`${hostTitle[host]} did not start: ${(error as Error).message}`);
             });
 
@@ -43,6 +60,7 @@ export async function playHost(context: Context, host: HostName): Promise<number
                 return ran.code;
             }
 
+            terminal.restore();
             process.stdout.write(cleanScreen);
         }
     } finally {
@@ -51,8 +69,8 @@ export async function playHost(context: Context, host: HostName): Promise<number
 }
 
 /**
- * Runs the host until it ends, or until `again`, asked every half second, says to start it again: then its process and those it started are ended. Its exit
- * code, and whether to start it again.
+ * Runs the host until it ends, or until `again`, asked every half second, says to start it again: then it is ended with what it started, killed when it
+ * does not end. Its exit code, and whether to start it again.
  */
 export function runHost(launch: HostLaunch, again: () => boolean, platform: string = process.platform, every = 500): Promise<{ code: number; again: boolean; }>
 {
@@ -61,18 +79,26 @@ export function runHost(launch: HostLaunch, again: () => boolean, platform: stri
         const command = launch.shell ? [words.map(cmdQuoted).join(" ")] : words;
         const chat = spawn(command[0]!, command.slice(1), { cwd: launch.folder, env: launch.env, stdio: "inherit", shell: launch.shell });
         let ended = false;
+        let killing: NodeJS.Timeout | undefined;
         const watch = setInterval(() => {
             if (!ended && again()) {
                 ended = true;
                 endTree(chat, platform);
+                killing = setTimeout(() => chat.kill("SIGKILL"), killAfter);
             }
         }, every);
-        chat.once("error", (error) => {
+
+        const stop = (): void => {
             clearInterval(watch);
+            clearTimeout(killing);
+        };
+
+        chat.once("error", (error) => {
+            stop();
             failed(error);
         });
         chat.once("exit", (code) => {
-            clearInterval(watch);
+            stop();
             done({ code: code ?? 1, again: ended || again() });
         });
     });
@@ -106,17 +132,45 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
 
 const hostTitle: Record<HostName, string> = { claude: "Claude Code", codex: "Codex" };
 
-// A host ended in the middle may leave the terminal on its own screen with the cursor hidden: back to the main one, the cursor shown, cleared, as a new chat.
-const cleanScreen = "\x1b[?1049l\x1b[?25h\x1b[2J\x1b[3J\x1b[H";
+// A host that has not ended this long after it was asked is killed.
+const killAfter = 3_000;
 
-// The host and what it started, its MCP server among them: on Windows its whole tree, which taskkill ends, never the console (Priya).
+// A host ended in the middle leaves the modes it set: colours, scroll region, synchronized output, bracketed paste, focus and mouse reports, kitty's
+// keyboard flags, its own screen, a hidden cursor (Priya). All off, and the screen cleared, as a new chat.
+const cleanScreen = "\x1b[0m\x1b[r\x1b[?2026l\x1b[?2004l\x1b[?1004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[<99u\x1b[?1049l\x1b[?25h\x1b[2J\x1b[3J\x1b[H";
+
+// The host and what it started, its MCP server among them: on Windows its whole tree, which taskkill ends, never the console (Priya); else the host,
+// which ends its own. A taskkill that failed leaves it to the kill that follows.
 function endTree(chat: ChildProcess, platform: string): void
 {
-    if (platform === "win32" && chat.pid !== undefined) {
-        spawnSync("taskkill", ["/T", "/F", "/PID", String(chat.pid)], { stdio: "ignore", windowsHide: true });
-    } else {
+    if (platform !== "win32" || chat.pid === undefined) {
         chat.kill("SIGTERM");
+        return;
     }
+
+    const taskkill = win32.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe");
+    const ended = spawnSync(taskkill, ["/T", "/F", "/PID", String(chat.pid)], { stdio: "ignore", windowsHide: true });
+
+    if (ended.status !== 0) {
+        chat.kill();
+    }
+}
+
+/**
+ * The terminal's settings before the first host, which one ended in the middle leaves raw, for the next to take as its own; stty keeps them on macOS and
+ * Linux, while on Windows each host sets the console's itself.
+ */
+function savedTerminal(platform: string): { restore(): void; }
+{
+    const saved = platform === "win32" || !process.stdin.isTTY ? undefined : spawnSync("stty", ["-g"], { stdio: ["inherit", "pipe", "ignore"], encoding: "utf8" });
+    const settings = saved?.status === 0 ? saved.stdout.trim() : undefined;
+    return {
+        restore: () => {
+            if (settings !== undefined) {
+                spawnSync("stty", [settings], { stdio: ["inherit", "ignore", "ignore"] });
+            }
+        },
+    };
 }
 
 // What marks a chat's own session, which a table started from inside a chat would hand down, and the host take for its own (Priya).
