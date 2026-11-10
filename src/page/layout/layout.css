@@ -800,6 +800,23 @@
         grid-template-areas: "head" "you" "board" "steps" "asleep" "note" "chat" "ai" "side";
     }
 
+    /* With the helps on, their map under the steps: an area the grid lacks would put it in a column of its own, off the screen */
+    .app:has(.talk.studied):has(.board-map) {
+        grid-template-areas: "head" "ai" "board" "steps" "map" "note" "chat" "you" "side";
+    }
+
+    .app.flipped:has(.talk.studied):has(.board-map) {
+        grid-template-areas: "head" "you" "board" "steps" "map" "note" "chat" "ai" "side";
+    }
+
+    .app:has(.talk.studied > .ai-block > .asleep):has(.board-map) {
+        grid-template-areas: "head" "ai" "board" "steps" "map" "asleep" "note" "chat" "you" "side";
+    }
+
+    .app.flipped:has(.talk.studied > .ai-block > .asleep):has(.board-map) {
+        grid-template-areas: "head" "you" "board" "steps" "map" "asleep" "note" "chat" "ai" "side";
+    }
+
     .talk.studied > .ai-block > .asleep {
         grid-area: asleep;
         margin: 0;

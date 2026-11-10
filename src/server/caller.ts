@@ -36,8 +36,8 @@ export async function callerOf(meta: Record<string, unknown> | undefined, client
     return client === undefined ? undefined : { annotator: client.title ?? client.name, hostOnly: true };
 }
 
-/** Who in Claude Code or Codex made a tool call: the chat itself, or one of its agents by its type. */
-export type CallingAgent = { chat: true; } | { agent: string; };
+/** Who in Claude Code or Codex made a tool call: the chat itself, or one of its agents by its type, with the run it is, when the host tells it. */
+export type CallingAgent = { chat: true; } | { agent: string; run?: string; };
 
 /**
  * Who in Claude Code or Codex made a tool call: the chat, when its line is in the chat's transcript, or the agent whose file has it, by the type Claude Code
@@ -64,8 +64,9 @@ export async function callingAgent(meta: Record<string, unknown> | undefined, fo
         return { chat: true };
     }
 
+    // Each agent Claude Code starts writes a file of its own: its name tells two runs of the same agent apart.
     const type = objectOf(textOf(found.file.replace(/\.jsonl$/, ".meta.json")))?.agentType;
-    return typeof type === "string" ? { agent: type } : undefined;
+    return typeof type === "string" ? { agent: type, run: basename(found.file, ".jsonl") } : undefined;
 }
 
 /** Whether a call comes from one of Codex's agents, as its metadata say: its own process starts no board page (D-98). */
@@ -161,7 +162,7 @@ async function codexCaller(turn: Record<string, unknown>, wait: number): Promise
         const role = /"agent_role":"([^"]+)"/.exec(start)?.[1];
 
         if (role !== undefined) {
-            const caller: CallingAgent = start.includes('"forked_from_id":"') ? { chat: true } : { agent: role };
+            const caller: CallingAgent = start.includes('"forked_from_id":"') ? { chat: true } : { agent: role, run: thread };
             codexThreads.set(thread, caller);
             return caller;
         }

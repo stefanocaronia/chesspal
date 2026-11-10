@@ -1,5 +1,5 @@
 import { commands } from "chesspal";
-import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -221,7 +221,9 @@ describe("a game in chat", () => {
         expect(readArchive(context)).toContain("1. e4 {The king's pawn. [%plan Take the centre.]} *");
         // Started in the same second, the new game takes the next one: its name in the archive is its own.
         expect(gameFile(context).started).toBe(new Date(2026, 10, 2, 15, 30, 13).toISOString());
-        expect(await run(context, "new_game", { ai_colour: "black", replace: true })).toContain("The game before is in games/2026-11-02-153013.pgn, unfinished.");
+        // A game replaced before any move is not kept.
+        expect(await run(context, "new_game", { ai_colour: "black", replace: true })).not.toContain("The game before");
+        expect(readdirSync(join(gameFolder(context.home()), "games"))).toEqual(["2026-11-02-153012.pgn"]);
         expect(readArchive(context)).toContain("[%plan Take the centre.]");
     });
 
@@ -258,9 +260,11 @@ describe("a game in chat", () => {
             const at = (time: string): Context => ({ ...context, now: () => new Date(time) });
             // 02:30 in summer time, then 02:30 again an hour later, in winter time.
             await run(at("2026-10-25T00:30:00Z"), "new_game", { ai_colour: "black" });
+            await run(at("2026-10-25T00:30:00Z"), "player_move", { move: "e4" });
 
             expect(await run(at("2026-10-25T01:30:00Z"), "new_game", { ai_colour: "black", replace: true })).toContain("The game before is in games/2026-10-25-023000.pgn");
             expect(gameFile(context).started).toBe("2026-10-25T01:30:01.000Z");
+            await run(at("2026-10-25T01:30:01Z"), "player_move", { move: "e4" });
 
             // The clock set back an hour: 02:30:00 is taken in the archive, 02:30:01 by the game going on.
             expect(await run(at("2026-10-25T00:30:00Z"), "new_game", { ai_colour: "black", replace: true })).toContain("The game before is in games/2026-10-25-023001.pgn");
@@ -336,15 +340,39 @@ describe("a game in chat", () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "black" });
         await expect(run(context, "end_game", { result: "draw_agreed" })).rejects.toThrow("A draw is agreed only once each side has made a move. Nothing changed.");
+        await run(context, "player_move", { move: "e4" });
         await run(context, "end_game", { result: "ai_resigns" });
 
         expect(readArchive(context)).toContain('[Result "1-0"]\n[AILevel "strong"]\n[Termination "Black resigns"]');
         await expect(run(context, "end_game", { result: "draw_agreed" })).rejects.toThrow("The game is over (1-0, Black resigns)");
     });
 
+    it("keeps no game closed before any move, nor offers to go over it, and leaves out of the memory one kept before", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black" });
+
+        expect(await run(context, "end_game", { result: "player_resigns" })).toBe(
+            "Game over: 0-1, White resigns.\nNext: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in "
+                + "words, another game. For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.",
+        );
+        expect(existsSync(join(gameFolder(context.home()), archive))).toBe(false);
+        expect(await run(context, "past_games")).toBe("No game played yet.");
+        await expect(run(context, "analyse_game")).rejects.toThrow("There is no game to study");
+
+        // One an older Chesspal kept stays out of the memory, and analyse_game goes over the last game played before it.
+        const games = join(gameFolder(context.home()), "games");
+        mkdirSync(games, { recursive: true });
+        writeFileSync(join(games, "2026-11-01-100000.pgn"), '[White "Player"]\n[Black "AI"]\n[Result "0-1"]\n\n0-1\n');
+        expect(await run(context, "past_games")).toBe("No game played yet.");
+        writeFileSync(join(games, "2026-10-31-100000.pgn"), '[White "Player"]\n[Black "AI"]\n[Result "*"]\n\n1. e4 e5 *\n');
+        expect(await run(context, "analyse_game")).toContain('Look and position take it as game "games/2026-10-31-100000.pgn".');
+    });
+
     it("draws a resignation the other side could never mate after (FIDE 5.1.2, D-65)", async () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "black", from: "8/8/4k3/8/8/4K3/8/7R w - - 0 1" });
+        await run(context, "player_move", { move: "Rh2" });
+        await run(context, "ai_move", { move: "Kd5", plan: "Hold on." });
 
         expect(await run(context, "end_game", { result: "player_resigns" })).toContain("Game over: 1/2-1/2, White resigns and Black cannot mate.");
         expect(readArchive(context)).toMatch(/\[Result "1\/2-1\/2"\][^]*\[Termination "White resigns and Black cannot mate"\]/);

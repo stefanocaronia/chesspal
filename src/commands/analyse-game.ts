@@ -26,9 +26,10 @@ import {
     withGameReview,
     withLead,
 } from "../core/index.ts";
-import { isGameName, keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis } from "../games/index.ts";
+import { gameInAnalysis, isGameName, keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis } from "../games/index.ts";
 import { analystAgent, instructions } from "../host-files/index.ts";
 import { activeProfile, gameFolder } from "../profiles/index.ts";
+import { analystOf, anotherAnalyst } from "./agents.ts";
 import type { Context } from "./context.ts";
 import { bookOpening, bookReaches } from "./opening-book.ts";
 import { defineCommand } from "./registry.ts";
@@ -131,9 +132,8 @@ export const analyseGame = defineCommand({
         const named = pgn !== undefined && isGameName(pgn) ? pgn.trim() : game;
         const studied = pgn === undefined || named !== game ? gameToStudy(context, named) : importedGame(context, pgn);
 
-        // One analyst a game: the chat goes over the review there is (Stefano).
-        if (context.agent === analystAgent && isReviewed(studied.record)) {
-            throw new Error("Stop now: this game has its review already. End with one line for the AI that started you: go over that review with the player.");
+        if (context.agent === analystAgent) {
+            oneAnalyst(context, studied);
         }
 
         const analysis = analysisOf(studied, activeProfile(context.home()).name);
@@ -160,6 +160,38 @@ export const analyseGame = defineCommand({
             ...analysis.moves.map(moveLine),
         ].join("\n"),
 });
+
+/**
+ * One analyst a game: one started on a game reviewed already, or that another analyst has taken, stops, and the chat goes over that review (Stefano); the
+ * analyst that took it may call again, its review half written. The game is taken at once, before the long reading of it, and read again: of two analysts
+ * started together in two processes, as Codex runs them, one goes on (Federico).
+ */
+function oneAnalyst(context: Context, studied: Studied): void
+{
+    const { name } = studied;
+    const holder = name === undefined ? undefined : analystOf(context, name);
+
+    if (holder !== undefined && holder === context.agentRun) {
+        return;
+    }
+
+    if (isReviewed(studied.record)) {
+        throw new Error("Stop now: this game has its review already. End with one line for the AI that started you: go over that review with the player.");
+    }
+
+    if (holder !== undefined) {
+        throw new Error(anotherAnalyst);
+    }
+
+    if (name !== undefined && context.agentRun !== undefined) {
+        const folder = gameFolder(context.home());
+        startAnalysis(folder, name, context.now(), { analyst: { game: name, run: context.agentRun, since: context.now().toISOString() } });
+
+        if (gameInAnalysis(folder)?.analyst?.run !== context.agentRun) {
+            throw new Error(anotherAnalyst);
+        }
+    }
+}
 
 /** A game the player brings as a PGN, checked move by move and kept to study with its clock and Chesspal's own review: no other comment, no engine's evaluation (D-6). */
 function importedGame(context: Context, pgn: string): Studied

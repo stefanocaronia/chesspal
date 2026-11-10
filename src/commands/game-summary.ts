@@ -147,6 +147,12 @@ export function gameGoingOn(folder: string, now: Date): CurrentGame
     return current;
 }
 
+/** Whether a game has no move yet, or was closed before any: nothing to go over. */
+export function unplayed(summary: GameSummary): boolean
+{
+    return summary.lastMoves === "";
+}
+
 /** How a game ended, in words: its result, and how it came when known. */
 export function endText({ result, termination }: { result: string; termination?: string; }): string
 {

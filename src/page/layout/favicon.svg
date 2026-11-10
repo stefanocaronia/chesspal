@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<!-- Chesspal, the favicon: the Torretta with its neutral face, on a grid of 16 pixels. © 2026 Stefano Caronia, Chesspal (https://github.com/stefanocaronia/chesspal), under the licence CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), crediting "Stefano Caronia, Chesspal". -->
+<rect x="15" y="4" width="2" height="4" fill="#4b7cb0"/>
+<rect x="14" y="0" width="4" height="4" rx="2" fill="#f4c84c"/>
+<rect x="2" y="18" width="4" height="8" rx="1" fill="#4b7cb0"/>
+<rect x="26" y="18" width="4" height="8" rx="1" fill="#4b7cb0"/>
+<path d="M4 8H10V12H14V8H18V12H22V8H28V16L26 18V28H6V18L4 16Z" fill="#6d9fd1"/>
+<rect x="2" y="28" width="28" height="4" rx="1" fill="#4b7cb0"/>
+<rect x="8" y="14" width="16" height="12" rx="1.5" fill="#16263a"/>
+<rect x="10" y="16" width="4" height="4" rx="1" fill="#f2f7fc"/>
+<rect x="18" y="16" width="4" height="4" rx="1" fill="#f2f7fc"/>
+<rect x="14" y="22" width="4" height="2" rx="1" fill="#f2f7fc"/>
+</svg>

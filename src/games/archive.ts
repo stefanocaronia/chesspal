@@ -1,7 +1,7 @@
 // The finished games, as PGN in games/ (D-9, D-41), with the AI's plans for the analyst (D-21); and the games played elsewhere, kept to study in study/ (D-68).
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { type GameRecord, movesOnly, pgnDate, readPgn, withAiHost, withAiModel, writePgn } from "../core/index.ts";
+import { type GameRecord, movesOnly, pgnDate, readPgn, unsigned, withAiHost, withAiModel, writePgn } from "../core/index.ts";
 import { aiHostOf, aiModelOf } from "./ai-model.ts";
 import { coachWords, withCoach } from "./coach.ts";
 import { type CurrentGame, endOf, loadGame } from "./current-game.ts";
@@ -43,10 +43,14 @@ export function startOfNewGame(folder: string, now: Date, before?: CurrentGame):
 
 /**
  * Writes the game to the archive, with the plans, how it ended and the AI's model and host last noted (D-82, D-97), and gives its name; the same game again rewrites the
- * same file.
+ * same file. A game closed before any move is not kept, as Lichess aborts it: none.
  */
-export function archiveGame(folder: string, current: CurrentGame): string
+export function archiveGame(folder: string, current: CurrentGame): string | undefined
 {
+    if (current.game.record.moves.length === 0) {
+        return undefined;
+    }
+
     const name = archiveName(current);
     const path = join(folder, name);
 
@@ -60,11 +64,15 @@ export function archiveGame(folder: string, current: CurrentGame): string
     return name;
 }
 
-/** Archives a game that has ended: its name in the archive or, when that fails, a warning, since the game is saved in game.json all the same. */
+/**
+ * Archives a game that has ended: its name in the archive, none for a game closed before any move, or, when that fails, a warning, since the game is saved in
+ * game.json all the same.
+ */
 export function archiveEnded(folder: string, current: CurrentGame): { archive?: string; warning?: string; }
 {
     try {
-        return { archive: archiveGame(folder, current) };
+        const archive = archiveGame(folder, current);
+        return archive === undefined ? {} : { archive };
     } catch (error) {
         return { warning: `${(error as Error).message} The game is saved in game.json: it goes to the archive when a new game starts.` };
     }
@@ -292,7 +300,8 @@ function gameNamed(folder: string, shelf: Shelf, name: string): GameRecord
 /** Whether two records are the same game: the same tags and the same moves, whatever their comments say. */
 function sameGame(one: GameRecord | undefined, other: GameRecord | undefined): boolean
 {
-    const shape = (record: GameRecord | undefined): string => JSON.stringify([record?.tags, record?.moves.map((move) => move.san)]);
+    // Who signed a review is not the game: one the AI reviewed, or brought again with Lichess's Annotator, is the one kept.
+    const shape = (record: GameRecord | undefined): string => JSON.stringify([record === undefined ? undefined : unsigned(record.tags), record?.moves.map((move) => move.san)]);
     return one !== undefined && shape(one) === shape(other);
 }
 

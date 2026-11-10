@@ -64,6 +64,7 @@ const html = [
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     '<meta name="color-scheme" content="light dark">',
     "<title>Chesspal</title>",
+    '<link rel="icon" type="image/svg+xml" href="/page/layout/favicon.svg">',
     '<link rel="stylesheet" href="/page/style.css">',
     `<script type="importmap">${importMap}</script>`,
     '<script type="module" src="/page/main.js"></script>',

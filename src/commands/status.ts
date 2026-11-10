@@ -4,7 +4,7 @@ import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "
 import { coachAgent, outdatedHostFiles } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
-import { agentsLine, analystLine, analystRuns, coachOnEnd, coachRuns, reviewedLine, withAnalyst } from "./agents.ts";
+import { agentsLine, analystLine, analystRuns, coachOnEnd, coachRuns, goneOver, reviewedLine, withAnalyst } from "./agents.ts";
 import { closingLines, newGameStep, positionLines, sidesLine, wordLines } from "./answer-lines.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
@@ -35,7 +35,7 @@ interface Status
     /** What the player wrote on the board page that the AI has not answered yet, all of it. */
     words?: Written[];
     /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there. */
-    analysis?: { game: string; brought?: true; analyst?: true; review?: string; };
+    analysis?: { game: string; brought?: true; analyst?: "done" | "offer"; review?: string; };
     /** A game going on from before this chat, told once a chat: the player says whether to go on with it. */
     fromBefore?: true;
     /** The coach to start, once, for the player's move that ended the game (D-88). */
@@ -102,12 +102,12 @@ export const status = defineCommand({
             const analysis = current === undefined || status.game?.end !== undefined ? gameInAnalysis(folder) : undefined;
 
             if (analysis !== undefined) {
-                // The analyst agent goes over a game the player brought, where it runs, and the chat over what it reviewed (D-89).
+                // The analyst agent goes over a game the player brought, or whose review was deleted, where it runs, and the chat over what it reviewed (D-89).
                 const review = analysis.brought === true ? undefined : reviewProgress(context, analysis.game);
                 status.analysis = {
                     game: analysis.game,
                     ...(analysis.brought === true ? { brought: true } : {}),
-                    ...(analystRuns(context) ? { analyst: true } : {}),
+                    ...(analystRuns(context) ? { analyst: goneOver(context, analysis.game) ? "done" as const : "offer" as const } : {}),
                     ...(review === undefined ? {} : { review }),
                 };
             }
@@ -163,17 +163,25 @@ function fromBeforeChat(context: Context, started: string): boolean
     return start === undefined || cleanSince(start, started);
 }
 
-/** The game in analysis, with how far its review has got; the next step when the player has just brought it on the board page. */
+/**
+ * The game in analysis, with how far its review has got; the next step when the player has just brought it on the board page, unless an analyst is at it
+ * already; the analyst agent for a game whose review was deleted, where it runs (Stefano).
+ */
 function analysisLine({ game, brought, analyst, review }: NonNullable<Status["analysis"]>): string
 {
-    if (brought === true) {
-        return analyst === true
+    if (brought === true && analyst !== "done") {
+        return analyst === "offer"
             ? `The player brought ${game} on the board page to analyse it. Next: ${analystLine(game)}`
             : `The player brought ${game} on the board page to analyse it. Next: call analyse_game {"game": "${game}"}, then keep your review on that page with annotate_game, and go over it with them.`;
     }
 
     const shown = `In analysis on the board page: ${game}${review === undefined ? "" : ` (${review})`}`;
-    return analyst === true ? `${shown}. ${reviewedLine(game)}` : `${shown}; analyse_game {"game": "${game}"} goes over it with the player.`;
+
+    if (analyst === "done") {
+        return `${shown}. ${reviewedLine(game)}`;
+    }
+
+    return analyst === "offer" ? `${shown}. When the player wants it gone over, ${analystLine(game)}` : `${shown}; analyse_game {"game": "${game}"} goes over it with the player.`;
 }
 
 /**

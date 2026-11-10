@@ -70,7 +70,7 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                                 {text.reviewing(analysis.by)}
                             </p>
                         )}
-                        <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} tools={legend} text={text} />
+                        {result !== undefined && plies.length === 0 ? null : <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} tools={legend} text={text} />}
                         {/* The saves and the analysis under the moves, over the buttons that step through them (Stefano). */}
                         {onDownload === undefined && onSaveMoves === undefined ? null : (
                             <div class="card analysis-actions">
@@ -148,6 +148,21 @@ function GameCard({ plies, result, how, lit, started, move, toMove, bar, text }:
                     </p>
                     {when === undefined ? null : <p class="when">{text.started(when)}</p>}
                     {bar}
+                </div>
+            </section>
+        );
+    }
+
+    // A game closed before any move: aborted, with no result to show.
+    if (plies.length === 0) {
+        return (
+            <section class={`card game-card${lit ? " lit" : ""}`} aria-label={text.game}>
+                <ResultTile result="*" />
+                <div class="what">
+                    <p class="head">
+                        <b class="big">{text.aborted}</b>
+                    </p>
+                    <p class="when">{text.lasted(0)}</p>
                 </div>
             </section>
         );

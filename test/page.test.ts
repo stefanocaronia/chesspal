@@ -45,6 +45,14 @@ describe("the page's server", () => {
         expect(headers["content-security-policy"]).toMatch(/script-src 'self' 'sha256-/);
     });
 
+    it("serves the favicon the page names, the Torretta", async () => {
+        const page = await open(playerFolder());
+        const href = /<link rel="icon"[^>]* href="([^"]+)"/.exec((await get(page, "/")).body)?.[1];
+
+        expect(href).toBe("/page/layout/favicon.svg");
+        expect(await get(page, href!)).toMatchObject({ status: 200, headers: { "content-type": "image/svg+xml" } });
+    });
+
     it("serves the packages the page imports, and nothing else from node_modules", async () => {
         const page = await open(playerFolder());
 
@@ -230,9 +238,28 @@ describe("the page's server", () => {
         expect(await post(page, "/api/delete-game", { game: kept })).toMatchObject({ status: 409, body: expect.stringContaining("There is no") });
     });
 
+    it("lets the player redo or delete a review begun and never finished, and lists a position brought without moves", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const listed = async (): Promise<unknown> => JSON.parse((await get(page, "/api/analyses")).body);
+        await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' });
+        // The book's badges are Chesspal's, not a review begun.
+        expect(await listed()).toEqual([expect.not.objectContaining({ begun: true })]);
+        await run(folder, "annotate_game", { notes: [{ move: "2.", badge: "inaccuracy" }] });
+        expect(await listed()).toMatchObject([{ reviewed: false, begun: true }]);
+
+        const other = playerFolder();
+        const shown = await open(other);
+        await run(other, "analyse_game", { pgn: '[FEN "8/8/4k3/8/8/4K3/8/7R w - - 0 1"]\n[SetUp "1"]\n\n*' });
+        expect(JSON.parse((await get(shown, "/api/analyses")).body)).toMatchObject([{ moves: 0, reviewed: false }]);
+    });
+
     it("lists the games played, reviewed or not, and opens the one just over for the chat to go over", async () => {
         const folder = playerFolder();
         const page = await open(folder);
+        // A game an older Chesspal kept with no move is not listed: there is nothing to analyse.
+        mkdirSync(join(gameFolder(folder), "games"), { recursive: true });
+        writeFileSync(join(gameFolder(folder), "games", "2026-11-01-100000.pgn"), '[White "Player"]\n[Black "AI"]\n[Result "0-1"]\n\n0-1\n');
         await run(folder, "new_game", { ai_colour: "black" });
         await post(page, "/api/move", { move: "e4" });
         await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." });
@@ -245,7 +272,7 @@ describe("the page's server", () => {
 
         // A link of the page opens it to look at, the chat not asked to go over it; the game named as the archive keeps it.
         const { game } = JSON.parse((await get(page, "/api/game")).body) as { game: { name: string; }; };
-        expect(archivedGames(gameFolder(folder))).toEqual([game.name]);
+        expect(archivedGames(gameFolder(folder))[0]).toBe(game.name);
         expect(await post(page, "/api/study", { game: anchorName(game.name), look: true })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
         expect(await statusOf(folder)).not.toContain("call analyse_game");
 

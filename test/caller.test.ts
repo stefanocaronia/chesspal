@@ -49,7 +49,8 @@ describe("who makes a tool call (D-81)", () => {
         expect(await by("toolu_1")).toBeUndefined();
         saveChatStart(folder, { source: "startup", at: "2026-11-08T10:00:00.000Z", transcript });
         expect(await by("toolu_1")).toEqual({ chat: true });
-        expect(await by("toolu_2")).toEqual({ agent: "chesspal-coach" });
+        // Its run is its file, which tells two agents of a type apart.
+        expect(await by("toolu_2")).toEqual({ agent: "chesspal-coach", run: "agent-a" });
         expect(await by("toolu_3")).toBeUndefined();
         expect(await by("toolu_9")).toBeUndefined();
         expect(await by(undefined)).toBeUndefined();
@@ -75,7 +76,7 @@ describe("who makes a tool call (D-81)", () => {
 
         try {
             expect(await by({ thread_source: "user", thread_id: coach })).toEqual({ chat: true });
-            expect(await by({ thread_source: "subagent", thread_id: coach })).toEqual({ agent: "chesspal-coach" });
+            expect(await by({ thread_source: "subagent", thread_id: coach })).toEqual({ agent: "chesspal-coach", run: coach });
             expect(await by({ thread_source: "subagent", thread_id: forked })).toEqual({ chat: true });
             expect(await by({ thread_source: "subagent", thread_id: "019a6b2e-1c40-7a3b-9e1f-2d4c5b6a7e89" })).toBeUndefined();
             expect(await by({ thread_source: "subagent", thread_id: "not a thread" })).toBeUndefined();

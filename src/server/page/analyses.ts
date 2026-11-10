@@ -2,8 +2,8 @@
 // review or the review alone (D-92).
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { bookOpening, deleteGame, deleteReview } from "../../commands/index.ts";
-import { type AiModel, aiModelIn, annotatorOf, type GameRecord, isReviewed } from "../../core/index.ts";
-import { archivedGame, archivedGames, gameStemOf, keptGame, keptGames } from "../../games/index.ts";
+import { type AiModel, aiModelIn, annotatorOf, type GameRecord, isReviewed, leadOf, reviewOf } from "../../core/index.ts";
+import { archivedGame, archivedGames, gameInAnalysis, gameStemOf, keptGame, keptGames } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { bodyOf, isJson, jsonOf, runRoute, sendJson, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
@@ -20,6 +20,8 @@ export interface AnalysisItem
     readonly opening?: string;
     readonly moves: number;
     readonly reviewed: boolean;
+    /** A review begun and not finished, its notes or the analyst that took it, which the page lets the player write again or delete (Stefano). */
+    readonly begun?: true;
     /** Who reviewed it (D-81). */
     readonly annotator?: AiModel;
     /** Where a game loaded from elsewhere was played, as its Site tag says: the player's name there makes it theirs (D-93). */
@@ -33,7 +35,8 @@ export function analysesOf(home: string): AnalysisItem[]
     // By the time in their names, which orders kept and played games together.
     const stamp = (name: string): string => gameStemOf(name) ?? "";
     const names = [...keptGames(folder), ...archivedGames(folder)].sort((one, other) => stamp(other).localeCompare(stamp(one)));
-    return names.flatMap((name) => itemOf(name, () => name.startsWith("study/") ? keptGame(folder, name) : archivedGame(folder, name)));
+    const taken = gameInAnalysis(folder)?.analyst?.game;
+    return names.flatMap((name) => itemOf(name, () => name.startsWith("study/") ? keptGame(folder, name) : archivedGame(folder, name), taken === name));
 }
 
 /** Answers the page's deletions, of a game or of its review alone, done as the command line does them: true when the request was one. */
@@ -64,7 +67,7 @@ export function answerAnalyses(request: IncomingMessage, response: ServerRespons
 
 const deletions: Readonly<Record<string, typeof deleteGame | typeof deleteReview>> = { "/api/delete-game": deleteGame, "/api/delete-review": deleteReview };
 
-function itemOf(name: string, read: () => GameRecord): AnalysisItem[]
+function itemOf(name: string, read: () => GameRecord, taken: boolean): AnalysisItem[]
 {
     let record: GameRecord;
 
@@ -75,6 +78,11 @@ function itemOf(name: string, read: () => GameRecord): AnalysisItem[]
         return [];
     }
 
+    // A game closed before any move has nothing to analyse; a position brought to study without moves stays, to open again or delete.
+    if (record.moves.length === 0 && name.startsWith("games/")) {
+        return [];
+    }
+
     const { tags } = record;
     const date = tags.Date === undefined || tags.Date.includes("?") ? undefined : tags.Date;
     const opening = bookOpening(record)?.name;
@@ -82,6 +90,8 @@ function itemOf(name: string, read: () => GameRecord): AnalysisItem[]
     const site = tags.Site === undefined || /^[?\-\s]*$/.test(tags.Site) ? undefined : tags.Site;
     const signed = annotatorOf(record);
     const annotator = signed === undefined ? undefined : { model: signed.annotator, ...(signed.effort === undefined ? {} : { effort: signed.effort }) };
+    const reviewed = isReviewed(record);
+    const begun = !reviewed && (taken || reviewBegun(record));
 
     return [{
         name,
@@ -92,8 +102,18 @@ function itemOf(name: string, read: () => GameRecord): AnalysisItem[]
         result: tags.Result ?? "*",
         ...(opening === undefined ? {} : { opening }),
         moves: Math.ceil(record.moves.length / 2),
-        reviewed: isReviewed(record),
+        reviewed,
+        ...(begun ? { begun: true } : {}),
         ...(annotator === undefined ? {} : { annotator }),
         ...(site === undefined ? {} : { site }),
     }];
+}
+
+/** Whether a game holds part of a review on its moves: a note, a badge but the book's, which Chesspal puts there, or who is ahead. */
+function reviewBegun(record: GameRecord): boolean
+{
+    return record.moves.some(({ comment }) => {
+        const review = reviewOf(comment);
+        return review?.note !== undefined || (review?.badge !== undefined && review.badge !== "book") || leadOf(comment) !== undefined;
+    });
 }

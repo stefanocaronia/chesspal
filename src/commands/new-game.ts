@@ -228,7 +228,7 @@ function chatToClear(context: Context): boolean
 // The hosts whose SessionStart hook, written by init, notes how each chat starts: Claude Code and Codex, by the names they give the server.
 const hostsNotingChats = new Set(["claude-code", "codex-mcp-client"]);
 
-function archiveBefore(folder: string, before: CurrentGame): string
+function archiveBefore(folder: string, before: CurrentGame): string | undefined
 {
     try {
         return archiveGame(folder, before);

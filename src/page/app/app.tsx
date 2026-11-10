@@ -63,6 +63,7 @@ import { anchorName, useAnchor } from "./anchor.ts";
 import { useBrowseKeys, useFoldKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
 import { phaseOf, verdictOf } from "./phase.ts";
 import { type PageData, post, sendMessage, sendMove, useServed } from "./served.ts";
+import { tabTitle, useTabTitle } from "./title.ts";
 
 /**
  * The page: the board of the game in the player's folder, where the player moves on their turn, the talk with the AI beside it, and the game's column; in the
@@ -250,6 +251,9 @@ export function App({ start }: { start: Settings; })
         (plies) => goTo(plies ?? total),
         async (wanted) => await post("/api/study", { game: wanted, look: true }, text, name) === undefined,
     );
+    // The tab names the game and the move shown, as the cards name its players; between games, Chesspal alone.
+    const titled = idle || served === undefined ? undefined : studiedSides(live.record.tags, served.profile.name, playedAs, text.sides, served.profile.accounts);
+    useTabTitle(titled === undefined ? undefined : tabTitle(titled.white.name, titled.black.name, at === 0 ? undefined : plies[at - 1]));
 
     // The header's theme switch picks the other of the two the page shows, leaving the system's.
     const switchTheme = (): void => change({ ...settings, theme: document.documentElement.dataset.theme === "dark" ? "light" : "dark" });
@@ -263,7 +267,9 @@ export function App({ start }: { start: Settings; })
     const result = resultOf(live);
     const ended = isOver(result);
     const how = ended ? howEnded(live.outcome, live.record.tags.Termination) : undefined;
-    const winner = result === "1-0" ? "white" : result === "0-1" ? "black" : undefined;
+    // A game closed before any move counts for no one, as Lichess aborts it: no winner, no kings' signs.
+    const aborted = ended && plies.length === 0;
+    const winner = aborted ? undefined : result === "1-0" ? "white" : result === "0-1" ? "black" : undefined;
     const justEnded = useJustEnded(played === undefined || played === null ? undefined : over ? "over" : "going");
     const offer = played?.drawOffer;
     const declined = useDeclined(offer, total, ended);
@@ -281,7 +287,7 @@ export function App({ start }: { start: Settings; })
         },
     };
 
-    const { kind, verdict } = verdictOf(phase, how, winner, offer, declined, text);
+    const { kind, verdict } = aborted && phase === "over" ? { kind: "over" as const, verdict: text.aborted } : verdictOf(phase, how, winner, offer, declined, text);
     const header = (
         <Header
             text={text}
@@ -342,7 +348,7 @@ export function App({ start }: { start: Settings; })
     const drawn = hintOpen && hint !== undefined && viewing === undefined && (hint.arrows !== undefined || hint.squares !== undefined) ? hint : review;
     const drawnByCoach = hint !== undefined && drawn === hint;
     // The game over, when this is its last position: the kings' signs, on the board and in the legend.
-    const boardEnd: BoardEnd | undefined = ended && viewing === undefined && pending === undefined ? { how, winner, player, fresh: justEnded } : undefined;
+    const boardEnd: BoardEnd | undefined = ended && !aborted && viewing === undefined && pending === undefined ? { how, winner, player, fresh: justEnded } : undefined;
     // The legend has the marks the board shows: none of the helps' or the drawings while the board is bare (D-99).
     const shownBare = bare && helps !== undefined;
     const legendRows = legendOf({
@@ -781,7 +787,7 @@ export function App({ start }: { start: Settings; })
                         onStep={step}
                         {...(studied === undefined ? {} : { onDownload: () => download(studied.pgn, pgnName(live.record.tags, "analysis")) })}
                         {...(total === 0 ? {} : { onSaveMoves: () => download(writePgn(movesOnly(live.record)), pgnName(live.record.tags)) })}
-                        {...(between && game !== null ? { onAnalyse: () => void studyGame({ last: true }) } : {})}
+                        {...(between && game !== null && replayed.record.moves.length > 0 ? { onAnalyse: () => void studyGame({ last: true }) } : {})}
                         text={text}
                     />
                 </main>

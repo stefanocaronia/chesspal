@@ -5,7 +5,7 @@ import { annotatorOf, badges, Game, type GameRecord, gameReviewOf, leadOf, revie
 import { gameInAnalysis, rewriteGame, startAnalysis } from "../games/index.ts";
 import { analystAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
-import { analystRuns } from "./agents.ts";
+import { analystOf, analystRuns, anotherAnalyst } from "./agents.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
 import { leadFrom, leadInput } from "./lead-input.ts";
@@ -77,6 +77,13 @@ export const annotateGame = defineCommand({
         // would be lost (Federico).
         const caller = await context.caller?.();
         const studied = game === undefined ? gameAnalysed(context) : namedGame(context, game);
+        // An analyst whose game another has taken since, the review started again, writes no more (Priya).
+        const holder = context.agent === analystAgent ? analystOf(context, studied.name) : undefined;
+
+        if (holder !== undefined && holder !== context.agentRun) {
+            throw new Error(`${anotherAnalyst} Nothing changed.`);
+        }
+
         const folder = gameFolder(context.home());
         const numbers = moveNumbers(studied.record);
         // Where the analyst reviews the games, the chat's notes are corrections it made with the player: the analyst, at work then or later, leaves those notes

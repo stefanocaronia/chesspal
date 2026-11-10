@@ -98,6 +98,8 @@ export interface Text
     readonly talk: string;
     readonly move: string;
     readonly draw: string;
+    /** A game closed before any move, which counts for no one. */
+    readonly aborted: string;
     readonly checkmate: string;
     /** How a game ended, as the game's card says it under the result. */
     readonly ended: Readonly<Record<HowEnded, string>>;
@@ -492,6 +494,7 @@ const english: Text = {
     talk: "The talk",
     move: "Move",
     draw: "draw",
+    aborted: "Game aborted",
     checkmate: "checkmate",
     ended: {
         checkmate: "checkmate",
@@ -836,6 +839,7 @@ const italian: Text = {
     talk: "Conversazione",
     move: "Mossa",
     draw: "patta",
+    aborted: "Partita annullata",
     checkmate: "scacco matto",
     ended: {
         checkmate: "scacco matto",

@@ -36,11 +36,11 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         expect(await run(context, "status")).toContain(`\nNext: answer the player with ai_say. To go over it, on their yes, ${analystLine}`);
 
         // Once the agent is at work, the offer is not made again (Federico), nor once it has reviewed the game, whatever the page opens since.
-        // The chat goes over its review then, and never starts it again (Stefano, after Priya's playtest).
+        // The chat goes over its review then, and doesn't start it for that review (Stefano, after Priya's playtest).
         // The game's name given as pgn, as haiku gives it, is that game (Priya).
-        const analyst = { ...context, agent: "chesspal-analyst" };
+        const analyst = { ...context, agent: "chesspal-analyst", agentRun: "agent-a" };
         expect(await run(analyst, "analyse_game", { pgn: "games/2026-11-02-153012.pgn" })).toMatch(/^The player speaks Italian\.\nYou played Black/);
-        const reviewed = "The analyst agent has gone over this game, or is at it: never start it again. When the player wants it gone over, go over it with them from what "
+        const reviewed = "The analyst agent has gone over this game, or is at it: don't start it for this review. When the player wants it gone over, go over it with them from what "
             + 'it told you, or, in a chat without it, from its review on the board page, which analyse_game {"game": "games/2026-11-02-153012.pgn"} gives.';
         const status = await run(context, "status");
         expect(status).not.toContain("chesspal-analyst");
@@ -49,9 +49,9 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         expect(await run(context, "ai_say", { text: "Ci lavoro." })).toContain(`\nNext: ${reviewed} When they want another game,`);
         await run(analyst, "annotate_game", { game: "games/2026-11-02-153012.pgn", summary: "Corta." });
         startAnalysis(gameFolder(context.home()), "games/2026-11-01-100000.pgn", context.now());
-        expect(await run(context, "status")).not.toContain("chesspal-analyst");
+        expect(await run(context, "status")).not.toContain('"Analyse games/2026-11-02-153012.pgn.');
         // A second analyst started anyway stops at once.
-        await expect(run(analyst, "analyse_game", { game: "games/2026-11-02-153012.pgn" })).rejects.toThrow("Stop now: this game has its review already.");
+        await expect(run({ ...analyst, agentRun: "agent-b" }, "analyse_game", { game: "games/2026-11-02-153012.pgn" })).rejects.toThrow("Stop now: this game has its review already.");
 
         // Without the agent, or in another host, the chat goes over it itself.
         const gemini = { ...playerFolder(), host: () => "gemini-cli-mcp-client" };
@@ -72,6 +72,104 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         );
     });
 
+    it("is started again when the player has the game just over analysed again on the page, its review deleted", async () => {
+        const context = claudeFolder();
+        await mate(context);
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+        const game = "games/2026-11-02-153012.pgn";
+        const analyst = { ...context, agent: "chesspal-analyst", agentRun: "agent-first" };
+        await run(analyst, "analyse_game", { game });
+        await run(analyst, "annotate_game", { game, summary: "Corta." });
+        expect(await run(context, "status")).toContain("don't start it for this review");
+
+        // The page's «Analyse again»: the review deleted, the game brought back.
+        await run(context, "delete_review", { game });
+        startAnalysis(gameFolder(context.home()), game, context.now(), { brought: true });
+        const status = await run(context, "status");
+        expect(status).toContain(`The player brought ${game} on the board page to analyse it. Next: start the chesspal-analyst agent`);
+        expect(status).not.toContain("don't start it for this review");
+        expect(await run({ ...analyst, agentRun: "agent-second" }, "analyse_game", { game })).toMatch(/^You played Black/);
+    });
+
+    it("stops a second analyst started on a game another is reviewing, and lets the first call again", async () => {
+        const context = claudeFolder();
+        await mate(context);
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+        const game = "games/2026-11-02-153012.pgn";
+        const first = { ...context, agent: "chesspal-analyst", agentRun: "agent-first" };
+        const second = { ...first, agentRun: "agent-second" };
+
+        await run(first, "analyse_game");
+        await expect(run(second, "analyse_game", { game })).rejects.toThrow("Stop now: another analyst is reviewing this game.");
+        await run(first, "annotate_game", { game, notes: [{ move: "2.", badge: "blunder" }] });
+        // The page opening the game meanwhile leaves it to the first, which may read it again with its review half written.
+        startAnalysis(gameFolder(context.home()), game, context.now(), { brought: true });
+        await expect(run(second, "analyse_game", { game })).rejects.toThrow("Stop now: another analyst is reviewing this game.");
+        expect(await run(first, "analyse_game", { game })).toContain("you marked blunder");
+        await run(first, "annotate_game", { game, summary: "Corta." });
+        expect(await run(first, "analyse_game", { game })).toContain("Your review: Corta.");
+        await expect(run(second, "analyse_game", { game })).rejects.toThrow("Stop now: this game has its review already.");
+        // The chat goes over the game whoever reviews it.
+        expect(await run(context, "analyse_game", { game })).toContain("Your review: Corta.");
+    });
+
+    it("lets another analyst take a game whose analyst went with its chat, not with a summary of it", async () => {
+        const context = claudeFolder();
+        await mate(context);
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+        const game = "games/2026-11-02-153012.pgn";
+        const first = { ...context, agent: "chesspal-analyst", agentRun: "agent-first" };
+        const second = { ...first, agentRun: "agent-second" };
+        await run(first, "analyse_game", { game });
+
+        const later = (minutes: number): string => new Date(context.now().getTime() + minutes * 60_000).toISOString();
+        saveChatStart(context.folder, { source: "compact", at: later(1) });
+        await expect(run(second, "analyse_game", { game })).rejects.toThrow("Stop now: another analyst is reviewing this game.");
+        saveChatStart(context.folder, { source: "resume", at: later(2) });
+        expect(await run(second, "analyse_game", { game })).toMatch(/^You played Black/);
+    });
+
+    it("keeps a game to its analyst while the page opens another and comes back to it", async () => {
+        const context = claudeFolder();
+        await mate(context);
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+        const game = "games/2026-11-02-153012.pgn";
+        const first = { ...context, agent: "chesspal-analyst", agentRun: "agent-first" };
+        await run(first, "analyse_game", { game });
+        const folder = gameFolder(context.home());
+        startAnalysis(folder, "study/2026-11-01-100000.pgn", context.now(), { brought: true });
+        startAnalysis(folder, game, context.now(), { brought: true });
+
+        const status = await run(context, "status");
+        expect(status).not.toContain("Next: start the chesspal-analyst agent");
+        expect(status).toContain(`In analysis on the board page: ${game}. The analyst agent has gone over this game, or is at it`);
+        await expect(run({ ...first, agentRun: "agent-second" }, "analyse_game", { game })).rejects.toThrow("Stop now: another analyst is reviewing this game.");
+    });
+
+    it("offers the analyst again once the review alone is deleted, whichever game the page shows, and stops the old analyst's notes", async () => {
+        const context = claudeFolder();
+        await mate(context);
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+        const game = "games/2026-11-02-153012.pgn";
+        const first = { ...context, agent: "chesspal-analyst", agentRun: "agent-first" };
+        const second = { ...first, agentRun: "agent-second" };
+        await run(first, "analyse_game", { game });
+        await run(first, "annotate_game", { game, notes: [{ move: "2.", badge: "blunder" }] });
+
+        // «Delete the analysis» alone, on the game shown: the analyst is offered again, on the player's word.
+        await run(context, "delete_review", { game });
+        const status = await run(context, "status");
+        expect(status).toContain(`In analysis on the board page: ${game} (no review yet). When the player wants it gone over, start the chesspal-analyst agent`);
+        expect(status).not.toContain("don't start it for this review");
+        await run(second, "analyse_game", { game });
+        await expect(run(first, "annotate_game", { game, notes: [{ move: "2.", badge: "mistake" }] })).rejects.toThrow("Stop now: another analyst is reviewing this game.");
+
+        // While the page shows another game, the deletion lets the analyst go too.
+        startAnalysis(gameFolder(context.home()), "study/2026-11-01-100000.pgn", context.now(), { brought: true });
+        await run(context, "delete_review", { game });
+        expect(await run(first, "analyse_game", { game })).toMatch(/^You played Black/);
+    });
+
     it("is offered when the game ends on the player's move or by a resignation", async () => {
         const context = claudeFolder();
         await run(context, "new_game", { ai_colour: "white" });
@@ -82,7 +180,13 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
 
         const resigned = claudeFolder();
         await run(resigned, "new_game", { ai_colour: "black" });
+        await run(resigned, "player_move", { move: "e4" });
         expect(await run(resigned, "end_game", { result: "player_resigns" })).toContain(`To go over it, on their yes, ${analystLine}`);
+
+        // A game closed before any move has nothing to go over.
+        const empty = claudeFolder();
+        await run(empty, "new_game", { ai_colour: "black" });
+        expect(await run(empty, "end_game", { result: "player_resigns" })).not.toContain("chesspal-analyst");
     });
 
     it("gets the player's language and no instructions from analyse_game, and leaves the player's words to the chat", async () => {

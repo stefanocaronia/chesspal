@@ -4,7 +4,7 @@ import { talkLimits, type Thought } from "../games/index.ts";
 import { onQuickModel } from "../host-files/index.ts";
 import { analystLine, reviewedLine } from "./agents.ts";
 import { clockLine } from "./clock.ts";
-import { endText, type GameSummary, type LastMove, type MovePlayed } from "./game-summary.ts";
+import { endText, type GameSummary, type LastMove, type MovePlayed, unplayed } from "./game-summary.ts";
 import type { Written } from "./say.ts";
 import { boardView, colourName, compactView, materialText } from "./view.ts";
 
@@ -117,6 +117,13 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
 
     if (game === undefined) {
         return words.length === 0 ? `Next: when the player wants a game, ${step}` : `Next: answer the player with ai_say. When they want a game, ${step}`;
+    }
+
+    if (game.end !== undefined && unplayed(game)) {
+        return words.length === 0
+            ? "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another "
+                + `game. For another, ${step}`
+            : `Next: answer the player with ai_say. When they want another game, ${step}`;
     }
 
     if (game.end !== undefined) {

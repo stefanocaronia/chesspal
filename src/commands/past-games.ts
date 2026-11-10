@@ -23,17 +23,28 @@ export const pastGames = defineCommand({
     format: (past) => ("pgn" in past ? past.pgn : past.games.length === 0 ? "No game played yet." : past.games.join("\n")),
 });
 
-/** The latest games of the archive, one line each as the AI reads them: none when there is no archive. */
+/** The latest games of the archive, one line each as the AI reads them: none when there is no archive. A game closed before any move is no game played. */
 export function pastGameLines(folder: string, count: number): string[]
 {
-    return archivedGames(folder).slice(0, count).flatMap((name) => {
+    const lines: string[] = [];
+
+    for (const name of archivedGames(folder)) {
+        if (lines.length === count) {
+            break;
+        }
+
         try {
-            return [pastGameLine(name, archivedGame(folder, name))];
+            const record = archivedGame(folder, name);
+
+            if (record.moves.length > 0) {
+                lines.push(pastGameLine(name, record));
+            }
         } catch {
             // A game the archive cannot read stays out of the memory.
-            return [];
         }
-    });
+    }
+
+    return lines;
 }
 
 const listed = 20;

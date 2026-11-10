@@ -203,7 +203,8 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
             context.calls?.();
         }
 
-        const who = agent !== undefined ? { agent } : calling !== undefined ? { chat: true as const } : {};
+        const run = calling !== undefined && "run" in calling ? calling.run : undefined;
+        const who = agent !== undefined ? { agent, ...(run === undefined ? {} : { agentRun: run }) } : calling !== undefined ? { chat: true as const } : {};
         const result: unknown = await command.run(checkedInput(command, input), { ...context, caller, ...who });
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {

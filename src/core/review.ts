@@ -115,8 +115,14 @@ export function unreviewed(record: GameRecord): GameRecord
     });
     const comment = withoutReview(record.comment);
     // A game from elsewhere keeps its own Annotator.
-    const tags = carriesReview(record) ? Object.fromEntries(Object.entries(record.tags).filter(([name]) => name !== "Annotator" && name !== effortTag)) : record.tags;
+    const tags = carriesReview(record) ? unsigned(record.tags) : record.tags;
     return comment === "" ? { tags, moves } : { tags, comment, moves };
+}
+
+/** The tags without who signed a review, the Annotator and its effort: the same game whoever reviewed it. */
+export function unsigned(tags: Readonly<Record<string, string>>): Record<string, string>
+{
+    return Object.fromEntries(Object.entries(tags).filter(([name]) => name !== "Annotator" && name !== effortTag));
 }
 
 /** The arrows and squares as PGN's [%cal] and [%csl] write them, for a comment; empty without any. */

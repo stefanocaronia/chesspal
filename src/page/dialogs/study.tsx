@@ -19,6 +19,7 @@ export interface AnalysisItem
     readonly opening?: string;
     readonly moves: number;
     readonly reviewed: boolean;
+    readonly begun?: true;
     readonly annotator?: AiModel;
     readonly site?: string;
 }

@@ -129,7 +129,7 @@ export function Analyses({ onStudy, onLoad, you, accounts, ai, text }: {
                                         ? (
                                             <RowMenu
                                                 anchor={menu.anchor}
-                                                reviewed={item.reviewed}
+                                                withReview={item.reviewed || item.begun === true}
                                                 onPick={(asked) => {
                                                     setMenu(undefined);
                                                     setAsking({ name: item.name, asked });
@@ -153,11 +153,11 @@ type Asked = "redo" | "unreview" | "remove";
 
 /**
  * A row's menu, over the dialog and the page in the browser's top layer, under its button or above it when there is no room: analyse again and delete the
- * analysis, for a game reviewed; delete the game, apart and in red. Scrolling closes it, which would leave its button.
+ * analysis, for a game reviewed or whose review was begun; delete the game, apart and in red. Scrolling closes it, which would leave its button.
  */
-function RowMenu({ anchor, reviewed, onPick, onClose, words }: {
+function RowMenu({ anchor, withReview, onPick, onClose, words }: {
     anchor: HTMLElement;
-    reviewed: boolean;
+    withReview: boolean;
     onPick: (asked: Asked) => void;
     onClose: () => void;
     words: StudyText;
@@ -181,7 +181,7 @@ function RowMenu({ anchor, reviewed, onPick, onClose, words }: {
 
     return (
         <div ref={menu} class="row-menu" popover="manual">
-            {reviewed
+            {withReview
                 ? (
                     <>
                         <button type="button" onClick={() => onPick("redo")}>

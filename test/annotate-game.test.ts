@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -186,6 +186,18 @@ describe("annotate_game (D-69)", () => {
         expect(readFileSync(join(gameFolder(context.folder), kept), "utf8")).toBe(before);
         expect(again).toContain("\nYour review: Black missed the threat on f7.\n");
         expect(again).toMatch(/\n3\.\.\.Nf6: .*; you marked blunder\n/);
+    });
+
+    it("keeps one copy when the same game is brought again after a review the AI signed, with the Annotator it came with or without", async () => {
+        const context = playerFolder();
+        const signedBy = (annotator: string): Context => ({ ...context, caller: () => Promise.resolve({ annotator, effort: "high" }) });
+        const copies = (): string[] => readdirSync(join(gameFolder(context.folder), "study"));
+        await analyse(context, { pgn: `[Annotator "lichess.org"]\n${pgn}` });
+        await annotate(signedBy("claude-opus-5-5"), { summary: "Black missed the threat on f7." });
+
+        await analyse(context, { pgn: `[Annotator "lichess.org"]\n${pgn}` });
+        await analyse(context, { pgn });
+        expect(copies()).toHaveLength(1);
     });
 
     it("changes nothing when a move is not in the game, and refuses without a game in analysis or while a game goes on", async () => {

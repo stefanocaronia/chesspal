@@ -53,19 +53,22 @@ export function gameToStudy(context: Context, name?: string): Studied
         return namedGame(context, name);
     }
 
-    if (current !== undefined) {
+    // A game closed before any move has nothing to study: the one before it is the last played.
+    if (current !== undefined && current.game.record.moves.length > 0) {
         // The archive's record, which keeps the AI's review (D-69).
         const archived = archivedName(folder, current);
         return archived === undefined ? { record: current.game.record } : { record: archivedGame(folder, archived), name: archived };
     }
 
-    const [latest] = archivedGames(folder);
+    for (const latest of archivedGames(folder)) {
+        const record = archivedGame(folder, latest);
 
-    if (latest === undefined) {
-        throw new Error("There is no game to study: play one with new_game, or give analyse_game the PGN of a game played elsewhere.");
+        if (record.moves.length > 0) {
+            return { record, name: latest };
+        }
     }
 
-    return { record: archivedGame(folder, latest), name: latest };
+    throw new Error("There is no game to study: play one with new_game, or give analyse_game the PGN of a game played elsewhere.");
 }
 
 /**
