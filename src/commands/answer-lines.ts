@@ -80,6 +80,12 @@ export function shownMove(move: string): string
     return `${number}${figurinesOf(san)}`;
 }
 
+/** Numbered moves as the player is shown them, with the pieces' figurines (D-86): 4...g6 5.Nxe5 Bxd1 is 4...g6 5.♞xe5 ♝xd1. */
+export function shownMoves(moves: string): string
+{
+    return moves.split(" ").map(shownMove).join(" ");
+}
+
 /** The lines after a move, which the line before named: its note, where the game stands, a warning. closingLines end them. */
 export function moveLines({ note, game, warning }: MovePlayed): string[]
 {

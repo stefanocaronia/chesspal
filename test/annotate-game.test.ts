@@ -154,6 +154,9 @@ describe("annotate_game (D-69)", () => {
         expect(read!.moves.map((move) => leadOf(move.comment))).toEqual([{ pawns: 0.3 }, { pawns: -0.2 }, { pawns: 0.4 }, { pawns: 0 }, { pawns: 0.5 }, { mate: 1 }, undefined]);
         expect(read!.moves[5]!.comment).toBe("[%lead #1]");
         expect(await annotate(context, { notes: [{ move: "3...", badge: "blunder" }], ahead: { "3...": "+M1", "1.": "−0.25" } })).not.toContain("Who is ahead is still missing");
+        // After the mate, which the board says, a figure is left out rather than refused, "#0" too.
+        expect(await annotate(context, { ahead: { "3.": 0.6, "4.": "#0" } })).toMatch(/: who is ahead after 1 move\. /);
+        expect(await annotate(context, { ahead: { "4.": 99 } })).toMatch(/^Nothing new kept in /);
 
         const analysis = await analyse(context, { game: kept });
         expect(analysis).toMatch(/\n1\.e4: .*ahead -0\.3\n/);
@@ -162,8 +165,8 @@ describe("annotate_game (D-69)", () => {
 
         // A figure that is no lead, or a move not in the game, changes nothing.
         const before = readFileSync(join(gameFolder(context.folder), kept), "utf8");
-        await expect(async () => annotate(context, { ahead: { "1.": "a lot" } })).rejects.toThrow(/who is ahead is a number of pawns/);
-        await expect(async () => annotate(context, { ahead: { "1.": 120 } })).rejects.toThrow(/up to 99/);
+        await expect(async () => annotate(context, { ahead: { "1.": "a lot" } })).rejects.toThrow(/^In ahead, after 1\., "a lot" is no figure: who is ahead is a number of pawns/);
+        await expect(async () => annotate(context, { ahead: { "1.": 120 } })).rejects.toThrow(/up to 99\. Nothing changed\.$/);
         await expect(async () => annotate(context, { ahead: { "2.": 1, "9.": 1 } })).rejects.toThrow(
             "In ahead, there is no 9. in this game: its moves go from 1.e4 to 4.Qxf7#. Nothing changed.",
         );
@@ -174,6 +177,16 @@ describe("annotate_game (D-69)", () => {
         expect(await analyse(other, { pgn: pgn.replace("1. e4 e5", "1. e4 {[%eval 1.2] [%lead +0.3]} e5 {[%eval -3.4]}") })).toContain("\n1.e4: ahead +0.3\n1...e5\n");
         const [imported] = readPgn(readFileSync(join(gameFolder(other.folder), kept), "utf8"));
         expect(imported!.moves.map((move) => move.comment ?? "").join(" ")).not.toContain("%eval");
+    });
+
+    it("keeps who is ahead after the last move of a game the board did not end, as a resignation", async () => {
+        const context = playerFolder();
+        await analyse(context, { pgn: '[Result "0-1"]\n\n1. e4 e5 2. Qh5 Nc6 0-1' });
+
+        expect(await annotate(context, { ahead: { "2...": 0.3 } })).toMatch(/: who is ahead after 1 move\. /);
+        const [read] = readPgn(readFileSync(join(gameFolder(context.folder), kept), "utf8"));
+        expect(leadOf(read!.moves[3]!.comment)).toEqual({ pawns: 0.3 });
+        await expect(async () => annotate(context, { ahead: { "2...": "#0" } })).rejects.toThrow(/^In ahead, after 2\.\.\., "#0" is no figure: /);
     });
 
     it("keeps the review when the same game is brought again as a PGN", async () => {

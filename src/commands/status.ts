@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { gameReviewOf, leadOf, reviewOf } from "../core/index.ts";
 import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "../games/index.ts";
-import { coachAgent, outdatedHostFiles } from "../host-files/index.ts";
+import { outdatedHostFiles } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
-import { agentsLine, analystLine, analystRuns, coachOnEnd, coachRuns, goneOver, reviewedLine, withAnalyst } from "./agents.ts";
-import { closingLines, newGameStep, positionLines, sidesLine, wordLines } from "./answer-lines.ts";
+import { analystLine, analystRuns, coachOnEnd, coachOnEndLine, coachRuns, goneOver, reviewedLine, withAnalyst } from "./agents.ts";
+import { closingLines, newGameStep, positionLines, shownMoves, sidesLine, wordLines } from "./answer-lines.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 import { type GameSummary, summaryOf, withThought } from "./game-summary.ts";
@@ -62,7 +62,10 @@ export const status = defineCommand({
         const folder = gameFolder(context.home());
         const player = playerLine(context);
         const speech = speechOf(folder, context.language);
-        const outdated = outdatedHostFiles(context.folder, context.platform);
+        const chatStart = lastChatStart(context.folder);
+        const first = firstInChat(context, chatStart?.at);
+        // An older init's files are told once a chat, at its first status: reading them all is the slowest part of a status.
+        const outdated = context.told === undefined || first ? outdatedHostFiles(context.folder, context.platform) : [];
         const status: Status = { version, folder, ...(player === undefined ? {} : { player }), ...(speech === undefined ? {} : { speech }), ...(outdated.length === 0 ? {} : { outdated }) };
 
         if (context.page !== undefined) {
@@ -72,9 +75,6 @@ export const status = defineCommand({
         if (closedPage(context) !== undefined) {
             status.pageClosed = true;
         }
-
-        const chatStart = lastChatStart(context.folder);
-        const first = firstInChat(context, chatStart?.at);
 
         if (!instructionsRead(context, chatStart?.at)) {
             status.unread = true;
@@ -224,12 +224,13 @@ function reviewProgress(context: Context, game: string): string | undefined
  */
 function gameLines(game: GameSummary | undefined, words: readonly Written[], brought: boolean, pageClosed: boolean, coach: boolean): string[]
 {
-    const closing = [...(coach ? [agentsLine([coachAgent])] : []), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed))];
+    const closing = [...(coach ? [coachOnEndLine] : []), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed))];
 
     if (game === undefined) {
         return ["No game.", ...closing];
     }
 
-    const moves = game.lastMoves === "" ? [] : [`Moves: ${game.lastMoves}`];
+    // With the figurines, as every answer writes moves: in letters the AI copied them into its message (Priya).
+    const moves = game.lastMoves === "" ? [] : [`Moves: ${shownMoves(game.lastMoves)}`];
     return [`Game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`, ...moves, ...positionLines(game), ...closing];
 }

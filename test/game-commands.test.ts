@@ -316,7 +316,7 @@ describe("a game in chat", () => {
         expect(readArchive(context)).not.toContain("(=)");
         expect(gameFile(context).drawOffer).toBeUndefined();
         await expect(run(context, "player_move", { move: "a3" })).rejects.toThrow("The game is over (0-1, checkmate): new_game starts another. Nothing changed.");
-        expect(await run(context, "status")).toContain(`Moves: 1.f3 e5 2.g4 Qh4#\nGame over: 0-1, checkmate. Archived in ${archive}.`);
+        expect(await run(context, "status")).toContain(`Moves: 1.f3 e5 2.g4 ♛h4#\nGame over: 0-1, checkmate. Archived in ${archive}.`);
         expect(await run(context, "new_game", { ai_colour: "white" })).toContain("New game: you play White");
     });
 

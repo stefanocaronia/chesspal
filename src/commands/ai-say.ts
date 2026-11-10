@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { moods } from "../core/index.ts";
 import { archivedName, talkLimits } from "../games/index.ts";
-import { coachAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
-import { agentsLine, analystLine, coachOnEnd, reviewedLine, withAnalyst } from "./agents.ts";
+import { analystLine, coachOnEnd, coachOnEndLine, reviewedLine, withAnalyst } from "./agents.ts";
 import { newGameStep, nextStep, wordLines } from "./answer-lines.ts";
 import { type GameSummary, summaryOf } from "./game-summary.ts";
 import { refuseOtherGame } from "./play-move.ts";
@@ -51,7 +50,7 @@ export const aiSay = defineCommand({
         [
             "Said on the board page, where the player reads it: don't write it again in the chat.",
             ...wordLines(words),
-            ...(coach === true ? [agentsLine([coachAgent])] : []),
+            ...(coach === true ? [coachOnEndLine] : []),
             afterWords(game, words),
         ].join("\n"),
 });

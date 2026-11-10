@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
+import type { Context } from "../src/commands/context.ts";
+import { status } from "../src/commands/status.ts";
 import { outdatedHostFiles, startInstructions } from "../src/host-files/index.ts";
 import { testContext } from "./commands.ts";
 
@@ -141,6 +143,11 @@ describe("chesspal init", () => {
         expect(outdatedHostFiles(folder, "linux")).toEqual([coach]);
         const { output } = await runCommandLine(["status"], testContext(folder));
         expect(output).toContain(`This folder was set up by an older Chesspal (${coach}): tell the player, in their language, to close this chat, run "chesspal init" in this folder`);
+
+        // In a chat, at its first status only: reading the files is the slowest part of a status.
+        const chat: Context = { ...testContext(folder), told: new Set() };
+        expect(status.format(await status.run({}, chat))).toMatch(/set up by an older Chesspal/);
+        expect(status.format(await status.run({}, chat))).not.toMatch(/older Chesspal/);
     });
 
     it("refuses a settings file that is not JSON, and says how to fix it", async () => {

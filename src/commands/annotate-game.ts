@@ -1,14 +1,14 @@
 // The AI's review of a game over (D-69): a badge on each move that matters, as chess.com marks them, with a note when it needs one, and its word on the
 // whole game, kept in the game's PGN for the board page. The judgment is the AI's alone: Chesspal gives no criteria (D-6, D-43).
 import { z } from "zod";
-import { annotatorOf, badges, Game, type GameRecord, gameReviewOf, leadOf, reviewed, reviewOf, withAnnotator, withGameReview, withLead } from "../core/index.ts";
+import { annotatorOf, badges, Game, type GameRecord, gameReviewOf, type Lead, leadOf, reviewed, reviewOf, withAnnotator, withGameReview, withLead } from "../core/index.ts";
 import { gameInAnalysis, rewriteGame, startAnalysis } from "../games/index.ts";
 import { analystAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { analystOf, analystRuns, anotherAnalyst } from "./agents.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
-import { leadFrom, leadInput } from "./lead-input.ts";
+import { leadFrom } from "./lead-input.ts";
 import { defineCommand } from "./registry.ts";
 import { moveIndex, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
 
@@ -53,10 +53,11 @@ export const annotateGame = defineCommand({
             arrows: arrowsInput,
             squares: squaresInput,
         })).optional().describe("the moves that matter, each with its badge, its note, or both"),
-        ahead: z.record(z.string(), leadInput).optional().describe(
+        // Checked in run, which leaves out a figure after the move that ended the game on the board.
+        ahead: z.record(z.string(), z.union([z.number(), z.string()])).optional().describe(
             "who is ahead after each move, by the move as analyse_game numbers it: pawns from White's side as chess.com shows it, 1.5 for White, -3 for Black, 0 for "
-                + 'even, or a mate you see in moves of the side that mates, "#3" for White\'s, "#-3" for Black\'s; every move, in one call or a few; a move given again '
-                + "takes its new figure",
+                + 'even, or a mate you see in moves of the side that mates, "#3" for White\'s, "#-3" for Black\'s; every move but the last when it mates or draws '
+                + "on the board, which says it, in one call or a few; a move given again takes its new figure",
         ),
         summary: z.string().max(summaryLimit).optional().describe("your word on the whole game: a short paragraph, with a few points as lines starting with - if it helps; the moves have their own notes"),
         closing: z.string().max(closingLimit).optional().describe("your last word on how the game ended, its win or loss, in a sentence or two: the page shows it at the end"),
@@ -115,9 +116,12 @@ export const annotateGame = defineCommand({
             moves[index] = reviewed(moves[index]!, { ...(kept === undefined ? {} : { badge: kept }), ...(note === undefined ? {} : { note }), ...drawingsOf(arrows, squares) });
         }
 
-        for (const [move, lead] of estimates) {
-            const index = indexIn(studied.record, move, "ahead");
-            moves[index] = withLead(moves[index]!, leadFrom(lead));
+        // After the move that ended the game on the board, which says it, a figure is left out rather than refused, "#0" too (Priya).
+        const over = new Game(studied.record).outcome.over;
+        const leads = estimates.map(([move, lead]) => ({ index: indexIn(studied.record, move, "ahead"), move, lead })).filter(({ index }) => !over || index < moves.length - 1);
+
+        for (const { index, move, lead } of leads) {
+            moves[index] = withLead(moves[index]!, leadAfter(move, lead));
         }
 
         // Who reviewed it, as far as the host says it for certain (D-81): on the command line, or by a host that names no model over one that did, as it was.
@@ -139,9 +143,9 @@ export const annotateGame = defineCommand({
             summary: summary !== undefined,
             closing: closing !== undefined,
             bookUnnoted: correction ? [] : bookUnnoted,
-            estimated: estimates.length,
+            estimated: leads.length,
             // Asked every time, of an older review too: an analyst whose instructions predate the estimates learns of them here.
-            unestimated: correction ? [] : unestimatedMoves(marked, numbers),
+            unestimated: correction ? [] : unestimatedMoves(marked, numbers, over),
             left: [...corrected],
             // A correction after the review's word on the game: that word may now say otherwise (Priya).
             summaryStands: correction && gameReviewOf(studied.record) !== undefined,
@@ -176,10 +180,19 @@ export const annotateGame = defineCommand({
 });
 
 /** The moves without who is ahead after them, as analyse_game numbers them: all but the last when the board ended the game there, which says it. */
-function unestimatedMoves(record: GameRecord, numbers: readonly string[]): string[]
+function unestimatedMoves(record: GameRecord, numbers: readonly string[], over: boolean): string[]
 {
-    const ended = new Game(record).outcome.over;
-    return record.moves.flatMap((move, index) => leadOf(move.comment) !== undefined || (ended && index === record.moves.length - 1) ? [] : [numbers[index]!]);
+    return record.moves.flatMap((move, index) => leadOf(move.comment) !== undefined || (over && index === record.moves.length - 1) ? [] : [numbers[index]!]);
+}
+
+/** Who is ahead after a move given in ahead, refused with the move it was given for. */
+function leadAfter(move: string, value: number | string): Lead
+{
+    try {
+        return leadFrom(value);
+    } catch (error) {
+        throw new Error(`In ahead, after ${move}, ${(error as Error).message}`);
+    }
 }
 
 /** A move given in notes or in ahead, as analyse_game numbers it, refused with where it was given (Priya). */

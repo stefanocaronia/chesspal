@@ -69,6 +69,14 @@ export function coachOnEnd(context: Context, folder: string, current: CurrentGam
 }
 
 /**
+ * How to start the coach on the player's move that ended the game: whatever the player asks, beside the analyst when the chat starts it too, since a chat on
+ * a quick model started only the agent that answered the player (Priya).
+ */
+export const coachOnEndLine = `Coach the player: start the ${coachAgent} agent in the background with the prompt "Coach.", whatever the player asks: it judges `
+    + "the move that ended the game, apart from the analyst; when you start the analyst too, start both in one message. Start it even when an agent of the move "
+    + "before has just ended, and write nothing about it in the chat, now or when it ends.";
+
+/**
  * How to start the agents, in one message, the one that thinks first, since it needs the time (Priya), and that the player sees nothing of
  * them: their end needs no answer either. The end of the last move's agents, told just after, must not take their place (Priya).
  */

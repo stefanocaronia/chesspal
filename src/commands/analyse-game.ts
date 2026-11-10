@@ -51,6 +51,8 @@ interface MoveFacts
     material?: string;
     /** After it, the pieces at risk of either side when they changed from the line before ("none" once no piece is), and the mates the side to move has; none once the board ends the game. */
     atRisk?: string;
+    /** After it, the only legal move of the side to move, when it has one alone: a rule, as a mate is, never a judgment (D-103). */
+    oneLegal?: string;
     mates?: readonly string[];
     /** After it, what the moves of the side to move would do (D-100): forks, double attacks, discovered and double checks, promotions, stalemates and traps. */
     tactics?: string;
@@ -101,7 +103,7 @@ interface Analysis
 /** A game replayed: the facts of its starting position, of each move, and how the board ends it. */
 interface Replay
 {
-    start: Pick<MoveFacts, "atRisk" | "mates" | "tactics">;
+    start: Pick<MoveFacts, "atRisk" | "oneLegal" | "mates" | "tactics">;
     moves: MoveFacts[];
     outcome: Outcome;
 }
@@ -110,7 +112,7 @@ interface Replay
 export const analyseGame = defineCommand({
     name: "analyse_game",
     description: "Gives a game that is over move by move, to comment it with the player: each move with what it took and the time it took, the material "
-        + "when it changes, the pieces at risk, the mates in one and what the next moves would do after it (forks, double attacks, discovered checks, "
+        + "when it changes, the pieces at risk, the only legal move when there is one alone, the mates in one and what the next moves would do after it (forks, double attacks, discovered checks, "
         + "promotions, stalemates and stalemate traps), where the game left the opening book, and your comments and plans. Facts "
         + "only: the judgment is yours. Without game or pgn, the game just over, or else the last one played; game: a name as past_games or study_games "
         + "writes it; pgn: a game the player brings from elsewhere, kept to study in the profile. Never while a game goes on. The first time in a chat "
@@ -301,7 +303,7 @@ function movesOf(record: GameRecord, ai: Side | undefined): Replay
     let inBook = record.tags.FEN === undefined && bookReaches(game.position.fen);
     let before = game.facts;
     let balance = materialOf(game.position.fen).balance;
-    const start = { atRisk: riskLine(before), mates: matesOf(before), tactics: tacticsText(before, game.possibilities, true) };
+    const start = { atRisk: riskLine(before), oneLegal: oneLegalMove(before), mates: matesOf(before), tactics: tacticsText(before, game.possibilities, true) };
     // What was at risk on the line before: a move tells it only when it changed.
     let risk = start.atRisk;
 
@@ -328,6 +330,7 @@ function movesOf(record: GameRecord, ai: Side | undefined): Replay
             left: clock,
             material: now === balance ? undefined : balanceText(now),
             atRisk: over || risks === risk ? undefined : (risks ?? "none"),
+            oneLegal: over ? undefined : oneLegalMove(facts),
             mates: over ? undefined : matesOf(facts),
             tactics: over ? undefined : tacticsText(facts, game.possibilities, true),
             outOfBook: outOfBook ? true : undefined,
@@ -382,6 +385,7 @@ function moveLine(move: MoveFacts): string
         move.spent === undefined ? left : `spent ${clockText(move.spent)}, ${left}`,
         move.material === undefined ? undefined : `material ${move.material}`,
         move.atRisk === undefined ? undefined : `at risk: ${move.atRisk}`,
+        move.oneLegal === undefined ? undefined : `one legal move: ${move.oneLegal}`,
         move.mates === undefined ? undefined : `mate in one: ${move.mates.join(" ")}`,
         move.tactics === undefined ? undefined : `tactics: ${move.tactics}`,
         move.outOfBook ? "out of book" : undefined,
@@ -417,6 +421,13 @@ function estimateOf(comment: string | undefined): string | undefined
 {
     const lead = leadOf(comment);
     return lead === undefined ? undefined : leadText(lead);
+}
+
+/** The only legal move of the side to move, when it has one alone (D-103). */
+function oneLegalMove(facts: Facts): string | undefined
+{
+    const moves = facts.pieces.flatMap((piece) => piece.moves ?? []);
+    return moves.length === 1 ? moves[0] : undefined;
 }
 
 /** The mates in one the side to move has; none when it has none. */

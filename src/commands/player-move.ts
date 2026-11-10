@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { loadGame } from "../games/index.ts";
-import { coachAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
-import { agentsLine, coachOnEnd, coachRuns, withAnalyst } from "./agents.ts";
+import { coachOnEnd, coachOnEndLine, coachRuns, withAnalyst } from "./agents.ts";
 import { closingLines, lastMoveText, moveLines, shownMove } from "./answer-lines.ts";
 import { type MovePlayed } from "./game-summary.ts";
 import { inviteLine, pageInvite } from "./page-link.ts";
@@ -44,7 +43,7 @@ export const playerMove = defineCommand({
             `Player: ${result.game.lastMove === undefined ? shownMove(result.move) : lastMoveText(result.game.lastMove)}.`,
             ...moveLines(result),
             ...(result.invite === undefined ? [] : [inviteLine(result.invite)]),
-            ...(result.coach === true ? [agentsLine([coachAgent])] : []),
+            ...(result.coach === true ? [coachOnEndLine] : []),
             ...closingLines(result.game, result.words),
         ].join("\n"),
 });

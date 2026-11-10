@@ -8,12 +8,15 @@ import { fileURLToPath } from "node:url";
 import type { Context } from "../../src/commands/context.ts";
 import { commands } from "../../src/commands/index.ts";
 import { Game, writePgn } from "../../src/core/index.ts";
+import { setUpHosts } from "../../src/host-files/index.ts";
 import { gameFolder } from "../../src/profiles/index.ts";
 import { testContext } from "../commands.ts";
 import { randomGame, report, timed } from "./bench.ts";
 
 const folder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
-const context = testContext(folder);
+// A player's folder as init sets it up, and a chat whose MCP server keeps what it told it, as the server runs the commands.
+setUpHosts(folder, process.platform);
+const context: Context = { ...testContext(folder), told: new Set() };
 const long = new Game({ tags: {}, moves: randomGame(1, 120).map((san) => ({ san })) });
 const longFile = JSON.stringify({ format: 1, ai: "black", started: new Date().toISOString(), pgn: writePgn(long.record) });
 // A game over in the archive of a data folder with no game going on, for the analysis.

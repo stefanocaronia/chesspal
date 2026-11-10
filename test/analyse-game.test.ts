@@ -131,6 +131,14 @@ describe("the analysis of a game (D-68)", () => {
         );
     });
 
+    it("says when the side to move had one legal move alone, as after the check of Légal's mate (D-103)", async () => {
+        const context = playerFolder();
+        const analysis = await analyse(context, { pgn: "1. e4 e5 2. Nf3 d6 3. Bc4 Bg4 4. Nc3 g6 5. Nxe5 Bxd1 6. Bxf7+ Ke7 7. Nd5# 1-0" });
+
+        expect(analysis).toMatch(/\n6\.Bxf7\+: [^\n]*; one legal move: Ke7[;\n]/);
+        expect(analysis.match(/one legal move/g)).toHaveLength(1);
+    });
+
     it("says what is at risk only when it changes, and none once nothing is", async () => {
         const context = playerFolder();
         const analysis = await analyse(context, { pgn: "1. e4 d5 2. a3 dxe4 3. Nc3 Nf6 *" });

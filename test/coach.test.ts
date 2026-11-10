@@ -247,7 +247,11 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         await run(context, "ai_move", { move: "g4", plan: "p" });
         const coachLine = 'Coach the player: start the chesspal-coach agent in the background with the prompt "Coach."';
 
-        expect(await run(context, "player_move", { move: "Qh4" })).toContain(coachLine);
+        // Whatever the player asks, beside the analyst: a chat on a quick model started only the agent that answered them (Priya).
+        expect(await run(context, "player_move", { move: "Qh4" })).toContain(
+            `${coachLine}, whatever the player asks: it judges the move that ended the game, apart from the analyst; `
+                + "when you start the analyst too, start both in one message.",
+        );
         expect(await run(context, "status")).toContain(coachLine);
 
         const start = await run(context, "coach");
