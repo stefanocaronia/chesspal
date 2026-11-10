@@ -207,6 +207,17 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         expect(await run(context, "look")).toContain("«Bella partita»");
     });
 
+    it("tells the agent who the player is, as status tells the chat, to write for their level (D-66)", async () => {
+        const context = { ...claudeFolder(), language: "it-IT" };
+        await run(context, "new_profile", { name: "Anna", level: "regular", rating: 1450, site: "lichess" });
+        await mate(context);
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+
+        expect(await run({ ...context, agent: "chesspal-analyst" }, "analyse_game")).toMatch(/^The player speaks Italian\.\nPlayer: Anna, plays often, Lichess 1450\.\nYou played Black /);
+        // The chat reads it in status.
+        expect(await run(context, "analyse_game")).not.toContain("Player: Anna");
+    });
+
     it("keeps two reviews written at once while the host is asked who writes them", async () => {
         const context = claudeFolder();
         await mate(context);

@@ -32,6 +32,7 @@ import { activeProfile, gameFolder } from "../profiles/index.ts";
 import { analystOf, anotherAnalyst } from "./agents.ts";
 import type { Context } from "./context.ts";
 import { bookOpening, bookReaches } from "./opening-book.ts";
+import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
 import { speechLine, speechOf } from "./speech.ts";
 import { gameToStudy, knownTag, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
@@ -75,6 +76,8 @@ interface Analysis
     instructions?: string;
     /** The player's language, for the analyst's agent, which talks with no one (D-89). */
     speech?: string;
+    /** Who the player is, how they play and their rating, for the analyst's agent, which never reads status (D-66). */
+    profile?: string;
     white: string;
     black: string;
     /** In a game played here: the side the AI played, and its level. */
@@ -142,10 +145,12 @@ export const analyseGame = defineCommand({
             startAnalysis(gameFolder(context.home()), studied.name, context.now());
         }
 
-        // The analyst's agent has its instructions in its own file, and the player's language in its prompt or, when Chesspal knows it, here (D-89).
+        // The analyst's agent has its instructions in its own file, and the player's language in its prompt or, when Chesspal knows it, here (D-89);
+        // who the player is, which the chat reads in status, here too, so that it writes for their level.
         if (context.agent === analystAgent) {
             const speech = speechOf(gameFolder(context.home()), context.language);
-            return speech === undefined ? analysis : { ...analysis, speech: speechLine(speech) };
+            const profile = playerLine(context);
+            return { ...analysis, ...(speech === undefined ? {} : { speech: speechLine(speech) }), ...(profile === undefined ? {} : { profile }) };
         }
 
         const told = analystInstructions(context);
@@ -155,6 +160,7 @@ export const analyseGame = defineCommand({
         [
             ...(analysis.instructions === undefined ? [] : [analysis.instructions, ""]),
             ...(analysis.speech === undefined ? [] : [analysis.speech]),
+            ...(analysis.profile === undefined ? [] : [analysis.profile]),
             ...analysisHead(analysis),
             ...analysis.moves.map(moveLine),
         ].join("\n"),
