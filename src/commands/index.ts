@@ -26,7 +26,7 @@ import { studyGames } from "./study-games.ts";
 export { aiMove } from "./ai-move.ts";
 export { analyseGame } from "./analyse-game.ts";
 export { gameAt } from "./clock.ts";
-export { type Caller, type Context, defaultContext, type SeenPosition } from "./context.ts";
+export { type Caller, type Context, defaultContext, type SeenPosition, speaksItalian } from "./context.ts";
 export { deleteGame } from "./delete-game.ts";
 export { deleteReview } from "./delete-review.ts";
 export { answerDraw, DrawRefused, offerDraw } from "./draw-offer.ts";

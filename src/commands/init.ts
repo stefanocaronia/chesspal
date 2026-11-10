@@ -4,6 +4,7 @@ import { relative, resolve } from "node:path";
 import { styleText } from "node:util";
 import { z } from "zod";
 import { codexHooksPath, setUpHosts } from "../host-files/index.ts";
+import { speaksItalian } from "./context.ts";
 import { defineCommand } from "./registry.ts";
 
 /** The player's folder set up for the AI hosts: the folder, and the files written there. */
@@ -40,7 +41,7 @@ export const init = defineCommand({
         };
     },
     format: ({ folder, written, enter, hooksChanged }, context) => {
-        const words = wordsFor(context?.language);
+        const words = speaksItalian(context?.language) ? italian : english;
         const steps = [words.open(enter === undefined ? undefined : quoted(enter)), ...words.steps];
         return [
             styleText(["bold", "green"], `♜ ${written.length === 0 ? words.ready(folder) : words.set(folder)}`),
@@ -92,11 +93,6 @@ const italian: InitWords = {
     hooksChanged: "Gli «hook» di Chesspal per Codex sono cambiati: quando Codex te lo chiede, scegli di nuovo Trust all.",
     updated: (count) => count === 1 ? "Aggiornato 1 file." : `Aggiornati ${count} file.`,
 };
-
-function wordsFor(language: string | undefined): InitWords
-{
-    return language?.slice(0, 2).toLowerCase() === "it" ? italian : english;
-}
 
 /** A path as a shell reads it as one word: in quotes when it has spaces. */
 function quoted(path: string): string

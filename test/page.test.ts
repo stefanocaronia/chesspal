@@ -1022,7 +1022,7 @@ describe("the doorbell of the chat", () => {
 
 async function open(folder: string, opponent?: () => string | undefined, context: Context = testContext(folder)): Promise<Page>
 {
-    const page = await startPage(context, opponent);
+    const page = await startPage(context, opponent === undefined ? {} : { opponent });
     opened.push(page);
     return page;
 }

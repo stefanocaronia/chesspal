@@ -12,7 +12,7 @@ import { analysesOf, answerAnalyses } from "./analyses.ts";
 import { type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";
 import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls } from "./game.ts";
-import { json, send } from "./http.ts";
+import { isJson, json, send, sendJson } from "./http.ts";
 import { answerProfiles } from "./profiles.ts";
 
 /** The page of a player's folder, served: its address, how to tell it the AI was given words, which change no file, and how to stop it. */
@@ -29,11 +29,26 @@ export interface Page
     close(): Promise<void>;
 }
 
+/** How a page is served, besides its context: the opponent's name, as the host gives it, and the table that serves it, when one does (D-104). */
+export interface PageOptions
+{
+    readonly opponent?: () => string | undefined;
+    readonly table?: TableEnd;
+}
+
+/** What the page tells the table that serves it: a request came, so the table is in use, or another Chesspal version asked it to quit. */
+export interface TableEnd
+{
+    used(): void;
+    quit(): void;
+}
+
 /**
- * Serves the page of the context's folder on 127.0.0.1, on a port of its own when free, else on any free one, where the doorbell cannot find it. The page
- * names the opponent as the host does, once it has connected; the doorbell knows from the context what the chat has read of the player's words.
+ * Serves the page of the context's folder on 127.0.0.1, on a port of its own when free, else on any free one, where the doorbell cannot find it; the
+ * table's on its own ports alone, which keep two tables apart. The page names the opponent as the host does, once it has connected; the doorbell knows
+ * from the context what the chat has read of the player's words.
  */
-export async function startPage(context: Context, opponent: () => string | undefined = () => undefined): Promise<Page>
+export async function startPage(context: Context, { opponent = () => undefined, table }: PageOptions = {}): Promise<Page>
 {
     const { folder } = context;
     const watchers = new Set<ServerResponse>();
@@ -48,10 +63,12 @@ export async function startPage(context: Context, opponent: () => string | undef
         watchers,
         port: 0,
         outdated,
+        ...(table === undefined ? {} : { table }),
     };
     const server = createServer((request, response) => answer(request, response, served));
+    const ports = table === undefined ? [...pagePorts(folder), 0] : pagePorts(folder);
 
-    for (const port of [...pagePorts(folder), 0]) {
+    for (const port of ports) {
         if (await listened(server, port)) {
             server.unref();
             served.port = portOf(server);
@@ -65,6 +82,10 @@ export async function startPage(context: Context, opponent: () => string | undef
                 close: () => closed(server, stopWatching),
             };
         }
+    }
+
+    if (table !== undefined) {
+        throw new Error(`The table's ports ${ports.join(", ")} on 127.0.0.1 are taken by other programs: close them, or play from a chat, which serves its own page.`);
     }
 
     throw new Error("Chesspal could not open a port for the page on 127.0.0.1: check that a firewall does not block local servers, then try again.");
@@ -85,6 +106,8 @@ export interface Served
     port: number;
     /** The folder was set up by an older init: the page asks the player to run it again. Read once, as init runs with the chat closed. */
     readonly outdated: boolean;
+    /** The table that serves the page, when one does (D-104). */
+    readonly table?: TableEnd;
 }
 
 /**
@@ -131,7 +154,16 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         return;
     }
 
+    served.table?.used();
+
     if (answerProfiles(request, response, url, served) || answerGame(request, response, url, served) || answerAnalyses(request, response, url, served)) {
+        return;
+    }
+
+    // Another Chesspal version asks the table to quit, to start its own in its place (D-104).
+    if (path === "/api/table/quit" && served.table !== undefined && request.method === "POST" && isJson(request)) {
+        sendJson(response, 200, { quitting: true });
+        served.table.quit();
         return;
     }
 
@@ -155,7 +187,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         keepPosted(request, response, served);
     } else if (path === "/api/bell") {
         if (url.searchParams.has("probe")) {
-            send(response, 200, json, JSON.stringify(bellProbe(served.folder, served.watchers.size > 0)));
+            send(response, 200, json, JSON.stringify(bellProbe(served.folder, served.watchers.size > 0, served.table !== undefined)));
         } else {
             served.bell.listen(request, response);
         }

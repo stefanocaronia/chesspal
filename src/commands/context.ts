@@ -91,6 +91,12 @@ export function defaultContext(): Context
     };
 }
 
+/** Whether the player's language is Italian: the command line speaks Italian to them then, English otherwise (D-32). */
+export function speaksItalian(language: string | undefined): boolean
+{
+    return language?.slice(0, 2).toLowerCase() === "it";
+}
+
 /** A data folder with a profile in it, the first made when there is none, named after the system's account (D-71). */
 export function withProfile(folder: string, account: string): string
 {

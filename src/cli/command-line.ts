@@ -11,10 +11,11 @@ export interface CommandLineResult
     exitCode: number;
 }
 
-// The commands that exist only on the command line: cli.ts starts the server, the doorbell or the chat's note, when one comes alone.
+// The commands that exist only on the command line: cli.ts starts the table, the server, the doorbell or the chat's note, when one comes alone.
 const mcpDescription = "Start the MCP server for an AI host. Through it the host uses these commands as tools; the host starts it, with no options.";
 const listenDescription = "Wait for the player's move on the board page and wake the chat. Claude Code starts it at the end of each turn, and Codex with --codex, as init sets them up.";
 const chatDescription = "Note how the chat started: new, cleared, resumed or compacted. Claude Code and Codex run it when a chat starts, as init sets them up.";
+const tableDescription = "Serve the board page with no chat, until no browser has had it open for five minutes. `chesspal` alone starts it apart and opens the page.";
 
 /** The `chesspal` command line: finds the command, validates its input, runs it and renders the result. */
 export async function runCommandLine(argv: string[], context: Context = defaultContext(), list: AnyCommand[] = commands): Promise<CommandLineResult>
@@ -44,6 +45,11 @@ export async function runCommandLine(argv: string[], context: Context = defaultC
     if (commandName === "chat") {
         const help = `chesspal chat\n\n${chatDescription}`;
         return args.length === 0 || args.includes("--help") || args.includes("-h") ? success(help) : failure(`chesspal chat takes no options: ${args.join(" ")}.\n\n${help}`);
+    }
+
+    if (commandName === "table") {
+        const help = `chesspal table\n\n${tableDescription}`;
+        return args.length === 0 || args.includes("--help") || args.includes("-h") ? success(help) : failure(`chesspal table takes no options: ${args.join(" ")}.\n\n${help}`);
     }
 
     const command = list.find((candidate) => candidate.name === commandName);
@@ -202,8 +208,11 @@ function generalHelp(list: AnyCommand[]): string
     return [
         `chesspal ${version}`,
         "",
+        "Run `chesspal` alone to open the board page in your browser.",
+        "",
         "Commands:",
         ...list.map((command) => line(command.name, command.description)),
+        line("table", tableDescription),
         line("mcp", mcpDescription),
         line("listen", listenDescription),
         line("chat", chatDescription),

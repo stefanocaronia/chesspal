@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { get, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
 import { writeAtomically } from "../games/index.ts";
+import { version } from "../version.ts";
 
 /** What the chat hears from the doorbell: one line for whatever the player did, never what, only where to read it. */
 export const bellLine = "The player acted on the board page: call status to see it.";
@@ -113,10 +114,13 @@ export class Bell
     }
 }
 
-/** Whose page answers at a port, for the hook to find its own: the chat's session, the player's folder, and whether a browser has the page open. */
-export function bellProbe(folder: string, open = false): BellProbe
+/**
+ * Whose page answers at a port, for the hook to find its own: the chat's session, the player's folder, whether a browser has the page open, Chesspal's
+ * version, and whether the table serves it (D-104), which has no chat and no session, even when started from a chat's terminal.
+ */
+export function bellProbe(folder: string, open = false, table = false): BellProbe
 {
-    return { session: process.env.CLAUDE_CODE_SESSION_ID ?? null, folder: resolve(folder), open };
+    return { session: table ? null : process.env.CLAUDE_CODE_SESSION_ID ?? null, folder: resolve(folder), open, version, ...(table ? { table } : {}) };
 }
 
 /** What a page says of itself at `/api/bell?probe`. */
@@ -125,6 +129,14 @@ export interface BellProbe
     session: string | null;
     folder: string;
     open: boolean;
+    version?: string;
+    table?: true;
+}
+
+/** What the page at a port of this computer says of itself; undefined when none answers there. */
+export async function pageAt(port: number): Promise<BellProbe | undefined>
+{
+    return probeOf(await body(port, "/api/bell?probe", probeWait));
 }
 
 /** The ports a folder's page tries first: one in each of a few ranges, by its path, since Windows may reserve a range. The hook looks for it there. */
@@ -184,7 +196,7 @@ export async function bellHeard(input: string, ports?: number[]): Promise<BellHe
     const hook = hookInput(input);
     const folder = chatFolder(hook);
     const tried = ports ?? pagePorts(folder);
-    const probes = await Promise.all(tried.map(async (port) => ({ port, said: probeOf(await body(port, "/api/bell?probe", probeWait)) })));
+    const probes = await Promise.all(tried.map(async (port) => ({ port, said: await pageAt(port) })));
     const ours = probes.flatMap(({ port, said }) => (said !== undefined && samePath(said.folder, folder) ? [{ port, said }] : []));
     const port = chatPage(ours, hook.session)?.port;
 
@@ -251,16 +263,21 @@ function chatPage(pages: { port: number; said: BellProbe; }[], session: string |
 function probeOf(said: string | undefined): BellProbe | undefined
 {
     try {
-        const parsed = said === undefined ? undefined : JSON.parse(said) as { session?: unknown; folder?: unknown; open?: unknown; };
-        return parsed === undefined || typeof parsed.folder !== "string"
-            ? undefined
-            : { session: typeof parsed.session === "string" ? parsed.session : null, folder: parsed.folder, open: parsed.open === true };
+        const parsed = said === undefined ? undefined : JSON.parse(said) as { session?: unknown; folder?: unknown; open?: unknown; version?: unknown; table?: unknown; };
+        return parsed === undefined || typeof parsed.folder !== "string" ? undefined : {
+            session: typeof parsed.session === "string" ? parsed.session : null,
+            folder: parsed.folder,
+            open: parsed.open === true,
+            ...(typeof parsed.version === "string" ? { version: parsed.version } : {}),
+            ...(parsed.table === true ? { table: true as const } : {}),
+        };
     } catch {
         return undefined;
     }
 }
 
-function samePath(one: string, other: string): boolean
+/** Whether two paths name the same folder: without regard to case on Windows. */
+export function samePath(one: string, other: string): boolean
 {
     return process.platform === "win32" ? resolve(one).toLowerCase() === resolve(other).toLowerCase() : resolve(one) === resolve(other);
 }
