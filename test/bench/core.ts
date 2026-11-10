@@ -14,7 +14,7 @@ const kept = new Game();
 let seed = 1_000;
 
 // Each case gives the time of one operation, in milliseconds.
-report([
+await report([
     { name: `replay a game of ${plies} plies`, budget: 15, run: () => timed(1, () => new Game(record)) },
     { name: "play a move in SAN", budget: 0.15, run: () => timed(sans.length, () => playAll(sans)) },
     { name: "play a move as squares, in a new position", budget: 2.5, run: () => onNewPositions((game, move) => game.play(move), true) },

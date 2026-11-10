@@ -10,6 +10,7 @@ import { commands } from "../../src/commands/index.ts";
 import { Game, writePgn } from "../../src/core/index.ts";
 import { setUpHosts } from "../../src/host-files/index.ts";
 import { gameFolder } from "../../src/profiles/index.ts";
+import { attachTable, startTable } from "../../src/server/table/index.ts";
 import { testContext } from "../commands.ts";
 import { randomGame, report, timed } from "./bench.ts";
 
@@ -24,17 +25,27 @@ const studyFolder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
 const cli = fileURLToPath(new URL("../../dist/cli/cli.js", import.meta.url));
 let seed = 2_000;
 
+// A chat attached to the table of its data folder (D-104), in a folder of its own: the table in this process, as near as another is.
+const chatFolder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
+const table = await startTable({ ...testContext(folder), now: () => new Date() });
+const chat: Context = { ...testContext(chatFolder), home: context.home, told: new Set() };
+const atTable = table === undefined ? undefined : await attachTable(chat, () => undefined);
+
 try {
-    report([
+    await report([
         // A move's write takes the game's lock (D-104): half a millisecond more on a synced folder.
         { name: "a move through player_move or ai_move, game.json written", budget: 3.5, run: movesOfANewGame },
+        { name: "a move with the chat at the table, which hears the call before it (D-104)", budget: 5, run: movesAtTheTable },
         { name: "status in a game", budget: 0.5, run: () => timed(1, () => call(context, "status")) },
         { name: "status after another process changed a game of 120 plies", budget: 25, run: readAgain },
         { name: "analyse_game on a game of 120 plies over, its positions new", budget: 250, run: analyseLong },
         { name: "chesspal status from the command line, a new process", budget: 500, run: () => timed(1, () => spawnSync(process.execPath, [cli, "status"], { cwd: folder, env: { ...process.env, CHESSPAL_HOME: folder } })) },
     ]);
 } finally {
+    await atTable?.close();
+    await table?.close();
     rmSync(folder, { recursive: true, force: true });
+    rmSync(chatFolder, { recursive: true, force: true });
     rmSync(studyFolder, { recursive: true, force: true });
 }
 
@@ -48,6 +59,32 @@ function movesOfANewGame(): number
     moves.forEach((move, index) => {
         time += timed(1, () => (index % 2 === 0 ? call(context, "player_move", { move }) : call(context, "ai_move", { move, plan: "A plan.", comment: "A comment." })));
     });
+
+    return time / moves.length;
+}
+
+/**
+ * The time of one move of a new random game with the chat at the table: the table told of the call before it runs; the copy of what the chat saw goes
+ * after the answer, off the AI's clock, and has gone before the next move, as between two tools of a chat.
+ */
+async function movesAtTheTable(): Promise<number>
+{
+    if (atTable === undefined) {
+        throw new Error("The chat did not attach to the bench's table: another table holds its ports.");
+    }
+
+    const moves = randomGame(seed++, 40);
+    call(chat, "new_game", { ai_colour: "black", replace: true });
+    let time = 0;
+
+    for (const [index, move] of moves.entries()) {
+        const started = performance.now();
+        await atTable.chatCalls();
+        void (index % 2 === 0 ? call(chat, "player_move", { move }) : call(chat, "ai_move", { move, plan: "A plan.", comment: "A comment." }));
+        time += performance.now() - started;
+        atTable.toolEnded();
+        await new Promise((done) => setTimeout(done, 5));
+    }
 
     return time / moves.length;
 }

@@ -1,23 +1,29 @@
 // What the benches share: timing, seeded random games, and the report against the budgets (D-34).
 import { Chess } from "chess.js";
 
-/** A case of a bench: what it times, its budget in milliseconds, and a run giving the time of one operation. */
+/** A case of a bench: what it times, its budget in milliseconds, and a run giving the time of one operation, at once or once it has ended. */
 export interface BenchCase
 {
     name: string;
     budget: number;
-    run: () => number;
+    run: () => number | Promise<number>;
 }
 
-/** Runs each case and prints its median against its budget; the process exits with 1 when one is over. */
-export function report(cases: BenchCase[], runs = 25): void
+/** Runs each case, one run after another, and prints its median against its budget; the process exits with 1 when one is over. */
+export async function report(cases: BenchCase[], runs = 25): Promise<void>
 {
     let over = false;
     console.log("| what | median | budget |\n|---|---|---|");
 
     for (const { name, budget, run } of cases) {
-        run();
-        const times = Array.from({ length: runs }, run).sort((one, other) => one - other);
+        await run();
+        const times: number[] = [];
+
+        for (let index = 0; index < runs; index++) {
+            times.push(await run());
+        }
+
+        times.sort((one, other) => one - other);
         const median = times[Math.floor(runs / 2)] ?? 0;
         over ||= median > budget;
         console.log(`| ${name} | ${format(median)} | ${format(budget)}${median > budget ? " ✗ over" : ""} |`);
