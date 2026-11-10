@@ -2,6 +2,7 @@
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import type { z } from "zod";
 import { type AnyCommand, baseType, commandLineFieldProblem, commands, type Context, defaultContext, inputProblems, isBoolean, isList, takesNumbers } from "../commands/index.ts";
+import { rerunIfChanged } from "../games/index.ts";
 import { version } from "../version.ts";
 
 export interface CommandLineResult
@@ -73,7 +74,8 @@ async function runCommand(command: AnyCommand, args: string[], context: Context)
         throw refused(command, inputProblems(command.name, parsed.error.issues, input, written));
     }
 
-    const result: unknown = await command.run(parsed.data, context);
+    // A game another process changed under the command is read again, and the command run once more.
+    const result: unknown = await rerunIfChanged(() => command.run(parsed.data, context));
     return asJson ? JSON.stringify(result, null, 2) : command.format(result, context);
 }
 

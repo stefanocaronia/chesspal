@@ -1,5 +1,5 @@
 // Writing the player's files safely: whole or not at all, with failures that say what to do (D-27).
-import { mkdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 
 /** Writes a file whole or not at all: a temporary file beside it, then renamed over it (D-27). A failure says what to do about it. */
 export function writeAtomically(path: string, text: string | Uint8Array): void
@@ -13,6 +13,41 @@ export function writeAtomically(path: string, text: string | Uint8Array): void
         throw new Error(problemOf(error as NodeJS.ErrnoException, path), { cause: error });
     } finally {
         rmSync(temporary, { force: true });
+    }
+}
+
+/**
+ * Runs `write` while this process alone holds the file's lock, a folder beside it made only if missing, cheaper than a file on Windows: another process
+ * waits, a second at most. A lock older than two seconds is of a process that stopped while it held it, and goes.
+ */
+export function whileLocked<T>(path: string, write: () => T): T
+{
+    const lock = `${path}.lock`;
+
+    for (let attempt = 1;; attempt++) {
+        try {
+            mkdirSync(lock);
+            break;
+        } catch (error) {
+            // Windows refuses to make a folder another process is deleting: the lock is still held.
+            if (!["EEXIST", "EPERM", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? "")) {
+                throw new Error(`${lock} could not be made (${(error as Error).message}): check that its folder can be written.`, { cause: error });
+            }
+
+            if (isStale(lock)) {
+                rmSync(lock, { recursive: true, force: true });
+            } else if (attempt === lockAttempts) {
+                throw new Error(`${lock} is held by another Chesspal writing the game: try again in a moment, or delete that folder when no Chesspal runs.`);
+            } else {
+                Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+            }
+        }
+    }
+
+    try {
+        return write();
+    } finally {
+        rmdirSync(lock);
     }
 }
 
@@ -35,6 +70,16 @@ export function stampOf(path: string): string | undefined
 }
 
 const attempts = 10;
+
+// A lock is waited for 5 ms at a time, a second at most; one older than two seconds is of a process that stopped while it held it.
+const lockAttempts = 200;
+const staleLock = 2_000;
+
+function isStale(lock: string): boolean
+{
+    const stats = statSync(lock, { throwIfNoEntry: false });
+    return stats !== undefined && Date.now() - stats.mtimeMs > staleLock;
+}
 
 /**
  * Renames a file or a folder. Windows refuses while another program holds a file in it open (an editor, an antivirus, a sync client): Chesspal waits a

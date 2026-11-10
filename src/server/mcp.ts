@@ -5,7 +5,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, inputProblems, isBoolean, PositionChanged } from "../commands/index.ts";
 import { aiNameOf } from "../core/index.ts";
-import { endOf, loadGame, noteAiHost, noteAiModel } from "../games/index.ts";
+import { endOf, loadGame, noteAiHost, noteAiModel, rerunIfChanged } from "../games/index.ts";
 import { agentTools, hasAgent, startInstructions } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
@@ -207,7 +207,8 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
 
         const run = calling !== undefined && "run" in calling ? calling.run : undefined;
         const who = agent !== undefined ? { agent, ...(run === undefined ? {} : { agentRun: run }) } : calling !== undefined ? { chat: true as const } : {};
-        const result: unknown = await command.run(checkedInput(command, input), { ...context, caller, ...who });
+        // A game another process changed under the call is read again, and the call made once more (T-215).
+        const result: unknown = await rerunIfChanged(() => command.run(checkedInput(command, input), { ...context, caller, ...who }));
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {
         refused = error instanceof PositionChanged;

@@ -4,7 +4,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { type Clock, Game, readPgn, type Side, writePgn } from "../core/index.ts";
-import { stampOf, writeAtomically } from "./files.ts";
+import { stampOf, whileLocked, writeAtomically } from "./files.ts";
 
 /** The player's current game, going on or over: the live game, and what game.json keeps beside its PGN. */
 export interface CurrentGame
@@ -76,29 +76,49 @@ export function loadGame(folder: string): CurrentGame | undefined
     return current;
 }
 
-/** Writes the current game to game.json, whole or not at all; from then on it is the one kept in memory. */
+/**
+ * Writes the current game to game.json, whole or not at all; from then on it is the one kept in memory. Refused with GameChanged when another process wrote
+ * the file since this one read it: the change made on the game read before would lose theirs.
+ */
 export function saveGame(folder: string, current: CurrentGame): void
 {
     const path = join(folder, fileName);
-    const file: GameFile = {
-        format: 1,
-        ai: current.ai,
-        started: current.started,
-        pgn: writePgn(current.game.record),
-        ...(current.talk.length === 0 ? {} : { talk: current.talk }),
-        ...(current.clock === undefined ? {} : { clock: savedClockOf(current.clock) }),
-        ...(drawOfferOf(current) === undefined ? {} : { drawOffer: current.drawOffer }),
+    whileLocked(path, () => {
+        if (stampOf(path) !== kept.get(path)?.stamp) {
+            kept.delete(path);
+            throw new GameChanged();
+        }
+
+        write(path, current);
+    });
+}
+
+/** The refusal of a save on a game another process changed since this one read it: what wrote it reads it again and starts over, once (rerunIfChanged). */
+export class GameChanged extends Error
+{
+    constructor()
+    {
+        super("The game changed on disk while this call was changing it, in another chat or on the board page: call it again. Nothing changed.");
+    }
+}
+
+/** Runs a change of the game, and once more from the start when another process changed the game under it: a second refusal stands. */
+export function rerunIfChanged<T>(run: () => T): T
+{
+    const again = (error: unknown): T => {
+        if (!(error instanceof GameChanged)) {
+            throw error;
+        }
+
+        return run();
     };
 
     try {
-        writeAtomically(path, `${JSON.stringify(file, null, 2)}\n`);
+        const result = run();
+        return result instanceof Promise ? result.catch(again) as T : result;
     } catch (error) {
-        // The live game may hold a move the file does not: the next call reads the file again.
-        kept.delete(path);
-        throw new Error(`Chesspal could not save the game: ${(error as Error).message} Nothing changed.`, { cause: error });
+        return again(error);
     }
-
-    kept.set(path, { stamp: stampOf(path) ?? "", current });
 }
 
 /** How the game ended, or undefined while it goes on: by the board, or by what the record says, such as a resignation. */
@@ -173,6 +193,29 @@ type GameFile = z.infer<typeof gameFile>;
 
 // The games read or written in this process, by their file, with the file's stamp then: a call reads a file again only when another process changed it.
 const kept = new Map<string, { stamp: string; current: CurrentGame; }>();
+
+function write(path: string, current: CurrentGame): void
+{
+    const file: GameFile = {
+        format: 1,
+        ai: current.ai,
+        started: current.started,
+        pgn: writePgn(current.game.record),
+        ...(current.talk.length === 0 ? {} : { talk: current.talk }),
+        ...(current.clock === undefined ? {} : { clock: savedClockOf(current.clock) }),
+        ...(drawOfferOf(current) === undefined ? {} : { drawOffer: current.drawOffer }),
+    };
+
+    try {
+        writeAtomically(path, `${JSON.stringify(file, null, 2)}\n`);
+    } catch (error) {
+        // The live game may hold a move the file does not: the next call reads the file again.
+        kept.delete(path);
+        throw new Error(`Chesspal could not save the game: ${(error as Error).message} Nothing changed.`, { cause: error });
+    }
+
+    kept.set(path, { stamp: stampOf(path) ?? "", current });
+}
 
 function parsed(text: string, path: string): CurrentGame
 {

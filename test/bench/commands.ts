@@ -26,7 +26,8 @@ let seed = 2_000;
 
 try {
     report([
-        { name: "a move through player_move or ai_move, game.json written", budget: 3, run: movesOfANewGame },
+        // A move's write takes the game's lock (D-104): half a millisecond more on a synced folder.
+        { name: "a move through player_move or ai_move, game.json written", budget: 3.5, run: movesOfANewGame },
         { name: "status in a game", budget: 0.5, run: () => timed(1, () => call(context, "status")) },
         { name: "status after another process changed a game of 120 plies", budget: 25, run: readAgain },
         { name: "analyse_game on a game of 120 plies over, its positions new", budget: 250, run: analyseLong },

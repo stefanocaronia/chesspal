@@ -37,6 +37,7 @@ import {
     loadTableTalk,
     playerPgn,
     ponderingOn,
+    rerunIfChanged,
     saveGame,
     startAnalysis,
     talkLimits,
@@ -71,7 +72,17 @@ export function chatCalls(served: Served): void
     const held = current !== undefined && aiHeld(served, current);
 
     if (served.bell.chatCalls() && held) {
-        saveGame(folder, { ...current, clock: { ...current.clock!, since: served.context.now().toISOString() } });
+        rerunIfChanged(() => giveHeldTime(served, folder));
+    }
+}
+
+/** The AI's clock, held while nobody heard the player, starts now: the time it was held is not the AI's. */
+function giveHeldTime(served: Served, folder: string): void
+{
+    const current = loadGame(folder);
+
+    if (current?.clock !== undefined && endOf(current.game) === undefined) {
+        saveGame(folder, { ...current, clock: { ...current.clock, since: served.context.now().toISOString() } });
     }
 }
 
@@ -126,7 +137,7 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
             return problem;
         };
 
-        playMove(gameFolder(served.context.home()), now, "player", move, refuse, message === undefined ? {} : { said: { text: message, at: now } });
+        rerunIfChanged(() => playMove(gameFolder(served.context.home()), now, "player", move, refuse, message === undefined ? {} : { said: { text: message, at: now } }));
     } catch (error) {
         // The game may have changed since the page read it: the move refused, the AI's turn, a flag fallen.
         send(response, 409, json, JSON.stringify(refusalFrom(error, illegal ? "illegal" : refusalOf(served)?.refusal)));
@@ -161,7 +172,7 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
     let current;
 
     try {
-        current = say(gameFolder(served.context.home()), "player", text, served.context.now(), undefined, shown);
+        current = rerunIfChanged(() => say(gameFolder(served.context.home()), "player", text, served.context.now(), undefined, shown));
     } catch (error) {
         const noGame = refusalOf(served)?.refusal === "no-game";
         send(response, 409, json, JSON.stringify(refusalFrom(error, noGame ? "no-game" : undefined)));
@@ -201,7 +212,7 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
         }
 
         // The game starts from the page, open: its clocks wait for the player's Start there.
-        startNewGame(input.data, { ...asTheChatSees(served.context, served.chat), pageOpen: () => true }, "page");
+        rerunIfChanged(() => startNewGame(input.data, { ...asTheChatSees(served.context, served.chat), pageOpen: () => true }, "page"));
     } catch (error) {
         send(response, 409, json, JSON.stringify(refusalFrom(error)));
         return;
@@ -229,11 +240,7 @@ async function drawFromPage(request: IncomingMessage, response: ServerResponse, 
     }
 
     try {
-        if (action === "offer") {
-            offerDraw(served.context);
-        } else {
-            answerDraw(served.context, action === "accept");
-        }
+        rerunIfChanged(() => action === "offer" ? offerDraw(served.context) : answerDraw(served.context, action === "accept"));
     } catch (error) {
         send(response, 409, json, JSON.stringify(refusalFrom(error, refusalOf(served)?.refusal)));
         return;
@@ -254,21 +261,32 @@ function startFromPage(request: IncomingMessage, response: ServerResponse, serve
         return;
     }
 
-    const folder = gameFolder(served.context.home());
-    const current = loadGame(folder);
+    const current = rerunIfChanged(() => startClocks(served));
 
-    if (current?.clock?.waiting !== true || endOf(current.game) !== undefined) {
+    if (current === undefined) {
         send(response, 409, json, JSON.stringify({ error: "No clock waits to start: start a game with a clock first." }));
         return;
     }
-
-    saveGame(folder, { ...current, clock: clockStarted(current.clock, served.context.now()) });
 
     if (current.game.position.turn === current.ai) {
         served.bell.ring();
     }
 
     send(response, 200, json, JSON.stringify({ started: true }));
+}
+
+/** Starts the clocks of the game, which wait from its start: the game started, or none when no clock waits. */
+function startClocks(served: Served): CurrentGame | undefined
+{
+    const folder = gameFolder(served.context.home());
+    const current = loadGame(folder);
+
+    if (current?.clock?.waiting !== true || endOf(current.game) !== undefined) {
+        return undefined;
+    }
+
+    saveGame(folder, { ...current, clock: clockStarted(current.clock, served.context.now()) });
+    return current;
 }
 
 /** The player resigns from the page (D-65), whoever is to move: the game ends and goes to the archive, and the doorbell tells the chat. */
@@ -280,7 +298,7 @@ function resignFromPage(request: IncomingMessage, response: ServerResponse, serv
     }
 
     try {
-        endGame.run({ result: "player_resigns" }, served.context);
+        rerunIfChanged(() => endGame.run({ result: "player_resigns" }, served.context));
     } catch (error) {
         send(response, 409, json, JSON.stringify(refusalFrom(error, refusalOf(served)?.refusal === "no-game" ? "no-game" : undefined)));
         return;
@@ -518,7 +536,7 @@ function gameNow(served: Served): CurrentGame | undefined
         return before;
     }
 
-    const current = gameAt(folder, served.context.now());
+    const current = rerunIfChanged(() => gameAt(folder, served.context.now()));
 
     if (before !== undefined && endOf(before.game) === undefined && current !== undefined && endOf(current.game) !== undefined) {
         served.bell.ring();
