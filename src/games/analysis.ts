@@ -4,18 +4,25 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomically } from "./files.ts";
 
-/** The game in analysis: its name as the lists write it, when the analysis last changed it, and whether the player brought it on the page and the AI has not gone over it yet. */
+/**
+ * The game in analysis: its name as the lists write it, when the analysis last changed it, whether the player brought it on the page and the AI has not
+ * gone over it yet, and the moves whose note the chat corrected with the player, which the analyst leaves (D-101).
+ */
 export interface Analysis
 {
     readonly game: string;
     readonly at: string;
     readonly brought?: true;
+    readonly corrected?: readonly string[];
 }
 
-/** Names the game in analysis, over the one before; written again each time its review changes, so the page hears of it. */
-export function startAnalysis(folder: string, game: string, now: Date, brought = false): void
+/** Names the game in analysis, over the one before; written again each time its review changes, so the page hears of it. The same game keeps its corrections. */
+export function startAnalysis(folder: string, game: string, now: Date, brought = false, corrected: readonly string[] = []): void
 {
-    writeAtomically(join(folder, fileName), `${JSON.stringify({ game, at: now.toISOString(), ...(brought ? { brought } : {}) }, null, 2)}\n`);
+    const before = gameInAnalysis(folder);
+    const kept = [...new Set([...(before?.game === game ? before.corrected ?? [] : []), ...corrected])];
+    const analysis = { game, at: now.toISOString(), ...(brought ? { brought } : {}), ...(kept.length === 0 ? {} : { corrected: kept }) };
+    writeAtomically(join(folder, fileName), `${JSON.stringify(analysis, null, 2)}\n`);
 }
 
 /** The game in analysis, or none when there is none, or analysis.json cannot be read. */
@@ -23,15 +30,16 @@ export function gameInAnalysis(folder: string): Analysis | undefined
 {
     try {
         const analysis = JSON.parse(readFileSync(join(folder, fileName), "utf8")) as Partial<Analysis>;
+        const corrected = Array.isArray(analysis.corrected) ? analysis.corrected.filter((move) => typeof move === "string") : [];
         return typeof analysis.game === "string" && typeof analysis.at === "string"
-            ? { game: analysis.game, at: analysis.at, ...(analysis.brought === true ? { brought: true } : {}) }
+            ? { game: analysis.game, at: analysis.at, ...(analysis.brought === true ? { brought: true } : {}), ...(corrected.length === 0 ? {} : { corrected }) }
             : undefined;
     } catch {
         return undefined;
     }
 }
 
-/** Ends the analysis, when a new game starts. */
+/** Ends the analysis, when a new game starts or its review is deleted. */
 export function endAnalysis(folder: string): void
 {
     rmSync(join(folder, fileName), { force: true });

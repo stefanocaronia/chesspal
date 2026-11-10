@@ -1,10 +1,10 @@
 // The player's current game on disk (D-27, D-41): game.json, its PGN and the talk on the board page inside, written whole at every change, and kept in
 // memory while nobody else changes it.
-import { readFileSync, rmSync, statSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { type Clock, Game, readPgn, type Side, writePgn } from "../core/index.ts";
-import { writeAtomically } from "./files.ts";
+import { stampOf, writeAtomically } from "./files.ts";
 
 /** The player's current game, going on or over: the live game, and what game.json keeps beside its PGN. */
 export interface CurrentGame
@@ -25,7 +25,10 @@ export interface CurrentGame
 /** Who speaks on the board page. */
 export type Speaker = "player" | "ai";
 
-/** A line said on the board page: who said it, its words, how many moves the game had then, and when, as an ISO date; the AI's agent on the player's time (D-72). */
+/**
+ * A line said on the board page: who said it, its words, how many moves the game had then, and when, as an ISO date; the AI's agent on the player's time
+ * (D-72); in analysis, the position the page showed as the player wrote (D-101).
+ */
 export interface TalkLine
 {
     readonly who: Speaker;
@@ -33,6 +36,15 @@ export interface TalkLine
     readonly ply: number;
     readonly at: string;
     readonly agent?: true;
+    readonly shown?: Shown;
+}
+
+/** A position of a game in analysis: the game's name, how many of its moves the page showed, and the last of them numbered, 52...Kf6; none at the start. */
+export interface Shown
+{
+    readonly game: string;
+    readonly at: number;
+    readonly move?: string;
 }
 
 /** How a game ended: its result, and why when the record says it or the board decided it. */
@@ -132,7 +144,14 @@ export function removeGame(folder: string): void
 const fileName = "game.json";
 
 /** A line of the talk as game.json and talk.json keep it. */
-export const savedLine = z.object({ who: z.enum(["player", "ai"]), text: z.string(), ply: z.int().min(0), at: z.iso.datetime(), agent: z.literal(true).optional() });
+export const savedLine = z.object({
+    who: z.enum(["player", "ai"]),
+    text: z.string(),
+    ply: z.int().min(0),
+    at: z.iso.datetime(),
+    agent: z.literal(true).optional(),
+    shown: z.object({ game: z.string(), at: z.int().min(0), move: z.string().optional() }).optional(),
+});
 const savedClock = z.object({
     base: z.int().positive(),
     increment: z.int().min(0),
@@ -154,13 +173,6 @@ type GameFile = z.infer<typeof gameFile>;
 
 // The games read or written in this process, by their file, with the file's stamp then: a call reads a file again only when another process changed it.
 const kept = new Map<string, { stamp: string; current: CurrentGame; }>();
-
-function stampOf(path: string): string | undefined
-{
-    // The file's id changes at every rename: a write within the same tick of the clock, and of the same size, is seen too.
-    const stats = statSync(path, { bigint: true, throwIfNoEntry: false });
-    return stats === undefined ? undefined : `${stats.ino}:${stats.mtimeNs}:${stats.size}`;
-}
 
 function parsed(text: string, path: string): CurrentGame
 {

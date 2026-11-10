@@ -45,7 +45,7 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         const status = await run(context, "status");
         expect(status).not.toContain("chesspal-analyst");
         expect(status).toContain(`\nNext: answer the player with ai_say. ${reviewed}`);
-        expect(status).toContain(`\nIn analysis on the board page: games/2026-11-02-153012.pgn. ${reviewed}`);
+        expect(status).toContain(`\nIn analysis on the board page: games/2026-11-02-153012.pgn (no review yet). ${reviewed}`);
         expect(await run(context, "ai_say", { text: "Ci lavoro." })).toContain(`\nNext: ${reviewed} When they want another game,`);
         await run(analyst, "annotate_game", { game: "games/2026-11-02-153012.pgn", summary: "Corta." });
         startAnalysis(gameFolder(context.home()), "games/2026-11-01-100000.pgn", context.now());
@@ -114,6 +114,35 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         const analysis = await run(context, "analyse_game");
         expect(analysis).toContain("2.g4: mate in one: Qh4#; you marked blunder");
         expect(analysis).toContain("Your review: Short and sharp.");
+    });
+
+    it("leaves the note the chat corrected with the player while it went over the game, until its review is deleted (D-101)", async () => {
+        const context = claudeFolder();
+        await mate(context);
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+        const [name] = readdirSync(join(gameFolder(context.home()), "games"));
+        const game = `games/${name!}`;
+        const analyst = { ...context, agent: "chesspal-analyst" };
+        await run(analyst, "analyse_game", { game });
+
+        // A caller the host does not tie to the chat corrects nothing; the chat's correction is not asked for the analyst's work.
+        expect(await run(context, "annotate_game", { game, notes: [{ move: "1.", badge: "good" }] })).toMatch(new RegExp(`^Kept in ${game}: 1 move marked\\.`));
+        const corrected = await run({ ...context, chat: true }, "annotate_game", { game, notes: [{ move: "2.", badge: "blunder", note: "Opens the king to Qh4." }] });
+        expect(corrected).toBe(`Kept in ${game}: 1 move marked. The board page shows them.`);
+
+        const review = await run(analyst, "annotate_game", { game, notes: [{ move: "1.", badge: "inaccuracy", note: "Weakens e1-h4." }, { move: "2.", badge: "mistake" }] });
+        expect(review).toMatch(new RegExp(`^Kept in ${game}: 1 move marked\\. The board page shows them\\.\\n2\\. keeps the note the AI wrote with the player: leave it, and don't contradict it in your summary\\.`));
+        expect(await run(analyst, "annotate_game", { game, notes: [{ move: "2.", badge: "good" }] })).toMatch(new RegExp(`^Nothing new kept in ${game}\\.\\n2\\. keeps the note`));
+        // The chat sees how far the review has got, the book's bare badges aside.
+        expect(await run(context, "status")).toContain(`In analysis on the board page: ${game} (its review so far: notes on 2 moves, who is ahead after 0 of 4)`);
+        // Told at each call, its summary too.
+        expect(await run(analyst, "annotate_game", { game, summary: "Short." })).toContain("2. keeps the note the AI wrote with the player: leave it, and don't contradict it in your summary; if this one does, give it again.");
+        expect(await run(context, "analyse_game", { game })).toContain('2.g4: mate in one: Qh4#; you marked blunder: "Opens the king to Qh4."');
+
+        // A review deleted is written again whole.
+        await run(context, "delete_review", { game });
+        await run(analyst, "analyse_game", { game });
+        expect(await run(analyst, "annotate_game", { game, notes: [{ move: "2.", badge: "mistake" }] })).not.toContain("keeps the note");
     });
 
     it("calls the tools it shares with the chat without counting as the chat that has read the game", async () => {

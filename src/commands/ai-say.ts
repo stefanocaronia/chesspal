@@ -8,13 +8,13 @@ import { newGameStep, nextStep, wordLines } from "./answer-lines.ts";
 import { type GameSummary, summaryOf } from "./game-summary.ts";
 import { refuseOtherGame } from "./play-move.ts";
 import { defineCommand } from "./registry.ts";
-import { give, say, waitingWords } from "./say.ts";
+import { give, say, waitingWords, type Written } from "./say.ts";
 
 interface Said
 {
     /** The game, none when the AI spoke before the first (D-77). */
     game?: GameSummary;
-    words: string[];
+    words: Written[];
     /** The coach yet to start on the player's move that ended the game (D-88). */
     coach?: true;
 }
@@ -57,7 +57,7 @@ export const aiSay = defineCommand({
 });
 
 /** The next step once the AI has spoken: the end of a game over has been told already, and the player's draw offer answered in words. */
-function afterWords(game: GameSummary | undefined, words: readonly string[]): string
+function afterWords(game: GameSummary | undefined, words: readonly Written[]): string
 {
     if (words.length === 0 && game?.end !== undefined) {
         // The offer to go over the game, made in the AI's words, waits for the player's yes (D-89).

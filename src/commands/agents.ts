@@ -31,7 +31,8 @@ export function withAnalyst(summary: GameSummary, context: Context, over?: Curre
 export function analystLine(game?: string): string
 {
     return `start the chesspal-analyst agent in the background with the prompt "Analyse${game === undefined ? "" : ` ${game}`}. The player speaks <their language>.": it writes its review on the board `
-        + "page, which shows it at work; tell the player in a word, and when it ends go over the game with them from what it tells you.";
+        + "page, which shows it at work; tell the player in a word, talk the game over with them meanwhile whenever they ask, and when it ends go over it with them "
+        + "from what it tells you.";
 }
 
 /** How the chat goes over a game the analyst agent has reviewed, or is reviewing: from that review, never with another agent (Stefano). */

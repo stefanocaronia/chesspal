@@ -5,7 +5,7 @@ import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import { refuseUnseen } from "./levels.ts";
 import { defineCommand } from "./registry.ts";
-import { gameToStudy, positionAfter, positionLine, studyInput } from "./study.ts";
+import { gameShown, positionAfter, positionLine, studyInput } from "./study.ts";
 import { colourName, materialText } from "./view.ts";
 
 /** The positional profile of a position: of a game studied, with where it stands. */
@@ -26,7 +26,7 @@ export const position = defineCommand({
     sharedWith: [analystAgent],
     run: ({ game, move }, context): Described => {
         if (game !== undefined || move !== undefined) {
-            const studied = gameToStudy(context, game);
+            const studied = gameShown(context, game);
             const at = positionAfter(studied.record, move);
             return { ...at.game.profile, where: positionLine(at, studied.name) };
         }

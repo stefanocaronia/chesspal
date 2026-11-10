@@ -102,13 +102,27 @@ export function judgmentsOf(plies: readonly Ply[], player: Side, { judgments }: 
 /** How long a line of the player's may be: the server's limit (D-54), which a test keeps equal. */
 export const talkLimits = { line: 200 } as const;
 
-/** A line said on the board page, with the moves the game had then; the player's with how far it got: written, read by the AI, or answered. */
+/**
+ * A line said on the board page, with the moves the game had then; the player's with how far it got: written, read by the AI, or answered; in analysis with
+ * the game and the move shown as they wrote it (D-101).
+ */
 export interface TalkLine
 {
     readonly who: "player" | "ai";
     readonly text: string;
     readonly ply: number;
     readonly heard?: "sent" | "read" | "answered";
+    readonly shown?: { readonly game: string; readonly at: number; readonly move?: string; };
+}
+
+/**
+ * The talk over a game in analysis (D-101): from the player's first line on it, the lines said since, but for the player's on another game; the last ten,
+ * which is all half the column holds (Zoe).
+ */
+export function analysisTalk(talk: readonly TalkLine[], game: string): TalkLine[]
+{
+    const first = talk.findIndex((line) => line.shown?.game === game);
+    return first === -1 ? [] : talk.slice(first).filter((line) => line.shown === undefined || line.shown.game === game).slice(-10);
 }
 
 /** How many times the AI has spoken in the game, its comments on its moves and its lines on the page: the page sees it speak when the count grows. */

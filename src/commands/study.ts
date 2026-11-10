@@ -2,7 +2,7 @@
 // goes on, nothing is studied: the analysis would help the game being played (D-60, D-62).
 import { z } from "zod";
 import { Game, type GameRecord } from "../core/index.ts";
-import { archivedGame, archivedGames, archivedName, type CurrentGame, endOf, keptGame, listedName } from "../games/index.ts";
+import { archivedGame, archivedGames, archivedName, type CurrentGame, endOf, gameInAnalysis, keptGame, listedName, type Shown } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
@@ -10,7 +10,7 @@ import { colourName } from "./view.ts";
 
 /** What look and position take to show any position of a game that is over. */
 export const studyInput = {
-    game: z.string().optional().describe("a game's name, as past_games, study_games or analyse_game writes it: one of its positions"),
+    game: z.string().optional().describe("a game's name, as past_games, study_games or analyse_game writes it: one of its positions; without it, the game on the board page"),
     move: z.string().optional().describe("the position after this move of a game over, as analyse_game numbers it: 12. for White's, 12... for Black's"),
 };
 
@@ -68,6 +68,22 @@ export function gameToStudy(context: Context, name?: string): Studied
     return { record: archivedGame(folder, latest), name: latest };
 }
 
+/**
+ * The game look and position show: without a name, for the chat, the one in analysis on the board page, which the player's words there name by their move
+ * alone (D-101, Priya); else as gameToStudy. An agent names its game, since the page may turn to another meanwhile.
+ */
+export function gameShown(context: Context, name?: string): Studied
+{
+    const analysis = name === undefined && context.agent === undefined ? gameInAnalysis(gameFolder(context.home())) : undefined;
+
+    if (analysis === undefined) {
+        return gameToStudy(context, name);
+    }
+
+    noGameGoingOn(context);
+    return namedGame(context, analysis.game);
+}
+
 /** A game played or kept to study by its name as the lists write it, or without its folder or its .pgn; refused when it is not there. */
 export function namedGame(context: Context, name: string): Required<Studied>
 {
@@ -80,6 +96,26 @@ export function namedGame(context: Context, name: string): Required<Studied>
 export function moveIndex(record: GameRecord, move: string): number
 {
     return plyOf(record, moveNumbers(record), move);
+}
+
+/**
+ * A position of a game over as the board page shows it in analysis (D-101): the game's name, how many of its moves it shows, and the last of them numbered;
+ * none for a game or a position there is not, or while a game goes on.
+ */
+export function shownPosition(context: Context, game: string, at: number): Shown | undefined
+{
+    try {
+        noGameGoingOn(context);
+        const { name, record } = namedGame(context, game);
+
+        if (!Number.isInteger(at) || at < 0 || at > record.moves.length) {
+            return undefined;
+        }
+
+        return at === 0 ? { game: name, at } : { game: name, at, move: `${moveNumbers(record)[at - 1]!}${record.moves[at - 1]!.san}` };
+    } catch {
+        return undefined;
+    }
 }
 
 /** The number of each move of a game as the analysis writes it: 1. for White's first move, 1... for Black's. */

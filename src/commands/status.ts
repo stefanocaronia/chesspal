@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { gameReviewOf, leadOf, reviewOf } from "../core/index.ts";
 import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "../games/index.ts";
 import { coachAgent, outdatedHostFiles } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
@@ -12,8 +13,9 @@ import { levelText } from "./levels.ts";
 import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 import { playerLine } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
-import { unansweredWords } from "./say.ts";
+import { unansweredWords, type Written } from "./say.ts";
 import { type Speech, speechLine, speechOf } from "./speech.ts";
+import { namedGame } from "./study.ts";
 
 interface Status
 {
@@ -31,9 +33,9 @@ interface Status
     /** Why the game on disk cannot be read, when it cannot. */
     problem?: string;
     /** What the player wrote on the board page that the AI has not answered yet, all of it. */
-    words?: string[];
+    words?: Written[];
     /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there. */
-    analysis?: { game: string; brought?: true; analyst?: true; };
+    analysis?: { game: string; brought?: true; analyst?: true; review?: string; };
     /** A game going on from before this chat, told once a chat: the player says whether to go on with it. */
     fromBefore?: true;
     /** The coach to start, once, for the player's move that ended the game (D-88). */
@@ -101,7 +103,13 @@ export const status = defineCommand({
 
             if (analysis !== undefined) {
                 // The analyst agent goes over a game the player brought, where it runs, and the chat over what it reviewed (D-89).
-                status.analysis = { game: analysis.game, ...(analysis.brought === true ? { brought: true } : {}), ...(analystRuns(context) ? { analyst: true } : {}) };
+                const review = analysis.brought === true ? undefined : reviewProgress(context, analysis.game);
+                status.analysis = {
+                    game: analysis.game,
+                    ...(analysis.brought === true ? { brought: true } : {}),
+                    ...(analystRuns(context) ? { analyst: true } : {}),
+                    ...(review === undefined ? {} : { review }),
+                };
             }
         } catch (error) {
             status.problem = (error as Error).message;
@@ -155,8 +163,8 @@ function fromBeforeChat(context: Context, started: string): boolean
     return start === undefined || cleanSince(start, started);
 }
 
-/** The game in analysis; the next step when the player has just brought it on the board page. */
-function analysisLine({ game, brought, analyst }: NonNullable<Status["analysis"]>): string
+/** The game in analysis, with how far its review has got; the next step when the player has just brought it on the board page. */
+function analysisLine({ game, brought, analyst, review }: NonNullable<Status["analysis"]>): string
 {
     if (brought === true) {
         return analyst === true
@@ -164,16 +172,36 @@ function analysisLine({ game, brought, analyst }: NonNullable<Status["analysis"]
             : `The player brought ${game} on the board page to analyse it. Next: call analyse_game {"game": "${game}"}, then keep your review on that page with annotate_game, and go over it with them.`;
     }
 
-    return analyst === true
-        ? `In analysis on the board page: ${game}. ${reviewedLine(game)}`
-        : `In analysis on the board page: ${game}; analyse_game {"game": "${game}"} goes over it with the player.`;
+    const shown = `In analysis on the board page: ${game}${review === undefined ? "" : ` (${review})`}`;
+    return analyst === true ? `${shown}. ${reviewedLine(game)}` : `${shown}; analyse_game {"game": "${game}"} goes over it with the player.`;
+}
+
+/** How far the review of a game has got, as the board page shows it (Priya): done once it holds the word on the whole game. */
+function reviewProgress(context: Context, game: string): string | undefined
+{
+    try {
+        const { record } = namedGame(context, game);
+
+        if (gameReviewOf(record) !== undefined) {
+            return "its review is done";
+        }
+
+        const noted = record.moves.filter(({ comment }) => {
+            const review = reviewOf(comment);
+            return review !== undefined && (review.badge !== "book" || review.note !== undefined);
+        }).length;
+        const estimated = record.moves.filter(({ comment }) => leadOf(comment) !== undefined).length;
+        return noted === 0 && estimated === 0 ? "no review yet" : `its review so far: notes on ${noted} moves, who is ahead after ${estimated} of ${record.moves.length}`;
+    } catch {
+        return undefined;
+    }
 }
 
 /**
  * The game's lines; a game the player brought to analyse takes the place of the next step. The coach to start goes just before the next step, where
  * the AI acts on it (Priya).
  */
-function gameLines(game: GameSummary | undefined, words: readonly string[], brought: boolean, pageClosed: boolean, coach: boolean): string[]
+function gameLines(game: GameSummary | undefined, words: readonly Written[], brought: boolean, pageClosed: boolean, coach: boolean): string[]
 {
     const closing = [...(coach ? [agentsLine([coachAgent])] : []), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed))];
 

@@ -18,6 +18,7 @@ import {
     samePosition,
     say,
     type SeenPosition,
+    shownPosition,
     startNewGame,
 } from "../../commands/index.ts";
 import { clockStarted, type GameRecord, isReviewed, writePgn } from "../../core/index.ts";
@@ -136,7 +137,10 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
     send(response, 200, json, JSON.stringify({ played: true }));
 }
 
-/** The player's words from the page, without a move: saved with the game as player_say saves them, refused in the player's words, the doorbell rung for the first. */
+/**
+ * The player's words from the page, without a move: saved with the game as player_say saves them, refused in the player's words, the doorbell rung for the
+ * first; in analysis with the position the page shows, and the doorbell rung for each (D-101).
+ */
 async function messageFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
     if (!isJson(request)) {
@@ -144,7 +148,9 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
         return;
     }
 
-    const text = textOf(jsonOf(await bodyOf(request))?.text);
+    const body = jsonOf(await bodyOf(request));
+    const text = textOf(body?.text);
+    const shown = typeof body?.game === "string" && typeof body.at === "number" ? shownPosition(served.context, body.game, body.at) : undefined;
 
     if (text === undefined) {
         send(response, 400, json, JSON.stringify({ error: `Send the message as JSON, ${talkLimits.player} characters at most: {"text": "…"}.` }));
@@ -154,15 +160,16 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
     let current;
 
     try {
-        current = say(gameFolder(served.context.home()), "player", text, served.context.now());
+        current = say(gameFolder(served.context.home()), "player", text, served.context.now(), undefined, shown);
     } catch (error) {
         const noGame = refusalOf(served)?.refusal === "no-game";
         send(response, 409, json, JSON.stringify(refusalFrom(error, noGame ? "no-game" : undefined)));
         return;
     }
 
-    // The first words of a move wake the chat, and between games the first since the AI spoke; the AI finds the rest at its next call (D-54, D-74).
-    if (wakesTheChat(current)) {
+    // The first words of a move wake the chat, and between games the first since the AI spoke; the AI finds the rest at its next call (D-54, D-74). In
+    // analysis every line does: a chat that answered in its own window would not hear the next (Priya).
+    if (shown !== undefined || wakesTheChat(current)) {
         served.bell.ring();
     }
 
@@ -347,7 +354,14 @@ function sendGame(response: ServerResponse, served: Served): void
     // With no game the page still shows the talk before the first (D-77).
     const spoken = current ?? loadTableTalk(folder);
     const heard = heardLines(spoken, served.context.given);
-    const talk = spoken.talk.map(({ who, text, ply }, index) => heard[index] === undefined ? { who, text, ply } : { who, text, ply, heard: heard[index] });
+    const talk = spoken.talk.map(({ who, text, ply, shown }, index) => ({
+        who,
+        text,
+        ply,
+        ...(heard[index] === undefined ? {} : { heard: heard[index] }),
+        // In analysis the page goes back to the move the player wrote about (D-101).
+        ...(shown === undefined ? {} : { shown }),
+    }));
     const offer = current === undefined ? undefined : drawOfferOf(current);
     const coach = coachOn(folder, current);
     const game = current === undefined ? null : {

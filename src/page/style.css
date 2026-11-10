@@ -4,6 +4,7 @@
 @import "layout/layout.css";
 @import "board/board.css";
 @import "talk/talk.css";
+@import "talk/chat.css";
 @import "game/game.css";
 @import "helps/helps.css";
 @import "legend/legend.css";

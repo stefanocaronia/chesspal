@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { boardText, type Facts, materialOf, type Side } from "../core/index.ts";
+import { boardText, type Chances, type Facts, materialOf, type Possibilities, sees, type Side } from "../core/index.ts";
 import { analystAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { headLines, wordLines } from "./answer-lines.ts";
@@ -8,26 +8,28 @@ import type { Context } from "./context.ts";
 import { type GameSummary, summaryOf } from "./game-summary.ts";
 import { refuseUnseen } from "./levels.ts";
 import { defineCommand } from "./registry.ts";
-import { newWords } from "./say.ts";
-import { gameToStudy, positionAfter, positionLine, studyInput } from "./study.ts";
+import { newWords, type Written } from "./say.ts";
+import { gameShown, positionAfter, positionLine, studyInput } from "./study.ts";
 import { fullView, materialText } from "./view.ts";
 
 /**
  * The whole view of the position, with what the player wrote on the board page the AI has not been given yet; the same view of a position of a game
  * studied; or only the board as text for the player.
  */
-type Look = { board: string; } | { game: Viewed; words: string[]; } | { study: StudyView; words: string[]; };
+type Look = { board: string; } | { game: Viewed; words: Written[]; } | { study: StudyView; words: Written[]; };
 
-/** The game with the facts of its position, whoever is to move. */
-type Viewed = GameSummary & { facts: Facts; };
+/** The game with the facts, the possibilities and the threats of its position, whoever is to move. */
+type Viewed = GameSummary & { facts: Facts; possibilities: Possibilities; };
 
-/** A position of a game studied (D-68): where it stands, and its facts. */
+/** A position of a game studied (D-68): where it stands, its facts, its possibilities and the threats. */
 interface StudyView
 {
     where: string;
     turn: Side;
     fen: string;
     facts: Facts;
+    possibilities: Possibilities;
+    threats: Chances | undefined;
 }
 
 /** The whole view (D-26), when the compact one after the player's move is not enough; or the board for the player, where the host does not show it (D-36). */
@@ -58,21 +60,27 @@ export const look = defineCommand({
             refuseUnseen(current, "tactics", 'look without only: "board"');
         }
 
-        return only === "board" ? { board: boardText(current.game.position.fen) } : { game: { ...summaryOf(current, context.now()), facts: current.game.facts }, words: newWords(context) };
+        if (only === "board") {
+            return { board: boardText(current.game.position.fen) };
+        }
+
+        const { threats } = current.game;
+        const viewed = { ...summaryOf(current, context.now()), facts: current.game.facts, possibilities: current.game.possibilities };
+        return { game: threats === undefined ? viewed : { ...viewed, threats }, words: newWords(context) };
     },
     format: (look) => {
         if ("board" in look) {
             return look.board;
         }
 
-        return [...("game" in look ? [...headLines(look.game), ...fullView(look.game.facts, look.game.turn)] : studyLines(look.study)), ...wordLines(look.words)].join("\n");
+        return [...("game" in look ? gameLines(look.game) : studyLines(look.study)), ...wordLines(look.words)].join("\n");
     },
 });
 
 /** A position of a game over, as the view of the game going on gives it. */
 function studyLook(context: Context, only: "board" | undefined, name: string | undefined, move: string | undefined): Look
 {
-    const studied = gameToStudy(context, name);
+    const studied = gameShown(context, name);
     const at = positionAfter(studied.record, move);
     const { position } = at.game;
 
@@ -80,16 +88,23 @@ function studyLook(context: Context, only: "board" | undefined, name: string | u
         return { board: boardText(position.fen) };
     }
 
-    return { study: { where: positionLine(at, studied.name), turn: position.turn, fen: position.fen, facts: at.game.facts }, words: newWords(context) };
+    const view = { where: positionLine(at, studied.name), turn: position.turn, fen: position.fen, facts: at.game.facts, possibilities: at.game.possibilities, threats: at.game.threats };
+    return { study: view, words: newWords(context) };
 }
 
-/** Where the position stands, the material, the FEN, and the whole view. */
-function studyLines({ where, turn, fen, facts }: StudyView): string[]
+/** The game going on: its head and the whole view, with the other side's chances from the strong level (D-100). */
+function gameLines(game: Viewed): string[]
+{
+    return [...headLines(game), ...fullView(game.facts, game.turn, { possibilities: game.possibilities, threats: game.threats, strong: sees(game.level, "strategy") })];
+}
+
+/** Where the position stands, the material, the FEN, and the whole view, with every possibility, as the analyst sees it. */
+function studyLines({ where, turn, fen, facts, possibilities, threats }: StudyView): string[]
 {
     return [
         where,
         `Material: ${materialText(materialOf(fen))}`,
         `FEN: ${fen}`,
-        ...fullView(facts, turn),
+        ...fullView(facts, turn, { possibilities, threats, strong: true }),
     ];
 }

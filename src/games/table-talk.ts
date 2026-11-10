@@ -3,7 +3,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { savedLine, type TalkLine } from "./current-game.ts";
-import { writeAtomically } from "./files.ts";
+import { stampOf, writeAtomically } from "./files.ts";
 
 /** What the player and the AI said with no game on the page, and since when: it keys the player's lines apart from any game's. */
 export interface TableTalk
@@ -26,6 +26,12 @@ export function loadTableTalk(folder: string): TableTalk
 export function saveTableTalk(folder: string, table: TableTalk): void
 {
     writeAtomically(join(folder, fileName), `${JSON.stringify(table, null, 2)}\n`);
+}
+
+/** A stamp of talk.json that changes whenever it is written; undefined when there is none. */
+export function tableTalkStamp(folder: string): string | undefined
+{
+    return stampOf(join(folder, fileName));
 }
 
 /** Forgets the talk with no game, when a game starts. */

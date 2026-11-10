@@ -1,14 +1,26 @@
 // The view of a position the AI reads (D-26): the facts the core computes, in the format a bench chose; never the grid, which is the player's.
-import type { Facts, Material, PieceFacts, PieceLetter, Side, Square } from "../core/index.ts";
+import type { Chances, DoubleAttack, Facts, Material, PieceFacts, PieceLetter, Possibilities, Side, Square } from "../core/index.ts";
 
-/** The view after the player's move: the check, the pieces attacked, then what is at risk, the pins, the checks and the moves of each piece. */
-export function compactView(facts: Facts, turn: Side): string[]
+/** What the moves would do (D-100), and the other side's threats, none in check. */
+export interface Possible
+{
+    readonly possibilities: Possibilities;
+    readonly threats: Chances | undefined;
+    /** The level sees the threats' double attacks and discovered checks, and the stalemate traps: from the strong level up. */
+    readonly strong: boolean;
+}
+
+/**
+ * The view after the player's move, in the masters' order (D-100): the check, the checks, the captures, the threats, what the moves would do, the pins,
+ * skewers and loose pieces, the pieces attacked, the moves of each piece.
+ */
+export function compactView(facts: Facts, turn: Side, possible?: Possible): string[]
 {
     const names = namesOf(facts);
     const attacked = officersOf(facts).filter((piece) => piece.attackers.length > 0);
     const pieces = attacked.length === 0 ? ["Attacked pieces: none"] : ["Attacked pieces (attackers / defenders):", ...attacked.map((piece) => pieceLine(piece, names, true))];
 
-    return [...checkLines(facts, turn, names), ...pieces, ...tacticLines(facts, turn, names)];
+    return [...checkLines(facts, turn, names), ...tacticLines(facts, turn, names, possible, pieces)];
 }
 
 /** The view of a level without the tactical facts (D-60): the check and the legal moves by piece, which are the rules (D-17). */
@@ -18,8 +30,8 @@ export function boardView(facts: Facts, turn: Side): string[]
     return [...checkLines(facts, turn, names), ...legalLines(facts, names)];
 }
 
-/** The whole view, for look: every piece with its attackers and defenders, then the same lines as the compact view. */
-export function fullView(facts: Facts, turn: Side): string[]
+/** The whole view, for look: the same lines as the compact view, with every piece's attackers and defenders. */
+export function fullView(facts: Facts, turn: Side, possible?: Possible): string[]
 {
     const names = namesOf(facts);
     const sides = sidesInOrder.flatMap((side) => [
@@ -27,7 +39,21 @@ export function fullView(facts: Facts, turn: Side): string[]
         ...officersOf(facts).filter((piece) => piece.side === side).map((piece) => pieceLine(piece, names, false)),
     ]);
 
-    return [...checkLines(facts, turn, names), ...sides, ...tacticLines(facts, turn, names)];
+    return [...checkLines(facts, turn, names), ...tacticLines(facts, turn, names, possible, sides)];
+}
+
+/** What the moves of the side to move would do, in one line for a move of the analysis: fork Nc7+ (Ke8 Ra8); stalemate Qf7; none when nothing. */
+export function tacticsText(facts: Facts, possibilities: Possibilities, withTraps: boolean): string | undefined
+{
+    const names = namesOf(facts);
+    const traps = withTraps ? possibilities.stalemateTraps.map(({ san, replies }) => `${san} (if ${replies === "all" ? "any reply" : replies.join(" or ")})`) : [];
+    const parts = [
+        ...chanceParts(possibilities, names),
+        kindPart("stalemate", possibilities.stalemates),
+        kindPart("stalemate trap", traps),
+    ].filter((part) => part !== undefined);
+
+    return parts.length === 0 ? undefined : parts.join("; ");
 }
 
 /** What is at risk, in one line for a move of the analysis (D-68): undefended Black Nf6; by a cheaper piece White Qd1; outnumbered Black Pe5; none when nothing is. */
@@ -89,8 +115,11 @@ function checkLines(facts: Facts, turn: Side, names: Names): string[]
     return facts.checkedBy === undefined ? [] : [`${colourName(turn)} is in check from ${facts.checkedBy.map(names.piece).join(" and ")}.`];
 }
 
-/** What is at risk, loose and pinned, the checks of both sides, and the legal moves of the side to move by piece. */
-function tacticLines(facts: Facts, turn: Side, names: Names): string[]
+/**
+ * In the masters' order (D-100): the side to move's checks and captures, the threats (what is at risk, the other side's checks and chances), what its
+ * moves would do, the pins, skewers and loose pieces, the pieces in detail, its legal moves by piece.
+ */
+function tacticLines(facts: Facts, turn: Side, names: Names, possible: Possible | undefined, detail: readonly string[]): string[]
 {
     const list = (squares: readonly Square[]) => bySide(facts, squares, names) || "none";
     const atRisk = facts.undefended.length === 0 && facts.attackedByCheaper.length === 0 && facts.outnumbered.length === 0
@@ -98,14 +127,65 @@ function tacticLines(facts: Facts, turn: Side, names: Names): string[]
         : `Attacked and undefended: ${list(facts.undefended)}; defended, but attacked by a cheaper piece: ${list(facts.attackedByCheaper)}; `
             + `attacked more times than defended: ${list(facts.outnumbered)}`;
     const pins = facts.pins.map((pin) => `${names.sided(pin.square)} to ${names.piece(pin.to)} by ${names.piece(pin.by)}`);
+    const skewers = facts.skewers.map((skewer) => `${names.sided(skewer.square)} with ${names.piece(skewer.to)} behind, by ${names.piece(skewer.by)}`);
+    const [ownChecks, ...otherChecks] = checksLines(facts, turn);
+    // A game over has no moves to tell of.
+    const moves = possible !== undefined && facts.pieces.some((piece) => (piece.moves?.length ?? 0) > 0) ? possible : undefined;
 
     return [
+        ownChecks!,
+        ...(moves === undefined ? [] : [captureLine(moves.possibilities)]),
         atRisk,
-        `Loose: ${list(facts.loose)}`,
+        ...otherChecks,
+        ...(moves === undefined ? [] : threatLines(moves, turn, names)),
+        ...(moves === undefined ? [] : [`${colourName(turn)} (to move) tactics: ${tacticsText(facts, moves.possibilities, moves.strong) ?? "none"}`]),
         `Pinned: ${pins.join(", ") || "none"}`,
-        ...checksLines(facts, turn),
+        ...(skewers.length === 0 ? [] : [`Skewered: ${skewers.join(", ")}`]),
+        `Loose: ${list(facts.loose)}`,
+        ...detail,
         ...legalLines(facts, names),
     ];
+}
+
+/** The captures of the side to move, each with what the piece taken is to the piece taking it. */
+function captureLine({ captures }: Possibilities): string
+{
+    return `Captures: ${captures.map((capture) => (capture.fact === undefined ? capture.san : `${capture.san} (${capture.fact})`)).join(", ") || "none"}`;
+}
+
+/** What the other side's moves would do if it were to move: its promotions, and as the level sees them its double attacks and discovered checks. */
+function threatLines({ threats, strong }: Possible, turn: Side, names: Names): string[]
+{
+    if (threats === undefined) {
+        return [];
+    }
+
+    const parts = [
+        kindPart("promote", threats.promotions),
+        ...(strong ? chanceParts({ ...threats, promotions: [] }, names) : []),
+    ].filter((part) => part !== undefined);
+
+    return parts.length === 0 ? [] : [`${colourName(turn === "white" ? "black" : "white")} threats, if it were to move: ${parts.join("; ")}`];
+}
+
+/** A side's forks, double attacks, double and discovered checks and promotions, each kind with its moves. */
+function chanceParts(chances: Chances, names: Names): (string | undefined)[]
+{
+    const attack = ({ san, targets }: DoubleAttack) => `${san} (${targets.map(names.piece).join(" ")})`;
+
+    return [
+        kindPart("fork", chances.doubleAttacks.filter((each) => each.fork).map(attack)),
+        kindPart("double attack", chances.doubleAttacks.filter((each) => !each.fork).map(attack)),
+        kindPart("double check", chances.doubleChecks),
+        kindPart("discovered check", chances.discoveredChecks),
+        kindPart("promote", chances.promotions),
+    ];
+}
+
+/** A kind with its moves, comma-separated; none without moves. */
+function kindPart(kind: string, moves: readonly string[]): string | undefined
+{
+    return moves.length === 0 ? undefined : `${kind} ${moves.join(", ")}`;
 }
 
 /** The checks the side to move can give, and those the other side could give if it were to move; one line when neither has any. */

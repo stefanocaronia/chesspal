@@ -1,9 +1,10 @@
 // The current game as the commands give it: plain data for the command line's JSON, from which answer-lines.ts writes the lines an AI reads.
-import { type AiLevel, type Facts, type GameRecord, levelOf, moodAt, type MoodNow, sees, type Side, type Square } from "../core/index.ts";
+import { type AiLevel, type Chances, type Facts, type GameRecord, levelOf, moodAt, type MoodNow, type Possibilities, sees, type Side, type Square } from "../core/index.ts";
 import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, type Thought, thoughtForLastMove } from "../games/index.ts";
 import { helpsIn } from "../profiles/index.ts";
 import { type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
+import type { Written } from "./say.ts";
 
 /** The current game, as the commands give it. */
 export interface GameSummary
@@ -22,6 +23,10 @@ export interface GameSummary
     opening?: string;
     /** When the AI is to move: the facts of the position (D-26); below the club level, only the check and the legal moves of each piece are shown. */
     facts?: Facts;
+    /** When the AI is to move, from the club level up: what the moves would do (D-100). */
+    possibilities?: Possibilities;
+    /** With the possibilities, out of check: what the player's moves would do if they were to move. */
+    threats?: Chances;
     /** When the AI is to move at the master level, in the book: the moves it knows from the position (D-15, D-60). */
     book?: readonly string[];
     /** When the AI is to move: the plan it wrote last. */
@@ -62,7 +67,7 @@ export interface MovePlayed
     /** What went wrong after the move was saved, such as the archive not written. */
     warning?: string;
     /** What the player wrote on the board page that the AI has not been given yet. */
-    words?: string[];
+    words?: Written[];
 }
 
 /** The game as the commands tell it; a game over with the name it has in the archive, when it is there. */
@@ -180,6 +185,15 @@ function addAiFacts(summary: GameSummary, { game }: CurrentGame): void
 {
     const plan = currentPlan(game.record);
     summary.facts = game.facts;
+
+    if (sees(summary.level, "tactics")) {
+        summary.possibilities = game.possibilities;
+        const { threats } = game;
+
+        if (threats !== undefined) {
+            summary.threats = threats;
+        }
+    }
 
     if (sees(summary.level, "theory")) {
         const book = knownMoves(summary.fen);

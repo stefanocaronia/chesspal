@@ -1,6 +1,7 @@
 // What a position shows, computed without judging it (D-19, D-26): who attacks and defends each piece, what is at risk, the pins and skewers, the checks, the moves of each piece.
 import { Chess, type Color, type PieceSymbol, type Square } from "chess.js";
 import type { Move, Side } from "./game.ts";
+import { mayCastle, Placement, turnPassed } from "./placement.ts";
 
 /** A piece's letter, as SAN writes it, with P for a pawn. */
 export type PieceLetter = "K" | "Q" | "R" | "B" | "N" | "P";
@@ -111,10 +112,19 @@ interface Placed
 /** Which pieces attack a square: chess.js's direct attacks, a piece pinned to its king only along the pin's line, and the pawns that take en passant. */
 export type Reach = (square: Square, color: Color) => Square[];
 
-/** Which pieces attack a square as the facts count them: a piece pinned to its king only along the pin's line, though it still gives check; no en passant. */
-export function attacksOf(chess: Chess): Reach
+/** What the attacks read of a board: its pieces, where a side's pieces of a type stand, and which pieces of a side attack a square, as chess.js counts them. */
+export interface Board
 {
-    return alongPins(chess, piecesOf(chess).filter((piece) => piece.type === "k").flatMap((king) => pinsTo(chess, king)));
+    get(square: Square): { type: PieceSymbol; color: Color; } | undefined;
+    findPiece(piece: { type: PieceSymbol; color: Color; }): Square[];
+    attackers(square: Square, color: Color): Square[];
+}
+
+/** Which pieces attack a square as the facts count them: a piece pinned to its king only along the pin's line, though it still gives check; no en passant. */
+export function attacksOf(board: Board): Reach
+{
+    const kings = (["w", "b"] as const).flatMap((color) => board.findPiece({ type: "k", color }).map((square) => ({ square, type: "k" as const, color })));
+    return alongPins(board, kings.flatMap((king) => pinsTo(board, king)));
 }
 
 /** The squares strictly between two squares on one line. */
@@ -176,7 +186,7 @@ function reachOf(chess: Chess, kingPins: readonly Pin[], legal: readonly Move[])
     return (square, color) => (square === enPassant?.square && color === chess.turn() ? [...direct(square, color), ...takers].sort(compare) : direct(square, color));
 }
 
-function alongPins(chess: Chess, kingPins: readonly Pin[]): Reach
+function alongPins(chess: Board, kingPins: readonly Pin[]): Reach
 {
     const pinLines = new Map(kingPins.map((pin) => [pin.square, new Set(squaresBetween(pin.to, pin.by).concat(pin.by))]));
 
@@ -236,7 +246,7 @@ function batteries(chess: Chess, target: Square, fronts: readonly Square[]): Par
 }
 
 /** The pins to a piece: by a rook, bishop or queen on its line, with a piece of its side between them. */
-function pinsTo(chess: Chess, target: Placed): Pin[]
+function pinsTo(chess: Board, target: Placed): Pin[]
 {
     const pins: Pin[] = [];
 
@@ -304,10 +314,24 @@ function enPassantVictim(chess: Chess): { square: Square; to: Square; } | undefi
 /** The checks of the side not to move, on the same board with the turn passed: no en passant, which belonged to the side to move. */
 function otherChecks(chess: Chess): string[]
 {
-    const fields = chess.fen().split(" ");
-    fields[1] = chess.turn() === "w" ? "b" : "w";
-    fields[3] = "-";
-    return new Chess(fields.join(" ")).moves().filter((san) => /[+#]$/.test(san));
+    const other: Color = chess.turn() === "w" ? "b" : "w";
+
+    // Castling may check, and the board of pieces alone does not try it: where the other side may castle, chess.js lists all its moves.
+    if (mayCastle(chess, other)) {
+        return turnPassed(chess).moves().filter((san) => /[+#]$/.test(san));
+    }
+
+    // Else its moves are tried and written on the board of pieces alone, in chess.js's order (D-34); chess.js writes the rare one it cannot.
+    const board = new Placement(chess);
+    const moves = board.movesOf(other);
+    const checks = moves.filter((move) => {
+        board.play(move);
+        const check = board.inCheck(chess.turn());
+        board.undo();
+        return check;
+    }).map((move) => board.sanOf(move, moves));
+
+    return checks.includes(undefined) ? turnPassed(chess).moves().filter((san) => /[+#]$/.test(san)) : checks as string[];
 }
 
 /** The pieces on the board, White's first, each side's from the king down (K Q R B N P), then by square. */
@@ -318,8 +342,25 @@ function piecesOf(chess: Chess): Placed[]
     );
 }
 
-/** The squares from a square to the edge of the board, one step at a time. */
-function rayFrom(from: Square, fileStep: number, rankStep: number): Square[]
+/** The squares from a square to the edge of the board, one step at a time; worked out once for each square and step. */
+function rayFrom(from: Square, fileStep: number, rankStep: number): readonly Square[]
+{
+    const step = (fileStep + 1) * 3 + rankStep + 1;
+    let known = rays.get(from);
+
+    if (known === undefined) {
+        known = [];
+        rays.set(from, known);
+    }
+
+    known[step] ??= Object.freeze(walked(from, fileStep, rankStep));
+    return known[step];
+}
+
+// The rays from each square already walked, by their step.
+const rays = new Map<Square, (readonly Square[])[]>();
+
+function walked(from: Square, fileStep: number, rankStep: number): Square[]
 {
     const ray: Square[] = [];
     let file = fileOf(from) + fileStep;

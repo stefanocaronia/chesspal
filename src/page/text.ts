@@ -92,6 +92,9 @@ export interface Text
     readonly send: string;
     readonly sent: string;
     readonly withMove: string;
+    /** In analysis, under the box: the words go with the move shown, or with the whole game at its start (D-101). */
+    readonly onMove: string;
+    readonly onWholeGame: string;
     readonly talk: string;
     readonly move: string;
     readonly draw: string;
@@ -109,6 +112,8 @@ export interface Text
     outdated(name: string): string;
     /** The page is served, but no chat hears the player (never started, or just cleared): where to write to wake it; its clock waits. */
     asleep(name: string): string;
+    /** The same over a game in analysis, where no clock waits (Zoe). */
+    asleepInAnalysis(name: string): string;
     /** The thought cloud on the Torretta, by what the AI thinks on: its move, or on the player's time (D-72). */
     thinking: { readonly move: string; readonly ponder: string; };
     /** The button that starts the clocks, which wait for the player from the game's start. */
@@ -126,6 +131,10 @@ export interface Text
     piece(letter: PieceLetter, side: Side): string;
     taken(pieces: readonly string[], ahead: number): string;
     writeTo(name: string): string;
+    /** In analysis, the box's placeholder (D-101). */
+    askAbout(name: string): string;
+    /** The move a line of the player's was written on, to go back to it. */
+    goTo(move: string): string;
     readBy(name: string): string;
     wrote(name: string): string;
     /** The header's words after the AI's name: its draw offer that stands, the player's it declined by its move (D-65). */
@@ -478,6 +487,8 @@ const english: Text = {
     send: "Send",
     sent: "Sent",
     withMove: "Or move: your words go with it",
+    onMove: "On",
+    onWholeGame: "On the whole game",
     talk: "The talk",
     move: "Move",
     draw: "draw",
@@ -504,6 +515,7 @@ const english: Text = {
     startClocks: "Start",
     thinking: { move: "Thinking about its move", ponder: "Thinking while you play" },
     asleep: (name) => `${name} is not listening: write a message, such as "hi", in the window where you opened ${name}, not here. Its clock waits until it answers.`,
+    asleepInAnalysis: (name) => `${name} is not listening: write to it in the window where you opened it, not here.`,
     commandHere: (name) => `/clear and the other commands go in the window where you opened ${name}, not here.`,
     refused: {
         "no-game": () => "There is no game going on: press + to start one, or ask for one in the chat.",
@@ -524,6 +536,8 @@ const english: Text = {
     piece: (letter, side) => `${side} ${englishNames[letter]}`,
     taken: (pieces, ahead) => `Pieces taken: ${pieces.length === 0 ? "none" : pieces.join(", ")}${ahead > 0 ? `; ahead by ${ahead}` : ""}`,
     writeTo: (name) => `Write to ${name}…`,
+    askAbout: (name) => `Ask ${name} about this game…`,
+    goTo: (move) => `Go to ${move}`,
     readBy: (name) => `Read by ${name}`,
     wrote: (name) => `${name} wrote`,
     offers: "offers a draw",
@@ -817,6 +831,8 @@ const italian: Text = {
     send: "Manda",
     sent: "Mandato",
     withMove: "Oppure muovi: parte con la mossa",
+    onMove: "Su",
+    onWholeGame: "Su tutta la partita",
     talk: "Conversazione",
     move: "Mossa",
     draw: "patta",
@@ -844,6 +860,7 @@ const italian: Text = {
     startClocks: "Inizia",
     thinking: { move: "Sta pensando alla sua mossa", ponder: "Pensa mentre giochi tu" },
     asleep: (name) => `${name} non ti sta ascoltando: scrivi un messaggio, per esempio "ciao", nella finestra dove hai aperto ${name}, non qui. Il suo orologio aspetta che risponda.`,
+    asleepInAnalysis: (name) => `${name} non ti sta ascoltando: scrivigli nella finestra dove l'hai aperto, non qui.`,
     commandHere: (name) => `/clear e gli altri comandi vanno scritti nella finestra dove hai aperto ${name}, non qui.`,
     refused: {
         "no-game": () => "Nessuna partita in corso: premi + per iniziarne una, o chiedila nella chat.",
@@ -865,6 +882,8 @@ const italian: Text = {
     piece: (letter, side) => `${italianNames[letter]} ${side === "white" ? (letter === "Q" || letter === "R" ? "bianca" : "bianco") : (letter === "Q" || letter === "R" ? "nera" : "nero")}`,
     taken: (pieces, ahead) => `Pezzi presi: ${pieces.length === 0 ? "nessuno" : pieces.join(", ")}${ahead > 0 ? `; avanti di ${ahead}` : ""}`,
     writeTo: (name) => `Scrivi a ${name}…`,
+    askAbout: (name) => `Chiedi a ${name} di questa partita…`,
+    goTo: (move) => `Vai a ${move}`,
     readBy: (name) => `Letto da ${name}`,
     wrote: (name) => `${name} ha scritto`,
     offers: "propone patta",

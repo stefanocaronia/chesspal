@@ -2,6 +2,7 @@
 import { Chess, type Move as ChessMove, type Square, validateFen } from "chess.js";
 import { type Facts, factsOf } from "./facts.ts";
 import { type Illegal, whyIllegal } from "./illegal.ts";
+import { type Chances, type Possibilities, possibilitiesOf, threatsOf } from "./possibilities.ts";
 import { type Profile, profileOf } from "./profile.ts";
 import { type Annotation, cleanComment, type GameRecord, type RecordedMove, recordedMove } from "./record.ts";
 
@@ -123,6 +124,18 @@ export class Game
     get facts(): Facts
     {
         return factsOf(this.chess, legalMovesOf(this.chess));
+    }
+
+    /** What the moves would do (D-100): captures, double attacks, discovered checks, promotions, stalemates; once for each position. */
+    get possibilities(): Possibilities
+    {
+        return possibilitiesOf(this.chess, legalMovesOf(this.chess));
+    }
+
+    /** What the other side's moves would do if it were to move (D-100), none in check; once for each position, only where it is shown. */
+    get threats(): Chances | undefined
+    {
+        return threatsOf(this.chess);
     }
 
     /** The positional profile (D-19): pawns, files, outposts, space, mobility, development, king safety, control, phase, draws; computed once for each position. */

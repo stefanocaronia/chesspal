@@ -1,5 +1,5 @@
 // The talk on the board page (D-51): the player's words and the AI's answers, kept in game.json beside the PGN, or in talk.json with no game (D-77).
-import { type CurrentGame, endOf, type Speaker, type TalkLine } from "./current-game.ts";
+import { type CurrentGame, endOf, type Shown, type Speaker, type TalkLine } from "./current-game.ts";
 import type { TableTalk } from "./table-talk.ts";
 
 /** The most the player may write in a move, in all their lines, and the most a line of the AI's may hold (D-54); with the helps on, as an analyst's note (D-78). */
@@ -15,7 +15,15 @@ export type Talk = CurrentGame | TableTalk;
  * A new line of the talk, said when the game has `ply` moves: refused when it is empty or too long. The player writes 200 characters a move in all, the
  * words sent with the move included; the AI speaks once a move of theirs, on their time, and its agent's word leaves it an answer to what they write after (D-54, D-72).
  */
-export function talkLine(current: Talk, sayer: Sayer, text: string, at: Date, ply = isGame(current) ? current.game.record.moves.length : 0, aiMost: number = talkLimits.ai): TalkLine
+export function talkLine(
+    current: Talk,
+    sayer: Sayer,
+    text: string,
+    at: Date,
+    ply = isGame(current) ? current.game.record.moves.length : 0,
+    aiMost: number = talkLimits.ai,
+    shown?: Shown,
+): TalkLine
 {
     const who = sayer === "agent" ? "ai" : sayer;
     const words = text.trim();
@@ -38,7 +46,7 @@ export function talkLine(current: Talk, sayer: Sayer, text: string, at: Date, pl
         refuseAiWords(current, sayer === "agent");
     }
 
-    return { who, text: words, ply, at: at.toISOString(), ...(sayer === "agent" ? { agent: true } : {}) };
+    return { who, text: words, ply, at: at.toISOString(), ...(sayer === "agent" ? { agent: true } : {}), ...(shown === undefined ? {} : { shown }) };
 }
 
 /** Words refused, and why, for the page to say it in the player's language: none, the move's characters spent, more than a line or what is left holds. */
@@ -61,17 +69,18 @@ export function wakesTheChat(current: Talk): boolean
     return going(current) ? playerLinesThisMove(current).length === 1 : unanswered(current).length === 1;
 }
 
-/** Words of the player's, with the key that tells them apart across games. */
+/** Words of the player's, with the key that tells them apart across games, and in analysis the position the page showed (D-101). */
 export interface Words
 {
     readonly key: string;
     readonly text: string;
+    readonly shown?: Shown;
 }
 
 /** What the player said that the AI has not answered, but for the words whose keys are in `given`. */
 export function unheardWords(current: Talk, given: ReadonlySet<string>): Words[]
 {
-    return unanswered(current).filter(({ key }) => !given.has(key)).map(({ key, line }) => ({ key, text: line.text }));
+    return unanswered(current).filter(({ key }) => !given.has(key)).map(({ key, line }) => ({ key, text: line.text, ...(line.shown === undefined ? {} : { shown: line.shown }) }));
 }
 
 /** How far a line of the player's got: written, read by the AI in this chat, or answered by its words or its move. */

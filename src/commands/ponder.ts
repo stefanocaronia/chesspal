@@ -217,7 +217,7 @@ function startOf(current: CurrentGame): Start
     const line = [
         `Position ${game.record.moves.length}: the player (${colourName(player)}) to move, move ${game.position.moveNumber}; you play ${colourName(ai)} ${levelText(level)}.`,
         `FEN: ${game.position.fen}`,
-        ...(sees(level, "tactics") ? compactView : boardView)(game.facts, player),
+        ...(sees(level, "tactics") ? compactView(game.facts, player, { possibilities: game.possibilities, threats: game.threats, strong: sees(level, "strategy") }) : boardView(game.facts, player)),
     ].join("\n");
     const said = talk.slice(-3).map((spoken) => `${spoken.who === "ai" ? "You" : "Player"}: «${spoken.text.replace(/\s+/g, " ")}»`);
     return {

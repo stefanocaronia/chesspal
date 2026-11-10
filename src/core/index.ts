@@ -15,6 +15,7 @@ export { endWithMood, type Mood, moodAt, type MoodNow, moodOf, moods, moodTag, w
 export { bookMoves, indexBook, indexOpenings, inOpenings, openingOf, outOfBookMove } from "./openings.ts";
 export type { Opening, OpeningBook, OpeningIndex } from "./openings.ts";
 export { pgnDate, readPgn, writePgn } from "./pgn.ts";
+export type { Capture, Chances, DoubleAttack, Possibilities, StalemateTrap } from "./possibilities.ts";
 export type { BishopFacts, CentreSquare, KingFacts, Outpost, PawnFacts, PawnSquare, Phase, Profile, SideProfile } from "./profile.ts";
 export { movesOnly } from "./record.ts";
 export type { Annotation, GameRecord, RecordedMove } from "./record.ts";

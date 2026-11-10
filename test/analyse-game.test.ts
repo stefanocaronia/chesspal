@@ -105,7 +105,7 @@ describe("the analysis of a game (D-68)", () => {
         expect(await analyse(context, { pgn: fromBlack })).toMatch(/\n1\.\.\.e5\n2\.Nf3: at risk: undefended Black Pe5\n2\.\.\.Nc6: at risk: none$/);
         expect(await lookAt(context, { game: imported, move: "2." })).toMatch(/^After 2\.Nf3 in /);
         expect(await analyse({ ...context, now: () => new Date(2026, 10, 3) }, { pgn: promotion })).toMatch(
-            /\n1\.\.\.bxc3: took P; material Black \+5; at risk: undefended Black Ra8\n2\.bxa8=Q\+: took R; material White \+8; at risk: none$/,
+            /\n1\.\.\.bxc3: took P; material Black \+5; at risk: undefended Black Ra8; tactics: promote b8=Q\+, bxa8=Q\+\n2\.bxa8=Q\+: took R; material White \+8; at risk: none$/,
         );
     });
 
@@ -204,6 +204,19 @@ describe("look and position on a game over (D-68)", () => {
 
         const profile = position.format(await position.run(position.input.parse({ game: imported, move: "1..." }), context));
         expect(profile).toMatch(new RegExp(`^After 1\\.\\.\\.e5 in ${imported}: White to move\\.\\nPhase: opening\\nMaterial: even`));
+    });
+
+    it("show the chat the game in analysis on the board page without its name, and an agent the game just over (D-101)", async () => {
+        const context = playerFolder();
+        await newGame.run(newGame.input.parse({ ai_colour: "black" }), context);
+        await playerMove.run(playerMove.input.parse({ move: "e4" }), context);
+        await aiMove.run(aiMove.input.parse({ move: "d5", plan: "open the centre" }), context);
+        await endGame.run(endGame.input.parse({ result: "player_resigns" }), context);
+        await analyse(context, { pgn });
+
+        expect(await lookAt(context, { move: "1..." })).toMatch(new RegExp(`^After 1\\.\\.\\.e5 in ${imported}:`));
+        expect(position.format(await position.run(position.input.parse({ move: "1..." }), context))).toMatch(new RegExp(`^After 1\\.\\.\\.e5 in ${imported}:`));
+        expect(await lookAt({ ...context, agent: "chesspal-analyst" }, { move: "1..." })).toMatch(/^After 1\.\.\.d5 in games\//);
     });
 
     it("refuse a move the game does not have", async () => {

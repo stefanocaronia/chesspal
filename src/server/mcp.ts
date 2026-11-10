@@ -10,7 +10,7 @@ import { agentTools, hasAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { pagePorts } from "./bell.ts";
-import { allowedCaller, callerOf, callingAgent, fromCodexAgent } from "./caller.ts";
+import { allowedCaller, callerOf, type CallingAgent, callingAgent, fromCodexAgent } from "./caller.ts";
 import { chatHasRead, startPage } from "./page/page.ts";
 
 /** What the host reads as the server starts, before any tool: where to begin, and the rule of every move (D-27). Short, since hosts may cut it. */
@@ -193,7 +193,8 @@ function toolConfig(command: AnyCommand)
 
 async function runTool(command: AnyCommand, input: unknown, context: Context, caller: NonNullable<Context["caller"]>, meta: Record<string, unknown> | undefined): Promise<CallToolResult>
 {
-    const agent = await sharingAgent(command, meta, context);
+    const calling = await sharingCaller(command, meta, context);
+    const agent = calling !== undefined && "agent" in calling ? calling.agent : undefined;
     const chat = command.byAgents === undefined && agent === undefined;
     let refused = false;
 
@@ -202,7 +203,8 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
             context.calls?.();
         }
 
-        const result: unknown = await command.run(checkedInput(command, input), { ...context, caller, ...(agent === undefined ? {} : { agent }) });
+        const who = agent !== undefined ? { agent } : calling !== undefined ? { chat: true as const } : {};
+        const result: unknown = await command.run(checkedInput(command, input), { ...context, caller, ...who });
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {
         refused = error instanceof PositionChanged;
@@ -217,10 +219,10 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
 }
 
 /**
- * The agent that calls a tool it shares with the chat, as the analyst (D-89), by its type: looked up only in a folder where one may run and while no game
- * goes on, so that no call of the chat's waits for it while it plays; none for the chat, or when it cannot be told.
+ * Who calls a tool the chat shares with an agent, as the analyst (D-89): the chat, or the agent by its type; looked up only in a folder where one may run
+ * and while no game goes on, so that no call of the chat's waits for it while it plays. None when it cannot be told, or for an agent the tool is not shared with.
  */
-async function sharingAgent(command: AnyCommand, meta: Record<string, unknown> | undefined, context: Context): Promise<string | undefined>
+async function sharingCaller(command: AnyCommand, meta: Record<string, unknown> | undefined, context: Context): Promise<CallingAgent | undefined>
 {
     const agents = command.sharedWith?.filter((agent) => hasAgent(context.folder, agent, context.host?.())) ?? [];
 
@@ -229,7 +231,7 @@ async function sharingAgent(command: AnyCommand, meta: Record<string, unknown> |
     }
 
     const caller = await callingAgent(meta, context.folder);
-    return caller !== undefined && "agent" in caller && agents.includes(caller.agent) ? caller.agent : undefined;
+    return caller !== undefined && "agent" in caller && !agents.includes(caller.agent) ? undefined : caller;
 }
 
 /** Whether a game goes on, or may: a game that cannot be read is the command's to report, as the chat's call (Federico). */

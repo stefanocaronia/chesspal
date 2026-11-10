@@ -1,5 +1,5 @@
 // Writing the player's files safely: whole or not at all, with failures that say what to do (D-27).
-import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 
 /** Writes a file whole or not at all: a temporary file beside it, then renamed over it (D-27). A failure says what to do about it. */
 export function writeAtomically(path: string, text: string | Uint8Array): void
@@ -24,6 +24,14 @@ export function makeFolder(path: string): void
     } catch (error) {
         throw new Error(`${path} could not be made (${(error as Error).message}): check that it is a folder, and can be written.`, { cause: error });
     }
+}
+
+/** A stamp of a file that changes whenever it is written, whoever writes it; undefined when there is none. */
+export function stampOf(path: string): string | undefined
+{
+    // The file's id changes at every rename: a write within the same tick of the clock, and of the same size, is seen too.
+    const stats = statSync(path, { bigint: true, throwIfNoEntry: false });
+    return stats === undefined ? undefined : `${stats.ino}:${stats.mtimeNs}:${stats.size}`;
 }
 
 const attempts = 10;

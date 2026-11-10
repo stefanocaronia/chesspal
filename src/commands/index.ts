@@ -36,7 +36,7 @@ export { playMove, PositionChanged, positionIn, samePosition } from "./play-move
 export { chooseDrawnAvatar, GameGoingOn, newProfile, setAccounts, useProfile } from "./profiles.ts";
 export { type AnyCommand, baseType, type Command, commandLineFieldProblem, inputProblems, isBoolean, isList, takesNumbers } from "./registry.ts";
 export { say } from "./say.ts";
-export { gameToStudy, namedGame } from "./study.ts";
+export { gameToStudy, namedGame, shownPosition } from "./study.ts";
 
 /** Every command of Chesspal, in the order the command line lists them and the MCP server offers them. */
 export const commands: AnyCommand[] = [

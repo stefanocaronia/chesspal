@@ -42,7 +42,7 @@ import { GameColumn } from "../game/column.tsx";
 import { howEnded, useDeclined, useJustEnded, useSawEnd } from "../game/ending.ts";
 import { Steps } from "../game/move-list.tsx";
 import { useOpeningBook } from "../game/opening-book.ts";
-import { aiSpoke, aiWords, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
+import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
 import { BareButton, HelpsCard, HintLine, MapButton } from "../helps/helps.tsx";
 import { helpsOf } from "../helps/view.ts";
 import { FoldTab } from "../layout/fold-tab.tsx";
@@ -397,7 +397,7 @@ export function App({ start }: { start: Settings; })
             />
         );
     // Where to wake the chat, under the AI's card (over the board when the talk is folded); the button that starts the clocks, under the player's (Zoe).
-    const asleepNote = asleep ? <p class="asleep" role="status">{text.asleep(name)}</p> : null;
+    const asleepNote = asleep ? <p class="asleep" role="status">{sides === undefined ? text.asleep(name) : text.asleepInAnalysis(name)}</p> : null;
     const startClocks = clockWaits
         ? (
             <button type="button" class="command primary start-clocks" onClick={() => act("/api/start", {})}>
@@ -472,7 +472,8 @@ export function App({ start }: { start: Settings; })
         }
     };
 
-    const sendWords = (): void => {
+    // In analysis the words go with the game and the move shown (D-101).
+    const sendWords = (shown?: { game: string; at: number; }): void => {
         const words = draft;
 
         // /clear and the other commands are for Claude's app: written here they would reach the AI as words (Sebastiano's playtest).
@@ -482,7 +483,7 @@ export function App({ start }: { start: Settings; })
         }
 
         setUnsent(undefined);
-        void sendMessage(words, text, name).then((refused) => {
+        void sendMessage(words, text, name, shown).then((refused) => {
             setUnsent(refused?.text);
             clearSent(refused?.text, words);
         });
@@ -499,10 +500,7 @@ export function App({ start }: { start: Settings; })
         act("/api/new", { ai_colour: colour === "random" ? "random" : colour === "white" ? "black" : "white", level: chosen, ...(control === undefined ? {} : { clock: control }) });
     };
 
-    // In analysis the AI's note stays under the card on top and its word on the game over the one below, however the board is turned (D-69).
-    const top = flipped ? player : ai;
-    const bottom = flipped ? ai : player;
-
+    // In analysis the AI's note goes with the other side's card and the talk with the player's, turned round with the board as in a game (D-101, Zoe).
     const studiedCard = (side: Side, place: "ai" | "you"): ComponentChildren =>
         sides === undefined ? null : (
             <PlayerCard
@@ -589,11 +587,11 @@ export function App({ start }: { start: Settings; })
                     <FoldTab column="game" folded={folds.game === "folded"} label={text.game} onFold={fold} />
                     <span class="visually-hidden" aria-live="polite">{unread ? text.wrote(name) : ""}</span>
                     <div class={sides === undefined ? "talk" : "talk studied"} id="talk">
-                        {sides !== undefined
+                        {sides !== undefined && studied !== undefined
                             ? (
                                 <>
-                                    <section class="ai-block" aria-label={sides[top].name}>
-                                        {studiedCard(top, "ai")}
+                                    <section class="ai-block" aria-label={sides[ai].name}>
+                                        {studiedCard(ai, "ai")}
                                         {asleepNote}
                                         <AiNote
                                             {...(reviewed === undefined ? {} : { ply: reviewed })}
@@ -608,8 +606,26 @@ export function App({ start }: { start: Settings; })
                                             text={text}
                                         />
                                     </section>
-                                    <section class="you-block" aria-label={sides[bottom].name}>
-                                        {studiedCard(bottom, "you")}
+                                    <section class="you-block" aria-label={sides[player].name}>
+                                        <div class="chat">
+                                            <Compose
+                                                lines={analysisTalk(talk, studied.name)}
+                                                newestFirst={false}
+                                                spent={0}
+                                                draft={draft}
+                                                onDraft={(words) => {
+                                                    setDraft(words);
+                                                    setUnsent(undefined);
+                                                }}
+                                                onSend={() => sendWords({ game: studied.name, at })}
+                                                canMove={false}
+                                                name={name}
+                                                problem={unsent}
+                                                about={{ ...(at === 0 ? {} : { ply: plies[at - 1]! }), onShow: goTo }}
+                                                text={text}
+                                            />
+                                        </div>
+                                        {studiedCard(player, "you")}
                                     </section>
                                 </>
                             )

@@ -1,0 +1,90 @@
+/* The talk over a game in analysis (D-101): the player's words and the AI's answers in one thread over the box, by the player's card; the AI's note stays
+   with the other side's card, and the thread gives way before the cards do (Zoe) */
+.talk.studied > .you-block {
+    flex: 1 1 auto;
+    max-height: none;
+}
+
+/* A line apart from the AI's note, which another voice signed (Zoe) */
+.talk.studied > section > .chat {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+}
+
+.chat > .compose {
+    flex: none;
+}
+
+/* The thread reads in time's order whichever way the board is turned: the newest words just over the box (Zoe) */
+.flipped .talk.studied .sent {
+    justify-content: flex-end;
+    margin: 0 0 8px;
+}
+
+.flipped .talk.studied .compose {
+    margin: 0;
+}
+
+/* Beside the board the talk takes the room the AI's notes leave, not half the column as in a game; turned round, the player's card goes on top and the
+   AI's note below the box; on a phone the talk has an area of its own (layout.css) */
+@media (min-width: 841px) {
+    .chat > .sent {
+        flex: 1 1 0;
+    }
+
+    .flipped .talk.studied,
+    .flipped .talk.studied > section {
+        flex-direction: column-reverse;
+    }
+
+    .flipped .talk.studied > section > .chat {
+        margin: 0 0 12px;
+        padding: 0 0 10px;
+        border-top: 0;
+        border-bottom: 1px solid var(--line);
+    }
+}
+
+/* The AI's answers on the left, in its bubbles, without the tail that points at the Torretta: it is not by them */
+.sent li.from-ai {
+    align-self: flex-start;
+    align-items: flex-start;
+}
+
+.talk.studied .sent .say::before,
+.talk.studied .sent .say::after {
+    content: none;
+}
+
+/* The box has no tail either: the card it would point at may be someone else's */
+.compose.asking::after {
+    content: none;
+}
+
+/* The move a line was written on, small at its head: a press shows it again */
+.shown-move {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    margin: 0 0 2px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.85;
+    cursor: pointer;
+}
+
+.shown-move:hover,
+.shown-move:focus-visible {
+    opacity: 1;
+    text-decoration: underline;
+}

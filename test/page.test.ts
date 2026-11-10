@@ -126,13 +126,56 @@ describe("the page's server", () => {
 
         // The same game brought again is news again; once the AI goes over it, it is only the game in analysis.
         await run(folder, "analyse_game", { game: kept });
-        expect(await statusOf(folder)).toContain(`\nIn analysis on the board page: ${kept}; analyse_game {"game": "${kept}"} goes over it with the player.`);
+        expect(await statusOf(folder)).toContain(`\nIn analysis on the board page: ${kept} (no review yet); analyse_game {"game": "${kept}"} goes over it with the player.`);
         await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' });
         expect(await statusOf(folder)).toContain(`The player brought ${kept} on the board page`);
 
         await run(folder, "new_game", { ai_colour: "black" });
         expect(await post(page, "/api/study", { pgn: "1. e4 *" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"game-going"') });
         expect(await statusOf(folder)).not.toContain("In analysis");
+    });
+
+    it("keeps the player's words on a game in analysis with the move the page shows, rings the chat for each, and tells it where the player stood (D-101)", async () => {
+        const folder = playerFolder();
+        // The chat's context, as the MCP server shares it with the page: the bell rings for what changed since the chat's last tool.
+        const context = testContext(folder);
+        const page = await open(folder, undefined, context);
+        const port = Number(new URL(page.url).port);
+        const kept = "study/2026-11-02-153012.pgn";
+        const hook = JSON.stringify({ cwd: folder });
+        await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' });
+        await run(folder, "analyse_game", { game: kept }, context);
+
+        let waiting = waitForBell(hook, [port]);
+        expect(await post(page, "/api/message", { text: "Why the queen?", game: kept, at: 3 })).toMatchObject({ status: 200 });
+        expect(await waiting).toBe(true);
+        // Words without a position ring only as the first since the AI spoke; on a position, every line does.
+        waiting = waitForBell(hook, [port]);
+        await post(page, "/api/message", { text: "Hm." });
+        expect(await shortly(waiting)).toBe("waiting");
+        await post(page, "/api/message", { text: "And at the start?", game: kept, at: 0 });
+        expect(await waiting).toBe(true);
+        // A position the game does not have is no position.
+        await post(page, "/api/message", { text: "Later?", game: kept, at: 9 });
+
+        const { talk } = JSON.parse((await get(page, "/api/game")).body) as { talk: { text: string; shown?: object; }[]; };
+        expect(talk.map(({ text, shown }) => ({ text, shown }))).toEqual([
+            { text: "Why the queen?", shown: { game: kept, at: 3, move: "2.Qh5" } },
+            { text: "Hm.", shown: undefined },
+            { text: "And at the start?", shown: { game: kept, at: 0 } },
+            { text: "Later?", shown: undefined },
+        ]);
+        expect(await statusOf(folder)).toContain(
+            "Player wrote on the board page, at 2.♛h5: «Why the queen?»\nPlayer wrote on the board page: «Hm.»\nPlayer wrote on the board page, at the start: «And at the start?»",
+        );
+        expect(await statusOf(folder)).toContain("\nNext: answer the player with ai_say, about the move they were looking at. When they show you something the review missed");
+
+        // While a game goes on, no game is in analysis: the words keep no position.
+        await post(page, "/api/new", {});
+        await post(page, "/api/message", { text: "Good luck!", game: kept, at: 3 });
+        const playing = JSON.parse((await get(page, "/api/game")).body) as { game: { talk: { text: string; shown?: object; }[]; }; };
+        expect(playing.game.talk.at(-1)).toMatchObject({ text: "Good luck!" });
+        expect(playing.game.talk.at(-1)?.shown).toBeUndefined();
     });
 
     it("lists the analyses, opens one again by its name, and takes back a review exported from the page ready, without waking the chat", async () => {

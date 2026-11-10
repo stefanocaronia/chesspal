@@ -5,6 +5,7 @@ import { annotatorOf, badges, Game, type GameRecord, leadOf, reviewed, reviewOf,
 import { gameInAnalysis, rewriteGame, startAnalysis } from "../games/index.ts";
 import { analystAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
+import { analystRuns } from "./agents.ts";
 import type { Context } from "./context.ts";
 import { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
 import { leadFrom, leadInput } from "./lead-input.ts";
@@ -26,6 +27,8 @@ interface Annotated
     /** How many moves took who is ahead after them, and those still without it, as analyse_game numbers them (D-90). */
     estimated: number;
     unestimated: string[];
+    /** The moves whose note the chat corrected with the player, told the analyst at each call: its notes leave them as they are (D-101). */
+    left: string[];
 }
 
 // How many moves still without who is ahead the answer names; the rest it counts.
@@ -72,6 +75,14 @@ export const annotateGame = defineCommand({
         // would be lost (Federico).
         const caller = await context.caller?.();
         const studied = game === undefined ? gameAnalysed(context) : namedGame(context, game);
+        const folder = gameFolder(context.home());
+        const numbers = moveNumbers(studied.record);
+        // Where the analyst reviews the games, the chat's notes are corrections it made with the player: the analyst, at work then or later, leaves those notes
+        // and is told of them at each call, and the chat is not asked for the analyst's work (D-101, Priya). Only a call the host ties to the chat is its own.
+        const correction = context.chat === true && analystRuns(context) && estimates.length === 0 && summary === undefined && closing === undefined;
+        const analysis = gameInAnalysis(folder);
+        const corrected = context.chat !== true && analysis?.game === studied.name ? analysis.corrected ?? [] : [];
+        let skipped = 0;
         // Every move is checked before the game is written: all or nothing.
         const moves = [...studied.record.moves];
 
@@ -81,6 +92,12 @@ export const annotateGame = defineCommand({
             }
 
             const index = indexIn(studied.record, move, "notes");
+
+            if (corrected.includes(numbers[index]!)) {
+                skipped += 1;
+                continue;
+            }
+
             // A note alone on a move of the book keeps its book badge: a fact Chesspal put there, not the AI's judgment.
             const kept = badge ?? (reviewOf(moves[index]!.comment)?.badge === "book" ? "book" : undefined);
             moves[index] = reviewed(moves[index]!, { ...(kept === undefined ? {} : { badge: kept }), ...(note === undefined ? {} : { note }), ...drawingsOf(arrows, squares) });
@@ -95,28 +112,28 @@ export const annotateGame = defineCommand({
         const kept = caller === undefined || (caller.hostOnly === true && annotatorOf(studied.record) !== undefined);
         const marked: GameRecord = { ...(kept ? studied.record : withAnnotator(studied.record, caller)), moves };
         rewriteGame(
-            gameFolder(context.home()),
+            folder,
             studied.name,
             summary === undefined && closing === undefined ? marked : withGameReview(marked, { ...(summary === undefined ? {} : { summary }), ...(closing === undefined ? {} : { closing }) }),
         );
-        startAnalysis(gameFolder(context.home()), studied.name, context.now());
-        const numbers = moveNumbers(marked);
+        startAnalysis(folder, studied.name, context.now(), false, correction ? notes.map(({ move }) => numbers[indexIn(studied.record, move, "notes")]!) : []);
         const bookUnnoted = moves.flatMap((move, index) => {
             const review = reviewOf(move.comment);
             return review?.badge === "book" && review.note === undefined ? [numbers[index]!] : [];
         });
         return {
             game: studied.name,
-            marked: notes.length,
+            marked: notes.length - skipped,
             summary: summary !== undefined,
             closing: closing !== undefined,
-            bookUnnoted,
+            bookUnnoted: correction ? [] : bookUnnoted,
             estimated: estimates.length,
             // Asked every time, of an older review too: an analyst whose instructions predate the estimates learns of them here.
-            unestimated: unestimatedMoves(marked, numbers),
+            unestimated: correction ? [] : unestimatedMoves(marked, numbers),
+            left: [...corrected],
         };
     },
-    format: ({ game, marked, summary, closing, bookUnnoted, estimated, unestimated }) => {
+    format: ({ game, marked, summary, closing, bookUnnoted, estimated, unestimated, left }) => {
         const kept = [
             marked === 0 ? undefined : `${marked} ${marked === 1 ? "move" : "moves"} marked`,
             estimated === 0 ? undefined : `who is ahead after ${estimated} ${estimated === 1 ? "move" : "moves"}`,
@@ -132,7 +149,14 @@ export const annotateGame = defineCommand({
         const shown = unestimated.slice(0, unestimatedShown).join(" ");
         const more = unestimated.length > unestimatedShown ? ` and ${unestimated.length - unestimatedShown} more` : "";
         const ahead = unestimated.length === 0 ? [] : [`Who is ahead is still missing after ${shown}${more}: give it with ahead, for the page's bar and chart.`];
-        return [`Kept in ${game}: ${[kept.slice(0, -1).join(", "), kept.at(-1)].filter((part) => part !== "").join(" and ")}. The board page shows them.`, ...book, ...ahead].join("\n");
+        const one = left.length === 1;
+        const corrected = left.length === 0
+            ? []
+            : [`${left.join(" ")} ${one ? "keeps the note" : "keep the notes"} the AI wrote with the player: leave ${one ? "it" : "them"}, and don't contradict ${one ? "it" : "them"} in your summary${
+                summary ? "; if this one does, give it again" : ""
+            }.`];
+        const head = kept.length === 0 ? `Nothing new kept in ${game}.` : `Kept in ${game}: ${[kept.slice(0, -1).join(", "), kept.at(-1)].filter((part) => part !== "").join(" and ")}. The board page shows them.`;
+        return [head, ...corrected, ...book, ...ahead].join("\n");
     },
 });
 

@@ -1,10 +1,11 @@
 // The lines an AI reads in a tool's answer about the current game: where it stands, the move just played, the player's words and what to do next.
-import { type AiLevel, figurinesOf, materialOf, sees, type Side } from "../core/index.ts";
+import { type AiLevel, type Facts, figurinesOf, materialOf, sees, type Side } from "../core/index.ts";
 import { talkLimits, type Thought } from "../games/index.ts";
 import { onQuickModel } from "../host-files/index.ts";
 import { analystLine, reviewedLine } from "./agents.ts";
 import { clockLine } from "./clock.ts";
 import { endText, type GameSummary, type LastMove, type MovePlayed } from "./game-summary.ts";
+import type { Written } from "./say.ts";
 import { boardView, colourName, compactView, materialText } from "./view.ts";
 
 /** Where the game stands: the AI's position to decide on, with its last move unless the lines before named it; the player's turn; or how it ended. */
@@ -16,13 +17,24 @@ export function positionLines(game: GameSummary, withLastMove = true): string[]
 
     return [
         ...headLines(game, withLastMove),
-        ...(game.facts === undefined ? [] : (sees(game.level, "tactics") ? compactView : boardView)(game.facts, game.turn)),
+        ...(game.facts === undefined ? [] : viewLines(game.facts, game)),
         ...(game.book === undefined ? [] : [`Book moves, most named lines first: ${game.book.join(", ")}`]),
         ...(game.plan === undefined ? [] : [`Plan: ${game.plan}`]),
         ...(game.thought === undefined ? [] : [thoughtLine(game.thought, game.level)]),
         ...moodLines(game),
         ...(game.helps === "coached" ? [`${helpsLine} ${coachLine}`] : game.helps === "on" ? [helpsLine] : game.helps === "off now" ? [helpsOffLine] : []),
     ];
+}
+
+/** The view of the AI's position as its level sees it (D-60, D-100): the tactical facts from the club level, the other side's chances from the strong level. */
+function viewLines(facts: Facts, game: GameSummary): string[]
+{
+    if (!sees(game.level, "tactics")) {
+        return boardView(facts, game.turn);
+    }
+
+    const possible = game.possibilities === undefined ? undefined : { possibilities: game.possibilities, threats: game.threats, strong: sees(game.level, "strategy") };
+    return compactView(facts, game.turn, possible);
 }
 
 /** The helps turned on: the AI may teach as the analyst does (D-62, D-78), never playing for the player. */
@@ -75,24 +87,33 @@ export function moveLines({ note, game, warning }: MovePlayed): string[]
 }
 
 /** The last lines of a tool's answer: the player's words from the board page, then the next step, which stays the last line. */
-export function closingLines(game: GameSummary | undefined, words: readonly string[] = [], pageClosed = false): string[]
+export function closingLines(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false): string[]
 {
     return [...wordLines(words), nextStep(game, words, pageClosed)];
 }
 
-/** The player's words from the board page, one line each: lines they broke are joined, so no line of theirs reads as one of Chesspal's. */
-export function wordLines(words: readonly string[]): string[]
+/**
+ * The player's words from the board page, one line each, in analysis with the move the page showed (D-101): lines they broke are joined, so no line of
+ * theirs reads as one of Chesspal's.
+ */
+export function wordLines(words: readonly Written[]): string[]
 {
-    return words.map((text) => `Player wrote on the board page: «${text.replace(/\s+/g, " ")}»`);
+    return words.map(({ text, at }) => `Player wrote on the board page${at === undefined ? "" : `, at ${at}`}: «${text.replace(/\s+/g, " ")}»`);
 }
 
 /**
  * What the AI does next: the one line every host reads, even where the server's instructions are not shown. Words of the player's ask for an answer. With the
  * board page open in no browser, a new game starts there, never in the chat.
  */
-export function nextStep(game: GameSummary | undefined, words: readonly string[] = [], pageClosed = false): string
+export function nextStep(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false): string
 {
     const step = pageClosed ? closedPageGameStep : newGameStep;
+
+    // Words written on a game in analysis: the chat answers them there, and corrects the review where they show it wrong (D-101).
+    if (words.some((word) => word.at !== undefined) && (game === undefined || game.end !== undefined)) {
+        return "Next: answer the player with ai_say, about the move they were looking at. When they show you something the review missed, first correct that move's "
+            + "note with annotate_game, that move only.";
+    }
 
     if (game === undefined) {
         return words.length === 0 ? `Next: when the player wants a game, ${step}` : `Next: answer the player with ai_say. When they want a game, ${step}`;

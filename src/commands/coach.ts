@@ -275,7 +275,7 @@ function judgedLines({ game }: CurrentGame, ply: number, player: Side): string[]
         `Their move to judge: ${lastMoves(played, 1)}. The position they played it in:`,
         `FEN: ${before.position.fen}`,
         `Material: ${materialText(materialOf(before.position.fen))}`,
-        ...compactView(before.facts, player),
+        ...compactView(before.facts, player, { possibilities: before.possibilities, threats: before.threats, strong: true }),
         ...(book.length === 0 ? [] : [`Book moves there, most named lines first: ${book.join(", ")}`]),
     ];
 
@@ -307,7 +307,7 @@ function nowLines(current: CurrentGame, folder: string, player: Side): string[]
     return [
         "Now, for who is ahead and your hint:",
         `FEN: ${game.position.fen}`,
-        ...compactView(game.facts, player),
+        ...compactView(game.facts, player, { possibilities: game.possibilities, threats: game.threats, strong: true }),
         ...profileLines(game.profile),
         ...(lead === undefined ? [] : [`Who you saw ahead on their turn before: ${leadText(lead)}, ${aheadWords(lead)}`]),
         ...(hint === undefined || hint.position !== plies - 2 ? [] : [`Your hint on their turn before: «${hint.text}»`]),

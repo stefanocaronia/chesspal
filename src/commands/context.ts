@@ -49,6 +49,8 @@ export interface Context
     caller?: () => Promise<Caller | undefined>;
     /** The agent that makes this call of a tool it shares with the chat, as the analyst (D-89); none for the chat, or when it cannot be told. */
     agent?: string;
+    /** The chat makes this call of a tool it shares with an agent, as the host tells it: a caller that cannot be told is not the chat here (Federico). */
+    chat?: true;
 }
 
 /** Who made a tool call: the model, else the host's name, never what the AI says of itself; the effort only when the host gives it. */

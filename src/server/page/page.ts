@@ -4,7 +4,7 @@ import { type FSWatcher, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { join } from "node:path";
 import { type Context, positionIn, samePosition, type SeenPosition } from "../../commands/index.ts";
-import { gameStamp } from "../../games/index.ts";
+import { gameStamp, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { Bell, bellProbe, pagePorts } from "../bell.ts";
@@ -159,13 +159,15 @@ function hasNews(context: Context): boolean
     return gameSeen(context) !== context.seen;
 }
 
-// The game the chat sees: the profile's folder, and the stamp of its game.json; none while the data folder cannot be made.
+// The game the chat sees: the profile's folder, and the stamps of its game.json and of the talk with no game, where the player's words go in analysis
+// before any game was played here (Priya); none while the data folder cannot be made.
 function gameSeen(context: Context): string
 {
     try {
         const folder = gameFolder(context.home());
         return `${folder}
-${gameStamp(folder) ?? ""}`;
+${gameStamp(folder) ?? ""}
+${tableTalkStamp(folder) ?? ""}`;
     } catch {
         return "";
     }

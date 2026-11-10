@@ -751,10 +751,31 @@
         display: none;
     }
 
-    /* A game in analysis, turned round or not: the card on top, the board, its steps under the thumb, the Torretta's note, the card below, the moves (Zoe) */
-    .app:has(.talk.studied),
+    /* A game in analysis: the card on top, the board, its steps under the thumb, the Torretta's note, the talk, the card below, the moves; turned round,
+       the player's card on top (Zoe) */
+    .app:has(.talk.studied) {
+        grid-template-areas: "head" "ai" "board" "steps" "note" "chat" "you" "side";
+    }
+
     .app.flipped:has(.talk.studied) {
-        grid-template-areas: "head" "ai" "board" "steps" "note" "you" "side";
+        grid-template-areas: "head" "you" "board" "steps" "note" "chat" "ai" "side";
+    }
+
+    .talk.studied > .you-block {
+        display: contents;
+    }
+
+    .talk.studied > .you-block > :not(.chat) {
+        grid-area: you;
+    }
+
+    /* The talk, under the note: half the screen of it at most */
+    .talk.studied .chat {
+        grid-area: chat;
+    }
+
+    .talk.studied .sent {
+        max-height: 50vh;
     }
 
     .talk.studied > .ai-block {
@@ -771,9 +792,12 @@
     }
 
     /* With no chat listening, its note comes before the Torretta's (Zoe) */
-    .app:has(.talk.studied > .ai-block > .asleep),
+    .app:has(.talk.studied > .ai-block > .asleep) {
+        grid-template-areas: "head" "ai" "board" "steps" "asleep" "note" "chat" "you" "side";
+    }
+
     .app.flipped:has(.talk.studied > .ai-block > .asleep) {
-        grid-template-areas: "head" "ai" "board" "steps" "asleep" "note" "you" "side";
+        grid-template-areas: "head" "you" "board" "steps" "asleep" "note" "chat" "ai" "side";
     }
 
     .talk.studied > .ai-block > .asleep {

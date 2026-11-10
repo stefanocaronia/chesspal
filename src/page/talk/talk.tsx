@@ -163,11 +163,19 @@ export function Legend({ review, words }: { review: Pick<MoveReview, "arrows" | 
     );
 }
 
+/** In analysis (D-101): the move shown, which the words go with, none at the start; and going back to the move a line of the player's was written on. */
+export interface About
+{
+    readonly ply?: Ply;
+    readonly onShow: (at: number) => void;
+}
+
 /**
  * The player's words of the game, the newest by the box they write in with how far it got, and the box: Enter or the button sends the words alone, the next
- * move takes them with it. 200 characters from one move of the AI's to the next: once they are written, the box goes until its move (D-54).
+ * move takes them with it. 200 characters from one move of the AI's to the next: once they are written, the box goes until its move (D-54). In analysis the
+ * AI's answers are in the same thread, and each line of the player's names the move it was written on (D-101).
  */
-export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, canMove, name, problem, text }: {
+export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, canMove, name, problem, about, text }: {
     lines: readonly TalkLine[];
     /** On a board turned round the box is above the words, and the newest come first. */
     newestFirst: boolean;
@@ -178,6 +186,7 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
     canMove: boolean;
     name: string;
     problem?: string;
+    about?: About;
     text: Text;
 })
 {
@@ -185,6 +194,9 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
     useOnlyWhole(list, lines.map((line) => line.text));
     const left = talkLimits.line - spent;
     const blank = draft.trim() === "";
+    const lastWritten = lines.findLastIndex((line) => line.who === "player");
+    const lastAnswer = lines.findLastIndex((line) => line.who === "ai");
+    const prompt = about === undefined ? text.writeTo(name) : text.askAbout(name);
 
     const submit = (): void => {
         if (!blank) {
@@ -197,9 +209,20 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
             <ol ref={list} class="sent" aria-live="polite">
                 {inOrder(
                     lines.map((line, index) => (
-                        <li key={index} style={aged(lines.length - 1 - index)}>
-                            <p class="said">{line.text}</p>
-                            {index === lines.length - 1 ? <Status heard={line.heard} name={name} text={text} /> : null}
+                        <li key={index} class={line.who === "ai" ? "from-ai" : undefined} style={about === undefined ? aged(lines.length - 1 - index) : reread(index, lastAnswer)}>
+                            {line.who === "ai"
+                                ? (
+                                    <p class="say">
+                                        <Marked text={line.text} />
+                                    </p>
+                                )
+                                : (
+                                    <p class="said">
+                                        {about === undefined || line.shown?.move === undefined ? null : <ShownMove move={line.shown.move} onShow={() => about.onShow(line.shown!.at)} text={text} />}
+                                        {line.text}
+                                    </p>
+                                )}
+                            {index === lastWritten ? <Status heard={line.heard} name={name} text={text} /> : null}
                         </li>
                     )),
                     newestFirst,
@@ -207,7 +230,7 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
             </ol>
             {left <= 0 ? null : (
                 <form
-                    class="compose"
+                    class={about === undefined ? "compose" : "compose asking"}
                     onSubmit={(event) => {
                         event.preventDefault();
                         submit();
@@ -217,8 +240,8 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
                     <textarea
                         rows={2}
                         maxLength={left}
-                        placeholder={text.writeTo(name)}
-                        aria-label={text.writeTo(name)}
+                        placeholder={prompt}
+                        aria-label={prompt}
                         value={draft}
                         onInput={(event) => onDraft(event.currentTarget.value)}
                         onKeyDown={(event) => {
@@ -231,7 +254,7 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
                     <div class="foot">
                         {spent + draft.length >= talkLimits.line - 50
                             ? <span class="count">{spent + draft.length}/{talkLimits.line}</span>
-                            : <span class="hint">{!blank && canMove ? text.withMove : ""}</span>}
+                            : <span class="hint">{about === undefined ? !blank && canMove ? text.withMove : "" : <OnMove ply={about.ply} text={text} />}</span>}
                         <button class="send" type="submit" disabled={blank}>
                             {text.send}
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -270,6 +293,34 @@ export function TalkFaces({ name, aiPicture, you, picture, ai, player, aiMoves, 
             <RailPlayer place="ai" picture={aiPicture ?? <Torretta size={40} />} name={name} {...(ai === undefined ? {} : { side: text.sides[ai] })} moves={aiMoves} unread={unread} />
             <RailPlayer place="you" picture={picture} name={you} {...(player === undefined ? {} : { side: text.sides[player] })} moves={playerMoves} />
         </div>
+    );
+}
+
+/** The move a line of the player's was written on, 14.♘f3, small at the line's head: a press shows it on the board again (Zoe). */
+function ShownMove({ move, onShow, text }: { move: string; onShow: () => void; text: Text; })
+{
+    const [, number = "", san = move] = /^(\d+\.+)(.+)$/.exec(move) ?? [];
+
+    return (
+        <button type="button" class="shown-move" title={text.goTo(move)} aria-label={text.goTo(move)} onClick={onShow}>
+            <span class="move-number">{number}</span>
+            <Figurines san={san} side={number.endsWith("...") ? "black" : "white"} />
+        </button>
+    );
+}
+
+/** What the words go with in analysis: the move shown, or the whole game at its start. */
+function OnMove({ ply, text }: { ply: Ply | undefined; text: Text; })
+{
+    if (ply === undefined) {
+        return <>{text.onWholeGame}</>;
+    }
+
+    return (
+        <>
+            {text.onMove} <span class="move-number">{ply.number}{ply.side === "white" ? "." : "..."}</span>
+            <Figurines san={ply.san} side={ply.side} />
+        </>
     );
 }
 
@@ -377,6 +428,12 @@ function inOrder<Item>(items: Item[], newestFirst: boolean): Item[]
 function aged(age: number): { opacity: number; }
 {
     return { opacity: age === 0 ? 1 : Math.max(0.2, 0.4 - (age - 1) * 0.1) };
+}
+
+/** In analysis the talk is read again: the AI's last answer and what follows it whole, the older lines a little back, still readable (Zoe). */
+function reread(index: number, lastAnswer: number): { opacity: number; }
+{
+    return { opacity: index >= lastAnswer ? 1 : 0.75 };
 }
 
 /**
