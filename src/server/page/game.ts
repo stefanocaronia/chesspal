@@ -50,6 +50,7 @@ import { asTheChatSees } from "./chat.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
+import { tableShown } from "./table.ts";
 
 /** Answers the page's requests about the game: true when the request was one. */
 export function answerGame(request: IncomingMessage, response: ServerResponse, url: URL, served: Served): boolean
@@ -407,6 +408,7 @@ function sendGame(response: ServerResponse, served: Served): void
         listening: served.bell.listening,
         ...thinkingShown(served, current),
         ...(served.outdated ? { outdated: true } : {}),
+        ...tableShown(served),
         ...profilesShown(served.context.home()),
     };
     send(response, 200, json, JSON.stringify(body));

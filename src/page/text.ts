@@ -116,6 +116,18 @@ export interface Text
     asleep(name: string): string;
     /** The same over a game in analysis, where no clock waits (Zoe). */
     asleepInAnalysis(name: string): string;
+    /** The table with no chat at it (D-104): the hosts that open one in a terminal, the model and effort beside each, and the command to type instead. */
+    readonly table: {
+        readonly label: string;
+        noChat(name: string): string;
+        install(name: string): string;
+        readonly model: string;
+        readonly effort: string;
+        asHost(host: string): string;
+        readonly opening: string;
+        readonly failed: string;
+        readonly typeIt: string;
+    };
     /** The thought cloud on the Torretta, by what the AI thinks on: its move, or on the player's time (D-72). */
     thinking: { readonly move: string; readonly ponder: string; };
     /** The button that starts the clocks, which wait for the player from the game's start. */
@@ -519,6 +531,17 @@ const english: Text = {
     thinking: { move: "Thinking about its move", ponder: "Thinking while you play" },
     asleep: (name) => `${name} is not listening: write a message, such as "hi", in the window where you opened ${name}, not here. Its clock waits until it answers.`,
     asleepInAnalysis: (name) => `${name} is not listening: write to it in the window where you opened it, not here.`,
+    table: {
+        label: "Open a chat",
+        noChat: (name) => `${name} is not at the table: open a chat, which starts in a terminal of its own.`,
+        install: (name) => `To play with ${name}, install Claude Code or Codex, then open this page again.`,
+        model: "Model",
+        effort: "Effort",
+        asHost: (host) => `as set in ${host}`,
+        opening: "Opening the terminal… If it asks whether you trust the folder, choose Yes with the arrow keys and press Enter.",
+        failed: "The terminal did not open: type the command below in a terminal.",
+        typeIt: "Or type in a terminal:",
+    },
     commandHere: (name) => `/clear and the other commands go in the window where you opened ${name}, not here.`,
     refused: {
         "no-game": () => "There is no game going on: press + to start one, or ask for one in the chat.",
@@ -865,6 +888,17 @@ const italian: Text = {
     thinking: { move: "Sta pensando alla sua mossa", ponder: "Pensa mentre giochi tu" },
     asleep: (name) => `${name} non ti sta ascoltando: scrivi un messaggio, per esempio "ciao", nella finestra dove hai aperto ${name}, non qui. Il suo orologio aspetta che risponda.`,
     asleepInAnalysis: (name) => `${name} non ti sta ascoltando: scrivigli nella finestra dove l'hai aperto, non qui.`,
+    table: {
+        label: "Apri una chat",
+        noChat: (name) => `${name} non è al tavolo: apri una chat, che parte in un terminale tutto suo.`,
+        install: (name) => `Per giocare con ${name}, installa Claude Code o Codex, poi apri di nuovo questa pagina.`,
+        model: "Modello",
+        effort: "Ragionamento",
+        asHost: (host) => `come è impostato in ${host}`,
+        opening: "Apro il terminale… Se ti chiede se ti fidi della cartella, scegli Yes con le frecce e premi Invio.",
+        failed: "Il terminale non si è aperto: scrivi il comando qui sotto in un terminale.",
+        typeIt: "Oppure scrivi in un terminale:",
+    },
     commandHere: (name) => `/clear e gli altri comandi vanno scritti nella finestra dove hai aperto ${name}, non qui.`,
     refused: {
         "no-game": () => "Nessuna partita in corso: premi + per iniziarne una, o chiedila nella chat.",

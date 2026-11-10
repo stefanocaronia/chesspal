@@ -3,9 +3,9 @@ import { runCommandLine } from "./command-line.ts";
 
 const args = process.argv.slice(2);
 
-// "chesspal" alone opens the table's page, "chesspal open" too as the icon runs it, "chesspal table" is the table itself and "chesspal icon" puts its icon
-// on the desktop (D-104); "chesspal mcp" turns the process into a server for an AI host, "chesspal listen" into the doorbell of Claude Code, or of Codex
-// with --codex, "chesspal chat" notes how the chat started; everything else is a command.
+// "chesspal" alone opens the table's page, "chesspal open" too as the icon runs it, "chesspal table" is the table itself, "chesspal icon" puts its icon
+// on the desktop and "chesspal play claude" starts a chat at the table (D-104); "chesspal mcp" turns the process into a server for an AI host, "chesspal
+// listen" into the doorbell of Claude Code, or of Codex with --codex, "chesspal chat" notes how the chat started; everything else is a command.
 if (args.length === 0) {
     await openTableHere(true);
 } else if (args.length === 1 && args[0] === "open") {
@@ -15,6 +15,8 @@ if (args.length === 0) {
     await serveTable();
 } else if (args.length === 1 && args[0] === "icon") {
     await putIconHere();
+} else if (args.length === 2 && args[0] === "play" && !args[1]!.startsWith("-")) {
+    await playHere(args[1]!);
 } else if (args.length === 1 && args[0] === "mcp") {
     // The server and its SDK load only here: every other command starts faster without them.
     const { startMcpServer } = await import("../server/mcp.ts");
@@ -78,13 +80,33 @@ async function putIconHere(): Promise<void>
     }
 }
 
+/** A chat at the table in this terminal, in the host named, until it ends: what the table's buttons run. */
+async function playHere(host: string): Promise<void>
+{
+    const [{ isHostName, playHost }, { defaultContext }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts")]);
+
+    if (!isHostName(host)) {
+        console.error(`chesspal play takes claude or codex, not ${host}.`);
+        process.exitCode = 1;
+        return;
+    }
+
+    try {
+        process.exitCode = await playHost(defaultContext(), host);
+    } catch (error) {
+        console.error((error as Error).message);
+        process.exitCode = 1;
+    }
+}
+
 /** The table, until it closes: `chesspal` alone starts it apart from the terminal. */
 async function serveTable(): Promise<void>
 {
-    const [{ startTable }, { defaultContext }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts")]);
+    const [{ startTable, tableTimes, terminalChats }, { defaultContext }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts")]);
 
     try {
-        const table = await startTable(defaultContext());
+        const context = defaultContext();
+        const table = await startTable(context, tableTimes, terminalChats(context));
         console.log(table === undefined ? "Another Chesspal table, started at the same time, is open: this one closes." : `Chesspal's table: ${table.url}`);
         await table?.closed;
     } catch (error) {

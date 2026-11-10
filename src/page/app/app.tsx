@@ -57,6 +57,7 @@ import { signature } from "../players/model-name.ts";
 import { keepSettings, type ProfileShown } from "../profile/profile.ts";
 import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "../profile/settings.ts";
 import { endSoundOf, playSound, soundOf, wakeSounds } from "../sounds/sounds.ts";
+import { ChatOpener } from "../table/opener.tsx";
 import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
 import { textFor } from "../text.ts";
 import { anchorName, useAnchor } from "./anchor.ts";
@@ -403,7 +404,10 @@ export function App({ start }: { start: Settings; })
             />
         );
     // Where to wake the chat, under the AI's card (over the board when the talk is folded); the button that starts the clocks, under the player's (Zoe).
-    const asleepNote = asleep ? <p class="asleep" role="status">{sides === undefined ? text.asleep(name) : text.asleepInAnalysis(name)}</p> : null;
+    // On the table with no chat at it, the note opens one instead (D-104).
+    const table = offline ? undefined : served.table;
+    const opener = table !== undefined && !table.chat ? <ChatOpener table={table} settings={settings} onChange={change} name={name} text={text} /> : undefined;
+    const asleepNote = opener ?? (asleep ? <p class="asleep" role="status">{sides === undefined ? text.asleep(name) : text.asleepInAnalysis(name)}</p> : null);
     const startClocks = clockWaits
         ? (
             <button type="button" class="command primary start-clocks" onClick={() => act("/api/start", {})}>
@@ -730,10 +734,10 @@ export function App({ start }: { start: Settings; })
                             text={text}
                         />
                         {/* With the talk folded, the note on the chat that does not listen (Stefano) and the button that starts the clocks come over the board's far edge */}
-                        {folds.talk !== "open" && (asleep || clockWaits)
+                        {folds.talk !== "open" && (asleep || opener !== undefined || clockWaits)
                             ? (
                                 <div class="over-board">
-                                    {asleep ? <p class="asleep" role="status">{text.asleep(name)}</p> : null}
+                                    {opener ?? (asleep ? <p class="asleep" role="status">{text.asleep(name)}</p> : null)}
                                     {startClocks}
                                 </div>
                             )

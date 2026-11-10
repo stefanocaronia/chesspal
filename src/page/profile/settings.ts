@@ -34,6 +34,11 @@ export interface Settings
     /** Whether the AI's words are read aloud, by the browser's local voices. */
     readonly voice: boolean;
     readonly language: "auto" | "it" | "en";
+    /** The model and effort of the chats the table opens, by host: empty keeps the host's own (D-104); `chesspal play` reads them. */
+    readonly claudeModel: string;
+    readonly claudeEffort: string;
+    readonly codexModel: string;
+    readonly codexEffort: string;
 }
 
 /** The settings this browser remembers, each one it does not know taking its default; the theme and the sounds chosen before the panel come along. */
@@ -62,6 +67,11 @@ export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | 
         sound: typeof stored.sound === "boolean" ? stored.sound : defaults.sound,
         voice: typeof stored.voice === "boolean" ? stored.voice : false,
         language: oneOf(stored.language, ["auto", "it", "en"], "auto"),
+        // Checked against what the host offers when the chat opens, which this page does not know.
+        claudeModel: word(stored.claudeModel),
+        claudeEffort: word(stored.claudeEffort),
+        codexModel: word(stored.codexModel),
+        codexEffort: word(stored.codexEffort),
     };
 }
 
@@ -116,4 +126,10 @@ function parsed(saved: string): Partial<Record<keyof Settings, unknown>>
 function oneOf<Choice extends string>(value: unknown, choices: readonly Choice[], fallback: Choice): Choice
 {
     return choices.find((choice) => choice === value) ?? fallback;
+}
+
+// A host's model or effort, a short word; empty when it is none.
+function word(value: unknown): string
+{
+    return typeof value === "string" && /^[\w.-]{1,40}$/.test(value) ? value : "";
 }

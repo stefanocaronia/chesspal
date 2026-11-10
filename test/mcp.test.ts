@@ -80,7 +80,7 @@ describe("the MCP server", () => {
 
         expect(context.seen).toBeUndefined();
 
-        await client.callTool({ name: "play", arguments: { san: "e4" } });
+        await client.callTool({ name: "try_move", arguments: { san: "e4" } });
 
         expect(context.seen).toBeDefined();
         rmSync(context.folder, { recursive: true, force: true });
@@ -167,7 +167,7 @@ describe("the MCP server", () => {
         const { tools } = await (await connect([...commands, play])).listTools();
 
         expect(tools.find((tool) => tool.name === "status")?.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
-        expect(tools.find((tool) => tool.name === "play")?.annotations).toEqual({ readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false });
+        expect(tools.find((tool) => tool.name === "try_move")?.annotations).toEqual({ readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false });
     });
 
     it("runs a tool and answers with its text: status asks first for the instructions a new server has not given (D-102)", async () => {
@@ -188,12 +188,12 @@ describe("the MCP server", () => {
             text: "status has no parameter colour. Nothing changed: call it again with no parameters.",
             isError: true,
         });
-        expect((await call("play", {}, [play])).text).toMatch(/^play needs san\. Nothing changed: call it again with its parameters\.\nplay takes:\n- san: the move, in SAN\n/);
-        expect((await call("play", { san: "e4", minutes: "5" }, [play])).text).toMatch(/^minutes: .*expected number, received string\. Nothing changed/);
+        expect((await call("try_move", {}, [play])).text).toMatch(/^try_move needs san\. Nothing changed: call it again with its parameters\.\ntry_move takes:\n- san: the move, in SAN\n/);
+        expect((await call("try_move", { san: "e4", minutes: "5" }, [play])).text).toMatch(/^minutes: .*expected number, received string\. Nothing changed/);
     });
 
     it("reads a flag sent as text, as some hosts send it, and shows each input without the draft's address", async () => {
-        expect(JSON.parse((await call("play", { san: "e4", flip: "false" }, [play])).text)).toEqual({ san: "e4", flip: false });
+        expect(JSON.parse((await call("try_move", { san: "e4", flip: "false" }, [play])).text)).toEqual({ san: "e4", flip: false });
 
         const { tools } = await (await connect()).listTools();
 

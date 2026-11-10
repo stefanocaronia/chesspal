@@ -1,0 +1,81 @@
+// The AI hosts the table opens a chat in (D-104): Claude Code and Codex, each with the start message, and the model and effort the player chose on the page
+// for the profile in use; "as the host" passes nothing, and the host's own settings stand.
+import { speaksItalian } from "../../../commands/index.ts";
+
+/** The hosts the page offers, by their command's name. */
+export const hostNames = ["claude", "codex"] as const;
+export type HostName = typeof hostNames[number];
+
+/** The models and efforts the player may choose for a host, as its command line names them: aliases, which follow the host's newest models. */
+export interface HostChoices
+{
+    readonly models: readonly string[];
+    readonly efforts: readonly string[];
+}
+
+/** What the player chose for a host on the page: none of either keeps the host's own. */
+export interface HostChoice
+{
+    readonly model?: string | undefined;
+    readonly effort?: string | undefined;
+}
+
+/**
+ * Each host's choices, as tried in each (Priya): a value outside them would fail only at the chat's first turn. Claude Code's are its aliases; Codex's, the
+ * models a ChatGPT account lists, which change with its releases.
+ */
+export const hostChoices: Readonly<Record<HostName, HostChoices>> = {
+    claude: { models: ["fable", "opus", "sonnet", "haiku"], efforts: ["low", "medium", "high", "xhigh", "max"] },
+    codex: { models: ["gpt-6.1-sol", "gpt-6-astra", "gpt-6.1-terra", "gpt-6-luna"], efforts: ["low", "medium", "high", "xhigh", "max"] },
+};
+
+/** Whether a word names a host the page offers. */
+export function isHostName(name: unknown): name is HostName
+{
+    return hostNames.includes(name as HostName);
+}
+
+/** The message a chat opened by the table starts with, in the player's language: the AI answers it by calling status, as every chat does. */
+export function startMessage(language: string | undefined): string
+{
+    return speaksItalian(language) ? "Giochiamo!" : "Let's play!";
+}
+
+/**
+ * The host's arguments for a chat: the start message, then the choices the host knows, each left out when it is not one of them. Claude Code takes the
+ * message first, or an option such as --mcp-config takes it as its own; Codex takes it last, where a word such as "resume" is no subcommand, and is kept
+ * from its update screen, which an Enter would accept.
+ */
+export function hostArgs(host: HostName, message: string, choice: HostChoice = {}): string[]
+{
+    const { model, effort } = offered(host, choice);
+
+    if (host === "claude") {
+        return [message, ...(model === undefined ? [] : ["--model", model]), ...(effort === undefined ? [] : ["--effort", effort])];
+    }
+
+    return ["-c", "check_for_update_on_startup=false", ...(model === undefined ? [] : ["-m", model]), ...(effort === undefined ? [] : ["-c", `model_reasoning_effort=${effort}`]), message];
+}
+
+/** The settings' keys that keep a host's choice in the profile: claudeModel, claudeEffort, codexModel, codexEffort. */
+export function choiceKeys(host: HostName): { model: string; effort: string; }
+{
+    return { model: `${host}Model`, effort: `${host}Effort` };
+}
+
+/** A host's choice as the profile's settings keep it: the values the host offers alone, the rest is the host's own. */
+export function choiceIn(settings: Readonly<Record<string, unknown>> | undefined, host: HostName): HostChoice
+{
+    const keys = choiceKeys(host);
+    const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
+    return offered(host, { model: text(settings?.[keys.model]), effort: text(settings?.[keys.effort]) });
+}
+
+// The choice kept to the values the host offers.
+function offered(host: HostName, choice: HostChoice): HostChoice
+{
+    const { models, efforts } = hostChoices[host];
+    const model = choice.model !== undefined && models.includes(choice.model) ? choice.model : undefined;
+    const effort = choice.effort !== undefined && efforts.includes(choice.effort) ? choice.effort : undefined;
+    return { model, effort };
+}

@@ -64,6 +64,7 @@ function attach(body: Record<string, unknown>, response: ServerResponse, served:
 
     const attached: Attached = { token: randomUUID(), chat: parsed.data, copy: undefined, given: new Set() };
     served.attached = attached;
+    served.chatOpened = undefined;
     served.outdated = parsed.data.outdated;
     response.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
     response.write(`${JSON.stringify({ token: attached.token, open: served.watchers.size > 0 })}\n`);

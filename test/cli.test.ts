@@ -67,7 +67,7 @@ describe("the command line", () => {
 });
 
 describe("the command line's arguments", () => {
-    const run = (...argv: string[]): ReturnType<typeof runCommandLine> => runCommandLine(["play", ...argv], context, [play]);
+    const run = (...argv: string[]): ReturnType<typeof runCommandLine> => runCommandLine(["try_move", ...argv], context, [play]);
 
     it("reads positionals, numbers, lists and flags turned off", async () => {
         const { output, exitCode } = await run("e4", "--minutes", "5", "--tag", "a", "--tag", "b c", "--seconds", "1", "--seconds", "2.5", "--no-flip", "--json");
@@ -77,7 +77,7 @@ describe("the command line's arguments", () => {
     });
 
     it("names what is missing or wrong, as the caller writes it", async () => {
-        expect((await run()).output).toMatch(/^play needs <san>\. Nothing changed\.\nUsage: chesspal play <san> \[options\]\n/);
+        expect((await run()).output).toMatch(/^try_move needs <san>\. Nothing changed\.\nUsage: chesspal try_move <san> \[options\]\n/);
         expect((await run("e4", "--minutes", "five")).output).toMatch(/^--minutes: .*expected number, received string\. Nothing changed\.\n/);
         expect((await run("e4", "--minutes")).output).toMatch(/^--minutes needs a value\. Nothing changed\.\n/);
         expect((await run("e4", "--minutes", "-5")).output).toMatch(/'--minutes=-XYZ'\. Nothing changed\.\n/);

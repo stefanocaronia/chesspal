@@ -1,0 +1,97 @@
+// What only the table's page answers (D-104): another Chesspal version asks it to quit, and the page opens a chat with no chat at the table, through the
+// hosts the table offers; a page a chat serves itself has none of these routes.
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { tellWatchers } from "./events.ts";
+import { bodyOf, isJson, jsonOf, runRoute, sendJson } from "./http.ts";
+import type { Served } from "./page.ts";
+
+/** A host the table offers a chat in: whether it is installed, the models and efforts the player may choose, and the command to open one by hand. */
+export interface ChatHost
+{
+    readonly name: string;
+    readonly installed: boolean;
+    readonly models: readonly string[];
+    readonly efforts: readonly string[];
+    readonly command: string;
+}
+
+/** How the table opens a chat: the hosts it offers, and a terminal with one of them; whether one opened. */
+export interface TableChats
+{
+    hosts(): readonly ChatHost[];
+    open(host: string): Promise<boolean>;
+}
+
+/** What the table's page shows of its chat: whether one is at the table, and the hosts it can open one in. */
+export function tableShown(served: Served): { table?: { chat: boolean; hosts: readonly ChatHost[]; opening: boolean; }; }
+{
+    const { table } = served;
+
+    if (table === undefined) {
+        return {};
+    }
+
+    return { table: { chat: served.attached !== undefined, hosts: table.chats?.hosts() ?? [], opening: opening(served) } };
+}
+
+/** Answers the table's own routes, under /api/table/; false for any other, and for every request to a page a chat serves itself. */
+export function answerTable(request: IncomingMessage, response: ServerResponse, url: URL, served: Served): boolean
+{
+    const path = url.pathname;
+
+    if (served.table === undefined || request.method !== "POST" || !path.startsWith("/api/table/") || !isJson(request)) {
+        return false;
+    }
+
+    if (path === "/api/table/quit") {
+        // Another Chesspal version asks the table to quit, to start its own in its place.
+        sendJson(response, 200, { quitting: true });
+        served.table.quit();
+    } else if (path === "/api/table/chat") {
+        runRoute(response, () => openChat(request, response, served));
+    } else {
+        sendJson(response, 404, { error: `${path} is no route of the table's: it answers POST /api/table/chat and /api/table/quit.` });
+    }
+
+    return true;
+}
+
+// A terminal takes a few seconds to open and its chat to attach: a second click meanwhile would open a second chat, which serves a page of its own.
+const openingFor = 30_000;
+
+/**
+ * Opens a chat in a terminal, asked by the table's own page alone, which a browser marks with its origin: never while a chat is at the table, or one is
+ * opening. Whether it opened; else the page shows the command to type.
+ */
+async function openChat(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
+{
+    const host = jsonOf(await bodyOf(request))?.host;
+    const offered = served.table?.chats?.hosts().find((one) => one.name === host && one.installed);
+
+    if (request.headers.origin !== `http://127.0.0.1:${served.port}` && request.headers.origin !== `http://localhost:${served.port}`) {
+        sendJson(response, 403, { error: "Only the table's own page opens a chat." });
+    } else if (offered === undefined || served.table?.chats === undefined) {
+        sendJson(response, 400, { error: `Name a host the table offers and this computer has: ${served.table?.chats?.hosts().filter((one) => one.installed).map((one) => one.name).join(", ") || "none"}.` });
+    } else if (served.attached !== undefined || opening(served)) {
+        sendJson(response, 409, { error: "A chat is at the table, or opening: play there." });
+    } else {
+        const at = served.context.now().getTime();
+        served.chatOpened = at;
+        tellWatchers(served.watchers);
+        const opened = await served.table.chats.open(offered.name);
+        served.chatOpened = opened ? at : undefined;
+        sendJson(response, 200, { opened });
+        tellWatchers(served.watchers);
+        // A chat that has not attached by then lets the pages open another.
+        setTimeout(() => {
+            if (served.chatOpened === at) {
+                tellWatchers(served.watchers);
+            }
+        }, openingFor).unref();
+    }
+}
+
+function opening(served: Served): boolean
+{
+    return served.attached === undefined && served.chatOpened !== undefined && served.context.now().getTime() - served.chatOpened < openingFor;
+}

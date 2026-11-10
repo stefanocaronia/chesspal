@@ -6,6 +6,7 @@ import { tableFolder } from "../../home/index.ts";
 import { setUpHosts } from "../../host-files/index.ts";
 import { pageAt, pagePorts, samePath } from "../bell.ts";
 import { type Page, startPage } from "../page/page.ts";
+import type { TableChats } from "../page/table.ts";
 
 /** A table served: its address, and how to close it. */
 export interface Table
@@ -36,10 +37,11 @@ export interface TableFound
 }
 
 /**
- * Starts the table on the context's data folder, its folder set up as init does: undefined when another table started at the same time took a lower port,
- * since a table's ports are its lock. It closes once no page has been open, no chat attached and no request come, for `times.idle`.
+ * Starts the table on the context's data folder, its folder set up as init does, its page opening chats through `chats`: undefined when another table
+ * started at the same time took a lower port, since a table's ports are its lock. It closes once no page has been open, no chat attached and no request
+ * come, for `times.idle`.
  */
-export async function startTable(context: Context, times: TableTimes = tableTimes): Promise<Table | undefined>
+export async function startTable(context: Context, times: TableTimes = tableTimes, chats?: TableChats): Promise<Table | undefined>
 {
     const folder = tableFolder(context.home());
     setUpHosts(folder, context.platform);
@@ -53,7 +55,7 @@ export async function startTable(context: Context, times: TableTimes = tableTime
         lastUsed = context.now().getTime();
     };
 
-    const page = await startPage({ ...context, folder }, { table: { used, quit } });
+    const page = await startPage({ ...context, folder }, { table: { used, quit, chats } });
 
     if (await lostTo(page.url, folder)) {
         await page.close();

@@ -1,0 +1,176 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { type IncomingMessage, request } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { runCommandLine } from "../src/cli/command-line.ts";
+import type { Context } from "../src/commands/index.ts";
+import { tableFolder } from "../src/home/index.ts";
+import { settingsFrom } from "../src/page/profile/settings.ts";
+import { activeProfile, saveProfileSettings } from "../src/profiles/index.ts";
+import type { TableChats } from "../src/server/page/table.ts";
+import { hostArgs, startMessage } from "../src/server/table/hosts/hosts.ts";
+import { terminals } from "../src/server/table/hosts/terminal.ts";
+import { hostLaunch, startTable, type Table, terminalChats } from "../src/server/table/index.ts";
+import { testContext } from "./commands.ts";
+
+const folders: string[] = [];
+const tables: Table[] = [];
+
+afterEach(async () => {
+    await Promise.all(tables.splice(0).map((table) => table.close()));
+    folders.splice(0).forEach((folder) => rmSync(folder, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
+});
+
+describe("a chat the table opens", () => {
+    it("starts Claude Code with the start message first, then the model and effort it offers; others are left out", () => {
+        expect(hostArgs("claude", "Giochiamo!", { model: "opus", effort: "high" })).toEqual(["Giochiamo!", "--model", "opus", "--effort", "high"]);
+        expect(hostArgs("claude", "Let's play!", { model: "gpt-6-luna", effort: "ultra" })).toEqual(["Let's play!"]);
+        expect(startMessage("it-IT")).toBe("Giochiamo!");
+        expect(startMessage(undefined)).toBe("Let's play!");
+    });
+
+    it("starts Codex with no update screen, its model and the effort in its config, the message last", () => {
+        expect(hostArgs("codex", "Let's play!", { model: "gpt-6-luna", effort: "low" })).toEqual(["-c", "check_for_update_on_startup=false", "-m", "gpt-6-luna", "-c", "model_reasoning_effort=low", "Let's play!"]);
+        expect(hostArgs("codex", "Let's play!")).toEqual(["-c", "check_for_update_on_startup=false", "Let's play!"]);
+    });
+
+    it("plays with the model and effort the profile in use chose on the page, in the table's folder, set up as init does", () => {
+        const context = homeContext("linux");
+        const home = context.home();
+        saveProfileSettings(home, activeProfile(home).id, { language: "it", claudeModel: "sonnet", claudeEffort: "max" });
+        const launch = hostLaunch(context, "claude", { PATH: "/usr/bin", CLAUDE_CODE_EFFORT_LEVEL: "low", CLAUDECODE: "1" }, (path) => path === "/usr/bin/claude");
+
+        expect(launch).toMatchObject({ program: "/usr/bin/claude", args: ["Giochiamo!", "--model", "sonnet", "--effort", "max"], folder: tableFolder(home), shell: false });
+        // An effort set for every chat would win over the page's; a chat's session, when the table was started from one, is not the host's.
+        expect(launch.env).toMatchObject({ PATH: "/usr/bin", CLAUDE_CODE_EFFORT_LEVEL: undefined, CLAUDECODE: undefined });
+    });
+
+    it("runs Codex's npm script with Node on Windows, without cmd, and its shim through cmd only when the script is not beside it", () => {
+        const context = homeContext("win32");
+        const env = { PATH: "C:\\npm", PATHEXT: ".EXE;.CMD" };
+        const script = "C:\\npm\\node_modules\\@openai\\codex\\bin\\codex.js";
+
+        expect(hostLaunch(context, "codex", env, (path) => path === "C:\\npm\\codex.cmd" || path === script)).toMatchObject({ program: process.execPath, shell: false });
+        expect(hostLaunch(context, "codex", env, (path) => path === "C:\\npm\\codex.cmd").args[0]).toBe("-c");
+        expect(hostLaunch(context, "codex", env, (path) => path === "C:\\npm\\codex.cmd")).toMatchObject({ program: "C:\\npm\\codex.cmd", shell: true });
+        expect(() => hostLaunch(context, "codex", env, () => false)).toThrow("Codex is not installed on this computer, or not on its PATH: install it (npm install -g @openai/codex), then try again.");
+    });
+
+    it("opens in Windows Terminal, else in the console Windows starts; in macOS's Terminal; on Linux in the terminals installed", () => {
+        const command = ["C:\\Program Files\\nodejs\\node.exe", "cli.js", "play", "claude"];
+        const windows = terminals("C:\\Users\\R&D\\table", command, "win32", { PATH: "C:\\apps", PATHEXT: ".EXE" }, (path) => path === "C:\\apps\\wt.exe");
+        const windowsConsole = ["cmd.exe", "/d", "/s", "/c", '"start "" /D "C:\\Users\\R&D\\table" "C:\\Program Files\\nodejs\\node.exe" cli.js play claude"'];
+
+        expect(windows).toEqual([["C:\\apps\\wt.exe", "-w", "new", "-d", "C:\\Users\\R&D\\table", "--title", "Chesspal", ...command], windowsConsole]);
+        expect(terminals("C:\\Users\\R&D\\table", command, "win32", { PATH: "C:\\apps" }, () => false)).toEqual([windowsConsole]);
+        expect(terminals("D:\\a;b", command, "win32", { PATH: "C:\\apps" }, (path) => path === "C:\\apps\\wt.exe")[0]?.[4]).toBe("D:\\a\\;b");
+        expect(terminals("/data/table", command, "darwin", {})[0]?.[0]).toBe("osascript");
+        expect(terminals("/data/table", command, "linux", { PATH: "/usr/bin" }, (path) => path === "/usr/bin/konsole")).toEqual([["/usr/bin/konsole", "--workdir", "/data/table", "-e", ...command]]);
+    });
+
+    it("offers the hosts found on the PATH, each with its choices and the command to type, and opens a terminal running chesspal play", async () => {
+        const bin = temporary();
+        writeFileSync(join(bin, process.platform === "win32" ? "claude.exe" : "claude"), "");
+        const chats = terminalChats(homeContext(process.platform), ["node", "cli.js"], { PATH: bin, PATHEXT: ".EXE" });
+
+        expect(chats.hosts()).toEqual([
+            expect.objectContaining({ name: "claude", installed: true, models: ["fable", "opus", "sonnet", "haiku"], command: "chesspal play claude" }),
+            expect.objectContaining({ name: "codex", installed: false }),
+        ]);
+        expect(await chats.open("gemini")).toBe(false);
+    });
+
+    it("keeps each host's choice in the page's settings, a word alone", () => {
+        expect(settingsFrom({ claudeModel: "opus", codexEffort: "x high!" })).toMatchObject({ claudeModel: "opus", claudeEffort: "", codexEffort: "" });
+    });
+
+    it("is chesspal play <host>, whose help the command line gives", async () => {
+        expect((await runCommandLine(["play", "--help"], testContext())).output).toContain("chesspal play <claude|codex>");
+        expect(await runCommandLine(["play"], testContext())).toMatchObject({ exitCode: 1, output: expect.stringContaining("chesspal play takes one host, claude or codex: none given.") });
+    });
+});
+
+describe("the table's page, with no chat at it", () => {
+    it("shows the hosts, and opens a chat when its own page asks, once, for a host installed", async () => {
+        const { table, opened } = await tableWith(fakeChats());
+        const origin = new URL(table.url).origin;
+
+        expect((await getGame(table.url)).table).toEqual({ chat: false, hosts: fakeHosts, opening: false });
+        expect(await openChat(table.url, "claude")).toMatchObject({ status: 403 });
+        expect(await openChat(table.url, "codex", origin)).toMatchObject({ status: 400 });
+        expect(await openChat(table.url, "claude", origin)).toEqual({ status: 200, body: { opened: true } });
+        expect(opened).toEqual(["claude"]);
+        expect((await getGame(table.url)).table).toMatchObject({ opening: true });
+        expect(await openChat(table.url, "claude", origin)).toMatchObject({ status: 409 });
+        expect(opened).toEqual(["claude"]);
+    });
+
+    it("lets the page open another when the terminal did not open", async () => {
+        const { table, opened } = await tableWith(fakeChats(false));
+        const origin = new URL(table.url).origin;
+
+        expect(await openChat(table.url, "claude", origin)).toEqual({ status: 200, body: { opened: false } });
+        expect((await getGame(table.url)).table).toMatchObject({ opening: false });
+        expect(await openChat(table.url, "claude", origin)).toMatchObject({ status: 200 });
+        expect(opened).toEqual(["claude", "claude"]);
+    });
+});
+
+const fakeHosts = [
+    { name: "claude", installed: true, models: ["opus"], efforts: ["high"], command: "chesspal play claude" },
+    { name: "codex", installed: false, models: [], efforts: [], command: "chesspal play codex" },
+];
+
+/** Chats that open no terminal: the hosts asked for, and whether each opened. */
+function fakeChats(opens = true): { chats: TableChats; opened: string[]; }
+{
+    const opened: string[] = [];
+    return { chats: { hosts: () => fakeHosts, open: (host) => Promise.resolve(opened.push(host) > 0 && opens) }, opened };
+}
+
+async function tableWith({ chats, opened }: { chats: TableChats; opened: string[]; }): Promise<{ table: Table; opened: string[]; }>
+{
+    const table = await startTable(homeContext("linux"), { idle: 60_000, every: 1_000 }, chats);
+
+    if (table === undefined) {
+        throw new Error("The table did not start: another one holds its ports.");
+    }
+
+    tables.push(table);
+    return { table, opened };
+}
+
+function getGame(url: string): Promise<{ table?: unknown; }>
+{
+    return fetch(new URL("/api/game", url)).then((response) => response.json() as Promise<{ table?: unknown; }>);
+}
+
+/** Asks the table for a chat, as a browser would, with the page's origin when given: the answer's status and body. */
+function openChat(url: string, host: string, origin?: string): Promise<{ status: number | undefined; body: unknown; }>
+{
+    return new Promise((done) => {
+        const headers = { "Content-Type": "application/json", ...(origin === undefined ? {} : { Origin: origin }) };
+        const asked = request(new URL("/api/table/chat", url), { method: "POST", headers }, (response: IncomingMessage) => {
+            let text = "";
+            response.on("data", (chunk: Buffer) => {
+                text += chunk.toString("utf8");
+            });
+            response.on("end", () => done({ status: response.statusCode, body: JSON.parse(text) as unknown }));
+        });
+        asked.end(JSON.stringify({ host }));
+    });
+}
+
+/** A context on a temporary data folder, with the real time, which the table's opening is measured with. */
+function homeContext(platform: string): Context
+{
+    return { ...testContext(temporary()), platform, now: () => new Date() };
+}
+
+function temporary(): string
+{
+    const folder = mkdtempSync(join(tmpdir(), "chesspal-hosts-"));
+    folders.push(folder);
+    return folder;
+}

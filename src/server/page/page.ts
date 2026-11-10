@@ -15,8 +15,9 @@ import { type Attached, attachedSeen, type ChatSeen, chatSeenOf, pageContext } f
 import { askNewGame, keepPosted, tellWatchers } from "./events.ts";
 import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls } from "./game.ts";
-import { isJson, json, send, sendJson } from "./http.ts";
+import { json, send } from "./http.ts";
 import { answerProfiles } from "./profiles.ts";
+import { answerTable, type TableChats } from "./table.ts";
 
 /**
  * The page of a player's folder, served by the chat's process or by the table it is attached to (D-104): its address, how to tell it what the chat does
@@ -47,11 +48,15 @@ export interface PageOptions
     readonly table?: TableEnd;
 }
 
-/** What the page tells the table that serves it: a request came, so the table is in use, or another Chesspal version asked it to quit. */
+/**
+ * What the page tells the table that serves it: a request came, so the table is in use, or another Chesspal version asked it to quit; and how the table
+ * opens a chat, which the page offers while none is at the table.
+ */
 export interface TableEnd
 {
     used(): void;
     quit(): void;
+    readonly chats?: TableChats | undefined;
 }
 
 /**
@@ -126,6 +131,8 @@ export interface Served
     readonly table?: TableEnd;
     /** The chat attached to the table, while one is. */
     attached?: Attached;
+    /** When the table last opened a chat from the page, which has not attached yet: no second one meanwhile. */
+    chatOpened?: number | undefined;
 }
 
 /**
@@ -179,16 +186,9 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
     }
 
     const answered = answerProfiles(request, response, url, served) || answerGame(request, response, url, served) || answerAnalyses(request, response, url, served)
-        || answerChat(request, response, url, served);
+        || answerChat(request, response, url, served) || answerTable(request, response, url, served);
 
     if (answered) {
-        return;
-    }
-
-    // Another Chesspal version asks the table to quit, to start its own in its place (D-104).
-    if (path === "/api/table/quit" && served.table !== undefined && request.method === "POST" && isJson(request)) {
-        sendJson(response, 200, { quitting: true });
-        served.table.quit();
         return;
     }
 

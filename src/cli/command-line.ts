@@ -19,6 +19,7 @@ const chatDescription = "Note how the chat started: new, cleared, resumed or com
 const tableDescription = "Serve the board page with no chat, until no browser has had it open for five minutes. `chesspal` alone starts it apart and opens the page.";
 const openDescription = "Open the board page as `chesspal` alone does, without asking about the icon: what the icon runs.";
 const iconDescription = "Put Chesspal's icon on the desktop and in the menu: it opens the board page as `chesspal` alone does, with no terminal.";
+const playDescription = "Play at the table in Claude Code or Codex, in this terminal: what the page's buttons open, with the model and effort chosen there.";
 // Those of them that take no options, by name.
 const plainCommands = new Map([["mcp", mcpDescription], ["chat", chatDescription], ["table", tableDescription], ["open", openDescription], ["icon", iconDescription]]);
 
@@ -47,6 +48,12 @@ export async function runCommandLine(argv: string[], context: Context = defaultC
         const help = `chesspal listen [--codex]\n\n${listenDescription}`;
         const known = args.every((arg) => ["--codex", "--help", "-h"].includes(arg));
         return known ? success(help) : failure(`chesspal listen takes only --codex: ${args.join(" ")}.\n\n${help}`);
+    }
+
+    if (commandName === "play") {
+        // cli.ts runs `chesspal play <host>`; here come the help and what it refuses.
+        const help = `chesspal play <claude|codex>\n\n${playDescription}`;
+        return args.includes("--help") || args.includes("-h") ? success(help) : failure(`chesspal play takes one host, claude or codex: ${args.join(" ") || "none given"}.\n\n${help}`);
     }
 
     const command = list.find((candidate) => candidate.name === commandName);
@@ -212,6 +219,7 @@ function generalHelp(list: AnyCommand[]): string
         line("table", tableDescription),
         line("open", openDescription),
         line("icon", iconDescription),
+        line("play", playDescription),
         line("mcp", mcpDescription),
         line("listen", listenDescription),
         line("chat", chatDescription),

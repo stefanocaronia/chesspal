@@ -103,11 +103,31 @@ export interface PageData
     readonly thinking?: Thinking;
     /** The player's folder was set up by an older Chesspal: init must run there again. */
     readonly outdated?: true;
+    /** On the table's page alone (D-104): whether a chat is at it, the hosts it opens one in, and whether one is opening. */
+    readonly table?: TableShown;
     readonly profile: ProfileShown;
     readonly profiles: readonly ProfileShown[];
     readonly settings?: object;
     /** Where the profiles are, folder by folder from the player's own. */
     readonly dataFolder: readonly string[];
+}
+
+/** The table's chat, as its page shows it (D-104). */
+export interface TableShown
+{
+    readonly chat: boolean;
+    readonly hosts: readonly ChatHost[];
+    readonly opening: boolean;
+}
+
+/** A host the table opens a chat in: whether it is installed, the models and efforts offered, and the command to type in a terminal instead. */
+export interface ChatHost
+{
+    readonly name: string;
+    readonly installed: boolean;
+    readonly models: readonly string[];
+    readonly efforts: readonly string[];
+    readonly command: string;
 }
 
 /**

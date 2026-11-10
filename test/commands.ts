@@ -25,7 +25,7 @@ function temporary(folder: string): string
 
 /** A command with every kind of field, for the command line and the server: the real ones come with the chess. */
 export const play = defineCommand({
-    name: "play",
+    name: "try_move",
     description: "Plays a move in a test game. Only the tests know it.",
     input: z.object({
         san: z.string().describe("the move, in SAN"),
