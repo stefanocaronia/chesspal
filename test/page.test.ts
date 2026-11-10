@@ -433,6 +433,17 @@ describe("the player's moves on the page", () => {
         expect(await post(page, "/api/resign", {})).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"no-game"') });
     });
 
+    it("lets the player resign from the page while the chat thinks on the position before their move: the chat's refusals are not the page's", async () => {
+        const folder = playerFolder();
+        const chat = { ...testContext(folder), positionSeen: null };
+        const page = await open(folder, undefined, chat);
+        await run(folder, "new_game", { ai_colour: "black" }, chat);
+        await post(page, "/api/move", { move: "e2e4" });
+
+        expect(await post(page, "/api/resign", {})).toMatchObject({ status: 200, body: '{"resigned":true}' });
+        await expect(run(folder, "ai_move", { move: "e5", plan: "A plan." }, chat)).rejects.toThrow(/changed since you last saw it/);
+    });
+
     it("takes the player's words, alone or with their move, and refuses them in the player's words", async () => {
         const folder = playerFolder();
         const page = await open(folder);

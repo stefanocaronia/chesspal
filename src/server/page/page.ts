@@ -9,6 +9,7 @@ import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { Bell, bellProbe, pagePorts } from "../bell.ts";
 import { analysesOf, answerAnalyses } from "./analyses.ts";
+import { type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";
 import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls } from "./game.ts";
 import { json, send } from "./http.ts";
@@ -37,7 +38,17 @@ export async function startPage(context: Context, opponent: () => string | undef
     const { folder } = context;
     const watchers = new Set<ServerResponse>();
     const outdated = outdatedHostFiles(folder, context.platform).length > 0;
-    const served: Served = { folder, context, opponent, bell: new Bell(() => hasNews(context), () => tellWatchers(served)), watchers, port: 0, outdated };
+    const chat = chatSeenOf(context);
+    const served: Served = {
+        folder,
+        context: pageContext(context),
+        chat,
+        opponent,
+        bell: new Bell(() => hasNews(context, chat), () => tellWatchers(served)),
+        watchers,
+        port: 0,
+        outdated,
+    };
     const server = createServer((request, response) => answer(request, response, served));
 
     for (const port of [...pagePorts(folder), 0]) {
@@ -64,7 +75,10 @@ export interface Served
 {
     /** The host's folder, which gives the page its ports and the doorbell its chat; the game is in the context's data folder (D-71). */
     readonly folder: string;
+    /** What the page runs its commands with: never the chat's own (D-71). */
     readonly context: Context;
+    /** What the page reads of the chat: the words it was given, the game and the position it saw, its host. */
+    readonly chat: ChatSeen;
     readonly opponent: () => string | undefined;
     readonly bell: Bell;
     readonly watchers: Set<ServerResponse>;
@@ -154,9 +168,9 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
  * Whether the chat has news from the page: a game changed since the chat's last tool, by the player's move, words, draw or resignation, a new game or a
  * flag that fell, or another profile in use, which wakes the chat at the next ring (D-66). The player's words the chat was given change nothing it has not read.
  */
-function hasNews(context: Context): boolean
+function hasNews(context: Context, chat: ChatSeen): boolean
 {
-    return gameSeen(context) !== context.seen;
+    return gameSeen(context) !== chat.seen;
 }
 
 // The game the chat sees: the profile's folder, and the stamps of its game.json and of the talk with no game, where the player's words go in analysis

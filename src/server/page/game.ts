@@ -45,6 +45,7 @@ import {
     WordsRefused,
 } from "../../games/index.ts";
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
+import { asTheChatSees } from "./chat.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
@@ -200,7 +201,7 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
         }
 
         // The game starts from the page, open: its clocks wait for the player's Start there.
-        startNewGame(input.data, { ...served.context, pageOpen: () => true }, "page");
+        startNewGame(input.data, { ...asTheChatSees(served.context, served.chat), pageOpen: () => true }, "page");
     } catch (error) {
         send(response, 409, json, JSON.stringify(refusalFrom(error)));
         return;
@@ -353,7 +354,7 @@ function sendGame(response: ServerResponse, served: Served): void
     const current = gameNow(served);
     // With no game the page still shows the talk before the first (D-77).
     const spoken = current ?? loadTableTalk(folder);
-    const heard = heardLines(spoken, served.context.given);
+    const heard = heardLines(spoken, served.chat.given);
     const talk = spoken.talk.map(({ who, text, ply, shown }, index) => ({
         who,
         text,
@@ -406,7 +407,7 @@ function thinkingShown(served: Served, current: CurrentGame | undefined): { thin
     const position: SeenPosition = { started: current.started, plies: current.game.record.moves.length };
 
     if (current.game.position.turn === current.ai) {
-        const seen = served.context.positionSeen;
+        const seen = served.chat.positionSeen;
         const onIt = served.bell.woke || (seen !== undefined && seen !== null && samePosition(seen, position));
         return served.bell.inTurn && onIt ? { thinking: "move" } : {};
     }
@@ -463,7 +464,7 @@ function lastPlayed(context: Context): { name: string; record: GameRecord; }
 /** A game brought as a PGN, kept to study as analyse_game keeps it: the one already kept when it is the same game, with its review. */
 function kept(served: Served, pgn: string): { name: string; record: GameRecord; }
 {
-    analyseGame.run({ pgn }, { ...served.context, told: undefined });
+    analyseGame.run({ pgn }, served.context);
     return namedGame(served.context, gameInAnalysis(gameFolder(served.context.home()))!.game);
 }
 
