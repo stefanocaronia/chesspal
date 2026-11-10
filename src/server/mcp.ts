@@ -264,7 +264,7 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
 
         const run = calling !== undefined && "run" in calling ? calling.run : undefined;
         const who = agent !== undefined ? { agent, ...(run === undefined ? {} : { agentRun: run }) } : calling !== undefined ? { chat: true as const } : {};
-        // A game another process changed under the call is read again, and the call made once more (T-215).
+        // A game another process changed under the call is read again, and the call made once more.
         const result: unknown = await rerunIfChanged(() => command.run(checkedInput(command, input), { ...context, caller, ...who }));
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {

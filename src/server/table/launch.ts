@@ -1,5 +1,7 @@
 // `chesspal` alone (D-104): the table's page opened in the browser, the table started first, apart from the terminal, when none of this version answers.
 import { spawn } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { styleText } from "node:util";
 import { type Context, speaksItalian } from "../../commands/index.ts";
 import { tableFolder } from "../../home/index.ts";
@@ -54,12 +56,24 @@ export async function openTable(context: Context, launcher: TableLauncher = proc
     }
 }
 
+/** Notes why the icon could not open the table, whose console nobody sees, in open.log of the table's folder: the last of them. */
+export function noteOpenFailed(context: Context, message: string): void
+{
+    try {
+        const folder = tableFolder(context.home());
+        mkdirSync(folder, { recursive: true });
+        writeFileSync(join(folder, "open.log"), `${context.now().toISOString()} ${message}\n`);
+    } catch {
+        // A data folder that cannot be written has no other place for it.
+    }
+}
+
 /** The launcher of a real `chesspal`: the table started with the same Node and script, the page opened in the default browser. */
 export function processLauncher(platform: string, command: string[] = [...process.execArgv, process.argv[1] ?? ""]): TableLauncher
 {
     return {
         start: (home) => {
-            // Its own process group, with no console and nothing of this one's: the terminal can close, the table stays (T-213).
+            // Its own process group, with no console and nothing of this one's: the terminal can close, the table stays.
             spawn(process.execPath, [...command, "table"], { cwd: home, detached: true, stdio: "ignore", windowsHide: true }).unref();
         },
         open: (url) => openInBrowser(url, platform),

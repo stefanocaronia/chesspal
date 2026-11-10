@@ -3,12 +3,18 @@ import { runCommandLine } from "./command-line.ts";
 
 const args = process.argv.slice(2);
 
-// "chesspal" alone opens the table's page and "chesspal table" is the table itself (D-104); "chesspal mcp" turns the process into a server for an AI
-// host, "chesspal listen" into the doorbell of Claude Code, or of Codex with --codex, "chesspal chat" notes how the chat started; everything else is a command.
+// "chesspal" alone opens the table's page, "chesspal open" too as the icon runs it, "chesspal table" is the table itself and "chesspal icon" puts its icon
+// on the desktop (D-104); "chesspal mcp" turns the process into a server for an AI host, "chesspal listen" into the doorbell of Claude Code, or of Codex
+// with --codex, "chesspal chat" notes how the chat started; everything else is a command.
 if (args.length === 0) {
-    await openTableHere();
+    await openTableHere(true);
+} else if (args.length === 1 && args[0] === "open") {
+    // The icon's: its console has no window, where a question would hang unseen.
+    await openTableHere(false);
 } else if (args.length === 1 && args[0] === "table") {
     await serveTable();
+} else if (args.length === 1 && args[0] === "icon") {
+    await putIconHere();
 } else if (args.length === 1 && args[0] === "mcp") {
     // The server and its SDK load only here: every other command starts faster without them.
     const { startMcpServer } = await import("../server/mcp.ts");
@@ -31,16 +37,44 @@ if (args.length === 0) {
     process.exitCode = exitCode;
 }
 
-/** Opens the table's page, the table started apart when none answers, and returns: the terminal stays free. */
-async function openTableHere(): Promise<void>
+/**
+ * Opens the table's page, the table started apart when none answers, and returns: the terminal stays free. From a terminal, the first time on a machine
+ * it asks first whether to put the icon on the desktop, before the page takes the screen; from the icon, which nobody reads, what went wrong is noted.
+ */
+async function openTableHere(fromTerminal: boolean): Promise<void>
 {
-    const [{ openTable }, { defaultContext }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts")]);
+    const [{ noteOpenFailed, openTable }, { defaultContext }, { offerIcon }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts"), import("./icon.ts")]);
+    const context = defaultContext();
 
     try {
-        console.log(await openTable(defaultContext()));
+        const icon = fromTerminal ? await offerIcon(context) : undefined;
+
+        if (icon !== undefined) {
+            console.log(icon);
+        }
+
+        console.log(await openTable(context));
     } catch (error) {
         console.error((error as Error).message);
         process.exitCode = 1;
+
+        if (!fromTerminal) {
+            noteOpenFailed(context, (error as Error).message);
+        }
+    }
+}
+
+/** Puts the icon on the desktop and in the menu. */
+async function putIconHere(): Promise<void>
+{
+    const [{ defaultContext }, { iconsMade }] = await Promise.all([import("../commands/index.ts"), import("./icon.ts")]);
+    const { said, failed } = await iconsMade(defaultContext());
+
+    if (failed) {
+        console.error(said);
+        process.exitCode = 1;
+    } else {
+        console.log(said);
     }
 }
 
