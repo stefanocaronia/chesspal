@@ -51,7 +51,7 @@ interface Status
 export const status = defineCommand({
     name: "status",
     description: "Shows what Chesspal sees now: its version, the profile's folder and the game, with your next step. Call it at the start of every chat, "
-        + "before anything else.",
+        + "with `instructions`.",
     input: z.object({}),
     // Read only for the host: a flag that has fallen is written, as the time already decided.
     readOnly: true,
@@ -73,10 +73,10 @@ export const status = defineCommand({
             status.pageClosed = true;
         }
 
-        const chatStart = lastChatStart(context.folder)?.at;
-        const first = firstInChat(context, chatStart);
+        const chatStart = lastChatStart(context.folder);
+        const first = firstInChat(context, chatStart?.at);
 
-        if (!instructionsRead(context, chatStart)) {
+        if (!instructionsRead(context, chatStart?.at)) {
             status.unread = true;
         }
 
@@ -97,7 +97,8 @@ export const status = defineCommand({
                     pageGiven(context, current.started);
                 }
 
-                if (first && endOf(current.game) === undefined && fromBeforeChat(context, current.started)) {
+                // A game a summarized or resumed chat still holds is its own; without the host's word of the chat's start, any game began before it.
+                if (first && endOf(current.game) === undefined && (chatStart === undefined || cleanSince(chatStart, current.started))) {
                     status.fromBefore = true;
                 }
 
@@ -147,7 +148,7 @@ function outdatedLine(files: readonly string[]): string
 }
 
 // The opponent's instructions, which the chat reads before its first reply (D-102).
-const unreadLine = "Call `instructions` before you answer the player, if you have not called it in this chat yet.";
+const unreadLine = "Call `instructions` before you answer the player, if you have not called it since this chat started or was summarized.";
 
 // The game going on as a chat starts: the player may have come back for it, or want another.
 const fromBeforeLine = "A game from before this chat is going on: ask the player whether to go on with it. For a new one, " + newGameStep;
@@ -166,13 +167,6 @@ function firstInChat(context: Context, chatStart: string | undefined): boolean
 
     context.told.add(key);
     return true;
-}
-
-/** Whether a game began before the chat: one a summarized or resumed chat still holds is its own; without the host's word, any game is. */
-function fromBeforeChat(context: Context, started: string): boolean
-{
-    const start = lastChatStart(context.folder);
-    return start === undefined || cleanSince(start, started);
 }
 
 /**

@@ -21,7 +21,7 @@ This file is about **developing** Chesspal. The instructions for **playing** are
 | `project/` | the maintainer's private repository: project docs and colleagues | no | no |
 | `.claude/` | a junction to `project/.claude/`: see "Colleagues" | no | no |
 | `src/` | the chess core (`src/core/`, browser-safe), the games on disk (`src/games/`), the commands, the CLI, the MCP server | yes | built into `dist/` |
-| `instructions/` | the opponent's instructions, which `chesspal init` installs in a player's folder | yes | yes |
+| `instructions/` | the instructions for the AI: the opponent's, which the MCP server gives; the lines that start a chat and the agents', which `chesspal init` installs in a player's folder | yes | yes |
 | `data/` | Lichess's openings, which the build turns into an index by position | yes | built into `dist/` |
 | `scripts/` | the build's scripts | yes | no |
 | `docs/` | `structure.md`, what each folder and module holds, what it depends on and where new code goes, changed with every folder added, moved or removed; the README's screenshot | yes | no |

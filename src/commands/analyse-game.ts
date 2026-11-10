@@ -27,7 +27,7 @@ import {
     withLead,
 } from "../core/index.ts";
 import { gameInAnalysis, isGameName, keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis } from "../games/index.ts";
-import { analystAgent, instructions } from "../host-files/index.ts";
+import { analystAgent, instructionsFile } from "../host-files/index.ts";
 import { activeProfile, gameFolder } from "../profiles/index.ts";
 import { analystOf, anotherAnalyst } from "./agents.ts";
 import type { Context } from "./context.ts";
@@ -36,9 +36,6 @@ import { defineCommand } from "./registry.ts";
 import { speechLine, speechOf } from "./speech.ts";
 import { gameToStudy, knownTag, moveNumbers, namedGame, noGameGoingOn, type Studied } from "./study.ts";
 import { balanceText, colourName, riskLine, tacticsText } from "./view.ts";
-
-// The analyst's instructions, read at the first analysis.
-let analystText: string | undefined;
 
 /** A move as the analysis gives it: what happened, never how good it was (D-6). */
 interface MoveFacts
@@ -412,8 +409,7 @@ function analystInstructions(context: Context): string | undefined
     }
 
     context.told.add(key);
-    analystText ??= `${instructions("analyst")}\n${instructions("analysis")}`;
-    return analystText;
+    return `${instructionsFile("analyst")}\n${instructionsFile("analysis")}`;
 }
 
 /** Who is ahead after a move, as the AI estimated it with annotate_game or the coach during the game (D-90). */

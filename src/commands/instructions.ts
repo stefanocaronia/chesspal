@@ -16,8 +16,7 @@ export const instructions = defineCommand({
     alwaysLoad: true,
     run: (input, context): string => {
         context.told?.add(readKey(lastChatStart(context.folder)?.at));
-        opponentText ??= opponentInstructions();
-        return opponentText;
+        return opponentInstructions();
     },
     format: (text) => text,
 });
@@ -30,9 +29,6 @@ export function instructionsRead(context: Context, chatStart: string | undefined
 {
     return context.told === undefined || context.told.has(readKey(chatStart));
 }
-
-// The opponent's instructions, read from the package once.
-let opponentText: string | undefined;
 
 function readKey(chatStart: string | undefined): string
 {

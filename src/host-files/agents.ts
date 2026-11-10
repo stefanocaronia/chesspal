@@ -57,11 +57,20 @@ export function agentFiles(folder: string): { path: string; text: string; }[]
     return [...agents.map((agent) => claudeAgentFile(folder, agent)), ...agents.map((agent) => codexAgentFile(folder, agent))];
 }
 
-/** Instructions for the AI, by their file's name in the package's instructions folder. */
-export function instructions(name: string): string
+/** Instructions for the AI, by their file's name in the package's instructions folder: read once, as the version installed has them. */
+export function instructionsFile(name: string): string
 {
-    return readFileSync(new URL(`../../instructions/${name}.md`, import.meta.url), "utf8").trim();
+    let text = instructionTexts.get(name);
+
+    if (text === undefined) {
+        text = readFileSync(new URL(`../../instructions/${name}.md`, import.meta.url), "utf8").trim();
+        instructionTexts.set(name, text);
+    }
+
+    return text;
 }
+
+const instructionTexts = new Map<string, string>();
 
 /** An agent as init writes it, with its model in each host: the AI's own unless one is given. */
 interface AgentSpec
@@ -85,7 +94,7 @@ const codexQuickModel = "gpt-6-luna";
 
 function agentSpecs(): AgentSpec[]
 {
-    const ponder = instructions("ponder");
+    const ponder = instructionsFile("ponder");
     const thinking = "Chesspal's opponent thinking on the player's time. Started by the AI in the background after its move, as ai_move says.";
     return [
         { agent: quickAgent, claudeModel: "haiku", codexModel: codexQuickModel, description: thinking, text: ponder },
@@ -95,13 +104,13 @@ function agentSpecs(): AgentSpec[]
             agent: coachAgent,
             claudeModel: "inherit",
             description: "Chesspal's coach. Started only as Chesspal's answers say, in the background, never to answer the player.",
-            text: instructions("coach"),
+            text: instructionsFile("coach"),
         },
         {
             agent: analystAgent,
             claudeModel: "inherit",
             description: "Chesspal's analyst. Started only as Chesspal's answers say, in the background, to review a game over on the board page; never to answer the player.",
-            text: `${instructions("analyst-agent")}\n${instructions("analysis")}`,
+            text: `${instructionsFile("analyst-agent")}\n${instructionsFile("analysis")}`,
         },
     ];
 }

@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { makeFolder, writeAtomically } from "../games/index.ts";
-import { agentFiles, instructions } from "./agents.ts";
+import { agentFiles, instructionsFile } from "./agents.ts";
 
 /**
  * Sets up the player's folder for Claude Code and Codex (D-31): .mcp.json with the chesspal server, AGENTS.md with the lines that start a chat between
@@ -44,13 +44,13 @@ export function codexHooksPath(folder: string): string
 /** The instructions of the AI opponent, read from the package wherever it is installed: the MCP server's `instructions` tool gives them (D-102). */
 export function opponentInstructions(): string
 {
-    return instructions("opponent");
+    return instructionsFile("opponent");
 }
 
 /** The lines that start a chat, in the MCP server's instructions and in AGENTS.md: call `instructions`, then `status` (D-102). */
 export function startInstructions(): string
 {
-    return instructions("start");
+    return instructionsFile("start");
 }
 
 interface FileChange

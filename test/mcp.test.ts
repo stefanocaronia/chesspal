@@ -178,7 +178,7 @@ describe("the MCP server", () => {
         expect(answer).toEqual({
             text: `Chesspal ${version}. Folder: ${
                 profileFolder(context.folder, "player")
-            }\nCall \`instructions\` before you answer the player, if you have not called it in this chat yet.\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.`,
+            }\nCall \`instructions\` before you answer the player, if you have not called it since this chat started or was summarized.\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.`,
             isError: false,
         });
     });

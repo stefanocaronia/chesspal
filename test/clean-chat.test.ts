@@ -126,9 +126,10 @@ describe("a game from before the chat", () => {
 });
 
 describe("the opponent's instructions (D-102)", () => {
+    const unread = /^Call `instructions` before you answer the player, if you have not called it since this chat started or was summarized\.$/m;
+
     it("are given by their tool, and status asks for them until the chat has read them, again once it is cleared or summarized", async () => {
         const context: Context = { ...chatWith("1. e4 *"), told: new Set() };
-        const unread = /^Call `instructions` before you answer the player, if you have not called it in this chat yet\.$/m;
         await chatStarted(context, "startup", before);
         expect(status.format(await status.run({}, context))).toMatch(unread);
 
@@ -139,8 +140,16 @@ describe("the opponent's instructions (D-102)", () => {
         expect(status.format(await status.run({}, context))).toMatch(unread);
     });
 
+    it("are asked for once per MCP server where no hook notes how chats start", async () => {
+        const context: Context = { ...chatWith("1. e4 *"), told: new Set() };
+        expect(status.format(await status.run({}, context))).toMatch(unread);
+
+        await instructions.run({}, context);
+        expect(status.format(await status.run({}, context))).not.toMatch(unread);
+    });
+
     it("are never asked for on the command line, which keeps nothing", async () => {
-        expect(status.format(await status.run({}, chatWith("1. e4 *")))).not.toMatch(/call `instructions`/);
+        expect(status.format(await status.run({}, chatWith("1. e4 *")))).not.toMatch(unread);
     });
 });
 
