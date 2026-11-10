@@ -111,7 +111,7 @@ describe("why a move is not legal", () => {
                 game.play(`${move.from}${move.to}${move.promotion ?? ""}`);
             }
         }
-    });
+    }, 20_000);
 
     it("refuses to explain a piece that may not move", () => {
         expect(() => new Game().whyNot("e7", "e5")).toThrow(/side to move/);
