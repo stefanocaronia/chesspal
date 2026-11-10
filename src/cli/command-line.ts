@@ -19,7 +19,7 @@ const chatDescription = "Note how the chat started: new, cleared, resumed or com
 const tableDescription = "Serve the board page with no chat, until no browser has had it open for five minutes. `chesspal` alone starts it apart and opens the page.";
 const openDescription = "Open the board page as `chesspal` alone does, without asking about the icon: what the icon runs.";
 const iconDescription = "Put Chesspal's icon on the desktop and in the menu: it opens the board page as `chesspal` alone does, with no terminal.";
-const playDescription = "Play at the table in Claude Code or Codex, in this terminal: what the page's buttons open, with the model and effort chosen there.";
+const playDescription = "Play at the table in Claude Code or Codex, in this terminal: what the page's buttons open, with the model and effort chosen there; New game on the page starts the chat again, clean.";
 // Those of them that take no options, by name.
 const plainCommands = new Map([["mcp", mcpDescription], ["chat", chatDescription], ["table", tableDescription], ["open", openDescription], ["icon", iconDescription]]);
 

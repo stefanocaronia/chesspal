@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { type IncomingMessage, request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +10,8 @@ import { settingsFrom } from "../src/page/profile/settings.ts";
 import { activeProfile, saveProfileSettings } from "../src/profiles/index.ts";
 import type { TableChats } from "../src/server/page/table.ts";
 import { hostArgs, startMessage } from "../src/server/table/hosts/hosts.ts";
+import { type HostLaunch, runHost } from "../src/server/table/hosts/play.ts";
+import { askAgain, askedAgain, leaveSeat, takeSeat } from "../src/server/table/hosts/seat.ts";
 import { terminals } from "../src/server/table/hosts/terminal.ts";
 import { hostLaunch, startTable, type Table, terminalChats } from "../src/server/table/index.ts";
 import { testContext } from "./commands.ts";
@@ -72,13 +74,23 @@ describe("a chat the table opens", () => {
     it("offers the hosts found on the PATH, each with its choices and the command to type, and opens a terminal running chesspal play", async () => {
         const bin = temporary();
         writeFileSync(join(bin, process.platform === "win32" ? "claude.exe" : "claude"), "");
-        const chats = terminalChats(homeContext(process.platform), ["node", "cli.js"], { PATH: bin, PATHEXT: ".EXE" });
+        const context = homeContext(process.platform);
+        const chats = terminalChats(context, ["node", "cli.js"], { PATH: bin, PATHEXT: ".EXE" });
 
         expect(chats.hosts()).toEqual([
             expect.objectContaining({ name: "claude", installed: true, models: ["fable", "opus", "sonnet", "haiku"], command: "chesspal play claude" }),
             expect.objectContaining({ name: "codex", installed: false }),
         ]);
         expect(await chats.open("gemini")).toBe(false);
+
+        // Only the chat in the table's folder, and only while chesspal play holds its seat, starts again.
+        const table = tableFolder(context.home());
+        mkdirSync(table, { recursive: true });
+        expect(chats.relaunch(table)).toBe(false);
+        takeSeat(table, { pid: process.pid, host: "claude" });
+        expect(chats.relaunch(bin)).toBe(false);
+        expect(chats.relaunch(table)).toBe(true);
+        expect(askedAgain(table, process.pid)).toBe(true);
     });
 
     it("keeps each host's choice in the page's settings, a word alone", () => {
@@ -89,6 +101,48 @@ describe("a chat the table opens", () => {
         expect((await runCommandLine(["play", "--help"], testContext())).output).toContain("chesspal play <claude|codex>");
         expect(await runCommandLine(["play"], testContext())).toMatchObject({ exitCode: 1, output: expect.stringContaining("chesspal play takes one host, claude or codex: none given.") });
     });
+});
+
+describe("the seat chesspal play takes at the table", () => {
+    it("is one play process's at a time, while it is alive, and the table asks that one alone to start its host again", () => {
+        // The table's folder, which the first play makes.
+        const folder = join(temporary(), "table");
+        const alive = (pid: number): boolean => pid !== 3;
+
+        expect(askAgain(folder, alive)).toBe(false);
+        takeSeat(folder, { pid: 1, host: "claude" }, alive);
+        expect(() => takeSeat(folder, { pid: 2, host: "codex" }, alive)).toThrow("A chat in claude already plays at the table, in another window: play there, or close it, then try again.");
+        expect(askedAgain(folder, 1)).toBe(false);
+        expect(askAgain(folder, alive)).toBe(true);
+        expect(askedAgain(folder, 2)).toBe(false);
+        expect(askedAgain(folder, 1)).toBe(true);
+        // The request is taken once.
+        expect(askedAgain(folder, 1)).toBe(false);
+
+        leaveSeat(folder, 2);
+        expect(askAgain(folder, alive)).toBe(true);
+        leaveSeat(folder, 1);
+        expect(askAgain(folder, alive)).toBe(false);
+    });
+
+    it("goes to a new play process when the one before it is gone, its request with it", () => {
+        const folder = temporary();
+        takeSeat(folder, { pid: 3, host: "claude" }, () => true);
+        askAgain(folder, () => true);
+        takeSeat(folder, { pid: 4, host: "claude" }, (pid) => pid !== 3);
+
+        expect(askedAgain(folder, 4)).toBe(false);
+        expect(askedAgain(folder, 3)).toBe(false);
+    });
+
+    it("has its host ended, with what it started, and started again when the table asks; a host that ends by itself ends the play", async () => {
+        const folder = temporary();
+        const host = (code: string): HostLaunch => ({ program: process.execPath, args: ["-e", code], folder, env: process.env, shell: false });
+        let asked = 0;
+
+        expect(await runHost(host("setTimeout(() => process.exit(7), 60000)"), () => ++asked === 2, process.platform, 20)).toEqual({ code: expect.any(Number), again: true });
+        expect(await runHost(host("process.exit(3)"), () => false, process.platform, 20)).toEqual({ code: 3, again: false });
+    }, 15_000);
 });
 
 describe("the table's page, with no chat at it", () => {
@@ -126,7 +180,7 @@ const fakeHosts = [
 function fakeChats(opens = true): { chats: TableChats; opened: string[]; }
 {
     const opened: string[] = [];
-    return { chats: { hosts: () => fakeHosts, open: (host) => Promise.resolve(opened.push(host) > 0 && opens) }, opened };
+    return { chats: { hosts: () => fakeHosts, open: (host) => Promise.resolve(opened.push(host) > 0 && opens), relaunch: () => false }, opened };
 }
 
 async function tableWith({ chats, opened }: { chats: TableChats; opened: string[]; }): Promise<{ table: Table; opened: string[]; }>

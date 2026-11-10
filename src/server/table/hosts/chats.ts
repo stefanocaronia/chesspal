@@ -1,10 +1,12 @@
 // The chats a table opens from its page (D-104): the hosts found on this computer, each with the choices the page offers, and a terminal in the table's
-// folder running `chesspal play <host>`, which starts the host there.
+// folder running `chesspal play <host>`, which starts the host there, and again when the table asks it.
 import type { Context } from "../../../commands/index.ts";
 import { tableFolder } from "../../../home/index.ts";
+import { samePath } from "../../bell.ts";
 import type { ChatHost, TableChats } from "../../page/table.ts";
 import { programPath } from "./find.ts";
 import { hostChoices, hostNames, isHostName } from "./hosts.ts";
+import { askAgain } from "./seat.ts";
 import { openTerminal } from "./terminal.ts";
 
 /**
@@ -26,6 +28,8 @@ export function terminalChats(context: Context, chesspal: readonly string[] = [p
             return found.hosts;
         },
         open: async (host) => isHostName(host) && await openTerminal(tableFolder(context.home()), [...chesspal, "play", host], context.platform, env),
+        // Only a chat in the table's folder can be the one chesspal play holds.
+        relaunch: (folder) => samePath(folder, tableFolder(context.home())) && askAgain(tableFolder(context.home())),
     };
 }
 

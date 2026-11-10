@@ -50,7 +50,7 @@ import { asTheChatSees } from "./chat.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
-import { tableShown } from "./table.ts";
+import { relaunchChat, tableShown } from "./table.ts";
 
 /** Answers the page's requests about the game: true when the request was one. */
 export function answerGame(request: IncomingMessage, response: ServerResponse, url: URL, served: Served): boolean
@@ -191,12 +191,14 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
 
 /**
  * A new game from the page, with the sides, the level and the clock the player chose: the sides and the level they leave out are as in the game
- * before, and no clock means a game without one. One going on goes to the archive unfinished, and the doorbell tells the chat.
+ * before, and no clock means a game without one. One going on goes to the archive unfinished, and the doorbell tells the chat, unless the table starts
+ * it again.
  */
 async function newGameFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
     const asked = 'Send the new game as JSON: {"ai_colour": "black", "level": "club", "clock": "10+5"}, each one optional; no clock for a game without one.';
     const body = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;
+    let relaunched = false;
 
     if (body === undefined) {
         send(response, isJson(request) ? 400 : 415, json, JSON.stringify({ error: asked }));
@@ -212,14 +214,19 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
             return;
         }
 
-        // The game starts from the page, open: its clocks wait for the player's Start there.
-        rerunIfChanged(() => startNewGame(input.data, { ...asTheChatSees(served.context, served.chat), pageOpen: () => true }, "page"));
+        // The game starts from the page, open: its clocks wait for the player's Start there. A chat the table starts again is clean: no /clear is asked.
+        relaunched = relaunchChat(served);
+        const sight = relaunched ? served.context : asTheChatSees(served.context, served.chat);
+        rerunIfChanged(() => startNewGame(input.data, { ...sight, pageOpen: () => true }, "page"));
     } catch (error) {
         send(response, 409, json, JSON.stringify(refusalFrom(error)));
         return;
     }
 
-    served.bell.ring();
+    if (!relaunched) {
+        served.bell.ring();
+    }
+
     send(response, 200, json, JSON.stringify({ started: true }));
 }
 
