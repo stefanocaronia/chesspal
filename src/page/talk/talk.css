@@ -1,23 +1,42 @@
 /* The talk's column: the players' cards with their pictures and names, the faces, the words said and the box to write in, the card of a page offline,
    and the notes laid over the board between games */
 
-/* The picture stays at the card's top left, however many lines the card has; the clock in the middle */
+/* The picture at the card's top left, the clock at its top right (Stefano); the pieces taken and the badges under the name, run to the card's edge, under
+   the clock too; the button that starts the clocks, or the next game, takes the card's width below */
 .player-line {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto 1fr;
+    column-gap: 12px;
+    align-items: start;
+}
+
+.player-line > :first-child {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.player-line:has(> .haul) > :first-child {
+    grid-row: 1 / span 2;
+}
+
+.player-line > .who {
+    grid-column: 2;
+    grid-row: 1;
 }
 
 .player-line > .clock {
-    align-self: center;
+    grid-column: 3;
+    grid-row: 1;
 }
 
-.player-line > svg {
-    flex: none;
+.player-line > .haul {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    min-width: 0;
 }
 
 .who {
-    flex: 1;
     min-width: 0;
     line-height: 1.25;
 }
@@ -76,14 +95,11 @@
 
 /* The clocks wait for the player (Zoe): the button that starts them takes a line of the player's card, under the clock it starts, off the board's squares;
    between games the new game takes the same line, in the clock's place (D-77) */
-.player-line:has(> .start-clocks, > .next-game) {
-    flex-wrap: wrap;
-    row-gap: 10px;
-}
-
 .start-clocks,
 .next-game {
-    flex: 1 0 100%;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 10px;
     justify-content: center;
     padding: 8px 14px;
     font-size: 15px;
@@ -107,7 +123,8 @@
     align-self: center;
 }
 
-.player-line > .who:not(:has(.note)) .taken:empty {
+/* In analysis, a side that took nothing has its badges right under its name */
+.haul:has(> .badge-counts) > .taken:empty {
     display: none;
 }
 
@@ -701,12 +718,6 @@
 
 .ai-note > .say + .who {
     margin-top: 4px;
-}
-
-/* In analysis the board turned round changes which side's card is on top, never the order of the talk */
-.flipped .talk.studied,
-.flipped .talk.studied > section {
-    flex-direction: column;
 }
 
 .move-note .head {

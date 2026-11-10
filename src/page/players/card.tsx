@@ -54,17 +54,22 @@ export function PlayerCard({ place, picture, name, signed, side, level, taken, a
                                 : null}
                         </div>
                     )}
-                    <div class="taken" role="img" aria-label={text.taken(taken.map((piece) => text.piece(piece, opponent)), ahead)}>
-                        {groupsOf(taken).map((group) => (
-                            <span key={group[0]} class={group[0]?.toUpperCase() === "P" ? "group pawns" : "group"}>
-                                {group.map((piece, index) => <Piece key={index} letter={opponent === "white" ? piece : piece.toLowerCase()} small />)}
-                            </span>
-                        ))}
-                        {ahead > 0 ? <span class="balance">+{ahead}</span> : null}
-                    </div>
-                    {badges}
                 </div>
                 {clock}
+                {/* Between games a card is the name alone; in a game the pieces taken keep their line, empty too, and run under the clock to the card's edge */}
+                {side === undefined && taken.length === 0 && badges === undefined ? null : (
+                    <div class="haul">
+                        <div class="taken" role="img" aria-label={text.taken(taken.map((piece) => text.piece(piece, opponent)), ahead)}>
+                            {groupsOf(taken).map((group) => (
+                                <span key={group[0]} class={group[0]?.toUpperCase() === "P" ? "group pawns" : "group"}>
+                                    {group.map((piece, index) => <Piece key={index} letter={opponent === "white" ? piece : piece.toLowerCase()} small />)}
+                                </span>
+                            ))}
+                            {ahead > 0 ? <span class="balance">+{ahead}</span> : null}
+                        </div>
+                        {badges}
+                    </div>
+                )}
             </div>
         </section>
     );
