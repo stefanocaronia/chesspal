@@ -38,11 +38,11 @@ function Face({ mood }: { mood: Mood; })
 {
     switch (mood) {
         case "happy":
-            // Eyes closed in two arcs, a wide open smile.
+            // Eyes closed in two low arcs, a wide open smile with its corners just rounded.
             return (
                 <>
-                    <path class="eyes line" d="M50.5 78.5a4.5 4.5 0 0 1 9 0M68.5 78.5a4.5 4.5 0 0 1 9 0" />
-                    <path class="mouth" d="M57 84h14a7 7 0 0 1-14 0Z" />
+                    <path class="eyes line" d="M50 77.5q5-5.4 10 0M68 77.5q5-5.4 10 0" />
+                    <path class="mouth" d="M56.6 83.2H71.4Q73 83.2 72.9 84.6A9 7.8 0 0 1 55.1 84.6Q55 83.2 56.6 83.2Z" />
                 </>
             );
         case "surprised":
@@ -69,16 +69,15 @@ function Face({ mood }: { mood: Mood; })
                 </>
             );
         case "thoughtful":
-            // A glance to the side under one raised brow, the mouth pushed to the other side; the light breathes.
+            // The neutral face tilted on the screen, a smaller mouth: the head bent of one who wonders; the light breathes.
             return (
-                <>
-                    <path class="brows" d="M71 68L80 66" />
+                <g transform="rotate(-12 64 79)">
                     <g class="eyes">
-                        <circle cx="58" cy="76.5" r="3.9" />
-                        <circle cx="76" cy="76.5" r="3.9" />
+                        <circle cx="55" cy="74.5" r="4.4" />
+                        <circle cx="73" cy="74.5" r="4.4" />
                     </g>
-                    <path class="mouth line" d="M52.5 89L63 87" />
-                </>
+                    <rect class="mouth" x="60" y="86.3" width="8" height="3.4" rx="1.7" />
+                </g>
             );
         case "sad":
             // No brows, the face sunk low: eyes half shut under lids that droop outwards, a deep frown; the light goes out.
