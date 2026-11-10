@@ -16,10 +16,21 @@ export interface Analysis
     readonly corrected?: readonly string[];
 }
 
-/** Names the game in analysis, over the one before; written again each time its review changes, so the page hears of it. The same game keeps its corrections. */
-export function startAnalysis(folder: string, game: string, now: Date, brought = false, corrected: readonly string[] = []): void
+/** How a game is named in analysis: brought to the page by the player, with the moves the chat just corrected, or afresh, without the corrections it had. */
+export interface AnalysisStart
 {
-    const before = gameInAnalysis(folder);
+    readonly brought?: boolean;
+    readonly corrected?: readonly string[];
+    readonly afresh?: boolean;
+}
+
+/**
+ * Names the game in analysis, over the one before; written again each time its review changes, so the page hears of it. The same game keeps its corrections
+ * unless it starts afresh, in one write, so that the page never sees it leave the analysis.
+ */
+export function startAnalysis(folder: string, game: string, now: Date, { brought = false, corrected = [], afresh = false }: AnalysisStart = {}): void
+{
+    const before = afresh ? undefined : gameInAnalysis(folder);
     const kept = [...new Set([...(before?.game === game ? before.corrected ?? [] : []), ...corrected])];
     const analysis = { game, at: now.toISOString(), ...(brought ? { brought } : {}), ...(kept.length === 0 ? {} : { corrected: kept }) };
     writeAtomically(join(folder, fileName), `${JSON.stringify(analysis, null, 2)}\n`);

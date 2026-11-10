@@ -44,7 +44,7 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
 export interface Written
 {
     readonly text: string;
-    readonly at?: string;
+    readonly place?: string;
 }
 
 /** What the player wrote on the board page that the AI has not been given in this chat, given now: each game tool gives it once; never to an agent (D-89). */
@@ -85,7 +85,7 @@ export function give(context: Context, words: readonly Words[]): Written[]
     }
 
     const analysed = words.some((word) => word.shown !== undefined) ? gameInAnalysis(gameFolder(context.home()))?.game : undefined;
-    return words.map(({ text, shown }) => shown === undefined ? { text } : { text, at: placeOf(shown, analysed) });
+    return words.map(({ text, shown }) => shown === undefined ? { text } : { text, place: placeOf(shown, analysed) });
 }
 
 /** Where the page stood: the move shown, as the player saw it, or the start; with the game's name when the page shows another now. */

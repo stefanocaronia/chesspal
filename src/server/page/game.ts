@@ -329,7 +329,7 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
         reviewed = isReviewed(opened.record);
         brought = !reviewed && !look;
         // A game not yet reviewed is marked as brought, for status to ask the AI to go over it; one reviewed is ready, and the chat sleeps on.
-        startAnalysis(gameFolder(served.context.home()), opened.name, served.context.now(), brought);
+        startAnalysis(gameFolder(served.context.home()), opened.name, served.context.now(), { brought });
     } catch (error) {
         send(response, 400, json, JSON.stringify({ error: (error as Error).message, refusal: "pgn-unreadable" }));
         return;

@@ -882,7 +882,7 @@ const italian: Text = {
     piece: (letter, side) => `${italianNames[letter]} ${side === "white" ? (letter === "Q" || letter === "R" ? "bianca" : "bianco") : (letter === "Q" || letter === "R" ? "nera" : "nero")}`,
     taken: (pieces, ahead) => `Pezzi presi: ${pieces.length === 0 ? "nessuno" : pieces.join(", ")}${ahead > 0 ? `; avanti di ${ahead}` : ""}`,
     writeTo: (name) => `Scrivi a ${name}…`,
-    askAbout: (name) => `Chiedi a ${name} di questa partita…`,
+    askAbout: (name) => `Chiedi ${name === "AI" ? "all'AI" : `a ${name}`} di questa partita…`,
     goTo: (move) => `Vai a ${move}`,
     readBy: (name) => `Letto da ${name}`,
     wrote: (name) => `${name} ha scritto`,

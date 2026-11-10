@@ -65,7 +65,7 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         await mate(context);
         await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
         const [name] = readdirSync(join(gameFolder(context.home()), "games"));
-        startAnalysis(gameFolder(context.home()), `games/${name!}`, context.now(), true);
+        startAnalysis(gameFolder(context.home()), `games/${name!}`, context.now(), { brought: true });
 
         expect(await run(context, "status")).toContain(
             `\nThe player brought games/${name!} on the board page to analyse it. Next: start the chesspal-analyst agent in the background with the prompt "Analyse games/${name!}. The player speaks <their language>.":`,
@@ -138,6 +138,16 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         // Told at each call, its summary too.
         expect(await run(analyst, "annotate_game", { game, summary: "Short." })).toContain("2. keeps the note the AI wrote with the player: leave it, and don't contradict it in your summary; if this one does, give it again.");
         expect(await run(context, "analyse_game", { game })).toContain('2.g4: mate in one: Qh4#; you marked blunder: "Opens the king to Qh4."');
+
+        // A correction with who is ahead is a correction too; after the word on the game, the chat hears it stays as written.
+        expect(await run({ ...context, chat: true }, "annotate_game", { game, notes: [{ move: "1...", note: "Frees the queen." }], ahead: { "1...": "-1" } })).toBe(
+            `Kept in ${game}: 1 move marked and who is ahead after 1 move. The board page shows them.\nThe review's word on the game stays as written: if it says otherwise, give summary again.`,
+        );
+        expect(await run(analyst, "annotate_game", { game, notes: [{ move: "1...", badge: "good" }] })).toContain("2. 1... keep the notes the AI wrote with the player");
+        // The word on the game is not the end of the review while who is ahead is missing.
+        expect(await run(context, "status")).toContain(`(its review so far: notes on 3 moves, who is ahead after 1 of 4, its word on the game written)`);
+        await run(analyst, "annotate_game", { game, ahead: { "1.": 0, "2.": "-2" } });
+        expect(await run(context, "status")).toContain(`${game} (its review is done)`);
 
         // A review deleted is written again whole.
         await run(context, "delete_review", { game });

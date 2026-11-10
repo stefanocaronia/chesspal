@@ -8,7 +8,7 @@ import { type Context, withProfile } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import { PositionChanged } from "../src/commands/play-move.ts";
 import { status } from "../src/commands/status.ts";
-import { archivedGames, noteAiModel, notePondering } from "../src/games/index.ts";
+import { archivedGames, noteAiModel, notePondering, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell.ts";
@@ -169,6 +169,11 @@ describe("the page's server", () => {
             "Player wrote on the board page, at 2.♛h5: «Why the queen?»\nPlayer wrote on the board page: «Hm.»\nPlayer wrote on the board page, at the start: «And at the start?»",
         );
         expect(await statusOf(folder)).toContain("\nNext: answer the player with ai_say, about the move they were looking at. When they show you something the review missed");
+
+        // Words on a game other than the one in analysis name it.
+        startAnalysis(gameFolder(context.home()), "study/2026-11-01-100000.pgn", context.now());
+        await post(page, "/api/message", { text: "Back to this one.", game: kept, at: 3 });
+        expect(await statusOf(folder)).toContain(`Player wrote on the board page, at 2.♛h5 of ${kept}: «Back to this one.»`);
 
         // While a game goes on, no game is in analysis: the words keep no position.
         await post(page, "/api/new", {});

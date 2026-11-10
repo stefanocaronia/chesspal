@@ -98,7 +98,7 @@ export function closingLines(game: GameSummary | undefined, words: readonly Writ
  */
 export function wordLines(words: readonly Written[]): string[]
 {
-    return words.map(({ text, at }) => `Player wrote on the board page${at === undefined ? "" : `, at ${at}`}: «${text.replace(/\s+/g, " ")}»`);
+    return words.map(({ text, place }) => `Player wrote on the board page${place === undefined ? "" : `, at ${place}`}: «${text.replace(/\s+/g, " ")}»`);
 }
 
 /**
@@ -110,7 +110,7 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
     const step = pageClosed ? closedPageGameStep : newGameStep;
 
     // Words written on a game in analysis: the chat answers them there, and corrects the review where they show it wrong (D-101).
-    if (words.some((word) => word.at !== undefined) && (game === undefined || game.end !== undefined)) {
+    if (words.some((word) => word.place !== undefined) && (game === undefined || game.end !== undefined)) {
         return "Next: answer the player with ai_say, about the move they were looking at. When they show you something the review missed, first correct that move's "
             + "note with annotate_game, that move only.";
     }

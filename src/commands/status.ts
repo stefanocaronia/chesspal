@@ -176,13 +176,18 @@ function analysisLine({ game, brought, analyst, review }: NonNullable<Status["an
     return analyst === true ? `${shown}. ${reviewedLine(game)}` : `${shown}; analyse_game {"game": "${game}"} goes over it with the player.`;
 }
 
-/** How far the review of a game has got, as the board page shows it (Priya): done once it holds the word on the whole game. */
+/**
+ * How far the review of a game has got, as the board page shows it (Priya): done once it holds the word on the whole game and who is ahead after every move
+ * but the last; the analyst may still write notes after its word, so that alone is not the end.
+ */
 function reviewProgress(context: Context, game: string): string | undefined
 {
     try {
         const { record } = namedGame(context, game);
+        const worded = gameReviewOf(record) !== undefined;
+        const estimated = record.moves.filter(({ comment }) => leadOf(comment) !== undefined).length;
 
-        if (gameReviewOf(record) !== undefined) {
+        if (worded && estimated >= record.moves.length - 1) {
             return "its review is done";
         }
 
@@ -190,8 +195,10 @@ function reviewProgress(context: Context, game: string): string | undefined
             const review = reviewOf(comment);
             return review !== undefined && (review.badge !== "book" || review.note !== undefined);
         }).length;
-        const estimated = record.moves.filter(({ comment }) => leadOf(comment) !== undefined).length;
-        return noted === 0 && estimated === 0 ? "no review yet" : `its review so far: notes on ${noted} moves, who is ahead after ${estimated} of ${record.moves.length}`;
+        const word = worded ? ", its word on the game written" : "";
+        return noted === 0 && estimated === 0 && !worded
+            ? "no review yet"
+            : `its review so far: notes on ${noted} moves, who is ahead after ${estimated} of ${record.moves.length}${word}`;
     } catch {
         return undefined;
     }

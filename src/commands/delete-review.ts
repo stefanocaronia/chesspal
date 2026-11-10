@@ -2,7 +2,7 @@
 // delete, never the AI.
 import { z } from "zod";
 import { isReviewed, unreviewed } from "../core/index.ts";
-import { endAnalysis, forgetCoach, gameInAnalysis, isOverOnTable, rewriteGame, startAnalysis } from "../games/index.ts";
+import { forgetCoach, gameInAnalysis, isOverOnTable, rewriteGame, startAnalysis } from "../games/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { defineCommand } from "./registry.ts";
 import { namedGame } from "./study.ts";
@@ -29,8 +29,7 @@ export const deleteReview = defineCommand({
 
         // The page showing the game hears of it, and shows it without its review; the chat's corrections go with it.
         if (gameInAnalysis(folder)?.game === name) {
-            endAnalysis(folder);
-            startAnalysis(folder, name, context.now());
+            startAnalysis(folder, name, context.now(), { afresh: true });
         }
 
         return { game: name, reviewed: isReviewed(record) };

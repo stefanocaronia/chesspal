@@ -1,7 +1,7 @@
 // The AI's review of a game over (D-69): a badge on each move that matters, as chess.com marks them, with a note when it needs one, and its word on the
 // whole game, kept in the game's PGN for the board page. The judgment is the AI's alone: Chesspal gives no criteria (D-6, D-43).
 import { z } from "zod";
-import { annotatorOf, badges, Game, type GameRecord, leadOf, reviewed, reviewOf, withAnnotator, withGameReview, withLead } from "../core/index.ts";
+import { annotatorOf, badges, Game, type GameRecord, gameReviewOf, leadOf, reviewed, reviewOf, withAnnotator, withGameReview, withLead } from "../core/index.ts";
 import { gameInAnalysis, rewriteGame, startAnalysis } from "../games/index.ts";
 import { analystAgent } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
@@ -29,6 +29,8 @@ interface Annotated
     unestimated: string[];
     /** The moves whose note the chat corrected with the player, told the analyst at each call: its notes leave them as they are (D-101). */
     left: string[];
+    /** The chat corrected a note of a review that already has its word on the game. */
+    summaryStands: boolean;
 }
 
 // How many moves still without who is ahead the answer names; the rest it counts.
@@ -79,10 +81,12 @@ export const annotateGame = defineCommand({
         const numbers = moveNumbers(studied.record);
         // Where the analyst reviews the games, the chat's notes are corrections it made with the player: the analyst, at work then or later, leaves those notes
         // and is told of them at each call, and the chat is not asked for the analyst's work (D-101, Priya). Only a call the host ties to the chat is its own.
-        const correction = context.chat === true && analystRuns(context) && estimates.length === 0 && summary === undefined && closing === undefined;
+        const correction = context.chat === true && analystRuns(context) && notes.length > 0 && summary === undefined && closing === undefined;
         const analysis = gameInAnalysis(folder);
         const corrected = context.chat !== true && analysis?.game === studied.name ? analysis.corrected ?? [] : [];
         let skipped = 0;
+        // The moves noted, as analyse_game numbers them: the chat's corrections.
+        const noted: string[] = [];
         // Every move is checked before the game is written: all or nothing.
         const moves = [...studied.record.moves];
 
@@ -92,6 +96,7 @@ export const annotateGame = defineCommand({
             }
 
             const index = indexIn(studied.record, move, "notes");
+            noted.push(numbers[index]!);
 
             if (corrected.includes(numbers[index]!)) {
                 skipped += 1;
@@ -116,7 +121,7 @@ export const annotateGame = defineCommand({
             studied.name,
             summary === undefined && closing === undefined ? marked : withGameReview(marked, { ...(summary === undefined ? {} : { summary }), ...(closing === undefined ? {} : { closing }) }),
         );
-        startAnalysis(folder, studied.name, context.now(), false, correction ? notes.map(({ move }) => numbers[indexIn(studied.record, move, "notes")]!) : []);
+        startAnalysis(folder, studied.name, context.now(), { corrected: correction ? noted : [] });
         const bookUnnoted = moves.flatMap((move, index) => {
             const review = reviewOf(move.comment);
             return review?.badge === "book" && review.note === undefined ? [numbers[index]!] : [];
@@ -131,9 +136,11 @@ export const annotateGame = defineCommand({
             // Asked every time, of an older review too: an analyst whose instructions predate the estimates learns of them here.
             unestimated: correction ? [] : unestimatedMoves(marked, numbers),
             left: [...corrected],
+            // A correction after the review's word on the game: that word may now say otherwise (Priya).
+            summaryStands: correction && gameReviewOf(studied.record) !== undefined,
         };
     },
-    format: ({ game, marked, summary, closing, bookUnnoted, estimated, unestimated, left }) => {
+    format: ({ game, marked, summary, closing, bookUnnoted, estimated, unestimated, left, summaryStands }) => {
         const kept = [
             marked === 0 ? undefined : `${marked} ${marked === 1 ? "move" : "moves"} marked`,
             estimated === 0 ? undefined : `who is ahead after ${estimated} ${estimated === 1 ? "move" : "moves"}`,
@@ -156,7 +163,8 @@ export const annotateGame = defineCommand({
                 summary ? "; if this one does, give it again" : ""
             }.`];
         const head = kept.length === 0 ? `Nothing new kept in ${game}.` : `Kept in ${game}: ${[kept.slice(0, -1).join(", "), kept.at(-1)].filter((part) => part !== "").join(" and ")}. The board page shows them.`;
-        return [head, ...corrected, ...book, ...ahead].join("\n");
+        const stands = summaryStands ? ["The review's word on the game stays as written: if it says otherwise, give summary again."] : [];
+        return [head, ...stands, ...corrected, ...book, ...ahead].join("\n");
     },
 });
 

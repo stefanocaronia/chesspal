@@ -116,13 +116,17 @@ export interface TalkLine
 }
 
 /**
- * The talk over a game in analysis (D-101): from the player's first line on it, the lines said since, but for the player's on another game; the last ten,
- * which is all half the column holds (Zoe).
+ * The talk over a game in analysis (D-101): from the player's first line on it, the lines said since on it, a line without a position belonging to the game
+ * of the player's last line before it; the last ten, which is all half the column holds (Zoe).
  */
 export function analysisTalk(talk: readonly TalkLine[], game: string): TalkLine[]
 {
-    const first = talk.findIndex((line) => line.shown?.game === game);
-    return first === -1 ? [] : talk.slice(first).filter((line) => line.shown === undefined || line.shown.game === game).slice(-10);
+    let on: string | undefined;
+
+    return talk.filter((line) => {
+        on = line.shown?.game ?? on;
+        return on === game;
+    }).slice(-10);
 }
 
 /** How many times the AI has spoken in the game, its comments on its moves and its lines on the page: the page sees it speak when the count grows. */

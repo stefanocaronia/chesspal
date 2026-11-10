@@ -95,6 +95,10 @@ describe("the moves on the page", () => {
 
         expect(analysisTalk([before, on("study/a.pgn", "Why?"), answer, on("study/b.pgn", "And here?")], "study/a.pgn")).toEqual([on("study/a.pgn", "Why?"), answer]);
         expect(analysisTalk([before], "study/a.pgn")).toEqual([]);
+        // The AI's answer on another game stays with that game, and the talk on this one goes on after it.
+        const other = { who: "ai", text: "On b.", ply: 0 } as const;
+        const back = on("study/a.pgn", "Back to a.");
+        expect(analysisTalk([on("study/a.pgn", "Why?"), answer, on("study/b.pgn", "And here?"), other, back], "study/a.pgn")).toEqual([on("study/a.pgn", "Why?"), answer, back]);
         expect(analysisTalk(Array.from({ length: 12 }, (_, index) => on("study/a.pgn", `${index}`)), "study/a.pgn").map(({ text }) => text)).toEqual(
             ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
         );

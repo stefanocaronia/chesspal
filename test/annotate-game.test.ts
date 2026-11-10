@@ -227,7 +227,7 @@ describe("annotate_game (D-69)", () => {
         await newGame.run(newGame.input.parse({ ai_colour: "black", level: "beginner" }), context);
         await endGame.run(endGame.input.parse({ result: "player_resigns" }), context);
         await analyse(context, { pgn });
-        startAnalysis(gameFolder(context.folder), kept, context.now(), true);
+        startAnalysis(gameFolder(context.folder), kept, context.now(), { brought: true });
 
         const lines = status.format(await status.run({}, context));
         expect(lines.match(/Next:/g)).toHaveLength(1);

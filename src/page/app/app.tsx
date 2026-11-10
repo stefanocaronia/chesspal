@@ -473,7 +473,7 @@ export function App({ start }: { start: Settings; })
     };
 
     // In analysis the words go with the game and the move shown (D-101).
-    const sendWords = (shown?: { game: string; at: number; }): void => {
+    const sendWords = (position?: { game: string; at: number; }): void => {
         const words = draft;
 
         // /clear and the other commands are for Claude's app: written here they would reach the AI as words (Sebastiano's playtest).
@@ -483,7 +483,7 @@ export function App({ start }: { start: Settings; })
         }
 
         setUnsent(undefined);
-        void sendMessage(words, text, name, shown).then((refused) => {
+        void sendMessage(words, text, name, position).then((refused) => {
             setUnsent(refused?.text);
             clearSent(refused?.text, words);
         });
