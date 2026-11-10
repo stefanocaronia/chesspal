@@ -1,6 +1,7 @@
 // The package as a player gets it: packed, installed in a temporary folder, run through npm's shim (the .cmd one on Windows) for its version and
-// chesspal init, and the MCP server started as .mcp.json starts it, with initialize timed against its budget, tools/list and a call to status.
-// Run it with: npm run smoke, after npm run build. It exits with 1 at the first check that fails.
+// chesspal init; the table served as `chesspal table`, and the MCP server started as .mcp.json starts it, with initialize timed against its budget,
+// tools/list and a call to status, which gives the table's page (D-104). Run it with: npm run smoke, after npm run build. It exits with 1 at the first
+// check that fails.
 import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -27,7 +28,16 @@ try {
     install(tarball);
     check(`chesspal --version is ${version}`, chesspal("--version") === version);
     const server = initialised();
-    await mcpSession(server.command, server.args);
+    const table = await tableStarted();
+    let left = false;
+
+    try {
+        await mcpSession(server.command, server.args, table.url);
+    } finally {
+        left = await table.quit();
+    }
+
+    check("chesspal table quits when asked", left);
 } catch (error) {
     console.error(`✗ ${(error as Error).message}`);
     process.exitCode = 1;
@@ -69,8 +79,47 @@ function initialised(): { command: string; args: string[]; }
     return server!;
 }
 
-/** The MCP server as the host starts it, from the player's folder: initialize within its budget, the tools listed, status called. */
-async function mcpSession(command: string, args: string[]): Promise<void>
+/** `chesspal table` as the icon starts it, on the smoke's data folder: its address once it says it, and how to ask it to quit, whether it left. */
+async function tableStarted(): Promise<{ url: string; quit: () => Promise<boolean>; }>
+{
+    const table = spawn("chesspal table", { cwd: player, env: environment, shell: true });
+    const exited = new Promise<boolean>((done) => table.once("exit", () => done(true)));
+    const url = await new Promise<string>((done, failed) => {
+        let said = "";
+        const timer = setTimeout(() => failed(new Error(`chesspal table gave no address in 15 s: ${said}`)), 15_000);
+
+        const heard = (chunk: Buffer): void => {
+            said += chunk.toString();
+            const found = /Chesspal's table: (http:\/\/127\.0\.0\.1:\d+\/)/.exec(said)?.[1];
+
+            if (found !== undefined) {
+                clearTimeout(timer);
+                done(found);
+            }
+        };
+
+        table.stdout.on("data", heard);
+        table.stderr.on("data", heard);
+        void exited.then(() => failed(new Error(`chesspal table left: ${said}`)));
+    });
+    check(`chesspal table serves the page at ${url}`, true);
+    return {
+        url,
+        quit: async () => {
+            await fetch(new URL("/api/table/quit", url), { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => undefined);
+            const left = await Promise.race([exited, new Promise<boolean>((done) => setTimeout(() => done(false), 10_000))]);
+
+            if (!left) {
+                stop(table);
+            }
+
+            return left;
+        },
+    };
+}
+
+/** The MCP server as the host starts it, from the player's folder: initialize within its budget, the tools listed, status called, which gives the table's page. */
+async function mcpSession(command: string, args: string[], table: string): Promise<void>
 {
     const started = performance.now();
     const server = spawn(command, args, { cwd: player, env: environment });
@@ -90,6 +139,7 @@ async function mcpSession(command: string, args: string[]): Promise<void>
         const status = await session.ask("tools/call", { name: "status", arguments: {} }) as { content: { text?: string; }[]; isError?: boolean; };
         const text = status.content.map((part) => part.text ?? "").join("\n");
         check(`status answers: ${text.split("\n")[0]}`, status.isError !== true && text.startsWith(`Chesspal ${version}.`));
+        check("the server attaches to the table: status gives its page", text.includes(table));
     } finally {
         server.stdin.end();
         // A server that does not leave is stopped; the check below says so, after the failure that came first, if any.
