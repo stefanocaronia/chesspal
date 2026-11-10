@@ -41,7 +41,7 @@ function packed(): string
     const [pack] = JSON.parse(npm(["pack", "--json", "--pack-destination", temporary], repository)) as [{ filename: string; files: { path: string; }[]; }];
     const files = pack.files.map(({ path }) => path.replaceAll("\\", "/"));
     check(`npm pack: ${pack.filename}, ${files.length} files`, files.length > 0);
-    check("the package holds the command line and the opponent's instructions", files.includes("dist/cli/cli.js") && files.includes("instructions/opponent.md"));
+    check("the package holds the command line and the opponent's instructions", files.includes("dist/cli/cli.js") && files.includes("instructions/opponent.md") && files.includes("instructions/start.md"));
     const strays = files.filter((path) => !shipped.test(path));
     check(`the package holds nothing but dist/, instructions/ and its own files${strays.length === 0 ? "" : `: not ${strays.join(", ")}`}`, strays.length === 0);
     return join(temporary, pack.filename);
@@ -64,8 +64,8 @@ function initialised(): { command: string; args: string[]; }
     const config = JSON.parse(readFileSync(join(player, ".mcp.json"), "utf8")) as { mcpServers?: { chesspal?: { command: string; args: string[]; }; }; };
     const server = config.mcpServers?.chesspal;
     check("chesspal init writes the chesspal server in .mcp.json", server !== undefined);
-    const instructions = readFileSync(join(installed, "node_modules", "chesspal", "instructions", "opponent.md"), "utf8").trim().split("\n")[0]!;
-    check("chesspal init writes the opponent's instructions in AGENTS.md", readFileSync(join(player, "AGENTS.md"), "utf8").includes(instructions));
+    const start = readFileSync(join(installed, "node_modules", "chesspal", "instructions", "start.md"), "utf8").trim();
+    check("chesspal init writes the lines that start a chat in AGENTS.md", readFileSync(join(player, "AGENTS.md"), "utf8").includes(start));
     return server!;
 }
 

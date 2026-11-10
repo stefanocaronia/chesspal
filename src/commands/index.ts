@@ -9,6 +9,7 @@ import { deleteReview } from "./delete-review.ts";
 import { endGame } from "./end-game.ts";
 import { exportGame } from "./export-game.ts";
 import { init } from "./init.ts";
+import { instructions } from "./instructions.ts";
 import { look } from "./look.ts";
 import { newGame } from "./new-game.ts";
 import { pastGames } from "./past-games.ts";
@@ -41,6 +42,7 @@ export { gameToStudy, namedGame, shownPosition } from "./study.ts";
 /** Every command of Chesspal, in the order the command line lists them and the MCP server offers them. */
 export const commands: AnyCommand[] = [
     init,
+    instructions,
     status,
     newGame,
     playerMove,

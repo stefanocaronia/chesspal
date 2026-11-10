@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
-import { opponentInstructions, outdatedHostFiles } from "../src/host-files/index.ts";
+import { outdatedHostFiles, startInstructions } from "../src/host-files/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -46,12 +46,12 @@ describe("chesspal init", () => {
                 + "  Updated 14 files.",
         );
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
-        expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${opponentInstructions()}\n<!-- chesspal: end -->\n`);
+        expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${startInstructions()}\n<!-- chesspal: end -->\n`);
         expect(text(chess, "CLAUDE.md")).toBe("@AGENTS.md\n");
         expect(json(chess, ".claude/settings.json")).toEqual({ enabledMcpjsonServers: ["chesspal"], permissions: { allow: ["mcp__chesspal"] }, hooks: { Stop: [{ hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] } });
         expect(text(chess, ".codex/config.toml")).toBe('[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
         expect(json(chess, ".codex/hooks.json")).toEqual({ hooks: { Stop: [{ hooks: [codexBellHook] }], SessionStart: [{ hooks: [codexChatHook] }] } });
-        expect(opponentInstructions()).toContain("call `status`");
+        expect(startInstructions()).toContain("even to a greeting, call `instructions` and `status`");
         expect(text(chess, ".claude/agents/chesspal-ponder-quick.md")).toMatch(
             /^---\nname: chesspal-ponder-quick\n.*\ntools: mcp__chesspal__ponder\nmodel: haiku\n---\n\nYou are the player's chess opponent/s,
         );

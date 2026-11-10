@@ -6,16 +6,18 @@ import { z } from "zod";
 import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, inputProblems, isBoolean, PositionChanged } from "../commands/index.ts";
 import { aiNameOf } from "../core/index.ts";
 import { endOf, loadGame, noteAiHost, noteAiModel } from "../games/index.ts";
-import { agentTools, hasAgent } from "../host-files/index.ts";
+import { agentTools, hasAgent, startInstructions } from "../host-files/index.ts";
 import { gameFolder } from "../profiles/index.ts";
 import { version } from "../version.ts";
 import { pagePorts } from "./bell.ts";
 import { allowedCaller, callerOf, type CallingAgent, callingAgent, fromCodexAgent } from "./caller.ts";
 import { chatHasRead, startPage } from "./page/page.ts";
 
-/** What the host reads as the server starts, before any tool: where to begin, and the rule of every move (D-27). Short, since hosts may cut it. */
-export const serverInstructions = "Chesspal keeps the chess for you: the rules, the board, the clock, the games and the player's memory. Call `status` at the start of every "
-    + "chat. Every move goes through Chesspal's tools: never keep the board in your head or invent a position.";
+/**
+ * What the host reads as the server starts, before any tool: the lines that start a chat, `instructions` then `status`, and the rule of every move (D-27,
+ * D-102). Short, since hosts cut them or copy them into every tool.
+ */
+export const serverInstructions = startInstructions();
 
 /** The MCP server for an AI host: every command of the registry as a tool, with its description and parameters (D-5). */
 export function createMcpServer(context: Context = defaultContext(), list: AnyCommand[] = commands, beforeCall?: (meta: Record<string, unknown> | undefined) => Promise<void>): McpServer

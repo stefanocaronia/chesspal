@@ -57,14 +57,15 @@ describe("the MCP server", () => {
         expect((await (await connect()).listTools()).tools.map((tool) => tool.name)).not.toContain("ponder");
     });
 
-    it("sends the host to status, keeps the board out of the AI's head, and loads status at once", async () => {
+    it("sends the host to the opponent's instructions and to status, keeps the board out of the AI's head, and loads both tools at once (D-102)", async () => {
         const { tools } = await (await connect()).listTools();
-        const status = tools.find((tool) => tool.name === "status");
+        const loaded = tools.filter((tool) => tool.name === "instructions" || tool.name === "status");
 
         expect(client?.getInstructions()).toBe(serverInstructions);
         expect(serverInstructions.length).toBeLessThan(512);
+        expect(serverInstructions).toContain("even to a greeting, call `instructions` and `status`");
         expect(serverInstructions).toContain("Every move goes through Chesspal's tools");
-        expect(status?._meta?.["anthropic/alwaysLoad"]).toBe(true);
+        expect(loaded.map((tool) => [tool.name, tool._meta?.["anthropic/alwaysLoad"], tool.annotations?.readOnlyHint])).toEqual([["instructions", true, true], ["status", true, true]]);
     });
 
     it("records what the chat has read after its own calls, not after an agent's, so that the doorbell still rings the player's move (D-72)", async () => {
@@ -169,7 +170,7 @@ describe("the MCP server", () => {
         expect(tools.find((tool) => tool.name === "play")?.annotations).toEqual({ readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false });
     });
 
-    it("runs a tool and answers with its text", async () => {
+    it("runs a tool and answers with its text: status asks first for the instructions a new server has not given (D-102)", async () => {
         const context = testContext(mkdtempSync(join(tmpdir(), "chesspal-")));
         const answer = await call("status", {}, undefined, context);
         rmSync(context.folder, { recursive: true, force: true });
@@ -177,7 +178,7 @@ describe("the MCP server", () => {
         expect(answer).toEqual({
             text: `Chesspal ${version}. Folder: ${
                 profileFolder(context.folder, "player")
-            }\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.`,
+            }\nCall \`instructions\` before you answer the player, if you have not called it in this chat yet.\nNo game.\nNext: when the player wants a game, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.`,
             isError: false,
         });
     });

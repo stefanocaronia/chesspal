@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { recordChatStart } from "../src/cli/chat-hook.ts";
 import type { Context } from "../src/commands/context.ts";
 import { endGame } from "../src/commands/end-game.ts";
+import { instructions } from "../src/commands/instructions.ts";
 import { newGame } from "../src/commands/new-game.ts";
 import { positionIn } from "../src/commands/play-move.ts";
 import { status } from "../src/commands/status.ts";
@@ -121,6 +122,25 @@ describe("a game from before the chat", () => {
         const line = chatWith("1. e4 *");
         await chatStarted(line, "clear", after);
         expect(status.format(await status.run({}, line))).not.toMatch(/from before this chat/);
+    });
+});
+
+describe("the opponent's instructions (D-102)", () => {
+    it("are given by their tool, and status asks for them until the chat has read them, again once it is cleared or summarized", async () => {
+        const context: Context = { ...chatWith("1. e4 *"), told: new Set() };
+        const unread = /^Call `instructions` before you answer the player, if you have not called it in this chat yet\.$/m;
+        await chatStarted(context, "startup", before);
+        expect(status.format(await status.run({}, context))).toMatch(unread);
+
+        expect(instructions.format(await instructions.run({}, context))).toMatch(/^You choose your moves, explain them briefly and talk with the player\./);
+        expect(status.format(await status.run({}, context))).not.toMatch(unread);
+
+        await chatStarted(context, "compact", after);
+        expect(status.format(await status.run({}, context))).toMatch(unread);
+    });
+
+    it("are never asked for on the command line, which keeps nothing", async () => {
+        expect(status.format(await status.run({}, chatWith("1. e4 *")))).not.toMatch(/call `instructions`/);
     });
 });
 

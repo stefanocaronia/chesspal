@@ -1,12 +1,12 @@
-// What `chesspal init` writes in a player's folder for each AI host: the opponent's instructions, the MCP server, the hooks and the agents.
+// What `chesspal init` writes in a player's folder for each AI host: the lines that start a chat, the MCP server, the hooks and the agents.
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { makeFolder, writeAtomically } from "../games/index.ts";
 import { agentFiles, instructions } from "./agents.ts";
 
 /**
- * Sets up the player's folder for Claude Code and Codex (D-31): .mcp.json with the chesspal server, AGENTS.md with the opponent's instructions between
- * Chesspal's marks, CLAUDE.md importing it, the hosts' settings with the server approved, and their hooks. What the player wrote there stays; it returns
+ * Sets up the player's folder for Claude Code and Codex (D-31): .mcp.json with the chesspal server, AGENTS.md with the lines that start a chat between
+ * Chesspal's marks (D-102), CLAUDE.md importing it, the hosts' settings with the server approved, and their hooks. What the player wrote there stays; it returns
  * the files written.
  */
 export function setUpHosts(folder: string, platform: string): string[]
@@ -41,10 +41,16 @@ export function codexHooksPath(folder: string): string
     return join(folder, ".codex", "hooks.json");
 }
 
-/** The instructions of the AI opponent, read from the package wherever it is installed. */
+/** The instructions of the AI opponent, read from the package wherever it is installed: the MCP server's `instructions` tool gives them (D-102). */
 export function opponentInstructions(): string
 {
     return instructions("opponent");
+}
+
+/** The lines that start a chat, in the MCP server's instructions and in AGENTS.md: call `instructions`, then `status` (D-102). */
+export function startInstructions(): string
+{
+    return instructions("start");
 }
 
 interface FileChange
@@ -87,12 +93,15 @@ function mcpFile(folder: string, platform: string): FileChange | undefined
     return changed(path, { ...config, mcpServers: { ...servers, chesspal: { ...chesspalServer(platform), ...(isObject(before.env) ? { env: before.env } : {}) } } });
 }
 
-/** AGENTS.md with the opponent's instructions between Chesspal's marks: rewritten when they changed, put first in a file that has none. */
+/**
+ * AGENTS.md with the lines that start a chat between Chesspal's marks, which Codex needs beside the server's instructions (D-31, D-102): rewritten when
+ * they changed, put first in a file that has none.
+ */
 function agentsFile(folder: string): FileChange | undefined
 {
     const path = join(folder, "AGENTS.md");
     const before = textOf(path);
-    const block = [startMark, opponentInstructions(), endMark].join("\n");
+    const block = [startMark, startInstructions(), endMark].join("\n");
 
     if (before === undefined) {
         return { path, text: `${block}\n` };

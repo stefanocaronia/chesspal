@@ -9,6 +9,7 @@ import { closingLines, newGameStep, positionLines, sidesLine, wordLines } from "
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
 import { type GameSummary, summaryOf, withThought } from "./game-summary.ts";
+import { instructionsRead } from "./instructions.ts";
 import { levelText } from "./levels.ts";
 import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 import { playerLine } from "./profiles.ts";
@@ -42,6 +43,8 @@ interface Status
     coach?: true;
     /** The files an older init wrote in the player's folder, which this version would write otherwise. */
     outdated?: string[];
+    /** The chat has not read the opponent's instructions since it started, or was cleared or summarized (D-102). */
+    unread?: true;
 }
 
 /** What Chesspal sees now, the first call of a chat: a dashboard under 150 tokens while the player is to move, with the next step. */
@@ -70,7 +73,12 @@ export const status = defineCommand({
             status.pageClosed = true;
         }
 
-        const first = firstInChat(context);
+        const chatStart = lastChatStart(context.folder)?.at;
+        const first = firstInChat(context, chatStart);
+
+        if (!instructionsRead(context, chatStart)) {
+            status.unread = true;
+        }
 
         try {
             const current = gameAt(folder, context.now());
@@ -117,9 +125,10 @@ export const status = defineCommand({
 
         return status;
     },
-    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words = [], analysis, fromBefore, coach, outdated }) =>
+    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words = [], analysis, fromBefore, coach, outdated, unread }) =>
         [
             `Chesspal ${version}. Folder: ${folder}`,
+            ...(unread === true ? [unreadLine] : []),
             ...(outdated === undefined ? [] : [outdatedLine(outdated)]),
             ...(page === undefined ? [] : [pageLine(page, pageClosed === true)]),
             ...(player === undefined ? [] : [player]),
@@ -137,6 +146,9 @@ function outdatedLine(files: readonly string[]): string
         + "in this folder and open a new chat. Until then the agents and your instructions are the old ones.";
 }
 
+// The opponent's instructions, which the chat reads before its first reply (D-102).
+const unreadLine = "Call `instructions` before you answer the player, if you have not called it in this chat yet.";
+
 // The game going on as a chat starts: the player may have come back for it, or want another.
 const fromBeforeLine = "A game from before this chat is going on: ask the player whether to go on with it. For a new one, " + newGameStep;
 
@@ -144,9 +156,9 @@ const fromBeforeLine = "A game from before this chat is going on: ask the player
  * Whether this is the chat's first status: once a chat where the MCP server keeps what it told, again in a chat cleared or summarized, since its start keys
  * it (D-57); never on the command line.
  */
-function firstInChat(context: Context): boolean
+function firstInChat(context: Context, chatStart: string | undefined): boolean
 {
-    const key = `game before ${lastChatStart(context.folder)?.at ?? ""}`;
+    const key = `game before ${chatStart ?? ""}`;
 
     if (context.told === undefined || context.told.has(key)) {
         return false;
