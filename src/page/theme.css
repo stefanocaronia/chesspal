@@ -33,6 +33,10 @@
     --help-on: #fff;
     --help-line: rgba(17, 22, 29, 0.78);
     --help-halo: rgba(255, 255, 255, 0.85);
+    /* The control map's veils (Zoe's variant A): grey over the board, sand where White alone reaches, slate where Black alone does */
+    --map-veil: rgba(160, 166, 176, 0.5);
+    --map-white: rgba(242, 233, 210, 0.78);
+    --map-black: rgba(56, 66, 84, 0.5);
     --torretta-body: #6d9fd1;
     --torretta-shade: #4b7cb0;
     --torretta-screen: #16263a;
@@ -102,6 +106,9 @@
     --badge-blunder: #d93434;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.25);
     --board-shadow: var(--shadow);
+    --map-veil: rgba(112, 120, 132, 0.66);
+    --map-white: rgba(226, 214, 188, 0.64);
+    --map-black: rgba(28, 35, 48, 0.7);
     color-scheme: dark;
 }
 

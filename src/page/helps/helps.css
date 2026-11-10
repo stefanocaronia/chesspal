@@ -146,8 +146,9 @@
     stroke-dasharray: 0.22 0.11 0 0.11;
 }
 
-/* The map (Zoe, after the round): every square on one neutral ground, then light where only White reaches, dark where only Black does, half and half
-   when both do; the two counts together in the middle, as a domino. The drawings and the pieces step back */
+/* The map (Zoe's veil, Stefano's choice): a grey veil flattens the board, sand where only White reaches, slate where only Black does; the squares both reach
+   and those none does stay grey, and their counts speak, together in the middle as a domino. Never an opaque ground: the square shows through. The drawings
+   and the pieces step back */
 .board.mapping ~ .arrows,
 .board.mapping .move-badge {
     opacity: 0.12;
@@ -158,26 +159,22 @@
 }
 
 .board.mapping .piece {
-    opacity: 0.45;
+    opacity: 0.5;
 }
 
 .control-ground {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: #8d96a1;
+    background: var(--map-veil);
 }
 
 .control-ground.white {
-    background: #eef1f4;
+    background: var(--map-white);
 }
 
 .control-ground.black {
-    background: #2b323c;
-}
-
-.control-ground.both {
-    background: linear-gradient(135deg, #eef1f4 50%, #2b323c 50%);
+    background: var(--map-black);
 }
 
 .control-count {
