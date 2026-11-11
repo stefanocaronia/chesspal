@@ -17,7 +17,7 @@ import { playerMove } from "./player-move.ts";
 import { playerSay } from "./player-say.ts";
 import { ponder } from "./ponder.ts";
 import { position } from "./position.ts";
-import { newProfile, profiles, setAccounts, setAvatar, useProfile } from "./profiles.ts";
+import { editProfile, newProfile, profiles, setAvatar, useProfile } from "./profiles.ts";
 import type { AnyCommand } from "./registry.ts";
 import { status } from "./status.ts";
 import { studyGames } from "./study-games.ts";
@@ -34,7 +34,7 @@ export { endGame } from "./end-game.ts";
 export { ChatNotClear, newGame, startNewGame } from "./new-game.ts";
 export { bookOpening, bookPlies } from "./opening-book.ts";
 export { playMove, PositionChanged, positionIn, samePosition } from "./play-move.ts";
-export { chooseDrawnAvatar, GameGoingOn, newProfile, setAccounts, useProfile } from "./profiles.ts";
+export { chooseDrawnAvatar, editProfile, GameGoingOn, newProfile, useProfile } from "./profiles.ts";
 export { type AnyCommand, baseType, type Command, commandLineFieldProblem, inputProblems, isBoolean, isList, takesNumbers } from "./registry.ts";
 export { say } from "./say.ts";
 export { gameToStudy, namedGame, shownPosition } from "./study.ts";
@@ -65,5 +65,5 @@ export const commands: AnyCommand[] = [
     newProfile,
     useProfile,
     setAvatar,
-    setAccounts,
+    editProfile,
 ];

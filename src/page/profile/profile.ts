@@ -46,6 +46,15 @@ export interface NewProfile
     readonly use?: boolean;
 }
 
+/** A change to the profile in use, one field at a time from the profile window. */
+export interface ProfileEdit
+{
+    readonly name?: string;
+    readonly level?: Level | "";
+    readonly lichess?: string;
+    readonly chesscom?: string;
+}
+
 /** A request the server refused: its words, and its code when the page says it in the player's language. */
 export interface Refused
 {
@@ -89,10 +98,10 @@ export async function chooseAvatar(profile: string, avatar: AvatarId): Promise<R
     return refusalOf(await post(forProfile("/api/profile/avatar", profile), jsonOf({ avatar })));
 }
 
-/** The player's names on Lichess and chess.com for the profile the page shows, an empty one removed: the server's refusal, or undefined. */
-export async function saveAccounts(profile: string, accounts: { readonly lichess: string; readonly chesscom: string; }): Promise<Refused | undefined>
+/** What the player changes in the profile the page shows: an empty level or site name removed. The server's refusal, or undefined. */
+export async function editProfile(profile: string, changes: ProfileEdit): Promise<Refused | undefined>
 {
-    return refusalOf(await post(forProfile("/api/profile/accounts", profile), jsonOf({ lichess: accounts.lichess.trim(), chesscom: accounts.chesscom.trim() })));
+    return refusalOf(await post(forProfile("/api/profile/edit", profile), jsonOf(changes)));
 }
 
 /** Opens the data folder in the system's file manager, where the page runs: the server's refusal, or undefined. */

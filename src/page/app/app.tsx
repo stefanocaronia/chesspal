@@ -32,7 +32,7 @@ import { explain } from "../board/explain.ts";
 import { kingSigns } from "../board/signs.ts";
 import { piecesOf } from "../board/squares.ts";
 import { type NewGameChoice, NewGameDialog } from "../dialogs/new-game.tsx";
-import { NameButton, PictureButton, PictureDialog, ProfilesDialog, Wizard } from "../dialogs/profiles.tsx";
+import { NameButton, PictureButton, ProfileDialog, ProfilesDialog, Wizard } from "../dialogs/profiles.tsx";
 import { SettingsPanel } from "../dialogs/settings.tsx";
 import { playerIn, type StudiedSide, studiedSides } from "../dialogs/studied.ts";
 import { type Studied, StudyDialog } from "../dialogs/study.tsx";
@@ -93,7 +93,7 @@ export function App({ start }: { start: Settings; })
         }
     };
 
-    const [dialog, setDialog] = useState<"picture" | "profiles" | "new-game" | "study" | undefined>(undefined);
+    const [dialog, setDialog] = useState<"profile" | "profiles" | "new-game" | "study" | undefined>(undefined);
     const { data: served, problem, offline, reload } = useServed(() => setDialog("new-game"));
     const [selected, setSelected] = useState<string | undefined>(undefined);
     const [refusal, setRefusal] = useState<Notice | undefined>(undefined);
@@ -515,8 +515,8 @@ export function App({ start }: { start: Settings; })
         sides === undefined ? null : (
             <PlayerCard
                 place={place}
-                // The player changes their picture in analysis too, from their own side's card.
-                picture={sides[side].who === "player" ? <PictureButton profile={profile} onOpen={() => setDialog("picture")} text={text} /> : pictureOf(sides[side], profile, 48, mood)}
+                // The player opens their profile in analysis too, from their own side's card.
+                picture={sides[side].who === "player" ? <PictureButton profile={profile} onOpen={() => setDialog("profile")} text={text} /> : pictureOf(sides[side], profile, 48, mood)}
                 name={sides[side].name}
                 signed={sides[side].who === "ai" && playedBy !== undefined ? signature(playedBy.model, playedBy.effort) : undefined}
                 side={side}
@@ -542,13 +542,14 @@ export function App({ start }: { start: Settings; })
         <ChosenSet.Provider value={settings.set}>
             <PointSquare.Provider value={pointSquare}>
                 {panel}
-                <PictureDialog open={dialog === "picture"} profile={profile} onClose={() => setDialog(undefined)} text={text} />
+                <ProfileDialog open={dialog === "profile"} profile={profile} onClose={() => setDialog(undefined)} text={text} />
                 <ProfilesDialog
                     open={dialog === "profiles"}
                     profiles={served.profiles}
                     active={profile}
                     locked={going ? text.profile.whilePlaying : undefined}
                     dataFolder={served.dataFolder}
+                    onEdit={() => setDialog("profile")}
                     onClose={() => setDialog(undefined)}
                     text={text}
                 />
@@ -680,7 +681,7 @@ export function App({ start }: { start: Settings; })
                                         />
                                         <PlayerCard
                                             place="you"
-                                            picture={<PictureButton profile={profile} onOpen={() => setDialog("picture")} text={text} />}
+                                            picture={<PictureButton profile={profile} onOpen={() => setDialog("profile")} text={text} />}
                                             name={<NameButton profile={profile} onOpen={() => setDialog("profiles")} text={text} />}
                                             side={idle ? undefined : player}
                                             taken={material.taken[player]}

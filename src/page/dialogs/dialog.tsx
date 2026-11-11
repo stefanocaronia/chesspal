@@ -14,6 +14,9 @@ export function Dialog({ open, title, onBack, onClose, text, children }: {
 })
 {
     const dialog = useRef<HTMLDialogElement>(null);
+    // Open as the page wants it: a dialog the page closed itself, to open another, does not close that one when the browser says it closed.
+    const wanted = useRef(open);
+    wanted.current = open;
 
     useEffect(() => {
         const element = dialog.current!;
@@ -38,7 +41,7 @@ export function Dialog({ open, title, onBack, onClose, text, children }: {
     };
 
     return (
-        <dialog ref={dialog} class="dialog" aria-label={title} onClose={onClose} onClick={closeOutside}>
+        <dialog ref={dialog} class="dialog" aria-label={title} onClose={() => wanted.current && onClose()} onClick={closeOutside}>
             <header>
                 {onBack === undefined ? null : (
                     <button class="icon-button" type="button" title={text.profile.back} aria-label={text.profile.back} onClick={onBack}>

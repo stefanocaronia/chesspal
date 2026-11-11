@@ -1,4 +1,5 @@
-// The profiles on the page (D-23, D-45): the wizard that completes the first (D-71), the player's picture to change, and the menu that puts another in use or makes one.
+// The profiles on the page (D-23, D-45): the wizard that completes the first (D-71), the profile of the player in use to change, and the menu that puts another in use or makes one.
+import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { DrawnAvatar, PlayerPicture } from "../avatars/avatars.tsx";
 import { Torretta } from "../avatars/torretta.tsx";
@@ -6,6 +7,7 @@ import {
     type AvatarId,
     avatarIds,
     chooseAvatar,
+    editProfile,
     imageAddress,
     type Level,
     levels,
@@ -17,7 +19,6 @@ import {
     type RatingSite,
     ratingSites,
     type Refused,
-    saveAccounts,
     sendPhoto,
     useProfile,
 } from "../profile/profile.ts";
@@ -50,14 +51,14 @@ export function Wizard({ text, hasGame, account, dataFolder, onMade }: {
     );
 }
 
-/** The player's picture on their card: a click opens the change of picture; a mark on it says so where nothing hovers. */
+/** The player's picture on their card: a click opens their profile; a mark on it says so where nothing hovers. */
 export function PictureButton({ profile, onOpen, text }: { profile: ProfileShown; onOpen: () => void; text: Text; })
 {
     return (
-        <button class="me" type="button" title={text.profile.changePicture} aria-label={text.profile.yourPicture} aria-haspopup="dialog" onClick={onOpen}>
+        <button class="me" type="button" title={text.profile.editProfile} aria-label={text.profile.yourPicture} aria-haspopup="dialog" onClick={onOpen}>
             <PlayerPicture profile={profile} />
-            <span class="me-cover">{cameraIcon}</span>
-            <span class="me-badge">{cameraIcon}</span>
+            <span class="me-cover">{pencilIcon}</span>
+            <span class="me-badge">{pencilIcon}</span>
         </button>
     );
 }
@@ -82,46 +83,24 @@ export function NameButton({ profile, onOpen, text }: { profile: ProfileShown; o
     );
 }
 
-/** The change of picture, open while `open`: one of the drawn avatars, or a photo of the player's, the one they have shown among them. */
-export function PictureDialog({ open, profile, onClose, text }: { open: boolean; profile: ProfileShown; onClose: () => void; text: Text; })
+/**
+ * The profile of the player in use, open while `open`: their picture, a drawn avatar or a photo of theirs, their name, how they play and their names on
+ * Lichess and chess.com, each saved once changed (D-93, D-106).
+ */
+export function ProfileDialog({ open, profile, onClose, text }: { open: boolean; profile: ProfileShown; onClose: () => void; text: Text; })
 {
-    const [problem, setProblem] = useState<string | undefined>(undefined);
-
-    const done = (refused: Refused | undefined): void => {
-        setProblem(refused === undefined ? undefined : refusalText(refused, text));
-
-        if (refused === undefined) {
-            onClose();
-        }
-    };
-
     return (
-        <Dialog open={open} title={text.profile.changePicture} onClose={onClose} text={text}>
-            <div class="avatars">
-                {avatarIds.map((id) => (
-                    <button
-                        key={id}
-                        class="avatar-choice"
-                        type="button"
-                        title={text.profile.avatars[id]}
-                        aria-pressed={profile.image === undefined && profile.avatar === id}
-                        onClick={() => void chooseAvatar(profile.id, id).then(done)}
-                    >
-                        <DrawnAvatar id={id} size={52} label={text.profile.avatars[id]} />
-                    </button>
-                ))}
-            </div>
-            <PhotoChoice on={profile.image !== undefined} current={imageAddress(profile)} onPhoto={(photo) => void sendPhoto(profile.id, photo).then(done)} text={text} />
-            {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
+        <Dialog open={open} title={text.profile.yourProfile} onClose={onClose} text={text}>
+            <ProfileEdit key={profile.id} profile={profile} text={text} />
         </Dialog>
     );
 }
 
 /**
- * The menu of the players, open while `open`: another put in use, never while a game goes on, or a new one made, which waits for it to end; and the names of the one in
- * use on Lichess and chess.com (D-93).
+ * The menu of the players, open while `open`: another put in use, never while a game goes on, or a new one made, which waits for it to end; a pencil beside the
+ * one in use opens their profile.
  */
-export function ProfilesDialog({ open, profiles, active, locked, dataFolder, onClose, text }: {
+export function ProfilesDialog({ open, profiles, active, locked, dataFolder, onEdit, onClose, text }: {
     open: boolean;
     profiles: readonly ProfileShown[];
     active: ProfileShown;
@@ -129,6 +108,7 @@ export function ProfilesDialog({ open, profiles, active, locked, dataFolder, onC
     locked?: string;
     /** Where the profiles are, folder by folder. */
     dataFolder: readonly string[];
+    onEdit: () => void;
     onClose: () => void;
     text: Text;
 })
@@ -162,23 +142,30 @@ export function ProfilesDialog({ open, profiles, active, locked, dataFolder, onC
                     <p class="note">{text.profile.eachOwn}</p>
                     <div class="profile-list" role="radiogroup" aria-label={text.profile.profiles}>
                         {profiles.map((profile) => (
-                            <button
-                                key={profile.id}
-                                class="choice"
-                                type="button"
-                                role="radio"
-                                title={profile.name}
-                                aria-checked={profile.id === active.id}
-                                disabled={locked !== undefined && profile.id !== active.id}
-                                onClick={() => use(profile.id)}
-                            >
-                                <PlayerPicture profile={profile} size={32} />
-                                <span>{profile.name}</span>
-                                {profile.id === active.id ? checkIcon : null}
-                            </button>
+                            <div key={profile.id} class="profile-row">
+                                <button
+                                    class="choice"
+                                    type="button"
+                                    role="radio"
+                                    title={profile.name}
+                                    aria-checked={profile.id === active.id}
+                                    disabled={locked !== undefined && profile.id !== active.id}
+                                    onClick={() => use(profile.id)}
+                                >
+                                    <PlayerPicture profile={profile} size={32} />
+                                    <span>{profile.name}</span>
+                                    {profile.id === active.id ? checkIcon : null}
+                                </button>
+                                {profile.id === active.id
+                                    ? (
+                                        <button class="icon-button edit-profile" type="button" title={text.profile.editProfile} aria-label={text.profile.editProfile} onClick={onEdit}>
+                                            {pencilIcon}
+                                        </button>
+                                    )
+                                    : null}
+                            </div>
                         ))}
                     </div>
-                    <AccountsForm key={`${active.id} ${String(open)}`} profile={active} text={text} />
                     {locked === undefined ? null : <p class="note">{locked}</p>}
                     <button class="command new-profile" type="button" onClick={() => setMaking(true)}>{text.profile.newProfile}</button>
                     {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
@@ -189,50 +176,102 @@ export function ProfilesDialog({ open, profiles, active, locked, dataFolder, onC
     );
 }
 
-/** The player's names on Lichess and chess.com, each saved once changed, with a tick beside it: a game loaded from there with that name is theirs (D-93). */
-function AccountsForm({ profile, text }: { profile: ProfileShown; text: Text; })
+/**
+ * What the player changes in their profile, each part saved once changed: the picture, the name, how they play, and their names on Lichess and chess.com,
+ * by which a game loaded from there is theirs (D-93). A field saved gets a tick; one the server would not take stays as typed, marked.
+ */
+function ProfileEdit({ profile, text }: { profile: ProfileShown; text: Text; })
 {
     const words = text.profile;
-    const [names, setNames] = useState({ lichess: profile.accounts?.lichess ?? "", chesscom: profile.accounts?.chesscom ?? "" });
-    const [saved, setSaved] = useState<AccountSite | undefined>(undefined);
+    const [saved, setSaved] = useState<TypedField | undefined>(undefined);
     const [problem, setProblem] = useState<string | undefined>(undefined);
 
-    const save = (site: AccountSite, field: HTMLInputElement): void => {
-        // A name the sites would not give stays in its field, marked, until it reads.
-        if (!field.validity.valid) {
-            setSaved(undefined);
-            return;
-        }
-
-        const changed = { ...names, [site]: field.value.trim() };
-        setNames(changed);
-        setSaved(undefined);
-        void saveAccounts(profile.id, changed).then((refused) => {
-            setProblem(refused === undefined ? undefined : refusalText(refused, text));
-            setSaved(refused === undefined ? site : undefined);
-        });
+    const report = (refused: Refused | undefined): boolean => {
+        setProblem(refused === undefined ? undefined : refusalText(refused, text));
+        return refused === undefined;
     };
 
+    const save = (field: TypedField, input: HTMLInputElement): void => {
+        setSaved(undefined);
+
+        if (input.validity.valid) {
+            void editProfile(profile.id, { [field]: input.value.trim() }).then((refused) => setSaved(report(refused) ? field : undefined));
+        }
+    };
+
+    const tick = (field: TypedField): ComponentChildren => (saved === field ? checkIcon : noTick);
+
     return (
-        <div class="accounts">
-            {accountSites.map((site) => (
-                <label key={site} title={words.accountTitle}>
-                    <span>{siteNames[site]}</span>
-                    <input
-                        type="text"
-                        // Not bound to the names saved: a name the sites would not give stays as typed, marked.
-                        defaultValue={names[site]}
-                        aria-label={siteNames[site]}
-                        placeholder={words.username}
-                        maxLength={nameLimit}
-                        pattern="\s*[\w\-]*\s*"
-                        autocomplete="off"
-                        spellcheck={false}
-                        onChange={(event) => save(site, event.currentTarget)}
-                    />
-                    {saved === site ? checkIcon : <span class="tick" />}
-                </label>
-            ))}
+        <div class="profile-form profile-edit">
+            <fieldset>
+                <legend>{words.avatar}</legend>
+                <div class="avatars">
+                    {avatarIds.map((id) => (
+                        <button
+                            key={id}
+                            class="avatar-choice"
+                            type="button"
+                            title={words.avatars[id]}
+                            aria-pressed={profile.image === undefined && profile.avatar === id}
+                            onClick={() => void chooseAvatar(profile.id, id).then(report)}
+                        >
+                            <DrawnAvatar id={id} size={52} label={words.avatars[id]} />
+                        </button>
+                    ))}
+                </div>
+                <PhotoChoice on={profile.image !== undefined} current={imageAddress(profile)} onPhoto={(photo) => void sendPhoto(profile.id, photo).then(report)} text={text} />
+            </fieldset>
+            <label class="field">
+                <span>{words.name}</span>
+                <input
+                    type="text"
+                    required
+                    maxLength={nameLimit}
+                    // Not bound to the profile: a name the server would not take stays as typed, marked.
+                    defaultValue={profile.name}
+                    autocomplete="given-name"
+                    onChange={(event) => save("name", event.currentTarget)}
+                />
+                {tick("name")}
+            </label>
+            <fieldset>
+                <legend>{words.level}</legend>
+                <div class="levels">
+                    {levels.map((id) => (
+                        <label key={id} class="level">
+                            <input type="radio" name="profile-level" checked={profile.level === id} onChange={() => void editProfile(profile.id, { level: id }).then(report)} />
+                            <span>
+                                <b>{words.levels[id][0]}</b>
+                                <small>{words.levels[id][1]}</small>
+                            </span>
+                        </label>
+                    ))}
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>
+                    {words.accounts} <small>{words.optional}</small>
+                </legend>
+                <div class="accounts">
+                    {accountSites.map((site) => (
+                        <label key={site} title={words.accountTitle}>
+                            <span>{siteNames[site]}</span>
+                            <input
+                                type="text"
+                                defaultValue={profile.accounts?.[site] ?? ""}
+                                aria-label={siteNames[site]}
+                                placeholder={words.username}
+                                maxLength={nameLimit}
+                                pattern="\s*[\w\-]*\s*"
+                                autocomplete="off"
+                                spellcheck={false}
+                                onChange={(event) => save(site, event.currentTarget)}
+                            />
+                            {tick(site)}
+                        </label>
+                    ))}
+                </div>
+            </fieldset>
             {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
         </div>
     );
@@ -241,6 +280,9 @@ function AccountsForm({ profile, text }: { profile: ProfileShown; text: Text; })
 const accountSites = ["lichess", "chesscom"] as const;
 type AccountSite = (typeof accountSites)[number];
 const siteNames: Readonly<Record<AccountSite, string>> = { lichess: "Lichess", chesscom: "Chess.com" };
+
+// The fields typed in the profile window, each with its tick once saved.
+type TypedField = "name" | AccountSite;
 
 /** Where the games are, as the file manager walks there, and a button that opens it there. */
 function DataFolder({ folders, text }: { folders: readonly string[]; text: Text; })
@@ -431,9 +473,20 @@ const cameraIcon = (
     </svg>
 );
 
-// The profile in use, in the menu.
+// The profile in use, in the menu, and a field saved in the profile window.
 const checkIcon = (
     <svg class="icon in-use" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M5 12.5L10 17.5L19 7.5" />
+    </svg>
+);
+
+// The room of the tick beside a field not saved yet.
+const noTick = <svg class="icon in-use" viewBox="0 0 24 24" aria-hidden="true" />;
+
+// The pencil on the player's picture and beside them in the menu: their profile opens.
+const pencilIcon = (
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 20L5 15L15.5 4.5L19.5 8.5L9 19Z" />
+        <path d="M13.5 6.5L17.5 10.5" />
     </svg>
 );

@@ -303,20 +303,43 @@ describe("the profiles' commands", () => {
         await expect(run(context, "set_avatar", { avatar: "missing.png" })).rejects.toThrow("cannot be read");
     });
 
-    it("set the names on Lichess and chess.com: each one given written, the other kept, an empty one removed, the rest of profile.md as it was", async () => {
+    it("edit the names on Lichess and chess.com: each one given written, the other kept, an empty one removed, the rest of profile.md as it was", async () => {
         const context = contextIn(playerFolder());
         await run(context, "new_profile", { name: "Anna", level: "regular" });
         const file = join(profileFolder(context.folder, "anna"), "profile.md");
         writeFileSync(file, readFileSync(file, "utf8").replace("---\n", "---\nclub: Roma\n") + "My notes.\n");
 
-        expect(await run(context, "set_accounts", { lichess: " anna_k ", chesscom: "AnnaK" })).toBe("anna is anna_k on Lichess and AnnaK on chess.com.");
-        expect(await run(context, "set_accounts", { chesscom: "" })).toBe("anna is anna_k on Lichess.");
+        expect(await run(context, "edit_profile", { lichess: " anna_k ", chesscom: "AnnaK" })).toBe("Profile anna: Anna, plays often; anna_k on Lichess and AnnaK on chess.com.");
+        expect(await run(context, "edit_profile", { chesscom: "" })).toBe("Profile anna: Anna, plays often; anna_k on Lichess.");
         expect(activeProfile(context.folder)).toMatchObject({ name: "Anna", level: "regular", accounts: { lichess: "anna_k" } });
         expect(readFileSync(file, "utf8")).toMatch(/club: "?Roma"?\n[\s\S]*---\nMy notes\.\n$/);
 
-        await expect(run(context, "set_accounts", { lichess: "anna k" })).rejects.toThrow("only letters, digits, underscores and hyphens");
-        expect(await run(context, "set_accounts", { lichess: "" })).toBe("anna is on neither Lichess nor chess.com.");
+        await expect(run(context, "edit_profile", { lichess: "anna k" })).rejects.toThrow("only letters, digits, underscores and hyphens");
+        expect(await run(context, "edit_profile", { lichess: "" })).toBe("Profile anna: Anna, plays often; on neither Lichess nor chess.com.");
         expect(activeProfile(context.folder).accounts).toBeUndefined();
+    });
+
+    it("edit the name and how the player plays, in a game too: the profile keeps its folder, its game and its place in use (D-106)", async () => {
+        const context = contextIn(playerFolder());
+        await run(context, "new_profile", { name: "Anna", level: "regular" });
+        await run(context, "new_game", { ai_colour: "black" });
+
+        expect(await run(context, "edit_profile", { name: " Anna Rossi ", level: "tournament" })).toBe("Profile anna: Anna Rossi, plays tournaments; on neither Lichess nor chess.com.");
+        expect(activeProfile(context.folder)).toMatchObject({ id: "anna", name: "Anna Rossi", level: "tournament" });
+        expect(gameFolder(context.folder)).toBe(profileFolder(context.folder, "anna"));
+        expect(await run(context, "status")).toContain("Player: Anna Rossi, plays tournaments.\nGame: you play Black");
+
+        expect(await run(context, "edit_profile", { level: "" })).toBe("Profile anna: Anna Rossi; on neither Lichess nor chess.com.");
+        await expect(run(context, "edit_profile", { name: "  " })).rejects.toThrow();
+        expect(activeProfile(context.folder).name).toBe("Anna Rossi");
+    });
+
+    it("leave the profile Chesspal made to the wizard when its name is edited (D-71)", async () => {
+        const context = contextIn(playerFolder());
+        await run(context, "edit_profile", { name: "Anna" });
+
+        expect(activeProfile(context.folder)).toEqual({ id: "player", name: "Anna", new: true });
+        expect(await run(context, "status")).not.toContain("Player:");
     });
 });
 

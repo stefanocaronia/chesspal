@@ -352,10 +352,15 @@ export interface ProfileText
     readonly eachOwn: string;
     readonly changePlayer: string;
     readonly back: string;
-    readonly changePicture: string;
+    /** The profile window's title. */
+    readonly yourProfile: string;
+    /** On the player's picture and the pencil beside them in the menu. */
+    readonly editProfile: string;
     readonly yourPicture: string;
     readonly avatars: Readonly<Record<AvatarId, string>>;
     readonly whilePlaying: string;
+    /** Above the names on Lichess and chess.com, in the profile window. */
+    readonly accounts: string;
     /** The empty field of a name on Lichess or chess.com. */
     readonly username: string;
     /** On the fields of the names on Lichess and chess.com: what they are for. */
@@ -615,10 +620,12 @@ const english: Text = {
         eachOwn: "Each player has their own games and settings.",
         changePlayer: "Change player",
         back: "Back",
-        changePicture: "Change picture",
-        yourPicture: "Your picture: change it",
+        yourProfile: "Your profile",
+        editProfile: "Edit your profile",
+        yourPicture: "Your picture: edit your profile",
         avatars: { "short-hair": "Short hair", bun: "Bun", glasses: "Glasses", beanie: "Beanie", beard: "Beard", curls: "Curls", moustache: "Moustache", "silver-bob": "Silver bob", cat: "Cat", owl: "Owl" },
         whilePlaying: "Finish the game, or resign, before changing player.",
+        accounts: "Do you play on Lichess or Chess.com?",
         username: "your username",
         accountTitle: "With your name there, a game you load from there knows which side is yours.",
         badImage: "That picture won't open: try another photo (the ones from a phone usually work).",
@@ -974,10 +981,12 @@ const italian: Text = {
         eachOwn: "Ognuno ha le sue partite e le sue impostazioni.",
         changePlayer: "Cambia giocatore",
         back: "Indietro",
-        changePicture: "Cambia immagine",
-        yourPicture: "La tua immagine: cambiala",
+        yourProfile: "Il tuo profilo",
+        editProfile: "Modifica il profilo",
+        yourPicture: "La tua immagine: modifica il profilo",
         avatars: { "short-hair": "Capelli corti", bun: "Chignon", glasses: "Occhiali", beanie: "Berretto", beard: "Barba", curls: "Ricci", moustache: "Baffi", "silver-bob": "Caschetto grigio", cat: "Gatto", owl: "Gufo" },
         whilePlaying: "Finisci la partita, o abbandona, prima di cambiare giocatore.",
+        accounts: "Giochi su Lichess o Chess.com?",
         username: "il tuo nome utente",
         accountTitle: "Col tuo nome lì, una partita che carichi da lì sa qual è la tua parte.",
         badImage: "Questa immagine non si apre: prova con un'altra foto (quelle del telefono di solito vanno bene).",

@@ -1,9 +1,9 @@
-// The profiles on the board page (D-23, D-45, D-56): who plays and their picture, the first profile completed by the wizard (D-71), another put in use, the settings kept,
+// The profiles on the board page (D-23, D-45, D-56): who plays and their picture, the first profile completed by the wizard (D-71), the one in use changed, another put in use, the settings kept,
 // and the data folder they are in, opened in the system's file manager.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { isAbsolute, relative, sep } from "node:path";
-import { chooseDrawnAvatar, GameGoingOn, inputProblems, newProfile, setAccounts, useProfile } from "../../commands/index.ts";
+import { chooseDrawnAvatar, editProfile, GameGoingOn, inputProblems, newProfile, useProfile } from "../../commands/index.ts";
 import {
     activeProfile,
     drawnAvatars,
@@ -69,7 +69,7 @@ const routes: Readonly<Record<string, Route>> = {
     "POST /api/profile/new": newProfileFromPage,
     "POST /api/profile/use": useProfileFromPage,
     "POST /api/profile/avatar": drawnAvatarFromPage,
-    "POST /api/profile/accounts": accountsFromPage,
+    "POST /api/profile/edit": editFromPage,
     "POST /api/profile/image": imageFromPage,
     "GET /api/profile/image": sendImage,
     "POST /api/settings": settingsFromPage,
@@ -136,11 +136,14 @@ async function drawnAvatarFromPage(request: IncomingMessage, response: ServerRes
     sendJson(response, 200, { avatar: drawn });
 }
 
-/** The player's names on Lichess and chess.com for the profile the page shows (D-93), in a game or in analysis too: they change only which side is theirs. */
-async function accountsFromPage(request: IncomingMessage, response: ServerResponse, served: Served, url: URL): Promise<void>
+/**
+ * What the player changes in the profile window for the profile the page shows, in a game or in analysis too: their name, how they play, their names on
+ * Lichess and chess.com (D-93), each saved once changed; the profile keeps its folder (D-106).
+ */
+async function editFromPage(request: IncomingMessage, response: ServerResponse, served: Served, url: URL): Promise<void>
 {
     const body = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;
-    const input = setAccounts.input.safeParse(body ?? {});
+    const input = editProfile.input.safeParse(body ?? {});
     const profile = profileInUse(served, url, response);
 
     if (profile === undefined) {
@@ -148,13 +151,13 @@ async function accountsFromPage(request: IncomingMessage, response: ServerRespon
     }
 
     if (body === undefined || !input.success) {
-        const problems = input.success ? "" : ` ${inputProblems("set_accounts", input.error.issues, body ?? {}, (name) => name)}`;
-        sendJson(response, 400, { error: `Send the names as JSON, {"lichess": "…", "chesscom": "…"}.${problems}` });
+        const problems = input.success ? "" : ` ${inputProblems("edit_profile", input.error.issues, body ?? {}, (name) => name)}`;
+        sendJson(response, 400, { error: `Send the changes as JSON, {"name": "…", "level": "regular", "lichess": "…", "chesscom": "…"}.${problems}` });
         return;
     }
 
-    const { accounts } = await setAccounts.run(input.data, served.context);
-    sendJson(response, 200, { accounts: accounts ?? {} });
+    const edited = await editProfile.run(input.data, served.context);
+    sendJson(response, 200, { profile: shown(served.context.home(), edited) });
 }
 
 /**

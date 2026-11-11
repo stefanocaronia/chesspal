@@ -580,10 +580,13 @@ describe("the profiles on the page (D-23, D-45)", () => {
         expect((await served()).profile.image).toBeUndefined();
         expect((await post(page, "/api/profile/avatar?profile=anna", { avatar: "dragon" })).status).toBe(400);
 
-        expect(await post(page, "/api/profile/accounts?profile=anna", { lichess: "anna_k", chesscom: "" })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/profile/edit?profile=anna", { lichess: "anna_k", chesscom: "" })).toMatchObject({ status: 200 });
         expect((await served()).profile.accounts).toEqual({ lichess: "anna_k" });
-        expect(await post(page, "/api/profile/accounts?profile=anna", { lichess: "anna k" })).toMatchObject({ status: 400, body: expect.stringContaining("only letters") });
-        expect((await post(page, "/api/profile/accounts?profile=bruno", { lichess: "bruno" })).status).toBe(409);
+        expect(await post(page, "/api/profile/edit?profile=anna", { name: "Anna Rossi", level: "casual" })).toMatchObject({ status: 200, body: expect.stringContaining('"name":"Anna Rossi"') });
+        expect((await served()).profile).toMatchObject({ id: "anna", name: "Anna Rossi", level: "casual", accounts: { lichess: "anna_k" } });
+        expect(await post(page, "/api/profile/edit?profile=anna", { lichess: "anna k" })).toMatchObject({ status: 400, body: expect.stringContaining("only letters") });
+        expect((await post(page, "/api/profile/edit?profile=anna", { level: "grandmaster" })).status).toBe(400);
+        expect((await post(page, "/api/profile/edit?profile=bruno", { lichess: "bruno" })).status).toBe(409);
         expect((await served()).profile.accounts).toEqual({ lichess: "anna_k" });
 
         expect(await post(page, "/api/settings?profile=anna", { theme: "dark", dots: false })).toMatchObject({ status: 200 });

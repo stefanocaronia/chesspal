@@ -1089,7 +1089,48 @@ h3 + .switch {
     height: 32px;
 }
 
-/* The names on Lichess and chess.com of the player in use, under their line: the site, the name, a tick once saved (D-93) */
+/* The player in use, with the pencil that opens their profile beside their line */
+.profile-row {
+    display: flex;
+    gap: 6px;
+}
+
+.profile-row .choice {
+    flex: 1;
+}
+
+.profile-row .edit-profile {
+    flex: none;
+    align-self: center;
+}
+
+/* The profile window: the name with its tick once saved, as the names on the sites have */
+.profile-edit .field {
+    display: grid;
+    grid-template-columns: 1fr 18px;
+    align-items: center;
+    gap: 0 10px;
+}
+
+.profile-edit .field > span {
+    grid-column: 1 / -1;
+}
+
+.profile-edit .field .in-use {
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+}
+
+.profile-edit input[type="text"]:invalid {
+    border-color: var(--low-time);
+}
+
+.profile-edit .accounts {
+    margin: 0;
+}
+
+/* The names on Lichess and chess.com of the player in use, in their profile: the site, the name, a tick once saved (D-93) */
 .dialog .accounts {
     display: grid;
     grid-template-columns: auto 1fr 18px;

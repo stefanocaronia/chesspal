@@ -1,4 +1,4 @@
-// The players' profiles (D-23), on the command line and the board page: listed, made, put in use, with their picture (D-45). The AI reads only who plays.
+// The players' profiles (D-23), on the command line and the board page: listed, made, changed, put in use, with their picture (D-45). The AI reads only who plays.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
@@ -58,7 +58,7 @@ export const newProfile = defineCommand({
         + "profiles/<id>/ of Chesspal's data folder; the profile Chesspal made at the first start becomes this one, its folder renamed, while nobody has completed "
         + "it. Example: chesspal new_profile Anna --level regular --rating 1450 --site lichess.",
     input: z.object({
-        name: z.string().trim().min(1).max(nameLimit).regex(/^[^\p{Cc}]+$/u, "one line of text").describe("the player's name"),
+        name: playerName().describe("the player's name"),
         level: z.enum(levels).optional().describe("how they play: learning, casual, regular or tournament"),
         rating: z.int().min(ratingLimits.lowest).max(ratingLimits.highest).optional().describe("their rating, with site"),
         site: z.enum(ratingSites).optional().describe("where the rating comes from: lichess, chess.com or fide"),
@@ -130,24 +130,32 @@ export const setAvatar = defineCommand({
     format: ({ profile, avatar }) => `The picture of ${profile} is ${avatar}.`,
 });
 
-/** The player's names on Lichess and chess.com, by which the games they load are theirs (D-93): each one given is written, an empty one goes. */
-export const setAccounts = defineCommand({
-    name: "set_accounts",
-    description: "Sets the player's names on Lichess and chess.com in the profile in use, by which a game loaded from there is theirs; an empty name removes it. "
-        + "Example: chesspal set_accounts --lichess anna_k --chesscom AnnaK.",
+/**
+ * What the player tells of themselves in the profile in use: their name, how they play, and their names on Lichess and chess.com, by which the games they
+ * load are theirs (D-93). Each one given is written, an empty one goes; the profile's folder keeps its name (D-106).
+ */
+export const editProfile = defineCommand({
+    name: "edit_profile",
+    description: "Changes the profile in use: the player's name, how they play, and their names on Lichess and chess.com, by which a game loaded from there is "
+        + "theirs; an empty level or site name removes it, and the profile keeps its folder. Example: chesspal edit_profile --name Anna --level regular --lichess anna_k.",
     input: z.object({
+        name: playerName().optional().describe("the player's name"),
+        level: z.union([z.enum(levels), z.literal("")]).optional().describe("how they play: learning, casual, regular or tournament; empty to remove it"),
         lichess: accountName().optional().describe("the player's name on Lichess"),
         chesscom: accountName().optional().describe("the player's name on chess.com"),
     }),
     cliOnly: true,
     idempotent: true,
-    run: (names, context): PlayerProfile => {
+    run: ({ name, level, lichess, chesscom }, context): PlayerProfile => {
         const profile = activeProfile(context.home());
-        const lichess = names.lichess ?? profile.accounts?.lichess ?? "";
-        const chesscom = names.chesscom ?? profile.accounts?.chesscom ?? "";
-        return updateProfile(context.home(), profile.id, { accounts: { ...(lichess === "" ? {} : { lichess }), ...(chesscom === "" ? {} : { chesscom }) } });
+        const named = lichess !== undefined || chesscom !== undefined;
+        return updateProfile(context.home(), profile.id, {
+            ...(name === undefined ? {} : { name }),
+            ...(level === undefined ? {} : { level: level === "" ? undefined : level }),
+            ...(named ? { accounts: accountsOf(lichess ?? profile.accounts?.lichess ?? "", chesscom ?? profile.accounts?.chesscom ?? "") } : {}),
+        });
     },
-    format: (profile) => `${profile.id} is ${accountsText(profile.accounts)}.`,
+    format: (profile) => `Profile ${profile.id}: ${playerText(profile)}; ${accountsText(profile.accounts)}.`,
 });
 
 /** A drawn avatar chosen for a profile: the player's own image goes, or it would still show. */
@@ -189,10 +197,21 @@ function playerText({ name, level, rating }: PlayerProfile): string
     return [name, ...(level === undefined ? [] : [levelText[level]]), ...(rating === undefined ? [] : [`${siteText[rating.site]} ${rating.value}`])].join(", ");
 }
 
+/** The player's name: one line of text. */
+function playerName(): z.ZodString
+{
+    return z.string().trim().min(1).max(nameLimit).regex(/^[^\p{Cc}]+$/u, "one line of text");
+}
+
 /** A name on Lichess or chess.com: their letters, digits, underscores and hyphens; empty to remove it. */
 function accountName(): z.ZodString
 {
     return z.string().trim().max(nameLimit).regex(/^[\w-]*$/, "A name on Lichess or chess.com has only letters, digits, underscores and hyphens.");
+}
+
+function accountsOf(lichess: string, chesscom: string): Accounts
+{
+    return { ...(lichess === "" ? {} : { lichess }), ...(chesscom === "" ? {} : { chesscom }) };
 }
 
 function accountsText(accounts: Accounts | undefined): string
