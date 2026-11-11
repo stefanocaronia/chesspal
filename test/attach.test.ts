@@ -333,8 +333,9 @@ describe("a new game at the table", () => {
         process.env.CHESSPAL_HOME = home;
 
         try {
-            // The chat sees a game where the AI is to move, in its turn.
+            // The chat, which played the game before, sees a game where the AI is to move, in its turn.
             startNewGame(newGame.input.parse({ ai_colour: "white", replace: true }), { ...homeContext(home), pageOpen: () => true }, "page");
+            chat.positionFirstSeen = { started: "2026-11-01T10:00:00.000Z", plies: 0 };
             chat.positionSeen = { started: loadGame(gameFolder(home))!.started, plies: 0 };
             await page.chatCalls();
             page.toolEnded();
@@ -364,7 +365,7 @@ describe("a new game at the table", () => {
         const { chats, relaunched } = playChats();
         const { home, table } = await tableOn(undefined, chats);
         const chat = { ...chatOn(home), host: () => "claude-code" };
-        await attached(chat);
+        const page = await attached(chat);
         const before = process.env.CHESSPAL_HOME;
         process.env.CHESSPAL_HOME = home;
 
@@ -376,8 +377,23 @@ describe("a new game at the table", () => {
             expect(await newGameAt(table.url)).toBe(200);
             expect(await greeted).toMatchObject({ rang: true });
 
-            // It saw the game, and its analyst works on another.
+            // Opened from the chat's window before a new game, it greeted the player on the game before, the only one it has seen.
             chat.positionSeen = { started: loadGame(gameFolder(home))!.started, plies: 0 };
+            chat.positionFirstSeen = chat.positionSeen;
+            page.toolEnded();
+            const opened = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(async () => {
+                const shown = await gameShown(table.url);
+                return shown.listening === true && shown.thinking === undefined;
+            });
+
+            expect(await newGameAt(table.url)).toBe(200);
+            expect(await opened).toMatchObject({ rang: true });
+            expect(relaunched).toEqual([]);
+
+            // It saw the game move, and its analyst works on another.
+            chat.positionSeen = { started: loadGame(gameFolder(home))!.started, plies: 0 };
+            page.toolEnded();
             startAnalysis(gameFolder(home), "games/2026-11-01-100000.pgn", new Date(), { analyst: { game: "games/2026-11-01-100000.pgn", run: "a-run", since: new Date().toISOString() } });
             // Woken by the bell, it thinks on its move until its hook waits again.
             const analysing = bellHeard(JSON.stringify({ cwd: chat.folder }));

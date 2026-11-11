@@ -2,6 +2,7 @@
 // hosts the table offers, starts it again for a new game, and with another model or host once it has done, or at once if the player says so (D-107); a
 // page a chat serves itself has none of these routes.
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { samePosition } from "../../commands/index.ts";
 import { gameInAnalysis } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { tellWatchers } from "./events.ts";
@@ -108,11 +109,13 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
 
 /**
  * Whether a new game starts the chat at the table again, clean (D-57): `chesspal play` holds it, it waits for the bell, no analyst of it is at work, and it
- * has seen a game; one that only greeted the player stays.
+ * has seen a game move since it was first shown one; one that only greeted the player stays, as one opened from the chat's window before a new game.
  */
 export function chatToRelaunch(served: Served): boolean
 {
-    return heldChat(served) !== undefined && chatAtRest(served) && served.chat.positionSeen?.started !== undefined;
+    const { positionSeen, positionFirstSeen } = served.chat;
+    const played = positionSeen?.started !== undefined && (positionFirstSeen === undefined || !samePosition(positionSeen, positionFirstSeen));
+    return played && heldChat(served) !== undefined && chatAtRest(served);
 }
 
 /**

@@ -47,6 +47,8 @@ export interface Context
      * (D-71); null in a chat no tool has shown the game yet, none outside a chat.
      */
     positionSeen?: SeenPosition | null | undefined;
+    /** The first position a tool showed the chat: a chat that has seen no other since has only greeted the player, and a new game keeps it (D-57). */
+    positionFirstSeen?: SeenPosition | undefined;
     /** The instructions the MCP server gave in this chat, by their name and the chat's start: each comes once a chat (D-68); none on the command line. */
     told?: Set<string>;
     /** Who makes this tool call, as far as the host ties it to the call (D-81); none on the command line. */

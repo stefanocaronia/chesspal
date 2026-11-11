@@ -445,6 +445,20 @@ describe("the player's moves on the page", () => {
         await expect(run(folder, "ai_move", { move: "e5", plan: "A plan." }, chat)).rejects.toThrow(/changed since you last saw it/);
     });
 
+    it("keeps the first position a tool showed the chat while the game moves on, by which a new game tells a chat that played from one that greeted", async () => {
+        const folder = playerFolder();
+        const chat = { ...testContext(folder), positionSeen: null };
+        const page = await open(folder, undefined, chat);
+        await run(folder, "new_game", { ai_colour: "black" }, chat);
+        const first = chat.positionSeen;
+        await post(page, "/api/move", { move: "e2e4" });
+        await run(folder, "status", {}, chat);
+
+        expect(first).toMatchObject({ plies: 0 });
+        expect(chat.positionFirstSeen).toEqual(first);
+        expect(chat.positionSeen).toMatchObject({ plies: 1 });
+    });
+
     it("takes the player's words, alone or with their move, and refuses them in the player's words", async () => {
         const folder = playerFolder();
         const page = await open(folder);

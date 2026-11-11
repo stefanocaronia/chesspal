@@ -263,6 +263,7 @@ function seenBy(context: Context): Record<string, unknown>
     return {
         seen: context.seen,
         positionSeen: context.positionSeen,
+        positionFirstSeen: context.positionFirstSeen,
         given: [...context.given],
         host: context.host?.(),
         aiModel: folder === undefined ? undefined : aiModelOf(folder),

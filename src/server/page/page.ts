@@ -158,6 +158,8 @@ export function chatHasRead(context: Context, showed: boolean): void
             context.positionSeen = null;
         }
 
+        context.positionFirstSeen ??= context.positionSeen ?? undefined;
+
         // The chat on another position may now be thinking on its move: the page hears it, which no file tells when no bell woke the chat.
         if (!sameSeen(before, context.positionSeen)) {
             context.heard?.();

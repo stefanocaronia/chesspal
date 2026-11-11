@@ -12,6 +12,7 @@ export interface ChatSeen
     readonly given: ReadonlySet<string>;
     readonly seen: string | undefined;
     readonly positionSeen: SeenPosition | null | undefined;
+    readonly positionFirstSeen: SeenPosition | undefined;
     host(): string | undefined;
 }
 
@@ -30,6 +31,10 @@ export function chatSeenOf(chat: Context): ChatSeen
         get positionSeen()
         {
             return chat.positionSeen;
+        },
+        get positionFirstSeen()
+        {
+            return chat.positionFirstSeen;
         },
         host: () => chat.host?.(),
     };
@@ -72,6 +77,8 @@ export const chatAttach = z.object({
 });
 export type ChatAttach = z.infer<typeof chatAttach>;
 
+const seenPosition = z.object({ started: z.string().optional(), plies: z.int().min(0) });
+
 /**
  * What the chat attached to the table tells it after each tool, and when the page has news no file holds (`news`): what it saw, the words it was given,
  * its host, and the AI's model and host, which the table notes for a game that ends on the page (D-82, D-97).
@@ -79,7 +86,8 @@ export type ChatAttach = z.infer<typeof chatAttach>;
 export const chatCopy = z.object({
     token: z.string(),
     seen: z.string().optional(),
-    positionSeen: z.object({ started: z.string().optional(), plies: z.int().min(0) }).nullable().optional(),
+    positionSeen: seenPosition.nullable().optional(),
+    positionFirstSeen: seenPosition.optional(),
     given: z.array(z.string()),
     host: z.string().optional(),
     aiModel: z.object({ model: z.string(), effort: z.string().optional() }).optional(),
@@ -113,6 +121,10 @@ export function attachedSeen(attached: () => Attached | undefined): ChatSeen
         get positionSeen()
         {
             return attached()?.copy?.positionSeen;
+        },
+        get positionFirstSeen()
+        {
+            return attached()?.copy?.positionFirstSeen;
         },
         host: () => attached()?.copy?.host ?? attached()?.chat.host,
     };
