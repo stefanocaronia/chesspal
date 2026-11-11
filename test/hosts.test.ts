@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,6 +14,7 @@ import { askAgain, askedAgain, leaveSeat, refreshSeat, seatTaken, seatTimes, tak
 import { terminals } from "../src/server/table/hosts/terminal.ts";
 import { hostLaunch, startTable, type Table, terminalChats } from "../src/server/table/index.ts";
 import { testContext } from "./commands.ts";
+import { removeFolder } from "./folders.ts";
 import { sent } from "./http.ts";
 import { onFreePorts } from "./ports.ts";
 
@@ -22,7 +23,7 @@ const tables: Table[] = [];
 
 afterEach(async () => {
     await Promise.all(tables.splice(0).map((table) => table.close()));
-    folders.splice(0).forEach((folder) => rmSync(folder, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
+    await Promise.all(folders.splice(0).map(removeFolder));
 });
 
 describe("a chat the table opens", () => {

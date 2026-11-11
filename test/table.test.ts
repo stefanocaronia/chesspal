@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { type ClientRequest, createServer, get, request, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +10,7 @@ import { startPage } from "../src/server/page/page.ts";
 import { openTable, processLauncher, startTable, type Table, type TableLauncher, type TableTimes } from "../src/server/table/index.ts";
 import { version } from "../src/version.ts";
 import { testContext } from "./commands.ts";
+import { removeFolder } from "./folders.ts";
 import { onFreePorts } from "./ports.ts";
 
 const folders: string[] = [];
@@ -20,8 +21,7 @@ const hasty: TableTimes = { idle: 200, every: 10 };
 
 afterEach(async () => {
     await Promise.all(tables.splice(0).map((table) => table.close()));
-    // A table's process that has just ended may still hold its folder on Windows for a moment.
-    folders.splice(0).forEach((folder) => rmSync(folder, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
+    await Promise.all(folders.splice(0).map(removeFolder));
 });
 
 describe("the table", () => {

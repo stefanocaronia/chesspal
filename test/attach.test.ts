@@ -1,6 +1,6 @@
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createServer, get, type Server } from "node:http";
 import type { Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -19,6 +19,7 @@ import type { TableChats } from "../src/server/page/table.ts";
 import { attachTable, startTable, type Table } from "../src/server/table/index.ts";
 import { version } from "../src/version.ts";
 import { testContext } from "./commands.ts";
+import { removeFolder } from "./folders.ts";
 import { sent } from "./http.ts";
 import { onFreePorts } from "./ports.ts";
 
@@ -29,7 +30,7 @@ const pages: Page[] = [];
 afterEach(async () => {
     await Promise.all(pages.splice(0).map((page) => page.close()));
     await Promise.all(tables.splice(0).map((table) => table.close()));
-    folders.splice(0).forEach((folder) => rmSync(folder, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
+    await Promise.all(folders.splice(0).map(removeFolder));
 });
 
 describe("a chat at the table", () => {

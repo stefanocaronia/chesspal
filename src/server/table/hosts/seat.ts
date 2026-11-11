@@ -85,8 +85,9 @@ const againFile = "play-again.json";
 function seatHeld(folder: string, now: Date): Seat | undefined
 {
     const seat = seatIn(folder);
+    // A file's time is finer than a Date's: it is compared to the millisecond, as the Date is.
     const refreshed = statSync(join(folder, seatFile), { throwIfNoEntry: false })?.mtimeMs;
-    return seat !== undefined && refreshed !== undefined && now.getTime() - refreshed < seatTimes.heldFor ? seat : undefined;
+    return seat !== undefined && refreshed !== undefined && now.getTime() - Math.floor(refreshed) < seatTimes.heldFor ? seat : undefined;
 }
 
 function seatIn(folder: string): Seat | undefined
