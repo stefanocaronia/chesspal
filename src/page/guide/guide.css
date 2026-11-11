@@ -82,8 +82,7 @@
     display: none;
 }
 
-.guide-part summary::before,
-.credits summary::before {
+.guide-part summary::before {
     content: "";
     width: 7px;
     height: 7px;
@@ -93,8 +92,7 @@
     transition: transform 0.15s;
 }
 
-.guide-part[open] summary::before,
-.credits[open] summary::before {
+.guide-part[open] summary::before {
     transform: rotate(45deg);
 }
 
@@ -125,68 +123,22 @@
     vertical-align: top;
 }
 
-/* The foot: who made Chesspal, where it lives, the heart that supports it; the credits folded under it */
+/* The foot: the credits */
 .guide-foot {
-    display: grid;
-    gap: 6px;
     margin-top: 18px;
     padding-top: 14px;
     border-top: 1px solid var(--line);
     color: var(--soft);
     font-size: 12.5px;
-    text-align: center;
 }
 
-.guide-foot p {
+.guide-foot h3 {
+    margin: 0 0 6px;
+    font-size: 13px;
+}
+
+.guide-foot ul {
     margin: 0;
-}
-
-.foot-own {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 6px 14px;
-}
-
-.guide .foot-own a {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    color: inherit;
-    text-decoration: none;
-}
-
-.guide .foot-own a:hover,
-.guide .foot-own a:focus-visible {
-    color: var(--ink);
-}
-
-.foot-own .icon {
-    width: 16px;
-    height: 16px;
-}
-
-.foot-support .icon {
-    color: var(--low-time);
-}
-
-.credits summary {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    list-style: none;
-}
-
-.credits summary::-webkit-details-marker {
-    display: none;
-}
-
-.credits ul {
-    margin: 8px auto 0;
-    max-width: 60ch;
-    text-align: start;
 }
 
 @media (max-width: 600px) {

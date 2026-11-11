@@ -48,6 +48,7 @@ import { BareButton, HelpsCard, HintLine, MapButton } from "../helps/helps.tsx";
 import { helpsOf } from "../helps/view.ts";
 import { FoldTab } from "../layout/fold-tab.tsx";
 import { type Column, nextFold, rememberFold, startFolds } from "../layout/folds.ts";
+import { PageFoot } from "../layout/footer.tsx";
 import { type GameActions, Header } from "../layout/header.tsx";
 import { standingsOf } from "../lead/view.ts";
 import { MarksLegend } from "../legend/legend.tsx";
@@ -844,6 +845,7 @@ export function App({ start }: { start: Settings; })
                         {...(between && game !== null && replayed.record.moves.length > 0 ? { onAnalyse: () => void studyGame({ last: true }) } : {})}
                         text={text}
                     />
+                    <PageFoot version={served.version} text={text} />
                 </main>
             </PointSquare.Provider>
         </ChosenSet.Provider>

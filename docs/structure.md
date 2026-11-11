@@ -45,7 +45,7 @@ The page's folders have no `index.ts`: they import each other's files directly, 
 | Path | What it holds |
 |---|---|
 | [app/](../src/page/app/) | The app: what the server sends, the phase (game, analysis), the keys, the move kept in the address |
-| [layout/](../src/page/layout/) | The header, the side columns and their drawers, the icons of the app |
+| [layout/](../src/page/layout/) | The header, the side columns and their drawers, the foot under the board with the version, the window the table opens, the icons of the app |
 | [board/](../src/page/board/) | The board: squares, pieces in motion, the pointer, the marks and arrows |
 | [pieces/](../src/page/pieces/) | The sets of pieces, one vector map each |
 | [players/](../src/page/players/) | A player's card: picture, name, clock, pieces taken, the AI's model |
@@ -53,7 +53,7 @@ The page's folders have no `index.ts`: they import each other's files directly, 
 | [talk/](../src/page/talk/) | The talk with the AI on the page, and the voice that reads it |
 | [table/](../src/page/table/) | The chat at the table (D-104, D-107): its window, from the AI's name, that opens one or starts it again with another model or host, and what the page says while it does; the mark and the window of a newer Chesspal, and on a chat's own page its strip (D-108) |
 | [dialogs/](../src/page/dialogs/) | The windows: who plays and the wizard, new game, settings, the analyses, a game to study |
-| [guide/](../src/page/guide/) | The guide from the header's book: its text in `it.md` and `en.md`, with the same headings, the markdown drawn as the page's elements, and its foot with the credits and the support |
+| [guide/](../src/page/guide/) | The guide from the header's book: its text in `it.md` and `en.md`, with the same headings, the markdown drawn as the page's elements, and its foot with the credits |
 | [profile/](../src/page/profile/) | The profile and the settings as the server sends them, and the requests that change them |
 | [helps/](../src/page/helps/), [legend/](../src/page/legend/), [lead/](../src/page/lead/) | The helps' card, the legend of the board's marks, who is ahead |
 | [avatars/](../src/page/avatars/) | The player's drawn avatars and the AI's, the Torretta |

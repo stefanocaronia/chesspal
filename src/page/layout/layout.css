@@ -205,8 +205,52 @@
     position: relative;
     /* 12.5cqw is a square, for the lifted piece too */
     container-type: inline-size;
-    width: min(calc(100vw - var(--left-now) - var(--right-now) - 2 * var(--gap) - 2 * var(--between)), max(var(--least), calc(100vh - var(--bar) - 3 * var(--between))));
+    width: min(calc(100vw - var(--left-now) - var(--right-now) - 2 * var(--gap) - 2 * var(--between)), max(var(--least), calc(100vh - var(--bar) - var(--foot) - 4 * var(--between))));
     transition: width 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* The page's foot, a thin line under the board and as wide as it, in a row of its own under the others at every width (Stefano); it never widens the board's
+   column */
+.page-foot {
+    grid-column: board;
+    grid-row: -1 / span 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 14px;
+    min-height: var(--foot);
+    contain: inline-size;
+    color: var(--soft);
+    font-size: 12px;
+}
+
+.page-foot a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.page-foot a:hover,
+.page-foot a:focus-visible {
+    color: var(--ink);
+}
+
+.foot-links {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.page-foot .icon {
+    width: 15px;
+    height: 15px;
+}
+
+.foot-support .icon {
+    color: var(--low-time);
 }
 
 .talk {
@@ -614,6 +658,14 @@
     min-height: 0;
 }
 
+/* The cards, then the foot: the moves, the saves and the steps */
+.side-cards,
+.side-foot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--between);
+}
+
 .board-steps,
 .board-map {
     display: none;
@@ -663,6 +715,38 @@
 
     .side > * {
         width: var(--right);
+    }
+
+    /* Beside the board the moves, the saves and the steps take the room the cards leave, by the board's lower edge, and the moves keep four rows at least; a
+       column too short for both scrolls the cards under the wheel, with no scrollbar, and the cards never give way themselves (Stefano, Zoe). A halo round
+       them keeps their shadows, which the scroll would cut, and they fade at the board's top edge and over the moves */
+    .side > .side-cards {
+        --halo: 16px;
+        flex: 0 1 auto;
+        min-height: 0;
+        width: calc(var(--right) + 2 * var(--halo));
+        margin: calc(-1 * var(--halo)) calc(-1 * var(--halo)) calc(-1 * var(--between));
+        padding: var(--halo) var(--halo) var(--between);
+        overflow: hidden auto;
+        scrollbar-width: none;
+        mask-image: linear-gradient(transparent, #000 var(--halo), #000 calc(100% - var(--between)), transparent);
+    }
+
+    .side > .side-cards > * {
+        flex-shrink: 0;
+    }
+
+    .side > .side-foot {
+        flex: 1 1 auto;
+    }
+
+    .side-foot > .moves-card:not(.folded) {
+        min-height: 150px;
+    }
+
+    /* A long game asks no room of its own: its moves scroll in what the cards leave */
+    .side-foot .moves {
+        contain: size;
     }
 }
 

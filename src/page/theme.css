@@ -77,6 +77,8 @@
     --ear: 36px;
     --tuck: 10px;
     --bar: 36px;
+    /* The page's foot under the board */
+    --foot: 18px;
     /* The cards' corners, as the board's; the room between the cards, and between them and the board */
     --radius: 6px;
     --between: 10px;

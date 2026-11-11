@@ -60,26 +60,31 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                 )
                 : (
                     <>
-                        <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} bar={bar} text={text} />
-                        {analysis === undefined || standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={shownPlies} onShow={onShow} text={text} />}
-                        {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
-                        {helps}
-                        {analysis === undefined || analysis.summary !== undefined ? null : (
-                            <p class="card review waiting" role="status">
-                                <span class="spinner" aria-hidden="true" />
-                                {text.reviewing(analysis.by)}
-                            </p>
-                        )}
-                        {result !== undefined && plies.length === 0 ? null : <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} tools={legend} text={text} />}
-                        {/* The saves and the analysis under the moves, over the buttons that step through them (Stefano). */}
-                        {onDownload === undefined && onSaveMoves === undefined ? null : (
-                            <div class="card analysis-actions">
-                                {onDownload === undefined ? null : <SaveButton label={text.study.download} hint={text.study.downloadHint} onSave={onDownload} />}
-                                {onSaveMoves === undefined ? null : <SaveButton label={text.saveMoves} hint={text.saveMovesHint} onSave={onSaveMoves} />}
-                            </div>
-                        )}
-                        {onAnalyse === undefined ? null : <AnalyseButton label={text.study.analyseIt} onAnalyse={onAnalyse} />}
-                        <Steps shown={shownPlies} total={plies.length} onStep={onStep} text={text} />
+                        {/* The cards scroll under the wheel when the column is short: the moves and the steps stay in sight, by the board's lower edge (Stefano). */}
+                        <div class="side-cards">
+                            <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} bar={bar} text={text} />
+                            {analysis === undefined || standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={shownPlies} onShow={onShow} text={text} />}
+                            {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
+                            {helps}
+                            {analysis === undefined || analysis.summary !== undefined ? null : (
+                                <p class="card review waiting" role="status">
+                                    <span class="spinner" aria-hidden="true" />
+                                    {text.reviewing(analysis.by)}
+                                </p>
+                            )}
+                        </div>
+                        {/* The moves, then the saves and the analysis, over the buttons that step through them (Stefano). */}
+                        <div class="side-foot">
+                            {result !== undefined && plies.length === 0 ? null : <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} tools={legend} text={text} />}
+                            {onDownload === undefined && onSaveMoves === undefined ? null : (
+                                <div class="card analysis-actions">
+                                    {onDownload === undefined ? null : <SaveButton label={text.study.download} hint={text.study.downloadHint} onSave={onDownload} />}
+                                    {onSaveMoves === undefined ? null : <SaveButton label={text.saveMoves} hint={text.saveMovesHint} onSave={onSaveMoves} />}
+                                </div>
+                            )}
+                            {onAnalyse === undefined ? null : <AnalyseButton label={text.study.analyseIt} onAnalyse={onAnalyse} />}
+                            <Steps shown={shownPlies} total={plies.length} onStep={onStep} text={text} />
+                        </div>
                     </>
                 )}
         </aside>

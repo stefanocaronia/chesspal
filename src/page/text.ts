@@ -209,22 +209,29 @@ export interface Text
     /** The helps' card (D-78): the facts the AI sees at the game's level. */
     readonly helpsCard: HelpsCardText;
     readonly legend: LegendText;
-    /** The guide, from the book in the header, and its foot. */
+    /** The guide, from the book in the header, with the credits. */
     readonly guide: GuideText;
+    /** The page's foot, under the board. */
+    readonly foot: FootText;
 }
 
-/** The words of the guide's dialog and of its foot. */
+/** The words of the guide's dialog and of its credits. */
 export interface GuideText
 {
     readonly title: string;
     /** The index of its parts, for a screen reader. */
     readonly contents: string;
-    readonly onGitHub: string;
-    readonly onNpm: string;
-    readonly support: string;
     readonly credits: string;
     /** The credits, as the README has them: each a line, with its links in markdown. */
     readonly creditLines: readonly string[];
+}
+
+/** The words of the page's foot. */
+export interface FootText
+{
+    readonly onGitHub: string;
+    readonly onNpm: string;
+    readonly support: string;
 }
 
 /** The words of the helps' card. */
@@ -912,9 +919,6 @@ const english: Text = {
     guide: {
         title: "Guide",
         contents: "Contents",
-        onGitHub: "Chesspal on GitHub",
-        onNpm: "Chesspal on npm",
-        support: "Support Chesspal",
         credits: "Credits",
         creditLines: [
             "The rules: [chess.js](https://github.com/jhlywa/chess.js), under the BSD 2-Clause license.",
@@ -922,6 +926,11 @@ const english: Text = {
             "The pieces: Nitida, Torretta and Capablanca are Chesspal's own, the last after the diagrams of Capablanca's *Chess Fundamentals* (1921), under CC BY 4.0: [their credits](https://github.com/stefanocaronia/chesspal/blob/main/src/page/pieces/CREDITS.md).",
             "The sounds: Chesspal's own.",
         ],
+    },
+    foot: {
+        onGitHub: "Chesspal on GitHub",
+        onNpm: "Chesspal on npm",
+        support: "Support Chesspal",
     },
 };
 
@@ -1318,9 +1327,6 @@ const italian: Text = {
     guide: {
         title: "Guida",
         contents: "Indice",
-        onGitHub: "Chesspal su GitHub",
-        onNpm: "Chesspal su npm",
-        support: "Sostieni Chesspal",
         credits: "Crediti",
         creditLines: [
             "Le regole: [chess.js](https://github.com/jhlywa/chess.js), con licenza BSD 2-Clause.",
@@ -1328,6 +1334,11 @@ const italian: Text = {
             "I pezzi: Nitida, Torretta e Capablanca sono di Chesspal, l'ultimo dai diagrammi di *Chess Fundamentals* di Capablanca (1921), con licenza CC BY 4.0: [i loro crediti](https://github.com/stefanocaronia/chesspal/blob/main/src/page/pieces/CREDITS.md).",
             "I suoni: di Chesspal.",
         ],
+    },
+    foot: {
+        onGitHub: "Chesspal su GitHub",
+        onNpm: "Chesspal su npm",
+        support: "Sostieni Chesspal",
     },
 };
 

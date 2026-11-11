@@ -13,7 +13,7 @@ export async function openInBrowser(url: string, platform: string): Promise<bool
     return (browser !== undefined && await started(browser, [`--app=${openedAddress(url)}`])) || openFolder(url, platform);
 }
 
-/** The address of the window the table opens, marked so that the page sizes it the first time (page/layout/window.ts). */
+/** The address of the window the table opens, marked so that the page sizes it as it opens (page/layout/window.ts). */
 export function openedAddress(url: string): string
 {
     const address = new URL(url);

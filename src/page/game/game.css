@@ -584,6 +584,6 @@
 }
 
 /* The saves and the steps stay at the foot of the column, with the moves folded too (Stefano) */
-.side > .moves-card + * {
+.side-foot > .moves-card + * {
     margin-top: auto;
 }
