@@ -7,7 +7,6 @@ import { version } from "../../version.ts";
 import {
     analystLine,
     analystRuns,
-    closedPage,
     closingLines,
     coachOnEnd,
     coachOnEndLine,
@@ -15,11 +14,8 @@ import {
     gameAt,
     type GameSummary,
     goneOver,
-    levelText,
     namedGame,
     newGameStep,
-    pageGiven,
-    pageLine,
     positionLines,
     reviewedLine,
     shownMoves,
@@ -37,6 +33,8 @@ import {
 import { playerLine } from "../profiles/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
 import { instructionsRead } from "../setup/index.ts";
+import { levelText } from "./levels.ts";
+import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 
 interface Status
 {

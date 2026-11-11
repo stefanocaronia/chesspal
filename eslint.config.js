@@ -7,7 +7,34 @@ import { builtinModules } from "node:module";
 const boundaries = [
     { regex: "^(?:\\./|(?:\\.\\./)+)(?:[^./][^/]*/)+(?!index\\.ts$)[^/]+$", message: "Import another folder through its index.ts, exporting there what is missing." },
     { regex: "^(?:\\.\\./)+(?!version\\.ts$)[^/]+$", message: "A folder never imports the files of the folder above it: move what both use into a folder of its own, with its index.ts." },
+    {
+        regex: "^(?:\\./|(?:\\.\\./)+)(?!server/)[^./][^/]*/[^/]+/(?:[^/]+/)*index\\.ts$",
+        message: "Reach a folder through the index.ts of the folder that holds it: only server/, which just groups its modules, is entered further down.",
+    },
 ];
+
+// no-restricted-imports does not see import(), with which the command line loads each module late: the same boundaries, through the syntax.
+const lateBoundaries = boundaries.map(({ regex, message }) => ({ selector: `ImportExpression[source.value=/${regex.replaceAll("/", "\\x2F")}/]`, message }));
+
+// The commands' folders by steps, from the bottom: each imports only the folders of a lower step, never one of its own step or above, nor commands/index.ts.
+const commandsSteps = [["registry"], ["answers"], ["setup", "profiles", "talk"], ["game", "analysis"]];
+const commandsOrder = commandsSteps.flatMap((step, index) =>
+    step.map((folder) => {
+        const notBelow = commandsSteps.slice(index).flat().filter((other) => other !== folder).map((other) => `../${other}/*`);
+        const message = "The commands' folders go one way: registry, answers, then setup, profiles and talk, then game and analysis; each imports only the steps below it.";
+        return {
+            files: [`src/commands/${folder}/**/*.ts`],
+            rules: {
+                "no-restricted-imports": ["error", {
+                    patterns: [
+                        { group: [...notBelow, "../../commands/*"], message },
+                        ...boundaries,
+                    ],
+                }],
+            },
+        };
+    })
+);
 
 // Only the layout rules dprint cannot apply: braces always, a blank line around block statements, at most one blank line.
 export default [
@@ -30,8 +57,9 @@ export default [
     {
         files: ["src/**/*.ts"],
         ignores: ["src/page/**"],
-        rules: { "no-restricted-imports": ["error", { patterns: boundaries }] },
+        rules: { "no-restricted-imports": ["error", { patterns: boundaries }], "no-restricted-syntax": ["error", ...lateBoundaries] },
     },
+    ...commandsOrder,
     // The chess core runs in the browser too (D-17, D-18): no Node, no console.
     {
         files: ["src/core/**/*.ts"],

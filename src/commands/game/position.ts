@@ -2,8 +2,9 @@ import { z } from "zod";
 import { type PieceLetter, type Profile, type Side, type SideProfile } from "../../core/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { colourName, gameAt, gameShown, materialText, positionAfter, positionLine, refuseUnseen, studyInput } from "../answers/index.ts";
+import { colourName, gameAt, gameShown, materialText, positionAfter, positionLine, studyInput } from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
+import { refuseUnseen } from "./levels.ts";
 
 /** The positional profile of a position: of a game studied, with where it stands. */
 type Described = Profile & { where?: string; };

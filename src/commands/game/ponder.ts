@@ -3,8 +3,9 @@ import { Game, levelOf, moodAt, sees, timeLeft } from "../../core/index.ts";
 import { type CurrentGame, currentPlan, endOf, keepThought, loadGame, notePondering, talkLimits, type Thought, thoughtKey, waitingSince } from "../../games/index.ts";
 import { agentHosts, isCodex, ponderAgents } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { boardView, colourName, compactView, type GameSummary, levelText, positionLines, say as sayWords, summaryOf } from "../answers/index.ts";
+import { boardView, colourName, compactView, type GameSummary, positionLines, say as sayWords, summaryOf } from "../answers/index.ts";
 import { defineCommand, sentence } from "../registry/index.ts";
+import { levelText } from "./levels.ts";
 
 /** What ponder answers: stop, the position to think on, the position after a reply, the thoughts kept, its words said, or still the player's move. */
 type Pondered =

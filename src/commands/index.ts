@@ -1,6 +1,6 @@
 // The commands: the only way the AI, the command line and the page change a game (D-5, D-27), grouped by area, each defined once.
-import { analyseGame, annotateGame, coach, deleteReview, studyGames } from "./analysis/index.ts";
-import { aiMove, endGame, exportGame, look, newGame, playerMove, ponder, position, status } from "./game/index.ts";
+import { analyseGame, annotateGame, deleteReview, studyGames } from "./analysis/index.ts";
+import { aiMove, coach, endGame, exportGame, look, newGame, playerMove, ponder, position, status } from "./game/index.ts";
 import { deleteGame, editProfile, newProfile, pastGames, profiles, setAvatar, useProfile } from "./profiles/index.ts";
 import type { AnyCommand } from "./registry/index.ts";
 import { init, instructions } from "./setup/index.ts";

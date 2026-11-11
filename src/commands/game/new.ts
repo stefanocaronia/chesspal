@@ -2,27 +2,11 @@ import { z } from "zod";
 import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../../core/index.ts";
 import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../../games/index.ts";
 import { gameFolder, gameFolders } from "../../profiles/index.ts";
-import {
-    closedPage,
-    coachRuns,
-    gameAt,
-    type GameSummary,
-    levelText,
-    levelToPlay,
-    nextStep,
-    pageGiven,
-    pageLine,
-    positionLines,
-    refuseUnseenPosition,
-    sidesLine,
-    type Speech,
-    speechLine,
-    speechOf,
-    summaryOf,
-    withThought,
-} from "../answers/index.ts";
+import { coachRuns, gameAt, type GameSummary, nextStep, positionLines, refuseUnseenPosition, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "../answers/index.ts";
 import { pastGameLines, playerLine } from "../profiles/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
+import { levelText, levelToPlay } from "./levels.ts";
+import { closedPage, pageGiven, pageLine } from "./page-link.ts";
 
 interface NewGame
 {

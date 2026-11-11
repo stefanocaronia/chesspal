@@ -23,9 +23,10 @@ import {
     speechOf,
     squaresInput,
 } from "../answers/index.ts";
-import { profileLines, waitForPlayer, wordsOf } from "../game/index.ts";
 import { ratingsText } from "../profiles/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
+import { waitForPlayer, wordsOf } from "./ponder.ts";
+import { profileLines } from "./position.ts";
 
 /** What coach answers: stop, the moves to work on, the words kept and what comes next, or still the player's move; with the game's key and the position. */
 type Coached =

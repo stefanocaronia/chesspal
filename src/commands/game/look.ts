@@ -2,8 +2,9 @@ import { z } from "zod";
 import { boardText, type Chances, type Facts, materialOf, type Possibilities, sees, type Side } from "../../core/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { fullView, gameAt, gameShown, type GameSummary, headLines, materialText, newWords, positionAfter, positionLine, refuseUnseen, studyInput, summaryOf, wordLines, type Written } from "../answers/index.ts";
+import { fullView, gameAt, gameShown, type GameSummary, headLines, materialText, newWords, positionAfter, positionLine, studyInput, summaryOf, wordLines, type Written } from "../answers/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
+import { refuseUnseen } from "./levels.ts";
 
 /**
  * The whole view of the position, with what the player wrote on the board page the AI has not been given yet; the same view of a position of a game

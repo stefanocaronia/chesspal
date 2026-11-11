@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { loadGame } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { closingLines, coachOnEnd, coachOnEndLine, coachRuns, inviteLine, lastMoveText, moveLines, type MovePlayed, newWords, pageInvite, playMove, positionIn, refuseUnseenPosition, shownMove, withAnalyst } from "../answers/index.ts";
+import { closingLines, coachOnEnd, coachOnEndLine, coachRuns, lastMoveText, moveLines, type MovePlayed, newWords, playMove, positionIn, refuseUnseenPosition, shownMove, withAnalyst } from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
+import { inviteLine, pageInvite } from "./page-link.ts";
 
 /** The player's move, written in the chat and given by the AI: it answers with the position the AI decides on (D-34). */
 export const playerMove = defineCommand({
