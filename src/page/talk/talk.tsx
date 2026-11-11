@@ -173,7 +173,7 @@ export interface About
 /**
  * The player's words of the game, the newest by the box they write in with how far it got, and the box: Enter or the button sends the words alone, the next
  * move takes them with it. 200 characters from one move of the AI's to the next: once they are written, the box goes until its move (D-54). In analysis the
- * AI's answers are in the same thread, and each line of the player's names the move it was written on (D-101).
+ * AI's answers are in the same thread, each by a small Torretta, and each line of the player's names the move it was written on (D-101).
  */
 export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, canMove, name, problem, about, text }: {
     lines: readonly TalkLine[];
@@ -212,9 +212,12 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
                         <li key={index} class={line.who === "ai" ? "from-ai" : undefined} style={about === undefined ? aged(lines.length - 1 - index) : reread(index, lastAnswer)}>
                             {line.who === "ai"
                                 ? (
-                                    <p class="say">
-                                        <Marked text={line.text} />
-                                    </p>
+                                    <>
+                                        <Torretta size={24} />
+                                        <p class="say">
+                                            <Marked text={line.text} />
+                                        </p>
+                                    </>
                                 )
                                 : (
                                     <p class="said">

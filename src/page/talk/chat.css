@@ -55,10 +55,21 @@
     }
 }
 
-/* The AI's answers on the left, in its bubbles, without the tail that points at the Torretta: it is not by them */
+/* The AI's answers on the left, in its bubbles, each with a small Torretta at its foot instead of the tail that points at the big one: it is not by them (Stefano) */
 .sent li.from-ai {
     align-self: flex-start;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.sent li.from-ai > .torretta {
+    flex: none;
+}
+
+/* The bubble's foot level with the Torretta's, spaced as the player's lines are */
+.sent li.from-ai > .say {
+    margin: 0;
 }
 
 .talk.studied .sent .say::before,
