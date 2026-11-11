@@ -9,7 +9,7 @@ import type { Context } from "../src/commands/context.ts";
 import { saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { setUpHosts } from "../src/host-files/host-files.ts";
 import { gameFolder } from "../src/profiles/index.ts";
-import { createMcpServer } from "../src/server/mcp.ts";
+import { createMcpServer } from "../src/server/mcp/mcp.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];

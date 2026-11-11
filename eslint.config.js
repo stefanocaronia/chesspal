@@ -2,6 +2,13 @@ import stylistic from "@stylistic/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
 import { builtinModules } from "node:module";
 
+// Every folder of src outside the page is a module: the others reach it only through its index.ts, and it never reaches into the folder above it,
+// but for src/version.ts, which must sit at the root to find package.json. The page is one Preact app built on its own; the tests may reach any file.
+const boundaries = [
+    { regex: "^(?:\\./|(?:\\.\\./)+)(?:[^./][^/]*/)+(?!index\\.ts$)[^/]+$", message: "Import another folder through its index.ts, exporting there what is missing." },
+    { regex: "^(?:\\.\\./)+(?!version\\.ts$)[^/]+$", message: "A folder never imports the files of the folder above it: move what both use into a folder of its own, with its index.ts." },
+];
+
 // Only the layout rules dprint cannot apply: braces always, a blank line around block statements, at most one blank line.
 export default [
     { ignores: ["**/dist/", "node_modules/", "project/", "tmp/"] },
@@ -19,6 +26,12 @@ export default [
             "@stylistic/no-multiple-empty-lines": ["error", { max: 1, maxBOF: 0, maxEOF: 0 }],
         },
     },
+    // The modules' boundaries; a block below that sets its own imports repeats them, since its options replace these.
+    {
+        files: ["src/**/*.ts"],
+        ignores: ["src/page/**"],
+        rules: { "no-restricted-imports": ["error", { patterns: boundaries }] },
+    },
     // The chess core runs in the browser too (D-17, D-18): no Node, no console.
     {
         files: ["src/core/**/*.ts"],
@@ -29,6 +42,7 @@ export default [
                 patterns: [
                     { group: ["node:*", ...builtinModules], message: "The chess core runs in the browser too: no Node." },
                     { group: ["../*"], message: "The chess core imports only its own files and chess.js: commands, server and CLI use the core, never the other way." },
+                    ...boundaries,
                 ],
             }],
         },
@@ -65,6 +79,7 @@ export default [
                 patterns: [
                     { group: ["../commands/*", "../server/*", "../cli/*"], message: "The games module sits below the commands: they use it, never the other way." },
                     { group: ["../profiles/*"], message: "The profiles use the games, never the other way: pass the game folder in." },
+                    ...boundaries,
                 ],
             }],
         },
@@ -75,7 +90,7 @@ export default [
         rules: {
             "no-console": "error",
             "no-restricted-imports": ["error", {
-                patterns: [{ group: ["../commands/*", "../server/*", "../cli/*"], message: "The profiles module sits below the commands: they use it, never the other way." }],
+                patterns: [{ group: ["../commands/*", "../server/*", "../cli/*"], message: "The profiles module sits below the commands: they use it, never the other way." }, ...boundaries],
             }],
         },
     },
@@ -85,7 +100,7 @@ export default [
         rules: {
             "no-console": "error",
             "no-restricted-imports": ["error", {
-                patterns: [{ group: ["../commands/*", "../server/*", "../cli/*"], message: "The sites module sits below the commands: they use it, never the other way." }],
+                patterns: [{ group: ["../commands/*", "../server/*", "../cli/*"], message: "The sites module sits below the commands: they use it, never the other way." }, ...boundaries],
             }],
         },
     },
@@ -93,14 +108,5 @@ export default [
     {
         files: ["src/commands/**/*.ts", "src/server/**/*.ts"],
         rules: { "no-console": "error" },
-    },
-    // The server and the command line reach the commands through their index, which says in one place what they use.
-    {
-        files: ["src/server/**/*.ts", "src/cli/**/*.ts", "src/index.ts"],
-        rules: {
-            "no-restricted-imports": ["error", {
-                patterns: [{ regex: "^\\.\\.?/(?:\\.\\./)*commands/(?!index\\.ts$)", message: "Import the commands from commands/index.ts, exporting there what is missing." }],
-            }],
-        },
     },
 ];

@@ -4,16 +4,16 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, inputProblems, isBoolean, PositionChanged } from "../commands/index.ts";
-import { aiNameOf } from "../core/index.ts";
-import { endOf, loadGame, noteAiHost, noteAiModel, rerunIfChanged } from "../games/index.ts";
-import { agentTools, hasAgent, startInstructions } from "../host-files/index.ts";
-import { gameFolder } from "../profiles/index.ts";
-import { version } from "../version.ts";
-import { pagePorts } from "./bell.ts";
+import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, inputProblems, isBoolean, PositionChanged } from "../../commands/index.ts";
+import { aiNameOf } from "../../core/index.ts";
+import { endOf, loadGame, noteAiHost, noteAiModel, rerunIfChanged } from "../../games/index.ts";
+import { agentTools, hasAgent, startInstructions } from "../../host-files/index.ts";
+import { gameFolder } from "../../profiles/index.ts";
+import { version } from "../../version.ts";
+import { pagePorts } from "../bell/index.ts";
+import { chatHasRead, type Page, startPage } from "../page/index.ts";
+import { attachTable, tableToJoin } from "../table/index.ts";
 import { allowedCaller, callerOf, type CallingAgent, callingAgent, fromCodexAgent } from "./caller.ts";
-import { chatHasRead, type Page, startPage } from "./page/page.ts";
-import { attachTable, tableToJoin } from "./table/index.ts";
 
 /**
  * What the host reads as the server starts, before any tool: the lines that start a chat, `instructions` then `status`, and the rule of every move (D-27,

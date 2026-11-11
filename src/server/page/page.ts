@@ -8,7 +8,7 @@ import { aiNameOf } from "../../core/index.ts";
 import { gameStamp, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { Bell, bellProbe, pagePorts, type TableChat } from "../bell.ts";
+import { Bell, bellProbe, pagePorts, type TableChat } from "../bell/index.ts";
 import { analysesOf, answerAnalyses } from "./analyses.ts";
 import { answerChat } from "./attach.ts";
 import { type Attached, attachedSeen, type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";

@@ -17,7 +17,7 @@ The build (`npm run build`) compiles `src/` into `dist/`, the page apart with it
 
 ## 2. Inside `src/`
 
-Each folder is a module with one job, which exposes its API from its `index.ts`: new code imports from there. The page is the exception (see below). The last column says what a module may import; ESLint enforces the rules marked ✓.
+Each folder is a module with one job, which exposes its API from its `index.ts`: the others import only from there, and a folder never imports the files of the one above it, but for `version.ts`, which must sit at the root to find `package.json` (ESLint enforces both). Three folders have no `index.ts`: `cli/`, the binary, which nothing imports; `server/`, which only groups its modules, so that each command loads only the one it needs; the page, one app built on its own (see below). The tests may import any file. The last column says what a module may import; ESLint enforces the rules marked ✓.
 
 | Path | What it holds | Depends on |
 |---|---|---|
@@ -28,11 +28,12 @@ Each folder is a module with one job, which exposes its API from its `index.ts`:
 | [home/](../src/home/) | Where the player's data is: `Documents\My Games\Chesspal`, or `CHESSPAL_HOME`; opening it in the file manager | Node only |
 | [host-files/](../src/host-files/) | What `chesspal init` writes for each AI host: the MCP server, the instructions, the hooks, the agents | core, games, and the files of `instructions/` |
 | [commands/](../src/commands/) | The commands, a file each, named as their tool: the only way the AI, the command line and the page change a game; [registry.ts](../src/commands/registry.ts) defines a command, [context.ts](../src/commands/context.ts) what it runs with (folders, time, randomness, the network) | core, games, profiles, sites, home, host-files |
-| [cli/](../src/cli/) | The `chesspal` binary: the commands from the arguments, the table's words (`open`, `table`, `icon`, `play`), `mcp`, `listen`, `chat` | commands through their index ✓, server, and the modules below them |
-| [server/](../src/server/) | [mcp.ts](../src/server/mcp.ts), the MCP server, every command as a tool; [bell.ts](../src/server/bell.ts), the doorbell that wakes a chat; [caller.ts](../src/server/caller.ts), who makes a tool call | commands through their index ✓, and the modules below them |
-| [server/page/](../src/server/page/) | The board page's server: its files, its routes for the game, the profiles and the analyses, the events the pages listen to, the chat attached to the table, a newer Chesspal on npm | commands, and the modules below them |
-| [server/table/](../src/server/table/) | The table, the page in a process of its own (D-104): started by `chesspal` alone, opened in the browser, attached to by the chats; it updates Chesspal with npm and starts again (D-108) | server/page, commands, and the modules below them |
-| [server/table/hosts/](../src/server/table/hosts/) | The chats the table opens: Claude Code and Codex found on this computer, the terminal they open in, `chesspal play` and its seat | server/page, the doorbell, commands, and the modules below them |
+| [cli/](../src/cli/) | The `chesspal` binary: the commands from the arguments, the table's words (`open`, `table`, `icon`, `play`), `mcp`, `listen`, `chat`; each loads the module it needs when it runs | commands, server's modules, and the modules below them |
+| [server/mcp/](../src/server/mcp/) | The MCP server, every command as a tool, with the MCP SDK; who makes a tool call | commands, server/bell, server/page, server/table, and the modules below them |
+| [server/bell/](../src/server/bell/) | The doorbell that wakes a chat when the player acts on the page, and the ports where a folder's page answers | games, home |
+| [server/page/](../src/server/page/) | The board page's server: its files, its routes for the game, the profiles and the analyses, the events the pages listen to, the chat attached to the table, a newer Chesspal on npm | commands, server/bell, and the modules below them |
+| [server/table/](../src/server/table/) | The table, the page in a process of its own (D-104): started by `chesspal` alone, opened in the browser, attached to by the chats; it updates Chesspal with npm and starts again (D-108) | server/page, server/bell, commands, and the modules below them |
+| [server/table/hosts/](../src/server/table/hosts/) | The chats the table opens: Claude Code and Codex found on this computer, the terminal they open in, `chesspal play` and its seat | server/page, server/bell, commands, and the modules below them |
 | [server/table/icon/](../src/server/table/icon/) | Chesspal's icon on the desktop and in the menu, on Windows, macOS and Linux | games, home |
 | [page/](../src/page/) | The board page, in Preact: [main.tsx](../src/page/main.tsx) starts it, [text.ts](../src/page/text.ts) holds its words in Italian and English | the chess core alone ✓; the rest it asks the server for |
 | [index.ts](../src/index.ts), [version.ts](../src/version.ts) | The package's public API, and its version | commands |

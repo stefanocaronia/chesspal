@@ -4,9 +4,8 @@ import { request } from "node:http";
 import type { Context } from "../../commands/index.ts";
 import { tableFolder } from "../../home/index.ts";
 import { setUpHosts } from "../../host-files/index.ts";
-import { pageAt, pagePorts, samePath } from "../bell.ts";
-import { type Page, startPage } from "../page/page.ts";
-import type { TableChats } from "../page/table.ts";
+import { pageAt, pagePorts, samePath } from "../bell/index.ts";
+import { type Page, startPage, type TableChats } from "../page/index.ts";
 import type { TableUpdater } from "./update.ts";
 
 /** A table served: its address, and how to close it. */

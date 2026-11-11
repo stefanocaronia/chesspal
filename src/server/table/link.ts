@@ -7,8 +7,7 @@ import { tableFolder } from "../../home/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { isOlder, version } from "../../version.ts";
-import { jsonOf } from "../page/http.ts";
-import type { Page } from "../page/page.ts";
+import { jsonOf, type Page } from "../page/index.ts";
 import { askToQuit, tableAt } from "./table.ts";
 
 /**

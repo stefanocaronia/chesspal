@@ -18,10 +18,10 @@ if (args.length === 0) {
     await playHere(args[1]!);
 } else if (args.length === 1 && args[0] === "mcp") {
     // The server and its SDK load only here: every other command starts faster without them.
-    const { startMcpServer } = await import("../server/mcp.ts");
+    const { startMcpServer } = await import("../server/mcp/index.ts");
     await startMcpServer();
 } else if (args[0] === "listen" && (args.length === 1 || (args.length === 2 && args[1] === "--codex"))) {
-    const { listen } = await import("../server/bell.ts");
+    const { listen } = await import("../server/bell/index.ts");
     await listen(args[1] === "--codex");
 } else if (args.length === 1 && args[0] === "chat") {
     const { recordChatStart } = await import("./chat-hook.ts");

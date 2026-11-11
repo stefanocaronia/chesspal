@@ -13,7 +13,7 @@ import { aiNameOf } from "../src/core/index.ts";
 import { loadGame, noteAiModel, saveTableTalk, startAnalysis, type TableTalk, talkLine } from "../src/games/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
-import { bellHeard, pageAt, pagePorts } from "../src/server/bell.ts";
+import { bellHeard, pageAt, pagePorts } from "../src/server/bell/bell.ts";
 import { type Page, startPage } from "../src/server/page/page.ts";
 import type { TableChats } from "../src/server/page/table.ts";
 import { attachTable, startTable, type Table } from "../src/server/table/index.ts";

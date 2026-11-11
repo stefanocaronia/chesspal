@@ -3,8 +3,8 @@
 import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import type { Caller } from "../commands/index.ts";
-import { lastChatStart } from "../games/index.ts";
+import type { Caller } from "../../commands/index.ts";
+import { lastChatStart } from "../../games/index.ts";
 
 /** The host as it names itself to the server. */
 export interface Client

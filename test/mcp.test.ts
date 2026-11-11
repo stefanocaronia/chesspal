@@ -12,7 +12,7 @@ import type { Context } from "../src/commands/context.ts";
 import { aiHostIn, aiModelIn, aiNameOf, readPgn } from "../src/core/index.ts";
 import { aiModelOf, saveChatStart } from "../src/games/index.ts";
 import { gameFolder, profileFolder } from "../src/profiles/index.ts";
-import { createMcpServer, lazyPage, opponentOf, serverInstructions } from "../src/server/mcp.ts";
+import { createMcpServer, lazyPage, opponentOf, serverInstructions } from "../src/server/mcp/mcp.ts";
 import { play, testContext } from "./commands.ts";
 
 let client: Client | undefined;

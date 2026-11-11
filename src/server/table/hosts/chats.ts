@@ -2,8 +2,8 @@
 // folder running `chesspal play <host>`, which starts the host there, and again when the table asks it.
 import type { Context } from "../../../commands/index.ts";
 import { tableFolder } from "../../../home/index.ts";
-import { samePath } from "../../bell.ts";
-import type { ChatHost, TableChats } from "../../page/table.ts";
+import { samePath } from "../../bell/index.ts";
+import type { ChatHost, TableChats } from "../../page/index.ts";
 import { programPath } from "./find.ts";
 import { hostChoices, hostNames, isHostName } from "./hosts.ts";
 import { askAgain, seatHeld } from "./seat.ts";

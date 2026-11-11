@@ -4,9 +4,9 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { get, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
-import { writeAtomically } from "../games/index.ts";
-import { dataFolder, tableFolder } from "../home/index.ts";
-import { version } from "../version.ts";
+import { writeAtomically } from "../../games/index.ts";
+import { dataFolder, tableFolder } from "../../home/index.ts";
+import { version } from "../../version.ts";
 
 /** What the chat hears from the doorbell: one line for whatever the player did, never what, only where to read it. */
 export const bellLine = "The player acted on the board page: call status to see it.";

@@ -2,7 +2,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { startMcpServer } from "../src/server/mcp.ts";
+import { startMcpServer } from "../src/server/mcp/mcp.ts";
 import { slow, testContext } from "./commands.ts";
 
 await startMcpServer(testContext(mkdtempSync(join(tmpdir(), "chesspal-slow-"))), [slow]);

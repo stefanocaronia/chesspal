@@ -15,7 +15,7 @@ import { newProfile } from "../src/commands/profiles.ts";
 import { studyGames } from "../src/commands/study-games.ts";
 import { saveChatStart } from "../src/games/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
-import { createMcpServer } from "../src/server/mcp.ts";
+import { createMcpServer } from "../src/server/mcp/mcp.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { saveChatStart } from "../src/games/index.ts";
-import { allowedCaller, callerOf, callingAgent, fromCodexAgent } from "../src/server/caller.ts";
+import { allowedCaller, callerOf, callingAgent, fromCodexAgent } from "../src/server/mcp/caller.ts";
 
 const folders: string[] = [];
 
