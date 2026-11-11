@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { runCommandLine } from "../src/cli/command-line.ts";
 import type { Context } from "../src/commands/context.ts";
 import { commands } from "../src/commands/index.ts";
 import { positionIn, refuseOtherGame, refuseUnseenPosition } from "../src/commands/play-move.ts";
@@ -13,6 +14,8 @@ import {
     createProfile,
     drawnAvatars,
     ensureProfile,
+    fideHighest,
+    fideLowest,
     gameFolder,
     imageTypeOf,
     levels,
@@ -316,6 +319,34 @@ describe("the profiles' commands", () => {
         expect(activeProfile(context.folder).accounts).toBeUndefined();
     });
 
+    it("keep the FIDE rating the player types, apart from the sites', and refuse one outside FIDE's range (D-106)", async () => {
+        const context = contextIn(playerFolder());
+        await run(context, "new_profile", { name: "Anna", level: "regular", fide: 1650 });
+        const file = join(profileFolder(context.folder, "anna"), "profile.md");
+
+        expect(activeProfile(context.folder).fide).toBe(1650);
+        expect(await run(context, "status")).toContain("Player: Anna, plays often, rated FIDE 1650.");
+        await expect(run(context, "edit_profile", { fide: 1200 })).rejects.toThrow("from 1400, FIDE's lowest since 2024, to 3000");
+        await expect(run(context, "edit_profile", { fide: 1650.5 })).rejects.toThrow("whole number");
+        expect(await run(context, "edit_profile", { fide: 1720 })).toBe("Profile anna: Anna, plays often, rated FIDE 1720; on neither Lichess nor Chess.com.");
+
+        // One written by hand outside FIDE's range is left out.
+        writeFileSync(file, readFileSync(file, "utf8").replace(/fide: "?1720"?/, "fide: 9999"));
+        expect(activeProfile(context.folder)).not.toHaveProperty("fide");
+
+        expect(await run(context, "edit_profile", { fide: "" })).toBe("Profile anna: Anna, plays often; on neither Lichess nor Chess.com.");
+        expect(readFileSync(file, "utf8")).not.toContain("fide");
+    });
+
+    it("take the FIDE rating from the command line as a number, and an empty one to remove it", async () => {
+        const context = contextIn(playerFolder());
+        await run(context, "new_profile", { name: "Anna" });
+
+        expect(await runCommandLine(["edit_profile", "--fide", "1650"], context)).toMatchObject({ exitCode: 0, output: expect.stringContaining("rated FIDE 1650") });
+        expect(await runCommandLine(["edit_profile", "--fide", ""], context)).toMatchObject({ exitCode: 0 });
+        expect(activeProfile(context.folder)).not.toHaveProperty("fide");
+    });
+
     it("edit the name and how the player plays, in a game too: the profile keeps its folder, its game and its place in use (D-106)", async () => {
         const context = contextIn(playerFolder());
         await run(context, "new_profile", { name: "Anna", level: "regular" });
@@ -347,6 +378,7 @@ describe("the profiles on the page", () => {
         expect(page.speeds).toEqual(speeds);
         expect(page.avatarIds).toEqual(drawnAvatars);
         expect(page.nameLimit).toBe(nameLimit);
+        expect([page.fideLowest, page.fideHighest]).toEqual([fideLowest, fideHighest]);
     });
 });
 
@@ -364,6 +396,11 @@ function contextIn(folder: string): Context
 
 async function run(context: Context, name: string, input: Record<string, unknown> = {}): Promise<string>
 {
-    const command = commands.find((candidate) => candidate.name === name)!;
+    const command = commands.find((candidate) => candidate.name === name);
+
+    if (command === undefined) {
+        throw new Error(`No command ${name}.`);
+    }
+
     return command.format(await command.run(command.input.parse(input), context));
 }

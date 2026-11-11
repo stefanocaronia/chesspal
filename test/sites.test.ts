@@ -88,6 +88,9 @@ describe("the ratings of the profile (D-106)", () => {
             "Profile anna: Anna, plays often, rated 1480 rapid on Chess.com (last game 2026-10); anna_k on Lichess and AnnaK on Chess.com.",
         );
         expect(await run(context, "status")).toContain("Player: Anna, plays often, rated 1480 rapid on Chess.com (last game 2026-10).");
+        // The FIDE rating the player types stands beside the site's, never merged with it.
+        await run(context, "edit_profile", { fide: 1650 });
+        expect(await run(context, "status")).toContain("Player: Anna, plays often, rated FIDE 1650 and 1480 rapid on Chess.com (last game 2026-10).");
         expect(JSON.parse(readFileSync(join(profileFolder(context.home(), "anna"), "ratings.json"), "utf8")).read).toBe(now.toISOString());
 
         // A name changed by hand leaves its site's rating out until it is read again.

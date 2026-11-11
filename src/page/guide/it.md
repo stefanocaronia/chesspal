@@ -52,8 +52,9 @@ Nessun motore di scacchi gioca al posto dell'AI: ogni mossa e ogni giudizio sono
 ## I giocatori e il profilo
 
 - **Chi gioca?**: la tua immagine in alto a destra sceglie un giocatore o ne aggiunge uno. Ognuno ha le sue partite e le sue impostazioni.
-- **Il tuo profilo**: un clic sulla tua immagine accanto alla scacchiera, o la matita in **Chi gioca?**, cambia la tua immagine, il nome, come giochi e i tuoi nomi su Lichess e Chess.com.
+- **Il tuo profilo**: un clic sulla tua immagine accanto alla scacchiera, o la matita in **Chi gioca?**, cambia la tua immagine, il nome, come giochi, i tuoi nomi su Lichess e Chess.com e il tuo punteggio FIDE.
 - **Il tuo punteggio**: dai tuoi nomi lì, Chesspal legge il tuo punteggio pubblico, quello delle partite rapide se le giochi, e lo dice all'AI. Niente password: quel punteggio lo vede chiunque sul sito. Senza un nome lì, l'AI sa come giochi da **Come giochi?**
+- **Il punteggio FIDE**, se giochi tornei, lo scrivi tu: nessun sito lo dà a Chesspal. L'AI lo legge accanto a quello del sito, ognuno per sé.
 - Se carichi una partita giocata su Lichess o Chess.com, Chesspal sa da che colore giocavi tu.
 
 ## Domande e problemi

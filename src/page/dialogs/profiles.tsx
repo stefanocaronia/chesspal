@@ -3,7 +3,26 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { DrawnAvatar, PlayerPicture } from "../avatars/avatars.tsx";
 import { Torretta } from "../avatars/torretta.tsx";
-import { type AvatarId, avatarIds, chooseAvatar, editProfile, imageAddress, type Level, levels, makeProfile, nameLimit, openDataFolder, type ProfileShown, type Refused, sendPhoto, type SiteReading, useProfile } from "../profile/profile.ts";
+import {
+    type AvatarId,
+    avatarIds,
+    chooseAvatar,
+    editProfile,
+    fideHighest,
+    fideLowest,
+    imageAddress,
+    type Level,
+    levels,
+    makeProfile,
+    nameLimit,
+    openDataFolder,
+    type ProfileEdit,
+    type ProfileShown,
+    type Refused,
+    sendPhoto,
+    type SiteReading,
+    useProfile,
+} from "../profile/profile.ts";
 import type { Text } from "../text.ts";
 import { Dialog } from "./dialog.tsx";
 
@@ -167,6 +186,7 @@ function ProfileEdit({ profile, text }: { profile: ProfileShown; text: Text; })
     const words = text.profile;
     const [saved, setSaved] = useState<TypedField | undefined>(undefined);
     const [problem, setProblem] = useState<string | undefined>(undefined);
+    const [fideWrong, setFideWrong] = useState(false);
 
     const report = (refused: Refused | undefined): boolean => {
         setProblem(refused === undefined ? undefined : refusalText(refused, text));
@@ -176,8 +196,14 @@ function ProfileEdit({ profile, text }: { profile: ProfileShown; text: Text; })
     const save = (field: TypedField, input: HTMLInputElement): void => {
         setSaved(undefined);
 
+        if (field === "fide") {
+            setFideWrong(!input.validity.valid);
+        }
+
         if (input.validity.valid) {
-            void editProfile(profile.id, { [field]: input.value.trim() }).then((refused) => setSaved(report(refused) ? field : undefined));
+            const value = input.value.trim();
+            const change: ProfileEdit = field === "fide" ? { fide: value === "" ? "" : Number(value) } : { [field]: value };
+            void editProfile(profile.id, change).then((refused) => setSaved(report(refused) ? field : undefined));
         }
     };
 
@@ -243,8 +269,15 @@ function ProfileEdit({ profile, text }: { profile: ProfileShown; text: Text; })
                             {tick(site)}
                         </label>
                     ))}
+                    <label title={words.fideTitle}>
+                        <span>FIDE</span>
+                        <FideRating initial={profile.fide} onChange={(input) => save("fide", input)} text={text} />
+                        <span class="site-mark" />
+                        {tick("fide")}
+                    </label>
                 </div>
                 {accountSites.map((site) => <SiteProblem key={site} reading={readingOf(profile, site)} site={site} text={text} />)}
+                {fideWrong ? <p class="site-problem">{words.fideRange(fideLowest, fideHighest)}</p> : null}
                 <p class="privacy">{words.privacy}</p>
             </fieldset>
             {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
@@ -275,6 +308,32 @@ function SiteName({ value, initial, site, onInput, onChange, text }: {
             pattern="\s*[\w\-]*\s*"
             autocomplete="off"
             spellcheck={false}
+            onInput={onInput === undefined ? undefined : (event) => onInput(event.currentTarget.value)}
+            onChange={onChange === undefined ? undefined : (event) => onChange(event.currentTarget)}
+        />
+    );
+}
+
+/** The player's FIDE rating, typed: FIDE has no API (D-106). In the wizard bound to its value, in the profile window not bound, as a site's name. */
+function FideRating({ value, initial, onInput, onChange, text }: {
+    value?: string;
+    initial?: number | undefined;
+    onInput?: (value: string) => void;
+    onChange?: (input: HTMLInputElement) => void;
+    text: Text;
+})
+{
+    return (
+        <input
+            type="number"
+            {...(value === undefined ? { defaultValue: initial === undefined ? "" : String(initial) } : { value })}
+            aria-label="FIDE"
+            placeholder={text.profile.fidePlaceholder}
+            min={fideLowest}
+            max={fideHighest}
+            step={1}
+            inputMode="numeric"
+            autocomplete="off"
             onInput={onInput === undefined ? undefined : (event) => onInput(event.currentTarget.value)}
             onChange={onChange === undefined ? undefined : (event) => onChange(event.currentTarget)}
         />
@@ -344,7 +403,7 @@ type AccountSite = (typeof accountSites)[number];
 const siteNames: Readonly<Record<AccountSite, string>> = { lichess: "Lichess", chesscom: "Chess.com" };
 
 // The fields typed in the profile window, each with its tick once saved.
-type TypedField = "name" | AccountSite;
+type TypedField = "name" | AccountSite | "fide";
 
 /** Where the games are, as the file manager walks there, and a button that opens it there. */
 function DataFolder({ folders, text }: { folders: readonly string[]; text: Text; })
@@ -392,13 +451,15 @@ function ProfileForm({ text, submit, suggestion, use = true, onMade }: { text: T
     const [photo, setPhoto] = useState<File | undefined>(undefined);
     const [level, setLevel] = useState<Level>("casual");
     const [names, setNames] = useState({ lichess: "", chesscom: "" });
+    const [fide, setFide] = useState("");
     const [problem, setProblem] = useState<string | undefined>(undefined);
     const [busy, setBusy] = useState(false);
 
     const send = (event: Event): void => {
         event.preventDefault();
         setBusy(true);
-        void makeProfile({ name, level, ...names, ...(photo === undefined ? { avatar } : { photo }), use }).then((refused) => {
+        const rated = fide.trim() === "" ? {} : { fide: Number(fide) };
+        void makeProfile({ name, level, ...names, ...rated, ...(photo === undefined ? { avatar } : { photo }), use }).then((refused) => {
             setBusy(false);
             setProblem(refused === undefined ? undefined : refusalText(refused, text));
 
@@ -474,6 +535,10 @@ function ProfileForm({ text, submit, suggestion, use = true, onMade }: { text: T
                             <SiteName value={names[site]} site={site} onInput={(value) => setNames({ ...names, [site]: value })} text={text} />
                         </label>
                     ))}
+                    <label title={words.fideTitle}>
+                        <span>FIDE</span>
+                        <FideRating value={fide} onInput={setFide} text={text} />
+                    </label>
                 </div>
                 <p class="privacy">{words.privacy}</p>
             </fieldset>

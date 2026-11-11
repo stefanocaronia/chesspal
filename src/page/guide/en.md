@@ -52,8 +52,9 @@ No chess engine plays for the AI: every move and every judgment is its own. Ches
 ## Players and profile
 
 - **Who's playing?**: your picture at the top right chooses a player or adds one. Each has their own games and settings.
-- **Your profile**: a click on your picture beside the board, or the pencil in **Who's playing?**, changes your picture, your name, how you play and your names on Lichess and Chess.com.
+- **Your profile**: a click on your picture beside the board, or the pencil in **Who's playing?**, changes your picture, your name, how you play, your names on Lichess and Chess.com and your FIDE rating.
 - **Your rating**: from your names there, Chesspal reads your public rating, the one of your rapid games if you play them, and tells the AI. No passwords: anyone can see that rating on the site. Without a name there, the AI knows how you play from **How do you play?**
+- **Your FIDE rating**, if you play tournaments, you type yourself: no site gives it to Chesspal. The AI reads it beside the site's, each on its own.
 - If you load a game played on Lichess or Chess.com, Chesspal knows which colour you played.
 
 ## Questions and problems

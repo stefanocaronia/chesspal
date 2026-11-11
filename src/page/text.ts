@@ -382,12 +382,16 @@ export interface ProfileText
     readonly yourPicture: string;
     readonly avatars: Readonly<Record<AvatarId, string>>;
     readonly whilePlaying: string;
-    /** Above the names on Lichess and chess.com, in the profile window. */
+    /** Above the names on Lichess and Chess.com and the FIDE rating, in the wizard and the profile window. */
     readonly accounts: string;
-    /** The empty field of a name on Lichess or chess.com. */
+    /** The empty field of a name on Lichess or Chess.com. */
     readonly username: string;
-    /** On the fields of the names on Lichess and chess.com: what they are for. */
+    /** On the fields of the names on Lichess and Chess.com: what they are for. */
     readonly accountTitle: string;
+    /** The empty field of the FIDE rating, its title, and the line under the fields when it is out of FIDE's range. */
+    readonly fidePlaceholder: string;
+    readonly fideTitle: string;
+    readonly fideRange: (lowest: number, highest: number) => string;
     readonly badImage: string;
 }
 
@@ -649,9 +653,12 @@ const english: Text = {
         yourPicture: "Your picture: edit your profile",
         avatars: { "short-hair": "Short hair", bun: "Bun", glasses: "Glasses", beanie: "Beanie", beard: "Beard", curls: "Curls", moustache: "Moustache", "silver-bob": "Silver bob", cat: "Cat", owl: "Owl" },
         whilePlaying: "Finish the game, or resign, before changing player.",
-        accounts: "Do you play on Lichess or Chess.com?",
+        accounts: "Do you play on Lichess, Chess.com or in FIDE tournaments?",
         username: "your username",
         accountTitle: "With your name there, a game you load from there knows which side is yours.",
+        fidePlaceholder: "your rating",
+        fideTitle: "Your FIDE rating, as FIDE lists it: Chesspal cannot read it by itself.",
+        fideRange: (lowest, highest) => `A FIDE rating goes from ${lowest} to ${highest}`,
         badImage: "That picture won't open: try another photo (the ones from a phone usually work).",
     },
     start: {
@@ -1025,9 +1032,12 @@ const italian: Text = {
         yourPicture: "La tua immagine: modifica il profilo",
         avatars: { "short-hair": "Capelli corti", bun: "Chignon", glasses: "Occhiali", beanie: "Berretto", beard: "Barba", curls: "Ricci", moustache: "Baffi", "silver-bob": "Caschetto grigio", cat: "Gatto", owl: "Gufo" },
         whilePlaying: "Finisci la partita, o abbandona, prima di cambiare giocatore.",
-        accounts: "Giochi su Lichess o Chess.com?",
+        accounts: "Giochi su Lichess, Chess.com o nei tornei FIDE?",
         username: "il tuo nome utente",
         accountTitle: "Col tuo nome lì, una partita che carichi da lì sa qual è la tua parte.",
+        fidePlaceholder: "il tuo punteggio",
+        fideTitle: "Il tuo punteggio FIDE, come lo trovi sul sito della FIDE: Chesspal non può leggerlo da sé.",
+        fideRange: (lowest, highest) => `Un punteggio FIDE va da ${lowest} a ${highest}`,
         badImage: "Questa immagine non si apre: prova con un'altra foto (quelle del telefono di solito vanno bene).",
     },
     start: {

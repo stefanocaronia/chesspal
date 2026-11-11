@@ -561,7 +561,7 @@ describe("the profiles on the page (D-23, D-45)", () => {
         const folder = playerFolder();
         const page = await open(folder);
         const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
-        const served = async (): Promise<{ profile: { avatar?: string; image?: string; accounts?: object; }; settings?: object; }> => JSON.parse((await get(page, "/api/game")).body);
+        const served = async (): Promise<{ profile: { avatar?: string; image?: string; accounts?: object; fide?: number; }; settings?: object; }> => JSON.parse((await get(page, "/api/game")).body);
         const image = (body: string | Buffer, type = "image/png"): ReturnType<typeof get> => get(page, "/api/profile/image?profile=anna", { "content-type": type }, "POST", body);
 
         expect((await get(page, "/api/profile/image?profile=anna", { "content-type": "image/png" }, "POST", png)).status).toBe(404);
@@ -587,6 +587,9 @@ describe("the profiles on the page (D-23, D-45)", () => {
         expect((await served()).profile).toMatchObject({ id: "anna", name: "Anna Rossi", level: "casual", accounts: { lichess: "anna_k" } });
         expect(await post(page, "/api/profile/edit?profile=anna", { lichess: "anna k" })).toMatchObject({ status: 400, body: expect.stringContaining("only letters") });
         expect((await post(page, "/api/profile/edit?profile=anna", { level: "grandmaster" })).status).toBe(400);
+        expect(await post(page, "/api/profile/edit?profile=anna", { fide: 1650 })).toMatchObject({ status: 200 });
+        expect((await served()).profile.fide).toBe(1650);
+        expect(await post(page, "/api/profile/edit?profile=anna", { fide: 900 })).toMatchObject({ status: 400, body: expect.stringContaining("FIDE's lowest") });
         expect((await post(page, "/api/profile/edit?profile=bruno", { lichess: "bruno" })).status).toBe(409);
         expect((await served()).profile.accounts).toEqual({ lichess: "anna_k" });
 

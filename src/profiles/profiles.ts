@@ -17,12 +17,17 @@ export const nameLimit = 40;
 export const drawnAvatars = ["short-hair", "bun", "glasses", "beanie", "beard", "curls", "moustache", "silver-bob", "cat", "owl"] as const;
 export type DrawnAvatar = (typeof drawnAvatars)[number];
 
-/** What the player tells of themselves: their name, how they play, the avatar they chose. */
+/** The FIDE ratings Chesspal takes: whole numbers from FIDE's lowest, 1400 since 2024, to 3000. */
+export const fideLowest = 1400;
+export const fideHighest = 3000;
+
+/** What the player tells of themselves: their name, how they play, the avatar they chose, their FIDE rating, typed since FIDE has no API (D-106). */
 export interface ProfileFields
 {
     readonly name: string;
     readonly level?: Level;
     readonly avatar?: DrawnAvatar;
+    readonly fide?: number;
 }
 
 /** The player's names on the sites they play on. */
@@ -95,9 +100,9 @@ export function createProfile(root: string, fields: ProfileFields, use = true): 
     const id = activeId(root);
 
     if (id !== undefined && readProfile(root, id).new === true) {
-        const { level, avatar } = fields;
+        const { level, avatar, fide } = fields;
         const named = renamed(root, id, fields.name);
-        writeProfile(root, named, { name: fields.name, level, avatar, new: false });
+        writeProfile(root, named, { name: fields.name, level, avatar, fide, new: false });
         return readProfile(root, named);
     }
 
@@ -258,6 +263,7 @@ function readProfile(root: string, id: string): PlayerProfile
     const { fields } = readFrontMatter(profileText(root, id));
     const level = oneOf(levels, fields.level);
     const avatar = oneOf(drawnAvatars, fields.avatar);
+    const fide = fideIn(fields.fide);
     const { accounts } = accountsIn(fields);
     const sites = savedReadings(profileFolder(root, id));
     const rating = sites === undefined ? undefined : surest([ofAccount(sites.lichess, accounts?.lichess), ofAccount(sites.chesscom, accounts?.chesscom)]);
@@ -267,6 +273,7 @@ function readProfile(root: string, id: string): PlayerProfile
         name: fields.name?.trim().slice(0, nameLimit).trim() || id,
         ...(level === undefined ? {} : { level }),
         ...(avatar === undefined ? {} : { avatar }),
+        ...(fide === undefined ? {} : { fide }),
         ...(fields.new === "true" ? { new: true as const } : {}),
         ...(accounts === undefined ? {} : { accounts }),
         ...(sites === undefined ? {} : { sites }),
@@ -284,6 +291,13 @@ function ofAccount(reading: SiteReading | undefined, account: string | undefined
 function surest(ratings: readonly (Rating | undefined)[]): Rating | undefined
 {
     return ratings.reduce<Rating | undefined>((best, one) => (one !== undefined && (best === undefined || one.deviation < best.deviation) ? one : best), undefined);
+}
+
+/** The FIDE rating of profile.md's fide line: none when it is not a whole number in FIDE's range, as one written by hand may not be. */
+function fideIn(text: string | undefined): number | undefined
+{
+    const fide = Number(text?.trim());
+    return Number.isInteger(fide) && fide >= fideLowest && fide <= fideHighest ? fide : undefined;
 }
 
 /** The player's names on the sites, from profile.md's lichess and chesscom lines; none without either. */
@@ -316,6 +330,10 @@ function writeProfile(root: string, id: string, changes: ProfileChanges & { read
 
     if ("avatar" in changes) {
         written.avatar = changes.avatar;
+    }
+
+    if ("fide" in changes) {
+        written.fide = changes.fide;
     }
 
     if ("accounts" in changes) {

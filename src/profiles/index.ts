@@ -9,6 +9,8 @@ export {
     type DrawnAvatar,
     drawnAvatars,
     ensureProfile,
+    fideHighest,
+    fideLowest,
     gameFolder,
     gameFolders,
     type Level,

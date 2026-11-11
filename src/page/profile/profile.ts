@@ -15,11 +15,15 @@ export type Speed = (typeof speeds)[number];
 /** The longest name the server keeps. */
 export const nameLimit = 40;
 
+/** The FIDE ratings the server takes, as whole numbers (D-106). */
+export const fideLowest = 1400;
+export const fideHighest = 3000;
+
 /** The drawn avatars, by the ids the server keeps (D-45). */
 export const avatarIds = ["short-hair", "bun", "glasses", "beanie", "beard", "curls", "moustache", "silver-bob", "cat", "owl"] as const;
 export type AvatarId = (typeof avatarIds)[number];
 
-/** A profile as the server sends it: its id, the player's name, how they play, their rating, a drawn avatar, and their own image's stamp when they have one. */
+/** A profile as the server sends it: its id, the player's name, how they play, their ratings, a drawn avatar, and their own image's stamp when they have one. */
 export interface ProfileShown
 {
     readonly id: string;
@@ -29,7 +33,9 @@ export interface ProfileShown
     readonly level?: Level;
     readonly avatar?: AvatarId;
     readonly image?: string;
-    /** The player's names on Lichess and chess.com, written in profile.md (D-93). */
+    /** Their FIDE rating, as they typed it (D-106). */
+    readonly fide?: number;
+    /** The player's names on Lichess and Chess.com, written in profile.md (D-93). */
     readonly accounts?: { readonly lichess?: string; readonly chesscom?: string; };
     /** What the sites said of those names, the last time Chesspal asked (D-105). */
     readonly sites?: { readonly read: string; readonly lichess?: SiteReading; readonly chesscom?: SiteReading; };
@@ -54,13 +60,14 @@ export interface SiteReading
     readonly unreached?: true;
 }
 
-/** What the wizard asks: the name, how the player plays, their names on Lichess and chess.com, a drawn avatar or a photo of theirs. */
+/** What the wizard asks: the name, how the player plays, their names on Lichess and Chess.com, their FIDE rating, a drawn avatar or a photo of theirs. */
 export interface NewProfile
 {
     readonly name: string;
     readonly level: Level;
     readonly lichess?: string;
     readonly chesscom?: string;
+    readonly fide?: number;
     readonly avatar?: AvatarId;
     readonly photo?: File;
     /** False to make it without putting it in use, while a game goes on. */
@@ -74,6 +81,8 @@ export interface ProfileEdit
     readonly level?: Level | "";
     readonly lichess?: string;
     readonly chesscom?: string;
+    /** Empty to remove it. */
+    readonly fide?: number | "";
 }
 
 /** A request the server refused: its words, and its code when the page says it in the player's language. */
@@ -90,7 +99,7 @@ export function imageAddress(profile: ProfileShown): string | undefined
 }
 
 /** Makes a profile, in use unless `use` is false, with the photo after it, made small first so that a photo that cannot be read makes no profile: the refusal, or undefined. */
-export async function makeProfile({ name, level, lichess, chesscom, avatar, photo, use }: NewProfile): Promise<Refused | undefined>
+export async function makeProfile({ name, level, lichess, chesscom, fide, avatar, photo, use }: NewProfile): Promise<Refused | undefined>
 {
     const image = photo === undefined ? undefined : await shrunk(photo).catch(() => undefined);
 
@@ -99,7 +108,8 @@ export async function makeProfile({ name, level, lichess, chesscom, avatar, phot
     }
 
     const names = { ...(lichess?.trim() ? { lichess: lichess.trim() } : {}), ...(chesscom?.trim() ? { chesscom: chesscom.trim() } : {}) };
-    const answer = await post("/api/profile/new", jsonOf({ name: name.trim(), level, ...names, ...(avatar === undefined ? {} : { avatar }), ...(use === false ? { use } : {}) }));
+    const chosen = { ...(fide === undefined ? {} : { fide }), ...(avatar === undefined ? {} : { avatar }), ...(use === false ? { use } : {}) };
+    const answer = await post("/api/profile/new", jsonOf({ name: name.trim(), level, ...names, ...chosen }));
 
     if ("refused" in answer) {
         return answer.refused;

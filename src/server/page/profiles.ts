@@ -153,7 +153,7 @@ async function editFromPage(request: IncomingMessage, response: ServerResponse, 
 
     if (body === undefined || !input.success) {
         const problems = input.success ? "" : ` ${inputProblems("edit_profile", input.error.issues, body ?? {}, (name) => name)}`;
-        sendJson(response, 400, { error: `Send the changes as JSON, {"name": "…", "level": "regular", "lichess": "…", "chesscom": "…"}.${problems}` });
+        sendJson(response, 400, { error: `Send the changes as JSON, {"name": "…", "level": "regular", "lichess": "…", "chesscom": "…", "fide": 1650}.${problems}` });
         return;
     }
 

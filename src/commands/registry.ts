@@ -93,11 +93,12 @@ export function baseType(field: z.ZodType): string
     return baseDefinition(field).type;
 }
 
-/** Whether a field takes numbers, alone or in a list: the command line reads them as text and turns them into numbers. */
+/** Whether a field takes numbers, alone, in a list or as one of its choices: the command line reads them as text and turns them into numbers. */
 export function takesNumbers(field: z.ZodType): boolean
 {
-    const definition = baseDefinition(field) as { type: string; element?: z.ZodType; };
-    return definition.type === "number" || (definition.type === "array" && definition.element !== undefined && baseType(definition.element) === "number");
+    const definition = baseDefinition(field) as { type: string; element?: z.ZodType; options?: readonly z.ZodType[]; };
+    const numbers = (one: z.ZodType | undefined): boolean => one !== undefined && baseType(one) === "number";
+    return definition.type === "number" || (definition.type === "array" && numbers(definition.element)) || (definition.type === "union" && (definition.options ?? []).some(numbers));
 }
 
 function inputIssue(command: string, issue: z.core.$ZodIssue, given: Record<string, unknown>, written: (name: string) => string): string
