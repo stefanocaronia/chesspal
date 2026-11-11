@@ -42,17 +42,17 @@ describe("the ratings on the sites (D-105, D-106)", () => {
 
         expect(read).toEqual({
             read: now.toISOString(),
-            lichess: { account: "anna_k", found: true, rating: { value: 1704, site: "lichess", speed: "classical", rd: 62, played: "2026-10-14" } },
+            lichess: { account: "anna_k", found: true, rating: { value: 1704, site: "lichess", speed: "classical", deviation: 62, played: "2026-10-14" } },
             chesscom: { account: "Ghost", found: false },
         });
         // Named as Chesspal, the name asked and nothing else.
         expect(asked.every((line) => line.endsWith(` Chesspal/${version()}`))).toBe(true);
     });
 
-    it("take chess.com's rapid as it is, never converted, and pass over a speed whose RD is still wide", async () => {
+    it("take Chess.com's rapid as it is, never converted, and pass over a speed whose RD is still wide", async () => {
         const wide = { "https://api.chess.com/pub/player/annak/stats": { body: { chess_rapid: { last: { rating: 1480, rd: 180, date: 0 } }, chess_blitz: { last: { rating: 1390, rd: 30, date: 0 } } } } };
 
-        expect((await readSites({ chesscom: "AnnaK" }, sites(chesscomAnna), undefined, now)).chesscom?.rating).toEqual({ value: 1480, site: "chess.com", speed: "rapid", rd: 38, played: "2026-10-30" });
+        expect((await readSites({ chesscom: "AnnaK" }, sites(chesscomAnna), undefined, now)).chesscom?.rating).toEqual({ value: 1480, site: "chess.com", speed: "rapid", deviation: 38, played: "2026-10-30" });
         expect((await readSites({ chesscom: "AnnaK" }, sites(wide), undefined, now)).chesscom?.rating).toMatchObject({ value: 1390, speed: "blitz" });
     });
 
@@ -64,16 +64,18 @@ describe("the ratings on the sites (D-105, D-106)", () => {
         expect((await readSites({ lichess: "gone" }, sites(closed), undefined, now)).lichess).toEqual({ account: "gone", found: false });
     });
 
-    it("keep what a site said before of the same name when it does not answer, marked, and know nothing of a new name", async () => {
+    it("keep what a site said before of the same name when it does not answer, marked, ask it again ten minutes later, and know nothing of a new name", async () => {
         const before = await readSites({ lichess: "anna_k", chesscom: "AnnaK" }, sites({ ...lichessAnna, ...chesscomAnna }), undefined, now);
         const down = sites({ "https://lichess.org/api/user/Anna_K": "down", "https://api.chess.com/pub/player/bruno/stats": { status: 503 } });
         const after = await readSites({ lichess: "Anna_K", chesscom: "Bruno" }, down, before, now);
 
         expect(after.lichess).toEqual({ ...before.lichess, account: "Anna_K", unreached: true });
         expect(after.chesscom).toEqual({ account: "Bruno", unreached: true });
-        expect(readingsStale(after, { lichess: "Anna_K", chesscom: "Bruno" })).toBe(true);
-        expect(readingsStale(before, { lichess: "anna_k", chesscom: "AnnaK" })).toBe(false);
-        expect(readingsStale(before, { lichess: "anna_k" })).toBe(true);
+        // A site that did not answer is asked again ten minutes later, not at once.
+        expect(readingsStale(after, { lichess: "Anna_K", chesscom: "Bruno" }, now)).toBe(false);
+        expect(readingsStale(after, { lichess: "Anna_K", chesscom: "Bruno" }, new Date(now.getTime() + 10 * 60 * 1000))).toBe(true);
+        expect(readingsStale(before, { lichess: "anna_k", chesscom: "AnnaK" }, later)).toBe(false);
+        expect(readingsStale(before, { lichess: "anna_k" }, now)).toBe(true);
     });
 });
 
@@ -83,7 +85,7 @@ describe("the ratings of the profile (D-106)", () => {
         await run(context, "new_profile", { name: "Anna", level: "regular" });
 
         expect(await run(context, "edit_profile", { lichess: "anna_k", chesscom: "AnnaK" })).toBe(
-            "Profile anna: Anna, plays often, rated 1480 rapid on Chess.com (last game 2026-10); anna_k on Lichess and AnnaK on chess.com.",
+            "Profile anna: Anna, plays often, rated 1480 rapid on Chess.com (last game 2026-10); anna_k on Lichess and AnnaK on Chess.com.",
         );
         expect(await run(context, "status")).toContain("Player: Anna, plays often, rated 1480 rapid on Chess.com (last game 2026-10).");
         expect(JSON.parse(readFileSync(join(profileFolder(context.home(), "anna"), "ratings.json"), "utf8")).read).toBe(now.toISOString());
@@ -119,14 +121,15 @@ describe("the ratings of the profile (D-106)", () => {
 
     it("drop what the sites said when the names changed while they answered", async () => {
         const context = contextWith({ ...lichessAnna });
-        const { fetch: answer, ...without } = context;
+        const { fetch: _fetch, ...without } = context;
+        const answer = sites({ ...lichessAnna });
         await run(without, "new_profile", { name: "Anna", lichess: "anna_k" });
         const folder = profileFolder(context.home(), activeProfile(context.home()).id);
         const file = join(folder, "profile.md");
 
         const changing: Fetch = async (input, init) => {
             writeFileSync(file, readFileSync(file, "utf8").replace('lichess: "anna_k"', 'lichess: "bruno"'));
-            return answer!(input, init);
+            return answer(input, init);
         };
 
         expect(await refreshRatings({ ...context, fetch: changing }, "anna")).toBe(false);
@@ -137,6 +140,7 @@ describe("the ratings of the profile (D-106)", () => {
 
 const now = new Date(Date.UTC(2026, 10, 11, 8));
 const day = 24 * 60 * 60 * 1000;
+const later = new Date(now.getTime() + day);
 
 function version(): string
 {
@@ -168,6 +172,11 @@ function contextWith(answers: Answers, asked: string[] = []): Context
 
 async function run(context: Context, name: string, input: Record<string, unknown> = {}): Promise<string>
 {
-    const command = commands.find((candidate) => candidate.name === name)!;
+    const command = commands.find((candidate) => candidate.name === name);
+
+    if (command === undefined) {
+        throw new Error(`No command ${name}.`);
+    }
+
     return command.format(await command.run(command.input.parse(input), context));
 }

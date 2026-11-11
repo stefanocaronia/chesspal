@@ -11,14 +11,14 @@ export interface SiteAnswer
     readonly body?: unknown;
 }
 
-/** The longest a site may take to answer, in milliseconds: the page waits for it. */
+/** The longest the sites may take to answer, together, in milliseconds: the page waits for them. */
 export const answerTime = 5000;
 
-/** Asks a site for JSON: what it answered, or undefined when it could not be reached in time. */
-export async function askSite(url: string, fetch: Fetch): Promise<SiteAnswer | undefined>
+/** Asks a site for JSON: what it answered, or undefined when it could not be reached before `signal` gave up. */
+export async function askSite(url: string, fetch: Fetch, signal: AbortSignal): Promise<SiteAnswer | undefined>
 {
     try {
-        const response = await fetch(url, { headers: { "Accept": "application/json", "User-Agent": `Chesspal/${version}` }, signal: AbortSignal.timeout(answerTime) });
+        const response = await fetch(url, { headers: { "Accept": "application/json", "User-Agent": `Chesspal/${version}` }, signal });
         const body: unknown = await response.json().catch(() => undefined);
         return body === undefined ? { status: response.status } : { status: response.status, body };
     } catch {

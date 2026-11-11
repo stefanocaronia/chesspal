@@ -5,7 +5,7 @@ import { type Speed, speeds } from "../profiles/index.ts";
 export interface Candidate
 {
     readonly value: number;
-    readonly rd: number;
+    readonly deviation: number;
     readonly established: boolean;
     readonly played?: string;
 }
@@ -15,7 +15,7 @@ export interface Played
 {
     readonly speed: Speed;
     readonly value: number;
-    readonly rd: number;
+    readonly deviation: number;
     readonly played?: string;
 }
 
@@ -26,8 +26,8 @@ export function counted(at: (speed: Speed) => Candidate | undefined): Played | u
         const candidate = at(speed);
 
         if (candidate?.established === true) {
-            const { value, rd, played } = candidate;
-            return { speed, value: Math.round(value), rd: Math.round(rd), ...(played === undefined ? {} : { played }) };
+            const { value, deviation, played } = candidate;
+            return { speed, value: Math.round(value), deviation: Math.round(deviation), ...(played === undefined ? {} : { played }) };
         }
     }
 

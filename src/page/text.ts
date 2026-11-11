@@ -345,10 +345,12 @@ export interface ProfileText
     readonly speeds: Readonly<Record<Speed, string>>;
     /** The title of a rating: its speed, and the day of the last game at that speed. */
     readonly ratingTitle: (speed: string, played: string | undefined) => string;
-    /** The title of the cross beside a name the site does not know. */
+    /** The line under the names when a site does not know one, beside its cross. */
     readonly notFound: (site: string) => string;
-    /** The title of the dash beside a name whose site did not answer. */
+    /** The line under the names when a site did not answer, beside its dash. */
     readonly unreached: (site: string) => string;
+    /** The title of the dots beside a name whose site is being asked. */
+    readonly pending: string;
     readonly start: string;
     readonly create: string;
     readonly newProfile: string;
@@ -616,8 +618,9 @@ const english: Text = {
         privacy: "We only read your public rating. No password.",
         speeds: { rapid: "rapid", classical: "classical", blitz: "blitz" },
         ratingTitle: (speed, played) => (played === undefined ? speed : `${speed} · last game ${played}`),
-        notFound: (site) => `No player of that name on ${site}`,
+        notFound: (site) => `${site} has no player of this name`,
         unreached: (site) => `${site} isn't answering: we'll try again later`,
+        pending: "Reading your rating…",
         start: "Start playing",
         create: "Done",
         newProfile: "Add a player",
@@ -977,8 +980,9 @@ const italian: Text = {
         privacy: "Leggiamo solo il tuo punteggio pubblico. Niente password.",
         speeds: { rapid: "rapid", classical: "classica", blitz: "blitz" },
         ratingTitle: (speed, played) => (played === undefined ? speed : `${speed} · ultima partita il ${played.split("-").reverse().join("/")}`),
-        notFound: (site) => `Nessun giocatore con questo nome su ${site}`,
+        notFound: (site) => `Su ${site} non trovo questo nome`,
         unreached: (site) => `${site} non risponde: riproviamo più tardi`,
+        pending: "Leggo il tuo punteggio…",
         start: "Inizia a giocare",
         create: "Fatto",
         newProfile: "Aggiungi un giocatore",

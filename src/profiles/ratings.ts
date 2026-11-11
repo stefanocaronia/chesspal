@@ -1,4 +1,4 @@
-// What Lichess and chess.com said of the player's names there (D-105, D-106): ratings.json in the profile's folder, written by Chesspal each time it reads
+// What Lichess and Chess.com said of the player's names there (D-105, D-106): ratings.json in the profile's folder, written by Chesspal each time it reads
 // them, never by hand; the rating that counts is chosen from it as the profile is read.
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -12,13 +12,13 @@ export type RatingSite = (typeof ratingSites)[number];
 export const speeds = ["rapid", "classical", "blitz"] as const;
 export type Speed = (typeof speeds)[number];
 
-/** A rating a site gives: the number as it is, never converted, its speed, how sure the site is of it (its RD), and the day of the last game at that speed. */
+/** A rating a site gives: the number as it is, never converted, its speed, how sure the site is of it (its rating deviation, RD), and the day of the last game at that speed. */
 export interface Rating
 {
     readonly value: number;
     readonly site: RatingSite;
     readonly speed: Speed;
-    readonly rd: number;
+    readonly deviation: number;
     /** YYYY-MM-DD. */
     readonly played?: string;
 }
@@ -102,10 +102,10 @@ function ratingOf(value: unknown, site: RatingSite): Rating | undefined
     const speed = speeds.find((one) => one === rating?.speed);
     const plausible = (number: unknown): number is number => typeof number === "number" && Number.isInteger(number) && number > 0 && number < 4000;
 
-    if (rating?.site !== site || speed === undefined || !plausible(rating.value) || !plausible(rating.rd)) {
+    if (rating?.site !== site || speed === undefined || !plausible(rating.value) || !plausible(rating.deviation)) {
         return undefined;
     }
 
     const played = typeof rating.played === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rating.played) ? rating.played : undefined;
-    return { value: rating.value, site, speed, rd: rating.rd, ...(played === undefined ? {} : { played }) };
+    return { value: rating.value, site, speed, deviation: rating.deviation, ...(played === undefined ? {} : { played }) };
 }

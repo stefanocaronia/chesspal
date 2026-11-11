@@ -1166,7 +1166,7 @@ h3 + .switch {
     grid-column: 1 / -1;
 }
 
-/* The rating a site gives, its speed in its title; a cross for a name it does not know, a dash or the rating faded when it did not answer */
+/* The rating a site gives, its speed in its title; a cross for a name it does not know, a dash or the rating soft when it did not answer, dots while read */
 .accounts .site-mark {
     color: var(--ink);
     font-size: 15px;
@@ -1184,9 +1184,20 @@ h3 + .switch {
     color: var(--low-time);
 }
 
-.accounts .site-mark.unreached {
+.accounts .site-mark.unreached,
+.accounts .site-mark.pending {
     color: var(--soft);
-    opacity: 0.6;
+}
+
+/* The cross and the dash in words, under the names */
+.site-problem {
+    margin: 6px 0 0;
+    color: var(--low-time);
+    font-size: 13px;
+}
+
+.site-problem.unreached {
+    color: var(--soft);
 }
 
 .privacy {

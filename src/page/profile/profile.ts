@@ -41,7 +41,7 @@ export interface Rating
     readonly value: number;
     readonly site: RatingSite;
     readonly speed: Speed;
-    readonly rd: number;
+    readonly deviation: number;
     readonly played?: string;
 }
 

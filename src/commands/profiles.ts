@@ -50,18 +50,18 @@ export const profiles = defineCommand({
 
 /**
  * A new profile, put in use unless asked not to; while a game goes on it is made all the same and waits, the player in use staying. The one Chesspal made at
- * the first start, while new, becomes it, game and all (D-71). With the player's names on Lichess and chess.com, their ratings are read there (D-106).
+ * the first start, while new, becomes it, game and all (D-71). With the player's names on Lichess and Chess.com, their ratings are read there (D-106).
  */
 export const newProfile = defineCommand({
     name: "new_profile",
     description: "Makes a player's profile and puts it in use, unless --use false or a game is going on: their games, picture and page settings go in "
         + "profiles/<id>/ of Chesspal's data folder; the profile Chesspal made at the first start becomes this one, its folder renamed, while nobody has completed "
-        + "it; their rating is read from their names on Lichess and chess.com. Example: chesspal new_profile Anna --level regular --lichess anna_k.",
+        + "it; their rating is read from their names on Lichess and Chess.com. Example: chesspal new_profile Anna --level regular --lichess anna_k.",
     input: z.object({
         name: playerName().describe("the player's name"),
         level: z.enum(levels).optional().describe("how they play: learning, casual, regular or tournament"),
         lichess: accountName().optional().describe("the player's name on Lichess"),
-        chesscom: accountName().optional().describe("the player's name on chess.com"),
+        chesscom: accountName().optional().describe("the player's name on Chess.com"),
         avatar: z.enum(drawnAvatars).optional().describe(`a drawn avatar: ${drawnAvatars.join(", ")}`),
         use: z.boolean().optional().describe("false to make it without putting it in use"),
     }),
@@ -124,18 +124,18 @@ export const setAvatar = defineCommand({
 });
 
 /**
- * What the player tells of themselves in the profile in use: their name, how they play, and their names on Lichess and chess.com, by which the games they
+ * What the player tells of themselves in the profile in use: their name, how they play, and their names on Lichess and Chess.com, by which the games they
  * load are theirs (D-93). Each one given is written, an empty one goes; the profile's folder keeps its name (D-106).
  */
 export const editProfile = defineCommand({
     name: "edit_profile",
-    description: "Changes the profile in use: the player's name, how they play, and their names on Lichess and chess.com, by which a game loaded from there is "
+    description: "Changes the profile in use: the player's name, how they play, and their names on Lichess and Chess.com, by which a game loaded from there is "
         + "theirs; an empty level or site name removes it, and the profile keeps its folder. Example: chesspal edit_profile --name Anna --level regular --lichess anna_k.",
     input: z.object({
         name: playerName().optional().describe("the player's name"),
         level: z.union([z.enum(levels), z.literal("")]).optional().describe("how they play: learning, casual, regular or tournament; empty to remove it"),
         lichess: accountName().optional().describe("the player's name on Lichess"),
-        chesscom: accountName().optional().describe("the player's name on chess.com"),
+        chesscom: accountName().optional().describe("the player's name on Chess.com"),
     }),
     cliOnly: true,
     idempotent: true,
@@ -210,10 +210,10 @@ function playerName(): z.ZodString
     return z.string().trim().min(1).max(nameLimit).regex(/^[^\p{Cc}]+$/u, "one line of text");
 }
 
-/** A name on Lichess or chess.com: their letters, digits, underscores and hyphens; empty to remove it. */
+/** A name on Lichess or Chess.com: their letters, digits, underscores and hyphens; empty to remove it. */
 function accountName(): z.ZodString
 {
-    return z.string().trim().max(nameLimit).regex(/^[\w-]*$/, "A name on Lichess or chess.com has only letters, digits, underscores and hyphens.");
+    return z.string().trim().max(nameLimit).regex(/^[\w-]*$/, "A name on Lichess or Chess.com has only letters, digits, underscores and hyphens.");
 }
 
 function accountsOf(lichess: string, chesscom: string): Accounts
@@ -223,8 +223,8 @@ function accountsOf(lichess: string, chesscom: string): Accounts
 
 function accountsText(accounts: Accounts | undefined): string
 {
-    const named = [...(accounts?.lichess === undefined ? [] : [`${accounts.lichess} on Lichess`]), ...(accounts?.chesscom === undefined ? [] : [`${accounts.chesscom} on chess.com`])];
-    return named.length === 0 ? "on neither Lichess nor chess.com" : named.join(" and ");
+    const named = [...(accounts?.lichess === undefined ? [] : [`${accounts.lichess} on Lichess`]), ...(accounts?.chesscom === undefined ? [] : [`${accounts.chesscom} on Chess.com`])];
+    return named.length === 0 ? "on neither Lichess nor Chess.com" : named.join(" and ");
 }
 
 function imageFile(path: string): Buffer

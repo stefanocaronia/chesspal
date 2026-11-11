@@ -283,7 +283,7 @@ function ofAccount(reading: SiteReading | undefined, account: string | undefined
 /** Of the ratings, the one its site is surest of: the lowest RD (D-106). */
 function surest(ratings: readonly (Rating | undefined)[]): Rating | undefined
 {
-    return ratings.reduce<Rating | undefined>((best, one) => (one !== undefined && (best === undefined || one.rd < best.rd) ? one : best), undefined);
+    return ratings.reduce<Rating | undefined>((best, one) => (one !== undefined && (best === undefined || one.deviation < best.deviation) ? one : best), undefined);
 }
 
 /** The player's names on the sites, from profile.md's lichess and chesscom lines; none without either. */

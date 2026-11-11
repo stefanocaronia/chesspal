@@ -44,6 +44,9 @@ describe("the MCP server", () => {
         expect(tools.map((tool) => tool.name)).toEqual(offered.map((command) => command.name));
         expect(tools[0]?.description).toBe(offered[0]?.description);
         expect(tools.map((tool) => tool.name)).not.toContain("init");
+        // Only the command line and the page ask the sites for the player's ratings, never a tool of the AI's.
+        expect(tools.map((tool) => tool.name)).not.toContain("new_profile");
+        expect(tools.map((tool) => tool.name)).not.toContain("edit_profile");
     });
 
     it("offers a host's own tool to that host alone: ponder to Claude Code (D-72)", async () => {

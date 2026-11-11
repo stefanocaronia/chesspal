@@ -159,7 +159,7 @@ export function ProfilesDialog({ open, profiles, active, locked, dataFolder, onE
 }
 
 /**
- * What the player changes in their profile, each part saved once changed: the picture, the name, how they play, and their names on Lichess and chess.com,
+ * What the player changes in their profile, each part saved once changed: the picture, the name, how they play, and their names on Lichess and Chess.com,
  * by which a game loaded from there is theirs (D-93). A field saved gets a tick; one the server would not take stays as typed, marked.
  */
 function ProfileEdit({ profile, text }: { profile: ProfileShown; text: Text; })
@@ -239,11 +239,12 @@ function ProfileEdit({ profile, text }: { profile: ProfileShown; text: Text; })
                         <label key={site} title={words.accountTitle}>
                             <span>{siteNames[site]}</span>
                             <SiteName initial={profile.accounts?.[site] ?? ""} site={site} onChange={(input) => save(site, input)} text={text} />
-                            <SiteMark reading={readingOf(profile, site)} site={site} text={text} />
+                            <SiteMark reading={readingOf(profile, site)} pending={profile.accounts?.[site] !== undefined} text={text} />
                             {tick(site)}
                         </label>
                     ))}
                 </div>
+                {accountSites.map((site) => <SiteProblem key={site} reading={readingOf(profile, site)} site={site} text={text} />)}
                 <p class="privacy">{words.privacy}</p>
             </fieldset>
             {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
@@ -252,7 +253,7 @@ function ProfileEdit({ profile, text }: { profile: ProfileShown; text: Text; })
 }
 
 /**
- * A field of the player's name on Lichess or chess.com: in the wizard bound to its value, in the profile window not bound, so that a name the sites would
+ * A field of the player's name on Lichess or Chess.com: in the wizard bound to its value, in the profile window not bound, so that a name the sites would
  * not give stays as typed, marked, until it reads.
  */
 function SiteName({ value, initial, site, onInput, onChange, text }: {
@@ -282,26 +283,52 @@ function SiteName({ value, initial, site, onInput, onChange, text }: {
 
 /**
  * Beside a name on a site, what the site said of it (D-105): the rating that counts, its speed and last game in its title; a cross when the site has no
- * such player; when it did not answer, the rating it gave before, faded, or a dash. Nothing while it has not been read, or the player has no rating
- * established there.
+ * such player; when it did not answer, the rating it gave before, soft, or a dash; dots while a name is being read. The line under the names says the
+ * cross and the dash in words.
  */
-function SiteMark({ reading, site, text }: { reading: SiteReading | undefined; site: AccountSite; text: Text; })
+function SiteMark({ reading, pending, text }: { reading: SiteReading | undefined; pending: boolean; text: Text; })
 {
     const words = text.profile;
     const rating = reading?.rating;
-    const number = rating === undefined ? null : <span title={words.ratingTitle(words.speeds[rating.speed], rating.played)}>{rating.value}</span>;
+    const number = rating === undefined ? null : <RatingNumber value={rating.value} said={words.ratingTitle(words.speeds[rating.speed], rating.played)} />;
 
+    if (reading === undefined) {
+        return pending
+            ? (
+                <span class="site-mark pending" title={words.pending}>
+                    <span aria-hidden="true">…</span>
+                    <span class="visually-hidden">{words.pending}</span>
+                </span>
+            )
+            : <span class="site-mark" />;
+    }
+
+    if (reading.unreached === true) {
+        return <span class="site-mark unreached">{number ?? <span aria-hidden="true">–</span>}</span>;
+    }
+
+    return reading.found === false ? <span class="site-mark missing" aria-hidden="true">✕</span> : <span class="site-mark">{number}</span>;
+}
+
+/** A rating, its speed and last game in its title, and read aloud after it. */
+function RatingNumber({ value, said }: { value: number; said: string; })
+{
+    return (
+        <span title={said}>
+            {value}
+            <span class="visually-hidden">{` ${said}`}</span>
+        </span>
+    );
+}
+
+/** Under the names, in words, a name a site does not know or a site that did not answer: a phone has no title to hover. */
+function SiteProblem({ reading, site, text }: { reading: SiteReading | undefined; site: AccountSite; text: Text; })
+{
     if (reading?.unreached === true) {
-        const said = words.unreached(siteNames[site]);
-        return <span class="site-mark unreached" title={said} aria-label={said}>{number ?? "–"}</span>;
+        return <p class="site-problem unreached">{text.profile.unreached(siteNames[site])}</p>;
     }
 
-    if (reading?.found === false) {
-        const said = words.notFound(siteNames[site]);
-        return <span class="site-mark missing" title={said} aria-label={said}>✕</span>;
-    }
-
-    return <span class="site-mark">{number}</span>;
+    return reading?.found === false ? <p class="site-problem">{text.profile.notFound(siteNames[site])}</p> : null;
 }
 
 /** What the site said of the name the profile has there now: none for a name changed since it was read. */

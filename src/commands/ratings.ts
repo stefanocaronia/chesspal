@@ -8,7 +8,7 @@ import type { Context } from "./context.ts";
 export const ratingsAge = 24 * 60 * 60 * 1000;
 
 /**
- * Reads a profile's ratings again when its names on the sites changed, a site did not answer the last time, or the last reading is older than `olderThan`
+ * Reads a profile's ratings again when its names on the sites changed, a site did not answer ten minutes ago or more, or the last reading is older than `olderThan`
  * milliseconds: whether new readings were kept. One reading at a time of the same names in this process.
  */
 export function refreshRatings(context: Context, id: string, olderThan = Infinity): Promise<boolean>
@@ -39,7 +39,7 @@ async function readAgain(context: Context, { id, accounts, sites }: PlayerProfil
     const home = context.home();
     const age = sites === undefined ? Infinity : context.now().getTime() - Date.parse(sites.read);
 
-    if (!readingsStale(sites, accounts) && age < olderThan) {
+    if (!readingsStale(sites, accounts, context.now()) && age < olderThan) {
         return false;
     }
 
