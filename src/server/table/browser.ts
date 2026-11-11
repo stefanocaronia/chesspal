@@ -10,7 +10,15 @@ export async function openInBrowser(url: string, platform: string): Promise<bool
 {
     const browser = appBrowser(platform, process.env);
     // Explorer, open and xdg-open take an address as they take a folder, and hand it to the default browser.
-    return (browser !== undefined && await started(browser, [`--app=${url}`])) || openFolder(url, platform);
+    return (browser !== undefined && await started(browser, [`--app=${openedAddress(url)}`])) || openFolder(url, platform);
+}
+
+/** The address of the window the table opens, marked so that the page sizes it the first time (page/layout/window.ts). */
+export function openedAddress(url: string): string
+{
+    const address = new URL(url);
+    address.searchParams.set("opened", "");
+    return address.href;
 }
 
 /** Chrome or Edge, where each system installs them: the first there is; none when neither is. */

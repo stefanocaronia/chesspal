@@ -6,7 +6,8 @@ import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import { offerIcon, type Terminal } from "../src/cli/icon.ts";
-import { appBrowser, iconAsked, type IconCommand, iconCommand, iconToRemake, makeIcons, noteIconAsked, noteIconMade } from "../src/server/table/index.ts";
+import { windowPlace } from "../src/page/layout/window.ts";
+import { appBrowser, iconAsked, type IconCommand, iconCommand, iconToRemake, makeIcons, noteIconAsked, noteIconMade, openedAddress } from "../src/server/table/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -32,6 +33,12 @@ describe("the table's window", () => {
 
         expect(appBrowser("darwin", { HOME: "/Users/ann" }, (path) => path === mac)).toBe(mac);
         expect(appBrowser("linux", { PATH: "/usr/bin:/snap/bin" }, (path) => path === linux)).toBe(linux);
+    });
+
+    it("opens marked, so that the page sizes it the first time: 1600×900 centred, or the screen's room when it has less", () => {
+        expect(openedAddress("http://localhost:5876/")).toBe("http://localhost:5876/?opened=");
+        expect(windowPlace(1920, 1040)).toEqual({ width: 1600, height: 900, left: 160, top: 70 });
+        expect(windowPlace(1366, 728)).toEqual({ width: 1366, height: 728, left: 0, top: 0 });
     });
 });
 

@@ -451,14 +451,16 @@ function useOnlyWhole(list: RefObject<HTMLElement>, lines: readonly string[], ne
 
         const fit = (): void => {
             const box = element.getBoundingClientRect();
+            const padding = getComputedStyle(element);
+            const room = element.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom);
             const newest = newestFirst ? element.firstElementChild : element.lastElementChild;
 
             for (const item of element.children) {
                 const place = item.getBoundingClientRect();
                 const style = (item as HTMLElement).style;
                 // The newest never hides: one longer than the column, as a note with the helps on (D-78), scrolls in itself.
-                style.maxHeight = item === newest ? box.height + "px" : "";
-                style.overflowY = item === newest && item.scrollHeight > box.height ? "auto" : "";
+                style.maxHeight = item === newest ? room + "px" : "";
+                style.overflowY = item === newest && item.scrollHeight > room ? "auto" : "";
                 style.visibility = item === newest || (place.top >= box.top - 1 && place.bottom <= box.bottom + 1) ? "" : "hidden";
             }
         };

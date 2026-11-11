@@ -447,6 +447,12 @@
     display: none;
 }
 
+/* A bubble keeps its height: one that does not fit is hidden whole, the newest scrolls in itself (talk.tsx) */
+.says > li,
+.sent > li {
+    flex: none;
+}
+
 .say {
     position: relative;
     background: var(--say);
@@ -661,11 +667,6 @@
 .flipped .sent {
     justify-content: flex-start;
     margin: 8px 0 0;
-}
-
-/* In analysis nothing in the talk gives way: on a short screen the talk scrolls whole */
-.talk.studied {
-    overflow-y: auto;
 }
 
 .talk.studied > section,
