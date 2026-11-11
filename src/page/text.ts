@@ -132,6 +132,8 @@ export interface Text
         readonly failed: string;
         /** On a chat's own page: the command to type follows. */
         notice(version: string, name: string): string;
+        /** Its ×, which hides it until a newer version still is out. */
+        readonly hide: string;
     };
     /** The page is served, but no chat hears the player (never started, or just cleared): where to write to wake it; its clock waits. */
     asleep(name: string): string;
@@ -655,6 +657,7 @@ const english: Text = {
         installed: "Installed: the table starts again by itself once the game is over.",
         failed: "Chesspal was not updated: close the chat, then type in a terminal, one after the other:",
         notice: (version, name) => `Chesspal ${version} is out: close the chat with ${name}, type this command in a terminal, then open a new chat.`,
+        hide: "Hide until the next version",
     },
     offline: (name) => `${name} is not connected. Write it a message in the window where you opened ${name}, not in this page's chat: the page connects again by itself.`,
     startClocks: "Start",
@@ -1059,6 +1062,7 @@ const italian: Text = {
         installed: "Installata: il tavolo riparte da solo a fine partita.",
         failed: "Chesspal non si è aggiornato: chiudi la chat, poi scrivi in un terminale, uno dopo l'altro:",
         notice: (version, name) => `È uscita la versione ${version} di Chesspal: chiudi la chat con ${name}, scrivi questo comando in un terminale e apri una chat nuova.`,
+        hide: "Nascondi fino alla prossima versione",
     },
     offline: (name) => `${name} è scollegato. Scrivigli un messaggio nella finestra dove hai aperto ${name}, non nella chat di questa pagina: la pagina si ricollega da sola.`,
     startClocks: "Inizia",

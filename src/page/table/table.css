@@ -109,10 +109,24 @@
     user-select: all;
 }
 
-/* On a chat's own page, news and no warning: the card's ground and an accent border */
+/* On a chat's own page, news and no warning: the card's ground and an accent border, the words beside the × that hides it */
 .outdated.update-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
     border-color: var(--accent);
     background: var(--card);
+}
+
+.update-notice > span {
+    flex: 1;
+    min-width: 0;
+}
+
+.update-notice .icon-button {
+    flex: none;
+    width: 30px;
+    height: 30px;
 }
 
 /* Empty, the state takes no room */

@@ -58,7 +58,7 @@ import { signature } from "../players/model-name.ts";
 import { keepSettings, type ProfileShown } from "../profile/profile.ts";
 import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "../profile/settings.ts";
 import { endSoundOf, playSound, soundOf, wakeSounds } from "../sounds/sounds.ts";
-import { UpdateDialog } from "../table/update.tsx";
+import { UpdateDialog, UpdateNotice } from "../table/update.tsx";
 import { AiNameButton, ChatDialog, tableNote } from "../table/window.tsx";
 import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
 import { textFor } from "../text.ts";
@@ -604,12 +604,7 @@ export function App({ start }: { start: Settings; })
                 {served.outdated === true
                     ? <p class="outdated" role="status">{text.outdated(name)}</p>
                     : served.update !== undefined && served.table === undefined
-                    ? (
-                        <p class="outdated update-notice" role="status">
-                            {text.update.notice(served.update.version, name)}
-                            <code>npm install -g chesspal</code>
-                        </p>
-                    )
+                    ? <UpdateNotice version={served.update.version} name={name} text={text} />
                     : null}
                 <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`} inert={offline}>
                     {header}

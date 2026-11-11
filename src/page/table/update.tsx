@@ -91,6 +91,56 @@ export function UpdateMark({ version, installing, onOpen, text }: { version: str
     );
 }
 
+/** On a chat's own page, the strip with the command that installs the newer Chesspal; its × hides it until a newer one still is out. */
+export function UpdateNotice({ version, name, text }: { version: string; name: string; text: Text; })
+{
+    const [hidden, setHidden] = useState(hiddenVersion);
+
+    if (hidden === version) {
+        return null;
+    }
+
+    const hide = (): void => {
+        rememberHidden(version);
+        setHidden(version);
+    };
+
+    return (
+        <p class="outdated update-notice" role="status">
+            <span>
+                {text.update.notice(version, name)}
+                <code>npm install -g chesspal</code>
+            </span>
+            <button class="icon-button" type="button" title={text.update.hide} aria-label={text.update.hide} onClick={hide}>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 6L18 18M18 6L6 18" />
+                </svg>
+            </button>
+        </p>
+    );
+}
+
+const hiddenKey = "chesspal-update-hidden";
+
+function hiddenVersion(): string | undefined
+{
+    try {
+        return localStorage.getItem(hiddenKey) ?? undefined;
+    } catch {
+        // A browser that keeps nothing for the page: the strip shows.
+        return undefined;
+    }
+}
+
+function rememberHidden(version: string): void
+{
+    try {
+        localStorage.setItem(hiddenKey, version);
+    } catch {
+        // Hidden as long as the page.
+    }
+}
+
 /** What the table answered: whether npm installed the version, or why it would not try, in the player's language. */
 type Installed = { readonly installed: boolean; readonly refused?: undefined; } | { readonly installed?: undefined; readonly refused: string; };
 
