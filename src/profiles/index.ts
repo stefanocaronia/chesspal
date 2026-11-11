@@ -18,10 +18,7 @@ export {
     type PlayerProfile,
     type ProfileFields,
     profileFolder,
-    type Rating,
-    ratingLimits,
-    type RatingSite,
-    ratingSites,
     updateProfile,
 } from "./profiles.ts";
+export { type Rating, type RatingSite, ratingSites, saveReadings, type SiteReading, type SiteReadings, type Speed, speeds } from "./ratings.ts";
 export { helpsIn, languageIn, type PageSettings, profileSettings, saveProfileSettings, settingsOf } from "./settings.ts";

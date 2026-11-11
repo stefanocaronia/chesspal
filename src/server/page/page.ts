@@ -16,7 +16,7 @@ import { askNewGame, keepPosted, tellWatchers } from "./events.ts";
 import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls } from "./game.ts";
 import { json, send } from "./http.ts";
-import { answerProfiles } from "./profiles.ts";
+import { answerProfiles, readRatingsOf } from "./profiles.ts";
 import { answerTable, type Opening, type TableChats } from "./table.ts";
 
 /**
@@ -210,6 +210,8 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         send(response, 200, json, JSON.stringify(analysesOf(served.context.home())));
     } else if (path === "/api/events") {
         keepPosted(request, response, served.watchers);
+        // A page that opens reads the player's ratings again after a day (D-106).
+        readRatingsOf(served);
     } else if (path === "/api/bell") {
         if (url.searchParams.has("probe")) {
             send(response, 200, json, JSON.stringify(bellProbe(served.folder, served.watchers.size > 0, tableChat(served))));
@@ -315,7 +317,7 @@ function watchFolder(folder: string, heard: (name: string | null) => void): FSWa
 
 // The current game, what the coach wrote on it, whether the AI thinks on the player's time, the talk before the first, the game in analysis, the profile
 // in use, and what a profile keeps (who plays, their picture, their settings); a folder's name, for a profile made or gone.
-const watched = /^(?:game\.json|coach\.json|thoughts\.json|talk\.json|analysis\.json|active\.json|profile\.md|settings\.json|avatar\.\w+|[a-z0-9-]+)$/;
+const watched = /^(?:game\.json|coach\.json|thoughts\.json|talk\.json|analysis\.json|active\.json|profile\.md|settings\.json|ratings\.json|avatar\.\w+|[a-z0-9-]+)$/;
 
 function fromHere(request: IncomingMessage, port: number, api: boolean): boolean
 {

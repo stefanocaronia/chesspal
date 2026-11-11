@@ -4,17 +4,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:f
 import { join } from "node:path";
 import { makeFolder, renameOver, writeAtomically } from "../games/index.ts";
 import { readFrontMatter, writeFrontMatter } from "./front-matter.ts";
+import { type Rating, savedReadings, type SiteReading, type SiteReadings } from "./ratings.ts";
 
 /** How the player says they play, from who has just learned to who plays tournaments. */
 export const levels = ["learning", "casual", "regular", "tournament"] as const;
 export type Level = (typeof levels)[number];
-
-/** Where a rating comes from. */
-export const ratingSites = ["lichess", "chess.com", "fide"] as const;
-export type RatingSite = (typeof ratingSites)[number];
-
-/** The lowest and highest rating a profile takes. */
-export const ratingLimits = { lowest: 100, highest: 3500 } as const;
 
 /** The longest name a profile keeps. */
 export const nameLimit = 40;
@@ -23,19 +17,11 @@ export const nameLimit = 40;
 export const drawnAvatars = ["short-hair", "bun", "glasses", "beanie", "beard", "curls", "moustache", "silver-bob", "cat", "owl"] as const;
 export type DrawnAvatar = (typeof drawnAvatars)[number];
 
-/** A rating and where it comes from. */
-export interface Rating
-{
-    readonly value: number;
-    readonly site: RatingSite;
-}
-
-/** What the player tells of themselves: their name, how they play, their rating, the avatar they chose. */
+/** What the player tells of themselves: their name, how they play, the avatar they chose. */
 export interface ProfileFields
 {
     readonly name: string;
     readonly level?: Level;
-    readonly rating?: Rating;
     readonly avatar?: DrawnAvatar;
 }
 
@@ -54,6 +40,10 @@ export interface PlayerProfile extends ProfileFields
     readonly new?: true;
     /** The player's names on Lichess and chess.com, written in profile.md by hand or from the page, by which the games they load are theirs (D-93). */
     readonly accounts?: Accounts;
+    /** What Lichess and chess.com said of those names, the last time Chesspal asked (D-105). */
+    readonly sites?: SiteReadings;
+    /** The rating that counts, of the names the profile has now: of two, the one the sites are surer of (D-106). */
+    readonly rating?: Rating;
 }
 
 /** What may change in a profile: what the player tells of themselves, and their names on the sites, each one written whole. */
@@ -105,9 +95,9 @@ export function createProfile(root: string, fields: ProfileFields, use = true): 
     const id = activeId(root);
 
     if (id !== undefined && readProfile(root, id).new === true) {
-        const { level, rating, avatar } = fields;
+        const { level, avatar } = fields;
         const named = renamed(root, id, fields.name);
-        writeProfile(root, named, { name: fields.name, level, rating, avatar, new: false });
+        writeProfile(root, named, { name: fields.name, level, avatar, new: false });
         return readProfile(root, named);
     }
 
@@ -266,21 +256,34 @@ function writeActive(root: string, id: string): void
 function readProfile(root: string, id: string): PlayerProfile
 {
     const { fields } = readFrontMatter(profileText(root, id));
-    const value = Number(fields.rating);
-    const site = oneOf(ratingSites, fields.site);
     const level = oneOf(levels, fields.level);
     const avatar = oneOf(drawnAvatars, fields.avatar);
-    const rated = Number.isInteger(value) && value >= ratingLimits.lowest && value <= ratingLimits.highest && site !== undefined;
+    const { accounts } = accountsIn(fields);
+    const sites = savedReadings(profileFolder(root, id));
+    const rating = sites === undefined ? undefined : surest([ofAccount(sites.lichess, accounts?.lichess), ofAccount(sites.chesscom, accounts?.chesscom)]);
     // A name written by hand is cut as the page and the CLI cut it: the AI reads it.
     return {
         id,
         name: fields.name?.trim().slice(0, nameLimit).trim() || id,
         ...(level === undefined ? {} : { level }),
-        ...(rated ? { rating: { value, site } } : {}),
         ...(avatar === undefined ? {} : { avatar }),
         ...(fields.new === "true" ? { new: true as const } : {}),
-        ...accountsIn(fields),
+        ...(accounts === undefined ? {} : { accounts }),
+        ...(sites === undefined ? {} : { sites }),
+        ...(rating === undefined ? {} : { rating }),
     };
+}
+
+/** A site's rating, when it was read for the name the profile has there now. */
+function ofAccount(reading: SiteReading | undefined, account: string | undefined): Rating | undefined
+{
+    return account !== undefined && reading?.account.toLowerCase() === account.toLowerCase() ? reading.rating : undefined;
+}
+
+/** Of the ratings, the one its site is surest of: the lowest RD (D-106). */
+function surest(ratings: readonly (Rating | undefined)[]): Rating | undefined
+{
+    return ratings.reduce<Rating | undefined>((best, one) => (one !== undefined && (best === undefined || one.rd < best.rd) ? one : best), undefined);
 }
 
 /** The player's names on the sites, from profile.md's lichess and chesscom lines; none without either. */
@@ -309,11 +312,6 @@ function writeProfile(root: string, id: string, changes: ProfileChanges & { read
 
     if ("level" in changes) {
         written.level = changes.level;
-    }
-
-    if ("rating" in changes) {
-        written.rating = changes.rating?.value;
-        written.site = changes.rating?.site;
     }
 
     if ("avatar" in changes) {

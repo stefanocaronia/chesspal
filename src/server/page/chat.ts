@@ -36,12 +36,12 @@ export function chatSeenOf(chat: Context): ChatSeen
 }
 
 /**
- * The context the page runs its commands with: the chat's folders, time and randomness, and nothing that is the chat's own, as the position it saw, which
+ * The context the page runs its commands with: the chat's folders, time, randomness and fetch, and nothing that is the chat's own, as the position it saw, which
  * would refuse the player's resignation while the AI thinks, or what it was told.
  */
 export function pageContext(chat: Context): Context
 {
-    const { folder, home, random, now, pause, platform, language, openFolder } = chat;
+    const { folder, home, random, now, pause, platform, language, openFolder, fetch } = chat;
     return {
         folder,
         home,
@@ -52,6 +52,7 @@ export function pageContext(chat: Context): Context
         ...(pause === undefined ? {} : { pause }),
         ...(language === undefined ? {} : { language }),
         ...(openFolder === undefined ? {} : { openFolder }),
+        ...(fetch === undefined ? {} : { fetch }),
     };
 }
 

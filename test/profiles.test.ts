@@ -22,12 +22,12 @@ import {
     ownImageStamp,
     profileFolder,
     profileSettings,
-    ratingLimits,
     ratingSites,
     saveOwnImage,
     saveProfileSettings,
     sentImageLimit,
     settingsOf,
+    speeds,
     updateProfile,
 } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
@@ -57,10 +57,10 @@ describe("the profiles (D-23)", () => {
         expect(readFileSync(join(gameFolder(root), "profile.md"), "utf8")).toBe('---\nname: "Stéfano Caronia"\nnew: "true"\n---\n');
 
         writeFileSync(join(gameFolder(root), "game.json"), "{}");
-        const stefano = createProfile(root, { name: "Stefano", level: "regular", rating: { value: 1450, site: "lichess" }, avatar: "owl" });
+        const stefano = createProfile(root, { name: "Stefano", level: "regular", avatar: "owl" });
 
         // Completed, its folder takes the player's name, with the game.
-        expect(stefano).toEqual({ id: "stefano", name: "Stefano", level: "regular", rating: { value: 1450, site: "lichess" }, avatar: "owl" });
+        expect(stefano).toEqual({ id: "stefano", name: "Stefano", level: "regular", avatar: "owl" });
         expect(gameFolder(root)).toBe(profileFolder(root, "stefano"));
         expect(readFileSync(join(gameFolder(root), "game.json"), "utf8")).toBe("{}");
         expect(JSON.parse(readFileSync(join(root, "profiles", "active.json"), "utf8"))).toEqual({ profile: "stefano" });
@@ -152,17 +152,17 @@ describe("the profiles (D-23)", () => {
         expect(activeProfile(root).id).toBe("bruno");
     });
 
-    it("read a profile.md written by hand, leaving out what they do not know, and keep its other fields and text when they change it", () => {
+    it("read a profile.md written by hand, leaving out what they do not know, a rating typed there too, and keep its other fields and text when they change it", () => {
         const root = playerFolder();
         mkdirSync(profileFolder(root, "lia"), { recursive: true });
-        writeFileSync(join(profileFolder(root, "lia"), "profile.md"), "---\nname: Lia\nlevel: master\nrating: 99999\nsite: lichess\nclub: 'Scacchi Roma'\n---\nMy notes.\n");
+        writeFileSync(join(profileFolder(root, "lia"), "profile.md"), "---\nname: Lia\nlevel: master\nrating: 1800\nsite: fide\nclub: 'Scacchi Roma'\n---\nMy notes.\n");
 
         expect(listProfiles(root)).toEqual([{ id: "lia", name: "Lia" }]);
 
-        updateProfile(root, "lia", { avatar: "cat", rating: { value: 1800, site: "fide" } });
+        updateProfile(root, "lia", { avatar: "cat" });
 
         expect(readFileSync(join(profileFolder(root, "lia"), "profile.md"), "utf8")).toBe(
-            '---\nname: "Lia"\nlevel: "master"\nrating: 1800\nsite: "fide"\nclub: "Scacchi Roma"\navatar: "cat"\n---\nMy notes.\n',
+            '---\nname: "Lia"\nlevel: "master"\nrating: "1800"\nsite: "fide"\nclub: "Scacchi Roma"\navatar: "cat"\n---\nMy notes.\n',
         );
     });
 
@@ -180,9 +180,9 @@ describe("the profiles (D-23)", () => {
     it("read a profile.md as an editor may save it: a byte-order mark, capitals, a name too long", () => {
         const root = playerFolder();
         mkdirSync(profileFolder(root, "lia"), { recursive: true });
-        writeFileSync(join(profileFolder(root, "lia"), "profile.md"), `\uFEFF---\r\nname: ${"Lia".repeat(20)}\r\nlevel: Regular\r\nrating: 1500\r\nsite: Lichess\r\n---\r\n`);
+        writeFileSync(join(profileFolder(root, "lia"), "profile.md"), `\uFEFF---\r\nname: ${"Lia".repeat(20)}\r\nlevel: Regular\r\nlichess: Lia_K\r\n---\r\n`);
 
-        expect(listProfiles(root)).toEqual([{ id: "lia", name: "Lia".repeat(20).slice(0, nameLimit), level: "regular", rating: { value: 1500, site: "lichess" } }]);
+        expect(listProfiles(root)).toEqual([{ id: "lia", name: "Lia".repeat(20).slice(0, nameLimit), level: "regular", accounts: { lichess: "Lia_K" } }]);
     });
 
     it("write a front matter that reads back any name", () => {
@@ -249,13 +249,10 @@ describe("the profiles' commands", () => {
 
         expect(await run(context, "profiles")).toBe("* player: Player");
         expect(await run(context, "status")).toContain(`Folder: ${profileFolder(context.folder, "player")}\nNo game.`);
-        expect(await run(context, "new_profile", { name: "Anna", level: "regular", rating: 1450, site: "lichess" })).toBe(
-            "Profile anna made, and in use: Anna, plays often, Lichess 1450.",
-        );
-        expect(await run(context, "status")).toContain(`Folder: ${profileFolder(context.folder, "anna")}\nPlayer: Anna, plays often, Lichess 1450.\nNo game.`);
-        expect(await run(context, "new_game", { ai_colour: "black" })).toMatch(/^New game: you play Black, the player White, at the club level \(board and tactical facts: no position\)\.\nPlayer: Anna, plays often, Lichess 1450\.\n/);
+        expect(await run(context, "new_profile", { name: "Anna", level: "regular" })).toBe("Profile anna made, and in use: Anna, plays often.");
+        expect(await run(context, "status")).toContain(`Folder: ${profileFolder(context.folder, "anna")}\nPlayer: Anna, plays often.\nNo game.`);
+        expect(await run(context, "new_game", { ai_colour: "black" })).toMatch(/^New game: you play Black, the player White, at the club level \(board and tactical facts: no position\)\.\nPlayer: Anna, plays often\.\n/);
         expect(existsSync(join(profileFolder(context.folder, "anna"), "game.json"))).toBe(true);
-        await expect(run(context, "new_profile", { name: "Bruno", rating: 1450 })).rejects.toThrow("Give the rating and its site together");
     });
 
     it("let a chat play on when the wizard renames the folder under the game it saw (D-71)", async () => {
@@ -347,8 +344,8 @@ describe("the profiles on the page", () => {
     it("offer the choices the server takes", () => {
         expect(page.levels).toEqual(levels);
         expect(page.ratingSites).toEqual(ratingSites);
+        expect(page.speeds).toEqual(speeds);
         expect(page.avatarIds).toEqual(drawnAvatars);
-        expect(page.ratingLimits).toEqual(ratingLimits);
         expect(page.nameLimit).toBe(nameLimit);
     });
 });

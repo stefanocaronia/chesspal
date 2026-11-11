@@ -26,6 +26,8 @@ export interface Context
     pageOpen?: () => boolean;
     /** Opens a folder in the system's file manager: the data folder, from the board page; whether it could; none in the tests. */
     openFolder?: (folder: string) => Promise<boolean>;
+    /** Asks the sites the player plays on for their ratings (D-105): only the page and the command line, never a tool of the AI's (D-106); none in the tests. */
+    fetch?: typeof globalThis.fetch;
     /** Opens the New game window on the board pages open now, where the player chooses the game: whether one was open. */
     askNewGame?: () => boolean;
     /** The AI host, as it names itself to the MCP server: claude-code, which notes how each chat starts (D-57); none on the command line. */
@@ -90,6 +92,7 @@ export function defaultContext(): Context
         language: systemLanguage(),
         given: new Set(),
         openFolder: (folder) => openFolder(folder, process.platform),
+        fetch: globalThis.fetch,
     };
 }
 

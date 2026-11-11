@@ -3,7 +3,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { isAbsolute, relative, sep } from "node:path";
-import { chooseDrawnAvatar, editProfile, GameGoingOn, inputProblems, newProfile, useProfile } from "../../commands/index.ts";
+import { chooseDrawnAvatar, editProfile, GameGoingOn, inputProblems, newProfile, ratingsAge, refreshRatings, useProfile } from "../../commands/index.ts";
 import {
     activeProfile,
     drawnAvatars,
@@ -96,7 +96,7 @@ async function newProfileFromPage(request: IncomingMessage, response: ServerResp
     }
 }
 
-/** Another profile put in use from the menu, once the game going on has ended: the chat is not woken for it (D-66). */
+/** Another profile put in use from the menu, once the game going on has ended: the chat is not woken for it (D-66); its ratings are read again after a day (D-106). */
 async function useProfileFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
     const profile = isJson(request) ? jsonOf(await bodyOf(request))?.profile : undefined;
@@ -114,6 +114,7 @@ async function useProfileFromPage(request: IncomingMessage, response: ServerResp
     }
 
     sendJson(response, 200, { profile });
+    readRatingsOf(served, profile);
 }
 
 /** A drawn avatar for the profile the page shows, in place of the player's own image. */
@@ -253,6 +254,19 @@ async function openDataFolder(request: IncomingMessage, response: ServerResponse
     }
 
     sendJson(response, 200, { opened: true });
+}
+
+/**
+ * Reads the ratings of a profile, the one in use unless named, again a day after the last reading, while the page goes on: the pages hear of them from the
+ * watcher (D-106).
+ */
+export function readRatingsOf(served: Served, id?: string): void
+{
+    try {
+        void refreshRatings(served.context, id ?? activeProfile(served.context.home()).id, ratingsAge).catch(() => false);
+    } catch {
+        // No data folder yet: the page says why as it loads.
+    }
 }
 
 /**

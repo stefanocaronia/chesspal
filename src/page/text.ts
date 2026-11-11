@@ -4,7 +4,7 @@ import type { BadgeKind } from "./board/signs.ts";
 import type { Step } from "./game/browse.ts";
 import type { HowEnded } from "./game/ending.ts";
 import type { StrategyGroup, StrategyRow, Tone } from "./helps/view.ts";
-import type { AvatarId, Level, RatingSite } from "./profile/profile.ts";
+import type { AvatarId, Level, Speed } from "./profile/profile.ts";
 
 /** The words of the page in one language. */
 export interface Text
@@ -338,12 +338,17 @@ export interface ProfileText
     readonly level: string;
     /** Each level, and a note under it. */
     readonly levels: Readonly<Record<Level, readonly [string, string]>>;
-    readonly rating: string;
     readonly optional: string;
-    readonly ratingPlaceholder: string;
-    readonly ratingLabel: string;
-    readonly siteLabel: string;
-    readonly sites: Readonly<Record<RatingSite, string>>;
+    /** Under the names on the sites: what Chesspal reads there, and what not. */
+    readonly privacy: string;
+    /** The speeds of a rating, in the title of the number beside a site's name. */
+    readonly speeds: Readonly<Record<Speed, string>>;
+    /** The title of a rating: its speed, and the day of the last game at that speed. */
+    readonly ratingTitle: (speed: string, played: string | undefined) => string;
+    /** The title of the cross beside a name the site does not know. */
+    readonly notFound: (site: string) => string;
+    /** The title of the dash beside a name whose site did not answer. */
+    readonly unreached: (site: string) => string;
     readonly start: string;
     readonly create: string;
     readonly newProfile: string;
@@ -605,14 +610,14 @@ const english: Text = {
             learning: ["I've just learned", "I know the rules, little more"],
             casual: ["I play now and then", "With friends or on my phone"],
             regular: ["I play often", "Online or at a club"],
-            tournament: ["I play tournaments", "I have a FIDE rating"],
+            tournament: ["I play tournaments", "At a club, with a rating"],
         },
-        rating: "Do you have a rating?",
         optional: "optional",
-        ratingPlaceholder: "e.g. 1450",
-        ratingLabel: "Rating",
-        siteLabel: "Where",
-        sites: { "lichess": "on Lichess", "chess.com": "on Chess.com", "fide": "FIDE" },
+        privacy: "We only read your public rating. No password.",
+        speeds: { rapid: "rapid", classical: "classical", blitz: "blitz" },
+        ratingTitle: (speed, played) => (played === undefined ? speed : `${speed} · last game ${played}`),
+        notFound: (site) => `No player of that name on ${site}`,
+        unreached: (site) => `${site} isn't answering: we'll try again later`,
         start: "Start playing",
         create: "Done",
         newProfile: "Add a player",
@@ -966,14 +971,14 @@ const italian: Text = {
             learning: ["Ho appena imparato", "Conosco le regole, poco di più"],
             casual: ["Gioco ogni tanto", "Con amici o sul telefono"],
             regular: ["Gioco spesso", "Online o al circolo"],
-            tournament: ["Gioco a torneo", "Ho un punteggio FIDE"],
+            tournament: ["Gioco a torneo", "Al circolo, con punteggio"],
         },
-        rating: "Hai un punteggio?",
         optional: "facoltativo",
-        ratingPlaceholder: "es. 1450",
-        ratingLabel: "Punteggio",
-        siteLabel: "Dove",
-        sites: { "lichess": "su Lichess", "chess.com": "su Chess.com", "fide": "FIDE" },
+        privacy: "Leggiamo solo il tuo punteggio pubblico. Niente password.",
+        speeds: { rapid: "rapid", classical: "classica", blitz: "blitz" },
+        ratingTitle: (speed, played) => (played === undefined ? speed : `${speed} · ultima partita il ${played.split("-").reverse().join("/")}`),
+        notFound: (site) => `Nessun giocatore con questo nome su ${site}`,
+        unreached: (site) => `${site} non risponde: riproviamo più tardi`,
         start: "Inizia a giocare",
         create: "Fatto",
         newProfile: "Aggiungi un giocatore",

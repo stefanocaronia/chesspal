@@ -3,25 +3,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { DrawnAvatar, PlayerPicture } from "../avatars/avatars.tsx";
 import { Torretta } from "../avatars/torretta.tsx";
-import {
-    type AvatarId,
-    avatarIds,
-    chooseAvatar,
-    editProfile,
-    imageAddress,
-    type Level,
-    levels,
-    makeProfile,
-    nameLimit,
-    openDataFolder,
-    type ProfileShown,
-    ratingLimits,
-    type RatingSite,
-    ratingSites,
-    type Refused,
-    sendPhoto,
-    useProfile,
-} from "../profile/profile.ts";
+import { type AvatarId, avatarIds, chooseAvatar, editProfile, imageAddress, type Level, levels, makeProfile, nameLimit, openDataFolder, type ProfileShown, type Refused, sendPhoto, type SiteReading, useProfile } from "../profile/profile.ts";
 import type { Text } from "../text.ts";
 import { Dialog } from "./dialog.tsx";
 
@@ -252,29 +234,82 @@ function ProfileEdit({ profile, text }: { profile: ProfileShown; text: Text; })
                 <legend>
                     {words.accounts} <small>{words.optional}</small>
                 </legend>
-                <div class="accounts">
+                <div class="accounts read">
                     {accountSites.map((site) => (
                         <label key={site} title={words.accountTitle}>
                             <span>{siteNames[site]}</span>
-                            <input
-                                type="text"
-                                defaultValue={profile.accounts?.[site] ?? ""}
-                                aria-label={siteNames[site]}
-                                placeholder={words.username}
-                                maxLength={nameLimit}
-                                pattern="\s*[\w\-]*\s*"
-                                autocomplete="off"
-                                spellcheck={false}
-                                onChange={(event) => save(site, event.currentTarget)}
-                            />
+                            <SiteName initial={profile.accounts?.[site] ?? ""} site={site} onChange={(input) => save(site, input)} text={text} />
+                            <SiteMark reading={readingOf(profile, site)} site={site} text={text} />
                             {tick(site)}
                         </label>
                     ))}
                 </div>
+                <p class="privacy">{words.privacy}</p>
             </fieldset>
             {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
         </div>
     );
+}
+
+/**
+ * A field of the player's name on Lichess or chess.com: in the wizard bound to its value, in the profile window not bound, so that a name the sites would
+ * not give stays as typed, marked, until it reads.
+ */
+function SiteName({ value, initial, site, onInput, onChange, text }: {
+    value?: string;
+    initial?: string;
+    site: AccountSite;
+    onInput?: (value: string) => void;
+    onChange?: (input: HTMLInputElement) => void;
+    text: Text;
+})
+{
+    return (
+        <input
+            type="text"
+            {...(value === undefined ? { defaultValue: initial } : { value })}
+            aria-label={siteNames[site]}
+            placeholder={text.profile.username}
+            maxLength={nameLimit}
+            pattern="\s*[\w\-]*\s*"
+            autocomplete="off"
+            spellcheck={false}
+            onInput={onInput === undefined ? undefined : (event) => onInput(event.currentTarget.value)}
+            onChange={onChange === undefined ? undefined : (event) => onChange(event.currentTarget)}
+        />
+    );
+}
+
+/**
+ * Beside a name on a site, what the site said of it (D-105): the rating that counts, its speed and last game in its title; a cross when the site has no
+ * such player; when it did not answer, the rating it gave before, faded, or a dash. Nothing while it has not been read, or the player has no rating
+ * established there.
+ */
+function SiteMark({ reading, site, text }: { reading: SiteReading | undefined; site: AccountSite; text: Text; })
+{
+    const words = text.profile;
+    const rating = reading?.rating;
+    const number = rating === undefined ? null : <span title={words.ratingTitle(words.speeds[rating.speed], rating.played)}>{rating.value}</span>;
+
+    if (reading?.unreached === true) {
+        const said = words.unreached(siteNames[site]);
+        return <span class="site-mark unreached" title={said} aria-label={said}>{number ?? "–"}</span>;
+    }
+
+    if (reading?.found === false) {
+        const said = words.notFound(siteNames[site]);
+        return <span class="site-mark missing" title={said} aria-label={said}>✕</span>;
+    }
+
+    return <span class="site-mark">{number}</span>;
+}
+
+/** What the site said of the name the profile has there now: none for a name changed since it was read. */
+function readingOf(profile: ProfileShown, site: AccountSite): SiteReading | undefined
+{
+    const reading = profile.sites?.[site];
+    const account = profile.accounts?.[site];
+    return reading !== undefined && account !== undefined && reading.account.toLowerCase() === account.toLowerCase() ? reading : undefined;
 }
 
 const accountSites = ["lichess", "chesscom"] as const;
@@ -329,16 +364,14 @@ function ProfileForm({ text, submit, suggestion, use = true, onMade }: { text: T
     const [avatar, setAvatar] = useState<AvatarId | undefined>(avatarIds[0]);
     const [photo, setPhoto] = useState<File | undefined>(undefined);
     const [level, setLevel] = useState<Level>("casual");
-    const [rating, setRating] = useState("");
-    const [site, setSite] = useState<RatingSite>("lichess");
+    const [names, setNames] = useState({ lichess: "", chesscom: "" });
     const [problem, setProblem] = useState<string | undefined>(undefined);
     const [busy, setBusy] = useState(false);
 
     const send = (event: Event): void => {
         event.preventDefault();
         setBusy(true);
-        const value = rating.trim() === "" ? undefined : Number(rating);
-        void makeProfile({ name, level, site, ...(value === undefined ? {} : { rating: value }), ...(photo === undefined ? { avatar } : { photo }), use }).then((refused) => {
+        void makeProfile({ name, level, ...names, ...(photo === undefined ? { avatar } : { photo }), use }).then((refused) => {
             setBusy(false);
             setProblem(refused === undefined ? undefined : refusalText(refused, text));
 
@@ -405,24 +438,17 @@ function ProfileForm({ text, submit, suggestion, use = true, onMade }: { text: T
             </fieldset>
             <fieldset>
                 <legend>
-                    {words.rating} <small>{words.optional}</small>
+                    {words.accounts} <small>{words.optional}</small>
                 </legend>
-                <div class="rating">
-                    <input
-                        type="number"
-                        inputmode="numeric"
-                        min={ratingLimits.lowest}
-                        max={ratingLimits.highest}
-                        step={1}
-                        placeholder={words.ratingPlaceholder}
-                        aria-label={words.ratingLabel}
-                        value={rating}
-                        onInput={(event) => setRating(event.currentTarget.value)}
-                    />
-                    <select aria-label={words.siteLabel} value={site} onChange={(event) => setSite(event.currentTarget.value as RatingSite)}>
-                        {ratingSites.map((id) => <option key={id} value={id}>{words.sites[id]}</option>)}
-                    </select>
+                <div class="accounts">
+                    {accountSites.map((site) => (
+                        <label key={site} title={words.accountTitle}>
+                            <span>{siteNames[site]}</span>
+                            <SiteName value={names[site]} site={site} onInput={(value) => setNames({ ...names, [site]: value })} text={text} />
+                        </label>
+                    ))}
                 </div>
+                <p class="privacy">{words.privacy}</p>
             </fieldset>
             {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
             <button class="start" type="submit" disabled={busy}>{submit}</button>

@@ -35,6 +35,7 @@ export { ChatNotClear, newGame, startNewGame } from "./new-game.ts";
 export { bookOpening, bookPlies } from "./opening-book.ts";
 export { playMove, PositionChanged, positionIn, samePosition } from "./play-move.ts";
 export { chooseDrawnAvatar, editProfile, GameGoingOn, newProfile, useProfile } from "./profiles.ts";
+export { ratingsAge, refreshRatings } from "./ratings.ts";
 export { type AnyCommand, baseType, type Command, commandLineFieldProblem, inputProblems, isBoolean, isList, takesNumbers } from "./registry.ts";
 export { say } from "./say.ts";
 export { gameToStudy, namedGame, shownPosition } from "./study.ts";

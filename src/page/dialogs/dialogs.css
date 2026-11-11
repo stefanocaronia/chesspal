@@ -1005,12 +1005,6 @@ h3 + .switch {
     outline-offset: 2px;
 }
 
-.rating {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-}
-
 .profile-form .start {
     width: 100%;
     padding: 13px;
@@ -1126,17 +1120,16 @@ h3 + .switch {
     border-color: var(--low-time);
 }
 
-.profile-edit .accounts {
-    margin: 0;
-}
-
-/* The names on Lichess and chess.com of the player in use, in their profile: the site, the name, a tick once saved (D-93) */
-.dialog .accounts {
+/* The names on Lichess and chess.com: the site and the name; in the profile window the rating read there, and a tick once saved (D-93, D-105) */
+.accounts {
     display: grid;
-    grid-template-columns: auto 1fr 18px;
+    grid-template-columns: auto 1fr;
     align-items: center;
     gap: 6px 10px;
-    margin: -4px 0 12px;
+}
+
+.accounts.read {
+    grid-template-columns: auto 1fr minmax(4ch, auto) 18px;
 }
 
 .accounts label {
@@ -1171,6 +1164,35 @@ h3 + .switch {
 
 .accounts .problem {
     grid-column: 1 / -1;
+}
+
+/* The rating a site gives, its speed in its title; a cross for a name it does not know, a dash or the rating faded when it did not answer */
+.accounts .site-mark {
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.accounts .site-mark span {
+    color: inherit;
+    font-size: inherit;
+}
+
+.accounts .site-mark.missing {
+    color: var(--low-time);
+}
+
+.accounts .site-mark.unreached {
+    color: var(--soft);
+    opacity: 0.6;
+}
+
+.privacy {
+    margin: 8px 0 0;
+    color: var(--soft);
+    font-size: 13px;
 }
 
 .dialog .new-profile {

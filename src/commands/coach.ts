@@ -11,6 +11,7 @@ import { aheadWords, leadFrom, leadInput } from "./lead-input.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
 import { waitForPlayer, wordsOf } from "./ponder.ts";
 import { profileLines } from "./position.ts";
+import { ratingText } from "./profiles.ts";
 import { defineCommand } from "./registry.ts";
 import { speechLine, speechOf } from "./speech.ts";
 import { colourName, compactView, materialText, riskLine } from "./view.ts";
@@ -318,7 +319,7 @@ function nowLines(current: CurrentGame, folder: string, player: Side): string[]
 function playerLines(context: Context): string[]
 {
     const { level, rating } = activeProfile(context.home());
-    const parts = [level === undefined ? undefined : `plays at the ${level} level`, rating === undefined ? undefined : `is rated ${rating.value} on ${rating.site}`];
+    const parts = [level === undefined ? undefined : `plays at the ${level} level`, rating === undefined ? undefined : `is rated ${ratingText(rating)}`];
     const said = parts.filter((part) => part !== undefined);
     return said.length === 0 ? [] : [`The player ${said.join(" and ")}.`];
 }

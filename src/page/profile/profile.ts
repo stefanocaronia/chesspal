@@ -4,12 +4,13 @@
 export const levels = ["learning", "casual", "regular", "tournament"] as const;
 export type Level = (typeof levels)[number];
 
-/** Where a rating comes from. */
-export const ratingSites = ["lichess", "chess.com", "fide"] as const;
+/** The sites a rating is read from, by the player's names there (D-105). */
+export const ratingSites = ["lichess", "chess.com"] as const;
 export type RatingSite = (typeof ratingSites)[number];
 
-/** The lowest and highest rating the server takes. */
-export const ratingLimits = { lowest: 100, highest: 3500 } as const;
+/** The speeds whose rating counts, in the order they count (D-106). */
+export const speeds = ["rapid", "classical", "blitz"] as const;
+export type Speed = (typeof speeds)[number];
 
 /** The longest name the server keeps. */
 export const nameLimit = 40;
@@ -26,20 +27,40 @@ export interface ProfileShown
     /** Made by Chesspal at the first start, until the wizard completes it (D-71). */
     readonly new?: true;
     readonly level?: Level;
-    readonly rating?: { readonly value: number; readonly site: RatingSite; };
     readonly avatar?: AvatarId;
     readonly image?: string;
     /** The player's names on Lichess and chess.com, written in profile.md (D-93). */
     readonly accounts?: { readonly lichess?: string; readonly chesscom?: string; };
+    /** What the sites said of those names, the last time Chesspal asked (D-105). */
+    readonly sites?: { readonly read: string; readonly lichess?: SiteReading; readonly chesscom?: SiteReading; };
 }
 
-/** What the wizard asks: the name, how the player plays, a rating and its site, a drawn avatar or a photo of theirs. */
+/** A rating a site gives: the number, its speed, how sure the site is, the day of the last game at that speed. */
+export interface Rating
+{
+    readonly value: number;
+    readonly site: RatingSite;
+    readonly speed: Speed;
+    readonly rd: number;
+    readonly played?: string;
+}
+
+/** What a site said of the player's name there: not found, its rating, or not reached the last time, what it said before staying. */
+export interface SiteReading
+{
+    readonly account: string;
+    readonly found?: boolean;
+    readonly rating?: Rating;
+    readonly unreached?: true;
+}
+
+/** What the wizard asks: the name, how the player plays, their names on Lichess and chess.com, a drawn avatar or a photo of theirs. */
 export interface NewProfile
 {
     readonly name: string;
     readonly level: Level;
-    readonly rating?: number;
-    readonly site: RatingSite;
+    readonly lichess?: string;
+    readonly chesscom?: string;
     readonly avatar?: AvatarId;
     readonly photo?: File;
     /** False to make it without putting it in use, while a game goes on. */
@@ -69,7 +90,7 @@ export function imageAddress(profile: ProfileShown): string | undefined
 }
 
 /** Makes a profile, in use unless `use` is false, with the photo after it, made small first so that a photo that cannot be read makes no profile: the refusal, or undefined. */
-export async function makeProfile({ name, level, rating, site, avatar, photo, use }: NewProfile): Promise<Refused | undefined>
+export async function makeProfile({ name, level, lichess, chesscom, avatar, photo, use }: NewProfile): Promise<Refused | undefined>
 {
     const image = photo === undefined ? undefined : await shrunk(photo).catch(() => undefined);
 
@@ -77,7 +98,8 @@ export async function makeProfile({ name, level, rating, site, avatar, photo, us
         return badImage;
     }
 
-    const answer = await post("/api/profile/new", jsonOf({ name: name.trim(), level, ...(rating === undefined ? {} : { rating, site }), ...(avatar === undefined ? {} : { avatar }), ...(use === false ? { use } : {}) }));
+    const names = { ...(lichess?.trim() ? { lichess: lichess.trim() } : {}), ...(chesscom?.trim() ? { chesscom: chesscom.trim() } : {}) };
+    const answer = await post("/api/profile/new", jsonOf({ name: name.trim(), level, ...names, ...(avatar === undefined ? {} : { avatar }), ...(use === false ? { use } : {}) }));
 
     if ("refused" in answer) {
         return answer.refused;

@@ -16,15 +16,15 @@ import {
     listProfiles,
     nameLimit,
     type PlayerProfile,
-    ratingLimits,
+    type Rating,
     type RatingSite,
-    ratingSites,
     removeOwnImage,
     saveOwnImage,
     updateProfile,
 } from "../profiles/index.ts";
 import { gameAt } from "./clock.ts";
 import type { Context } from "./context.ts";
+import { refreshRatings } from "./ratings.ts";
 import { defineCommand } from "./registry.ts";
 
 /** A change of profile refused while a game goes on: the page says it in the player's language. */
@@ -50,36 +50,29 @@ export const profiles = defineCommand({
 
 /**
  * A new profile, put in use unless asked not to; while a game goes on it is made all the same and waits, the player in use staying. The one Chesspal made at
- * the first start, while new, becomes it, game and all (D-71).
+ * the first start, while new, becomes it, game and all (D-71). With the player's names on Lichess and chess.com, their ratings are read there (D-106).
  */
 export const newProfile = defineCommand({
     name: "new_profile",
     description: "Makes a player's profile and puts it in use, unless --use false or a game is going on: their games, picture and page settings go in "
         + "profiles/<id>/ of Chesspal's data folder; the profile Chesspal made at the first start becomes this one, its folder renamed, while nobody has completed "
-        + "it. Example: chesspal new_profile Anna --level regular --rating 1450 --site lichess.",
+        + "it; their rating is read from their names on Lichess and chess.com. Example: chesspal new_profile Anna --level regular --lichess anna_k.",
     input: z.object({
         name: playerName().describe("the player's name"),
         level: z.enum(levels).optional().describe("how they play: learning, casual, regular or tournament"),
-        rating: z.int().min(ratingLimits.lowest).max(ratingLimits.highest).optional().describe("their rating, with site"),
-        site: z.enum(ratingSites).optional().describe("where the rating comes from: lichess, chess.com or fide"),
+        lichess: accountName().optional().describe("the player's name on Lichess"),
+        chesscom: accountName().optional().describe("the player's name on chess.com"),
         avatar: z.enum(drawnAvatars).optional().describe(`a drawn avatar: ${drawnAvatars.join(", ")}`),
         use: z.boolean().optional().describe("false to make it without putting it in use"),
     }),
     cliOnly: true,
     positionals: ["name"],
-    run: ({ name, level, rating, site, avatar, use }, context): PlayerProfile & { readonly inUse: boolean; } => {
-        if ((rating === undefined) !== (site === undefined)) {
-            throw new Error("Give the rating and its site together, such as --rating 1450 --site lichess, or neither. Nothing changed.");
-        }
-
+    run: async ({ name, level, lichess, chesscom, avatar, use }, context): Promise<PlayerProfile & { readonly inUse: boolean; }> => {
         const first = activeProfile(context.home()).new === true;
         const inUse = first || (use !== false && !isPlaying(context));
-        const profile = createProfile(context.home(), {
-            name,
-            ...(level === undefined ? {} : { level }),
-            ...(rating === undefined || site === undefined ? {} : { rating: { value: rating, site } }),
-            ...(avatar === undefined ? {} : { avatar }),
-        }, inUse);
+        const made = createProfile(context.home(), { name, ...(level === undefined ? {} : { level }), ...(avatar === undefined ? {} : { avatar }) }, inUse);
+        const accounts = accountsOf(lichess ?? "", chesscom ?? "");
+        const profile = Object.keys(accounts).length === 0 ? made : await withRatings(context, updateProfile(context.home(), made.id, { accounts }));
         return { ...profile, inUse };
     },
     format: (profile) => `Profile ${profile.id} made${profile.inUse ? ", and in use" : ", not in use"}: ${playerText(profile)}.`,
@@ -146,14 +139,15 @@ export const editProfile = defineCommand({
     }),
     cliOnly: true,
     idempotent: true,
-    run: ({ name, level, lichess, chesscom }, context): PlayerProfile => {
+    run: async ({ name, level, lichess, chesscom }, context): Promise<PlayerProfile> => {
         const profile = activeProfile(context.home());
         const named = lichess !== undefined || chesscom !== undefined;
-        return updateProfile(context.home(), profile.id, {
+        const edited = updateProfile(context.home(), profile.id, {
             ...(name === undefined ? {} : { name }),
             ...(level === undefined ? {} : { level: level === "" ? undefined : level }),
             ...(named ? { accounts: accountsOf(lichess ?? profile.accounts?.lichess ?? "", chesscom ?? profile.accounts?.chesscom ?? "") } : {}),
         });
+        return named ? withRatings(context, edited) : edited;
     },
     format: (profile) => `Profile ${profile.id}: ${playerText(profile)}; ${accountsText(profile.accounts)}.`,
 });
@@ -175,6 +169,12 @@ export function playerLine(context: Context): string | undefined
     return profile.new === true ? undefined : `Player: ${playerText(profile)}.`;
 }
 
+/** How the AI reads a rating: the number as the site gives it, its speed and site, and the month of the last game there (D-106). */
+export function ratingText({ value, speed, site, played }: Rating): string
+{
+    return `${value} ${speed} on ${siteText[site]}${played === undefined ? "" : ` (last game ${played.slice(0, 7)})`}`;
+}
+
 /** Throws while a game goes on in the profile in use. */
 function refuseWhilePlaying(context: Context): void
 {
@@ -190,11 +190,18 @@ function isPlaying(context: Context): boolean
 }
 
 const levelText: Readonly<Record<Level, string>> = { learning: "has just learned", casual: "plays now and then", regular: "plays often", tournament: "plays tournaments" };
-const siteText: Readonly<Record<RatingSite, string>> = { "lichess": "Lichess", "chess.com": "Chess.com", "fide": "FIDE" };
+const siteText: Readonly<Record<RatingSite, string>> = { "lichess": "Lichess", "chess.com": "Chess.com" };
 
 function playerText({ name, level, rating }: PlayerProfile): string
 {
-    return [name, ...(level === undefined ? [] : [levelText[level]]), ...(rating === undefined ? [] : [`${siteText[rating.site]} ${rating.value}`])].join(", ");
+    return [name, ...(level === undefined ? [] : [levelText[level]]), ...(rating === undefined ? [] : [`rated ${ratingText(rating)}`])].join(", ");
+}
+
+/** The profile once its names on the sites have been read, when they changed: the command line and the page wait for the sites, at most a few seconds. */
+async function withRatings(context: Context, profile: PlayerProfile): Promise<PlayerProfile>
+{
+    const read = await refreshRatings(context, profile.id);
+    return read ? listProfiles(context.home()).find(({ id }) => id === profile.id) ?? profile : profile;
 }
 
 /** The player's name: one line of text. */

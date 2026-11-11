@@ -79,6 +79,16 @@ export default [
             }],
         },
     },
+    // The sites sit below the commands, beside the profiles whose types they fill, and print nothing.
+    {
+        files: ["src/sites/**/*.ts"],
+        rules: {
+            "no-console": "error",
+            "no-restricted-imports": ["error", {
+                patterns: [{ group: ["../commands/*", "../server/*", "../cli/*"], message: "The sites module sits below the commands: they use it, never the other way." }],
+            }],
+        },
+    },
     // The MCP server speaks on stdout: commands return values, and only the CLI prints.
     {
         files: ["src/commands/**/*.ts", "src/server/**/*.ts"],
