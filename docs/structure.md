@@ -27,7 +27,7 @@ Each folder is a module with one job, which exposes its API from its `index.ts`:
 | [sites/](../src/sites/) | The sites the player plays on: their public ratings on Lichess and Chess.com, read from the names in the profile, without a key, within one timeout; which speed counts | profiles (their types and the speeds), the version; never commands, server or CLI ✓ |
 | [home/](../src/home/) | Where the player's data is: `Documents\My Games\Chesspal`, or `CHESSPAL_HOME`; opening it in the file manager | Node only |
 | [host-files/](../src/host-files/) | What `chesspal init` writes for each AI host: the MCP server, the instructions, the hooks, the agents | core, games, and the files of `instructions/` |
-| [commands/](../src/commands/) | The commands, a file each, named as their tool: the only way the AI, the command line and the page change a game; [registry.ts](../src/commands/registry.ts) defines a command, [context.ts](../src/commands/context.ts) what it runs with (folders, time, randomness, the network) | core, games, profiles, sites, home, host-files |
+| [commands/](../src/commands/) | The commands, the only way the AI, the command line and the page change a game, in folders by area: [registry/](../src/commands/registry/) defines a command and what it runs with (folders, time, randomness, the network); [answers/](../src/commands/answers/) holds what the commands share to answer the AI; [game/](../src/commands/game/), [talk/](../src/commands/talk/), [analysis/](../src/commands/analysis/), [profiles/](../src/commands/profiles/) and [setup/](../src/commands/setup/) the commands themselves. They depend one way only: answers and setup on registry; profiles and talk on answers; game on profiles and setup; analysis on game and profiles; [index.ts](../src/commands/index.ts) lists them all | core, games, profiles, sites, home, host-files |
 | [cli/](../src/cli/) | The `chesspal` binary: the commands from the arguments, the table's words (`open`, `table`, `icon`, `play`), `mcp`, `listen`, `chat`; each loads the module it needs when it runs | commands, server's modules, and the modules below them |
 | [server/mcp/](../src/server/mcp/) | The MCP server, every command as a tool, with the MCP SDK; who makes a tool call | commands, server/bell, server/page, server/table, and the modules below them |
 | [server/bell/](../src/server/bell/) | The doorbell that wakes a chat when the player acts on the page, and the ports where a folder's page answers | games, home |
@@ -61,7 +61,7 @@ The page's folders have no `index.ts`: they import each other's files directly, 
 
 ## 3. Where new code goes
 
-- **A new operation** is a command in `commands/`, a file named as its tool, registered in `commands/index.ts`: the CLI and the MCP server get it from there. The page reaches it through a route in `server/page/` that calls the same command.
+- **A new operation** is a command in its area's folder of `commands/`, exported by that folder's `index.ts` and listed in `commands/index.ts`: the CLI and the MCP server get it from there. The page reaches it through a route in `server/page/` that calls the same command.
 - **A rule or a fact of chess** goes in `core/`, browser-safe, so the page uses the same code.
 - **Something kept on disk** goes in `games/` or `profiles/`, behind their index, written whole or not at all; the AI and the page change it only through a command.
 - **Something from outside** (the time, randomness, folders, the network) comes in through `Context`, so the tests inject it.

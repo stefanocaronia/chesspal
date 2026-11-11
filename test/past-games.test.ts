@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Context } from "../src/commands/context.ts";
-import { endGame } from "../src/commands/end-game.ts";
-import { newGame } from "../src/commands/new-game.ts";
-import { pastGames } from "../src/commands/past-games.ts";
+import { endGame } from "../src/commands/game/end.ts";
+import { newGame } from "../src/commands/game/new.ts";
+import { pastGames } from "../src/commands/profiles/past-games.ts";
+import type { Context } from "../src/commands/registry/context.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];

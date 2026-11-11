@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Context } from "../src/commands/context.ts";
+import type { Context } from "../src/commands/registry/context.ts";
 import { coachShown, coachWords, loadGame } from "../src/games/index.ts";
 import { setUpHosts } from "../src/host-files/host-files.ts";
 import { gameFolder } from "../src/profiles/index.ts";

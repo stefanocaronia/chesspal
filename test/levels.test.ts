@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Context } from "../src/commands/context.ts";
+import type { Context } from "../src/commands/registry/context.ts";
 import { aiLevels, bookMoves, indexBook, layersOf, levelForPlayer, levelOf, sees, suggestedLevel } from "../src/core/index.ts";
 import { levels as playerLevels } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";

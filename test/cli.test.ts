@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { runCommandLine } from "../src/cli/command-line.ts";
-import { defineCommand } from "../src/commands/registry.ts";
+import { defineCommand } from "../src/commands/registry/registry.ts";
 import { profileFolder } from "../src/profiles/index.ts";
 import { play, testContext } from "./commands.ts";
 

@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
-import type { Context } from "../src/commands/context.ts";
+import { positionIn, refuseOtherGame, refuseUnseenPosition } from "../src/commands/answers/play-move.ts";
 import { commands } from "../src/commands/index.ts";
-import { positionIn, refuseOtherGame, refuseUnseenPosition } from "../src/commands/play-move.ts";
+import type { Context } from "../src/commands/registry/context.ts";
 import * as page from "../src/page/profile/profile.ts";
 import { readFrontMatter, writeFrontMatter } from "../src/profiles/front-matter.ts";
 import {

@@ -2,8 +2,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Context } from "../src/commands/context.ts";
 import { commands, refreshRatings } from "../src/commands/index.ts";
+import type { Context } from "../src/commands/registry/context.ts";
 import { activeProfile, profileFolder } from "../src/profiles/index.ts";
 import { type Fetch, readingsStale, readSites } from "../src/sites/index.ts";
 import { testContext } from "./commands.ts";

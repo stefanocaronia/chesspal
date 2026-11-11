@@ -1,8 +1,8 @@
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { z } from "zod";
-import { type Context, withProfile } from "../src/commands/context.ts";
-import { defineCommand } from "../src/commands/registry.ts";
+import { type Context, withProfile } from "../src/commands/registry/context.ts";
+import { defineCommand } from "../src/commands/registry/registry.ts";
 
 /**
  * A context for the tests: a folder, which is the data folder too, its first profile made by Chesspal for the account "Player" as it needs it, a fixed

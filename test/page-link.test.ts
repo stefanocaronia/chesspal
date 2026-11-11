@@ -3,11 +3,11 @@ import { get } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { aiMove } from "../src/commands/ai-move.ts";
-import type { Context } from "../src/commands/context.ts";
-import { newGame } from "../src/commands/new-game.ts";
-import { playerMove } from "../src/commands/player-move.ts";
-import { status } from "../src/commands/status.ts";
+import { aiMove } from "../src/commands/game/ai-move.ts";
+import { newGame } from "../src/commands/game/new.ts";
+import { playerMove } from "../src/commands/game/player-move.ts";
+import { status } from "../src/commands/game/status.ts";
+import type { Context } from "../src/commands/registry/context.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { testContext } from "./commands.ts";
 

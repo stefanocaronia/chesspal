@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Context } from "../src/commands/context.ts";
+import type { Context } from "../src/commands/registry/context.ts";
 import { aiHostIn, aiModelIn, aiNameOf, readPgn } from "../src/core/index.ts";
 import { aiModelOf, saveChatStart } from "../src/games/index.ts";
 import { gameFolder, profileFolder } from "../src/profiles/index.ts";

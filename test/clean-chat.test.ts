@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { recordChatStart } from "../src/cli/chat-hook.ts";
-import type { Context } from "../src/commands/context.ts";
-import { endGame } from "../src/commands/end-game.ts";
-import { instructions } from "../src/commands/instructions.ts";
-import { newGame } from "../src/commands/new-game.ts";
-import { positionIn } from "../src/commands/play-move.ts";
-import { status } from "../src/commands/status.ts";
+import { positionIn } from "../src/commands/answers/play-move.ts";
+import { endGame } from "../src/commands/game/end.ts";
+import { newGame } from "../src/commands/game/new.ts";
+import { status } from "../src/commands/game/status.ts";
+import type { Context } from "../src/commands/registry/context.ts";
+import { instructions } from "../src/commands/setup/instructions.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
 

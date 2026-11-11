@@ -4,12 +4,12 @@
 import { mkdirSync, rmSync } from "node:fs";
 import { createServer, request as forward, type Server } from "node:http";
 import { fileURLToPath } from "node:url";
-import { aiMove } from "../../src/commands/ai-move.ts";
-import { defaultContext, withProfile } from "../../src/commands/context.ts";
-import { endGame } from "../../src/commands/end-game.ts";
-import { newGame } from "../../src/commands/new-game.ts";
-import { playerMove } from "../../src/commands/player-move.ts";
-import { newProfile } from "../../src/commands/profiles.ts";
+import { aiMove } from "../../src/commands/game/ai-move.ts";
+import { endGame } from "../../src/commands/game/end.ts";
+import { newGame } from "../../src/commands/game/new.ts";
+import { playerMove } from "../../src/commands/game/player-move.ts";
+import { newProfile } from "../../src/commands/profiles/profiles.ts";
+import { defaultContext, withProfile } from "../../src/commands/registry/context.ts";
 import { startPage } from "../../src/server/page/page.ts";
 
 /** A game one move from its end, and its end; the player has White. */

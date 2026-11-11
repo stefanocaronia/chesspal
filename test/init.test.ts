@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
-import type { Context } from "../src/commands/context.ts";
-import { status } from "../src/commands/status.ts";
+import { status } from "../src/commands/game/status.ts";
+import type { Context } from "../src/commands/registry/context.ts";
 import { outdatedHostFiles, startInstructions } from "../src/host-files/index.ts";
 import { testContext } from "./commands.ts";
 

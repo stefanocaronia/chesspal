@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Context } from "../src/commands/context.ts";
+import type { Context } from "../src/commands/registry/context.ts";
 import { canMate, clockStarted, clockTag, clockText, timeControlOf, timeControlTag } from "../src/core/index.ts";
 import { loadGame, saveGame } from "../src/games/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
