@@ -15,6 +15,8 @@ export interface Text
     readonly sounds: string;
     /** The switch that reads the AI's words aloud. */
     readonly voice: string;
+    /** A move the AI wrote as the voice reads it (Stefano): ♞xf6+ as "knight takes f6, check", never the figurine's name. */
+    readonly saidMove: (move: SaidMove) => string;
     readonly newGame: string;
     /** The player's draws and resignation in a game going on (D-65). */
     readonly offerDraw: string;
@@ -440,6 +442,20 @@ export interface RefusedMove
     readonly at?: string;
 }
 
+/**
+ * A move the AI wrote, as the voice reads it: a castling, or the piece, the file or rank it comes from when the move says it, whether it takes, its square
+ * and what a pawn becomes; and a check or a mate.
+ */
+export type SaidMove =
+    & ({ readonly castles: "short" | "long"; } | {
+        readonly piece: PieceLetter;
+        readonly from?: string;
+        readonly takes: boolean;
+        readonly square: string;
+        readonly promotion?: PieceLetter;
+    })
+    & { readonly check?: "check" | "mate"; };
+
 /** The words for the first of the browser's languages the page speaks, else English. */
 export function textFor(languages: readonly string[]): Text
 {
@@ -450,12 +466,45 @@ export function textFor(languages: readonly string[]): Text
 const englishNames: Readonly<Record<PieceLetter, string>> = { K: "king", Q: "queen", R: "rook", B: "bishop", N: "knight", P: "pawn" };
 const italianNames: Readonly<Record<PieceLetter, string>> = { K: "re", Q: "donna", R: "torre", B: "alfiere", N: "cavallo", P: "pedone" };
 
+// The words a move is read aloud with: the pieces, castling, where it comes from, where it goes or what it takes, what a pawn becomes, check and mate.
+interface MoveWords
+{
+    readonly names: Readonly<Record<PieceLetter, string>>;
+    readonly castles: Readonly<Record<"short" | "long", string>>;
+    readonly from: string;
+    readonly to: string;
+    readonly takes: string;
+    readonly promotes: string;
+    readonly check: Readonly<Record<"check" | "mate", string>>;
+}
+
+const englishMoveWords: MoveWords = {
+    names: englishNames,
+    castles: { short: "castles short", long: "castles long" },
+    from: "from",
+    to: "to",
+    takes: "takes",
+    promotes: "promotes to",
+    check: { check: "check", mate: "checkmate" },
+};
+
+const italianMoveWords: MoveWords = {
+    names: italianNames,
+    castles: { short: "arrocco corto", long: "arrocco lungo" },
+    from: "da",
+    to: "in",
+    takes: "prende",
+    promotes: "promuove a",
+    check: { check: "scacco", mate: "scacco matto" },
+};
+
 const english: Text = {
     language: "en",
     flip: "Flip",
     theme: "Light or dark theme",
     sounds: "Sounds",
     voice: "Read the AI's words aloud",
+    saidMove: (move) => moveInWords(englishMoveWords, move),
     newGame: "New game",
     offerDraw: "Offer a draw",
     offerDrawWhen: "Offer a draw: on your turn, once each side has moved",
@@ -843,6 +892,7 @@ const italian: Text = {
     theme: "Tema chiaro o scuro",
     sounds: "Suoni",
     voice: "Leggi ad alta voce le parole dell'AI",
+    saidMove: (move) => moveInWords(italianMoveWords, move),
     newGame: "Nuova partita",
     offerDraw: "Proponi patta",
     offerDrawWhen: "Proponi patta: nel tuo turno, dopo una mossa a testa",
@@ -1299,6 +1349,16 @@ function italianCulprit(by: RefusedMove["by"]): string
 function italianWith(preposition: "a" | "da", letter: PieceLetter): string
 {
     return italianThe[letter].replace(/^il /, `${preposition}l `).replace(/^la /, `${preposition}lla `).replace(/^l'/, `${preposition}ll'`);
+}
+
+/** A move in words: "knight from b takes d7, check", "cavallo in f3", "arrocco corto". */
+function moveInWords(words: MoveWords, move: SaidMove): string
+{
+    const promotion = "castles" in move || move.promotion === undefined ? undefined : `${words.promotes} ${words.names[move.promotion]}`;
+    const played = "castles" in move
+        ? words.castles[move.castles]
+        : [words.names[move.piece], ...(move.from === undefined ? [] : [words.from, move.from]), move.takes ? words.takes : words.to, move.square].join(" ");
+    return [played, promotion, move.check === undefined ? undefined : words.check[move.check]].filter((part) => part !== undefined).join(", ");
 }
 
 /** The words with their first letter capital, to open a sentence. */

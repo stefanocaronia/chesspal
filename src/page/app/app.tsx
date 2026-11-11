@@ -639,7 +639,7 @@ export function App({ start }: { start: Settings; })
                                             name={analyst}
                                             by={annotator}
                                             mood={mood}
-                                            {...(settings.voice ? { voice: text.language } : {})}
+                                            {...(settings.voice ? { voice: text } : {})}
                                             text={text}
                                         />
                                     </section>
@@ -685,7 +685,7 @@ export function App({ start }: { start: Settings; })
                                         <AiWords
                                             words={aiWords(plies, ai, talk)}
                                             newestFirst={!flipped}
-                                            {...(settings.voice ? { voice: text.language } : {})}
+                                            {...(settings.voice ? { voice: text } : {})}
                                         />
                                     </section>
                                     <section class="you-block" aria-label={profile.name}>

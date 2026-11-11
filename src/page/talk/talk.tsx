@@ -8,10 +8,10 @@ import { Figurines } from "../game/move-list.tsx";
 import { type Ply, talkLimits, type TalkLine } from "../game/plies.ts";
 import { signature } from "../players/model-name.ts";
 import type { Text } from "../text.ts";
-import { hush, speak } from "./voice.ts";
+import { hush, speak, type Voice } from "./voice.ts";
 
 /** The AI's words of the game, a bubble each, the newest by the Torretta: below it, or above it on a board turned round; the first points at it. */
-export function AiWords({ words, newestFirst, voice }: { words: readonly string[]; newestFirst: boolean; voice?: string; })
+export function AiWords({ words, newestFirst, voice }: { words: readonly string[]; newestFirst: boolean; voice?: Voice; })
 {
     const list = useRef<HTMLOListElement>(null);
     useOnlyWhole(list, words, newestFirst);
@@ -47,8 +47,8 @@ export function AiNote({ ply, opening, closing, summary, reviewing, name, by, mo
     by?: { annotator: string; effort?: string; } | undefined;
     /** The AI's mood on the move shown, which the Torretta that speaks shows too (D-70). */
     mood: Mood;
-    /** The language to read the note aloud in, when the player wants it. */
-    voice?: string;
+    /** The voice that reads the note aloud, when the player wants it. */
+    voice?: Voice;
     text: Text;
 })
 {
@@ -405,7 +405,7 @@ function RailPlayer({ place, picture, name, side, moves, unread = false }: {
 }
 
 /** Reads aloud each word the AI adds while the page is open, not those already there. */
-function useSpokenNews(words: readonly string[], voice: string | undefined): void
+function useSpokenNews(words: readonly string[], voice: Voice | undefined): void
 {
     const heard = useRef(words.length);
 
