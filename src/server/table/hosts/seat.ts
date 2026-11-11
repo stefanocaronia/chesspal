@@ -51,8 +51,8 @@ export function seatTaken(folder: string, now: Date = new Date()): boolean
     return seatHeld(folder, now) !== undefined;
 }
 
-/** Asks the play process in the seat to start its host again: whether one holds it, and was asked. */
-export function askAgain(folder: string, now: Date = new Date()): boolean
+/** Asks the play process in the seat to start its host again, or `again.host` in its place: whether one holds it, and was asked. */
+export function askAgain(folder: string, now: Date = new Date(), again: Again = {}): boolean
 {
     const held = seatHeld(folder, now);
 
@@ -60,20 +60,27 @@ export function askAgain(folder: string, now: Date = new Date()): boolean
         return false;
     }
 
-    writeAtomically(join(folder, againFile), `${JSON.stringify({ pid: held.pid })}\n`);
+    writeAtomically(join(folder, againFile), `${JSON.stringify({ pid: held.pid, ...again })}\n`);
     return true;
 }
 
-/** Whether the table asked this play process to start its host again; the request is taken. */
-export function askedAgain(folder: string, pid: number): boolean
+/** What the table asks the play process in the seat: to start its host again, or the host named in its place (D-107). */
+export interface Again
 {
-    const asked = (jsonIn(join(folder, againFile)) as { pid?: unknown; } | undefined)?.pid === pid;
+    readonly host?: string;
+}
 
-    if (asked) {
-        rmSync(join(folder, againFile), { force: true });
+/** What the table asked this play process, when it asked it to start its host again; the request is taken. */
+export function askedAgain(folder: string, pid: number): Again | undefined
+{
+    const asked = jsonIn(join(folder, againFile)) as { pid?: unknown; host?: unknown; } | undefined;
+
+    if (asked?.pid !== pid) {
+        return undefined;
     }
 
-    return asked;
+    rmSync(join(folder, againFile), { force: true });
+    return typeof asked.host === "string" ? { host: asked.host } : {};
 }
 
 /** How often a play process refreshes its seat, and how long the seat stays held without it. */

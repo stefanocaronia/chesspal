@@ -17,7 +17,7 @@ import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls } from "./game.ts";
 import { json, send } from "./http.ts";
 import { answerProfiles, readRatingsOf } from "./profiles.ts";
-import { answerTable, type Opening, type TableChats } from "./table.ts";
+import { answerTable, type Opening, restartWhenAtRest, type TableChats } from "./table.ts";
 
 /**
  * The page of a player's folder, served by the chat's process or by the table it is attached to (D-104): its address, how to tell it what the chat does
@@ -75,7 +75,11 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
         context: pageContext(context),
         chat,
         opponent: options.opponent ?? (() => aiNameOf(chat.host())),
-        bell: new Bell(() => hasNews(context, chat), () => tellWatchers(watchers)),
+        // A start again asked while the chat was at work comes once it has ended its answer (D-107).
+        bell: new Bell(() => hasNews(context, chat), () => {
+            restartWhenAtRest(served);
+            tellWatchers(watchers);
+        }),
         watchers,
         port: 0,
         outdated: outdatedHostFiles(folder, context.platform).length > 0,
@@ -133,6 +137,8 @@ export interface Served
     attached?: Attached;
     /** When the table last opened a chat from the page, which has not attached yet: no second one meanwhile. */
     chatOpened?: { readonly at: number; readonly how: Opening; } | undefined;
+    /** The host the page asked the chat to start again with while it was at work (D-107). */
+    restartWanted?: { readonly host: string; } | undefined;
 }
 
 /**

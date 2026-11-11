@@ -8,7 +8,7 @@ import { tableFolder } from "../../../home/index.ts";
 import { setUpHosts } from "../../../host-files/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
 import { programPath } from "./find.ts";
-import { choiceIn, hostArgs, type HostName, startMessage } from "./hosts.ts";
+import { choiceIn, hostArgs, type HostName, isHostName, startMessage } from "./hosts.ts";
 import { askedAgain, leaveSeat, refreshSeat, seatTimes, takeSeat } from "./seat.ts";
 import { cmdQuoted } from "./terminal.ts";
 
@@ -23,8 +23,8 @@ export interface HostLaunch
 }
 
 /**
- * Runs the host in the table's folder, in this terminal, until it ends: its exit code; started again, clean, when the table asks for a new game (D-57).
- * Ctrl+C is the host's: this process ignores it, or the terminal would close with the chat.
+ * Runs the host in the table's folder, in this terminal, until it ends: its exit code; started again, clean, when the table asks for a new game (D-57),
+ * or for another model or host, which then takes its place (D-107). Ctrl+C is the host's: this process ignores it, or the terminal would close with the chat.
  */
 export async function playHost(context: Context, host: HostName): Promise<number>
 {
@@ -37,6 +37,10 @@ export async function playHost(context: Context, host: HostName): Promise<number
         process.exit(129);
     });
     const terminal = savedTerminal(context.platform);
+    let playing = host;
+    let next = host;
+    // The host before one asked in its place, until that one has started: it goes on when the other does not start.
+    let before: HostName | undefined;
     let refreshed = Date.now();
 
     const asked = (): boolean => {
@@ -45,19 +49,41 @@ export async function playHost(context: Context, host: HostName): Promise<number
             refreshSeat(folder, process.pid);
         }
 
-        return askedAgain(folder, process.pid);
+        const again = askedAgain(folder, process.pid);
+        next = again?.host !== undefined && isHostName(again.host) ? again.host : playing;
+        return again !== undefined;
     };
 
     try {
         for (;;) {
             // A request left from a second click while the host before was ending is not for this one.
             askedAgain(folder, process.pid);
-            const ran = await runHost(hostLaunch(context, host), asked, context.platform).catch((error: unknown) => {
-                throw new Error(`${hostTitle[host]} did not start: ${(error as Error).message}`);
+            const ran = await started(context, playing, asked).catch((error: unknown) => {
+                if (before === undefined) {
+                    throw error;
+                }
+
+                process.stderr.write(`${(error as Error).message} ${hostTitle[before]} goes on.\n`);
+                return undefined;
             });
+
+            if (ran === undefined) {
+                playing = before ?? playing;
+                before = undefined;
+                takeSeat(folder, { pid: process.pid, host: playing });
+                continue;
+            }
+
+            before = undefined;
 
             if (!ran.again) {
                 return ran.code;
+            }
+
+            if (next !== playing) {
+                before = playing;
+                playing = next;
+                takeSeat(folder, { pid: process.pid, host: playing });
             }
 
             terminal.restore();
@@ -131,6 +157,15 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
 }
 
 const hostTitle: Record<HostName, string> = { claude: "Claude Code", codex: "Codex" };
+
+// Runs the host as runHost does; one not installed, or that could not start, fails saying so.
+async function started(context: Context, host: HostName, again: () => boolean): Promise<{ code: number; again: boolean; }>
+{
+    const launch = hostLaunch(context, host);
+    return runHost(launch, again, context.platform).catch((error: unknown) => {
+        throw new Error(`${hostTitle[host]} did not start: ${(error as Error).message}`);
+    });
+}
 
 // A host that has not ended this long after it was asked is killed.
 const killAfter = 3_000;

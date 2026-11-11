@@ -602,32 +602,6 @@
         min-height: 0;
         overflow-y: auto;
     }
-
-    /* On a short column the table's note keeps its buttons and drops the commands to type, then the box and the words go: they wait for a chat anyway.
-       In analysis the cards are taller and the AI's note needs room too */
-    @container talk (max-height: 560px) {
-        .opener-command {
-            display: none;
-        }
-    }
-
-    @container talk (max-height: 500px) {
-        .ai-block:has(> .opener) + .you-block > :is(.sent, .compose) {
-            display: none;
-        }
-    }
-
-    @container talk (max-height: 640px) {
-        .talk.studied .opener-command {
-            display: none;
-        }
-    }
-
-    @container talk (max-height: 580px) {
-        .talk.studied > .ai-block:has(> .opener) + .you-block > .chat {
-            display: none;
-        }
-    }
 }
 
 /* The game's column, which folds from its tab */

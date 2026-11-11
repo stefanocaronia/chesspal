@@ -112,12 +112,18 @@ export interface PageData
     readonly dataFolder: readonly string[];
 }
 
-/** The table's chat, as its page shows it (D-104): one opening is one the page asked for, or the one started again for a new game. */
+/**
+ * The table's chat, as its page shows it (D-104, D-107): whether one is at the table, its host, and whether chesspal play holds it, which the page can then
+ * start again; one opening is one the page asked for, the one started again for a new game, or with another model or host, which may wait for its answer.
+ */
 export interface TableShown
 {
     readonly chat: boolean;
+    readonly host?: string;
+    readonly held: boolean;
     readonly hosts: readonly ChatHost[];
-    readonly opening?: "chat" | "again";
+    readonly opening?: "chat" | "again" | "restart";
+    readonly waiting?: true;
 }
 
 /** A host the table opens a chat in: whether it is installed, the models and efforts offered, and the command to type in a terminal instead. */

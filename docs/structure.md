@@ -50,7 +50,7 @@ The page's folders have no `index.ts`: they import each other's files directly, 
 | [players/](../src/page/players/) | A player's card: picture, name, clock, pieces taken, the AI's model |
 | [game/](../src/page/game/) | The game's column: move list, badges, opening, result, browsing a game |
 | [talk/](../src/page/talk/) | The talk with the AI on the page, and the voice that reads it |
-| [table/](../src/page/table/) | The table with no chat at it: the buttons that open one |
+| [table/](../src/page/table/) | The chat at the table (D-104, D-107): its window, from the AI's name, that opens one or starts it again with another model or host, and what the page says while it does |
 | [dialogs/](../src/page/dialogs/) | The windows: who plays and the wizard, new game, settings, the analyses, a game to study |
 | [guide/](../src/page/guide/) | The guide from the header's book: its text in `it.md` and `en.md`, with the same headings, the markdown drawn as the page's elements, and its foot with the credits and the support |
 | [profile/](../src/page/profile/) | The profile and the settings as the server sends them, and the requests that change them |

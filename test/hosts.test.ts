@@ -95,7 +95,10 @@ describe("a chat the table opens", () => {
         expect(chats.holds(table)).toBe(true);
         expect(chats.relaunch(bin)).toBe(false);
         expect(chats.relaunch(table)).toBe(true);
-        expect(askedAgain(table, process.pid)).toBe(true);
+        expect(askedAgain(table, process.pid)).toEqual({});
+        // Asked with another host, which takes its place (D-107).
+        expect(chats.relaunch(table, "codex")).toBe(true);
+        expect(askedAgain(table, process.pid)).toEqual({ host: "codex" });
     });
 
     it("keeps each host's choice in the page's settings, a word alone", () => {
@@ -117,12 +120,12 @@ describe("the seat chesspal play takes at the table", () => {
         takeSeat(folder, { pid: 1, host: "claude" });
         expect(() => takeSeat(folder, { pid: 2, host: "codex" })).toThrow("A chat in claude already plays at the table, in another window: play there, or close it, then try again.");
         expect(seatTaken(folder)).toBe(true);
-        expect(askedAgain(folder, 1)).toBe(false);
+        expect(askedAgain(folder, 1)).toBeUndefined();
         expect(askAgain(folder)).toBe(true);
-        expect(askedAgain(folder, 2)).toBe(false);
-        expect(askedAgain(folder, 1)).toBe(true);
+        expect(askedAgain(folder, 2)).toBeUndefined();
+        expect(askedAgain(folder, 1)).toEqual({});
         // The request is taken once.
-        expect(askedAgain(folder, 1)).toBe(false);
+        expect(askedAgain(folder, 1)).toBeUndefined();
 
         leaveSeat(folder, 2);
         expect(askAgain(folder)).toBe(true);
@@ -144,8 +147,8 @@ describe("the seat chesspal play takes at the table", () => {
 
         const after = new Date(later.getTime() + seatTimes.heldFor);
         takeSeat(folder, { pid: 4, host: "codex" }, after);
-        expect(askedAgain(folder, 4)).toBe(false);
-        expect(askedAgain(folder, 3)).toBe(false);
+        expect(askedAgain(folder, 4)).toBeUndefined();
+        expect(askedAgain(folder, 3)).toBeUndefined();
     });
 
     it("has its host ended and started again when the table asks; a host that ends by itself ends the play", async () => {
@@ -181,7 +184,7 @@ describe("the table's page, with no chat at it", () => {
         const { table, opened } = await tableWith(fakeChats());
         const origin = new URL(table.url).origin;
 
-        expect((await getGame(table.url)).table).toEqual({ chat: false, hosts: fakeHosts });
+        expect((await getGame(table.url)).table).toEqual({ chat: false, held: false, hosts: fakeHosts });
         expect(await openChat(table.url, "claude")).toMatchObject({ status: 403 });
         expect(await openChat(table.url, "codex", origin)).toMatchObject({ status: 400 });
         expect(await openChat(table.url, "claude", origin)).toEqual({ status: 200, body: { opened: true } });

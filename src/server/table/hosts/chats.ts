@@ -30,7 +30,7 @@ export function terminalChats(context: Context, chesspal: readonly string[] = [p
         open: async (host) => isHostName(host) && await openTerminal(tableFolder(context.home()), [...chesspal, "play", host], context.platform, env),
         // Only a chat in the table's folder can be the one chesspal play holds.
         holds: (folder) => samePath(folder, tableFolder(context.home())) && seatTaken(folder, context.now()),
-        relaunch: (folder) => samePath(folder, tableFolder(context.home())) && askAgain(folder, context.now()),
+        relaunch: (folder, host) => samePath(folder, tableFolder(context.home())) && askAgain(folder, context.now(), host === undefined ? {} : { host }),
     };
 }
 

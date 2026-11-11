@@ -591,8 +591,8 @@ const cameraIcon = (
     </svg>
 );
 
-// The profile in use, in the menu, and a field saved in the profile window.
-const checkIcon = (
+/** The tick on the choice in use: the profile, a name saved, the chat at the table. */
+export const checkIcon = (
     <svg class="icon in-use" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M5 12.5L10 17.5L19 7.5" />
     </svg>

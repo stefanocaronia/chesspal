@@ -118,15 +118,25 @@ export interface Text
     asleepInAnalysis(name: string): string;
     /** The table with no chat at it (D-104): the hosts that open one in a terminal, the model and effort beside each, and the command to type instead. */
     readonly table: {
-        readonly label: string;
-        noChat(name: string): string;
+        /** The chat's window (D-107): its title, and what it says with no chat at the table, with one it can start again, and with one opened by hand. */
+        readonly title: string;
+        readonly choose: string;
+        readonly restartHint: string;
+        byHand(name: string): string;
+        /** The title of the AI's name, which opens the window: with no chat at the table, and with one. */
+        readonly noChat: string;
+        readonly change: string;
         install(name: string): string;
         readonly model: string;
         readonly effort: string;
         asHost(host: string): string;
+        /** Where the asleep note stands: a chat opening, starting again for a new game, or with another model or host, and waiting to. */
         readonly opening: string;
         again(name: string): string;
+        readonly restart: string;
+        waiting(name: string): string;
         readonly failed: string;
+        readonly notRestarted: string;
         readonly typeIt: string;
     };
     /** The thought cloud on the Torretta, by what the AI thinks on: its move, or on the player's time (D-72). */
@@ -565,15 +575,22 @@ const english: Text = {
     asleep: (name) => `${name} is not listening: write a message, such as "hi", in the window where you opened ${name}, not here. Its clock waits until it answers.`,
     asleepInAnalysis: (name) => `${name} is not listening: write to it in the window where you opened it, not here.`,
     table: {
-        label: "Open a chat",
-        noChat: (name) => `To play with ${name}, open its chat: it starts in a window of its own, to keep open.`,
+        title: "Who are you playing?",
+        choose: "Choose the chat to play with: it opens in a window of its own, to keep open.",
+        restartHint: "Choose the model and effort, then press Claude Code or Codex: the chat starts again, clean, in the same window, once it has ended its answer. The game stays as it is.",
+        byHand: (name) => `You opened this chat yourself: change ${name}'s model with /model in its window, or close it and open one from here, with the choices below.`,
+        noChat: "No chat at the table: choose one",
+        change: "Change the chat or its model",
         install: (name) => `To play with ${name}, install Claude Code or Codex, then open this page again.`,
         model: "Model",
         effort: "Effort",
         asHost: (host) => `as set in ${host}`,
         opening: "Opening the chat… In the terminal, if it asks whether you trust the folder, choose Yes with the arrow keys and press Enter.",
         again: (name) => `${name} starts again with a clean chat for the new game…`,
+        restart: "The chat starts again, clean…",
+        waiting: (name) => `${name} starts again once it has ended its answer…`,
         failed: "The terminal did not open: type the command below in a terminal.",
+        notRestarted: "The chat did not start again: close its window, then open another from here.",
         typeIt: "Or type in a terminal:",
     },
     commandHere: (name) => `/clear and the other commands go in the window where you opened ${name}, not here.`,
@@ -943,15 +960,22 @@ const italian: Text = {
     asleep: (name) => `${name} non ti sta ascoltando: scrivi un messaggio, per esempio "ciao", nella finestra dove hai aperto ${name}, non qui. Il suo orologio aspetta che risponda.`,
     asleepInAnalysis: (name) => `${name} non ti sta ascoltando: scrivigli nella finestra dove l'hai aperto, non qui.`,
     table: {
-        label: "Apri una chat",
-        noChat: (name) => `Per giocare con ${name}, apri la sua chat: parte in una finestra a parte, da tenere aperta.`,
+        title: "Contro chi giochi?",
+        choose: "Scegli la chat con cui giocare: parte in una finestra a parte, da tenere aperta.",
+        restartHint: "Scegli modello e ragionamento, poi premi Claude Code o Codex: la chat riparte pulita nella stessa finestra, appena ha finito di rispondere. La partita resta com'è.",
+        byHand: (name) => `Questa chat l'hai aperta tu: cambia il modello di ${name} con /model nella sua finestra, oppure chiudila e aprine una da qui, con le scelte qui sotto.`,
+        noChat: "Nessuna chat al tavolo: scegline una",
+        change: "Cambia la chat o il modello",
         install: (name) => `Per giocare con ${name}, installa Claude Code o Codex, poi apri di nuovo questa pagina.`,
         model: "Modello",
         effort: "Ragionamento",
         asHost: (host) => `come è impostato in ${host}`,
         opening: "Apro la chat… Nel terminale, se ti chiede se ti fidi della cartella, scegli Yes con le frecce e premi Invio.",
         again: (name) => `${name} riparte con una chat pulita per la nuova partita…`,
+        restart: "La chat riparte pulita…",
+        waiting: (name) => `${name} riparte appena ha finito di rispondere…`,
         failed: "Il terminale non si è aperto: scrivi il comando qui sotto in un terminale.",
+        notRestarted: "La chat non è ripartita: chiudi la sua finestra, poi aprine un'altra da qui.",
         typeIt: "Oppure scrivi in un terminale:",
     },
     commandHere: (name) => `/clear e gli altri comandi vanno scritti nella finestra dove hai aperto ${name}, non qui.`,

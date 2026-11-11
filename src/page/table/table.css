@@ -1,0 +1,88 @@
+/* The chat's window (D-107): narrow, a row for each host, its button with the tick of the one at the table and its model and effort under their titles,
+   their columns shared through the subgrid; the command to type instead */
+.dialog:has(> .chat-hosts) {
+    width: min(460px, calc(100vw - 32px));
+}
+
+.chat-hosts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 6px;
+    margin: 8px 0 12px;
+}
+
+.chat-head,
+.chat-host {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+}
+
+.chat-head {
+    color: var(--soft);
+    font-size: 12px;
+}
+
+.chat-host .choice {
+    min-width: 0;
+    font-size: 15px;
+    text-align: left;
+}
+
+.chat-host .choice span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.chat-host .in-use {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+}
+
+.chat-host .choice[aria-disabled="true"] {
+    border-color: var(--line);
+    opacity: 0.6;
+    cursor: default;
+}
+
+.chat-host select {
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+}
+
+/* Empty, the state takes no room */
+.chat-state:empty {
+    display: none;
+}
+
+.chat-command {
+    color: var(--soft);
+    font-size: 12.5px;
+}
+
+/* Each command whole on its line; two families, so the browser does not shrink the monospace */
+.chat-command code {
+    font-family: ui-monospace, monospace;
+    white-space: nowrap;
+    user-select: all;
+}
+
+/* The AI's name with no chat at the table: a hollow ring before it */
+.ai-name .no-chat {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-right: 5px;
+    border: 1.5px solid var(--soft);
+    border-radius: 50%;
+}

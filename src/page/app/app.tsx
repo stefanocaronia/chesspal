@@ -58,7 +58,7 @@ import { signature } from "../players/model-name.ts";
 import { keepSettings, type ProfileShown } from "../profile/profile.ts";
 import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "../profile/settings.ts";
 import { endSoundOf, playSound, soundOf, wakeSounds } from "../sounds/sounds.ts";
-import { ChatOpener } from "../table/opener.tsx";
+import { AiNameButton, ChatDialog, chatState } from "../table/window.tsx";
 import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
 import { textFor } from "../text.ts";
 import { anchorName, useAnchor } from "./anchor.ts";
@@ -94,8 +94,23 @@ export function App({ start }: { start: Settings; })
         }
     };
 
-    const [dialog, setDialog] = useState<"profile" | "profiles" | "new-game" | "study" | "guide" | undefined>(undefined);
+    const [dialog, setDialog] = useState<"profile" | "profiles" | "new-game" | "chat" | "study" | "guide" | undefined>(undefined);
     const { data: served, problem, offline, reload } = useServed(() => setDialog("new-game"));
+    // Nuova partita with no chat at the table asks for one first (D-107): the chat's window, then the new game's, however the first closes.
+    const [chatFirst, setChatFirst] = useState(false);
+
+    const askNewGame = (): void => {
+        const table = offline ? undefined : served?.table;
+        const first = table !== undefined && !table.chat && table.opening === undefined;
+        setChatFirst(first);
+        setDialog(first ? "chat" : "new-game");
+    };
+
+    const closeChat = (): void => {
+        setDialog(chatFirst ? "new-game" : undefined);
+        setChatFirst(false);
+    };
+
     const [selected, setSelected] = useState<string | undefined>(undefined);
     const [refusal, setRefusal] = useState<Notice | undefined>(undefined);
     // A pawn taken to the last rank waits for the player to choose what it becomes.
@@ -297,7 +312,7 @@ export function App({ start }: { start: Settings; })
             verdict={verdict}
             {...(!ended && (offer === "ai" || declined) ? { who: name } : {})}
             actions={actions}
-            onNewGame={served === undefined ? undefined : () => setDialog("new-game")}
+            onNewGame={served === undefined ? undefined : askNewGame}
             // Between games the new one stands out in the player's card (D-77): in the header only when the talk, and the card with it, is folded away.
             standOut={studied !== undefined || (between && folds.talk !== "open")}
             onStudy={served === undefined || going ? undefined : () => setDialog("study")}
@@ -410,9 +425,14 @@ export function App({ start }: { start: Settings; })
         );
     // Where to wake the chat, under the AI's card (over the board when the talk is folded); the button that starts the clocks, under the player's (Zoe).
     // On the table with no chat at it, the note opens one instead (D-104).
+    // On the table, what its chat is doing stands there; with no chat at it, the AI's name says so, which opens the chat's window (D-107).
     const table = offline ? undefined : served.table;
-    const opener = table !== undefined && !table.chat ? <ChatOpener table={table} settings={settings} onChange={change} name={name} text={text} /> : undefined;
-    const asleepNote = opener ?? (asleep ? <p class="asleep" role="status">{sides === undefined ? text.asleep(name) : text.asleepInAnalysis(name)}</p> : null);
+    const atTable = table === undefined ? undefined : chatState(table, name, text);
+    const asleepNote = atTable !== undefined
+        ? <p class="asleep" role="status">{atTable}</p>
+        : asleep && table?.chat !== false
+        ? <p class="asleep" role="status">{sides === undefined ? text.asleep(name) : text.asleepInAnalysis(name)}</p>
+        : null;
     const startClocks = clockWaits
         ? (
             <button type="button" class="command primary start-clocks" onClick={() => act("/api/start", {})}>
@@ -426,7 +446,7 @@ export function App({ start }: { start: Settings; })
     // Between games the next starts from the player's card, where the clock and the button that starts it stand in a game (D-77).
     const nextGame = between
         ? (
-            <button type="button" class="command primary next-game" onClick={() => setDialog("new-game")}>
+            <button type="button" class="command primary next-game" onClick={askNewGame}>
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 5V19M5 12H19" />
                 </svg>
@@ -558,6 +578,7 @@ export function App({ start }: { start: Settings; })
                     onClose={() => setDialog(undefined)}
                     text={text}
                 />
+                {table === undefined ? null : <ChatDialog open={dialog === "chat"} table={table} settings={settings} onChange={change} name={name} onClose={closeChat} text={text} />}
                 <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
                 {guide}
                 <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} you={profile.name} accounts={profile.accounts} ai={name} text={text} />
@@ -652,7 +673,7 @@ export function App({ start }: { start: Settings; })
                                         <PlayerCard
                                             place="ai"
                                             picture={thinker(48)}
-                                            name={name}
+                                            name={table === undefined ? name : <AiNameButton name={name} table={table} onOpen={() => setDialog("chat")} text={text} />}
                                             signed={signed}
                                             side={idle ? undefined : ai}
                                             {...(idle ? {} : { level: text.start.levels[level] })}
@@ -741,10 +762,10 @@ export function App({ start }: { start: Settings; })
                             text={text}
                         />
                         {/* With the talk folded, the note on the chat that does not listen (Stefano) and the button that starts the clocks come over the board's far edge */}
-                        {folds.talk !== "open" && (asleep || opener !== undefined || clockWaits)
+                        {folds.talk !== "open" && (asleepNote !== null || clockWaits)
                             ? (
                                 <div class="over-board">
-                                    {opener ?? (asleep ? <p class="asleep" role="status">{text.asleep(name)}</p> : null)}
+                                    {asleepNote}
                                     {startClocks}
                                 </div>
                             )

@@ -395,11 +395,87 @@ describe("a new game at the table", () => {
     });
 });
 
-/** The chats of a table where chesspal play holds the seat: the folders whose chat it was asked to start again. */
-function playChats(): { chats: TableChats; relaunched: string[]; }
+describe("the chat's window at the table", () => {
+    it("starts the chat chesspal play holds again with the host the page names: at once when it is at rest, else once its turn ends (D-107)", async () => {
+        const { chats, relaunched, asked } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            expect(await gameShown(table.url)).toMatchObject({ table: { chat: true, host: "claude", held: true } });
+            expect(await restartAt(table.url, "codex", "http://example.com")).toMatchObject({ status: 403 });
+            expect(await restartAt(table.url, "gemini")).toMatchObject({ status: 400 });
+
+            // In a turn, the request waits for its end.
+            await page.chatCalls();
+            expect(await restartAt(table.url, "codex")).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+            expect(relaunched).toEqual([]);
+            expect(await gameShown(table.url)).toMatchObject({ table: { waiting: true } });
+
+            // Its turn ends, and its hook waits for the bell: the chat starts again with Codex.
+            const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(() => Promise.resolve(relaunched.length > 0));
+            expect(relaunched).toEqual([chat.folder]);
+            expect(asked).toEqual(["codex"]);
+
+            // The chat ends: the pages show another host opening, which may ask about the folder, and the bell never rang for it.
+            await page.close();
+            expect(await hook).toMatchObject({ rang: false });
+            const shown = await gameShown(table.url);
+            expect(shown).toMatchObject({ table: { chat: false, opening: "chat" } });
+            expect(shown.table).not.toHaveProperty("waiting");
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
+    it("starts the chat at rest again at once, and refuses one opened by hand, which changes its model with /model", async () => {
+        const held = playChats();
+        const { home, table } = await tableOn(undefined, held.chats);
+        const chat = { ...chatOn(home), host: () => "codex-mcp-client" };
+        await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            // The hook waits until the table closes.
+            void bellHeard(JSON.stringify({ cwd: chat.folder })).catch(() => undefined);
+            await until(async () => (await gameShown(table.url)).listening === true);
+
+            expect(await gameShown(table.url)).toMatchObject({ table: { host: "codex" } });
+            expect(await restartAt(table.url, "codex")).toEqual({ status: 200, text: JSON.stringify({ restarting: true }) });
+            expect(held.asked).toEqual(["codex"]);
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+
+        const byHand = playChats(false);
+        const other = await tableOn(undefined, byHand.chats);
+        await attached({ ...chatOn(other.home), host: () => "claude-code" });
+
+        expect(await gameShown(other.table.url)).toMatchObject({ table: { chat: true, held: false } });
+        expect(await restartAt(other.table.url, "claude")).toMatchObject({ status: 409 });
+        expect(byHand.relaunched).toEqual([]);
+    });
+});
+
+/** The chats of a table where chesspal play holds the seat, unless not `held`: the folders whose chat it was asked to start again, and with which host. */
+function playChats(held = true): { chats: TableChats; relaunched: string[]; asked: (string | undefined)[]; }
 {
     const relaunched: string[] = [];
-    return { chats: { hosts: () => [], open: () => Promise.resolve(false), holds: () => true, relaunch: (folder) => relaunched.push(folder) > 0 }, relaunched };
+    const asked: (string | undefined)[] = [];
+    const hosts = ["claude", "codex"].map((name) => ({ name, installed: true, models: [], efforts: [], command: `chesspal play ${name}` }));
+    const relaunch = (folder: string, host?: string): boolean => relaunched.push(folder) > 0 && asked.push(host) > 0;
+    return { chats: { hosts: () => hosts, open: () => Promise.resolve(false), holds: () => held, relaunch }, relaunched, asked };
+}
+
+/** Asks the table to start its chat again with a host, as its page does, from the origin given, else the page's own: the answer's status and text. */
+async function restartAt(url: string, host: string, origin = new URL(url).origin): Promise<{ status: number; text: string; }>
+{
+    return sent(new URL("/api/table/restart", url), { method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify({ host }) });
 }
 
 /** A new game asked from the table's page, as its window sends it: the answer's status. */
