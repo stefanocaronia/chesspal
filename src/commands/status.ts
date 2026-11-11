@@ -97,8 +97,9 @@ export const status = defineCommand({
                     pageGiven(context, current.started);
                 }
 
-                // A game a summarized or resumed chat still holds is its own; without the host's word of the chat's start, any game began before it.
-                if (first && endOf(current.game) === undefined && (chatStart === undefined || cleanSince(chatStart, current.started))) {
+                // A game a summarized or resumed chat still holds is its own; without the host's word of the chat's start, any game began before it. One with no
+                // move yet has nothing to go on with: the chat the table starts again for a new game begins just after it (D-76).
+                if (first && endOf(current.game) === undefined && current.game.record.moves.length > 0 && (chatStart === undefined || cleanSince(chatStart, current.started))) {
                     status.fromBefore = true;
                 }
 

@@ -158,12 +158,20 @@ function startedLines({ game, archived, past, player, speech, closedPage: closed
 
 /**
  * The New game window opened on the board page, or its address for the player to open it first; a chat to clear refuses it as a new game does (D-57), and
- * without the page the player is asked in the chat.
+ * without the page the player is asked in the chat. A game just begun, with no move yet, is the one the player chose there: the chat the table started
+ * again for it would open the window over it (Priya).
  */
 function askedOnPage(context: Context): Asked
 {
     if (chatToClear(context)) {
         throw new ChatNotClear();
+    }
+
+    if (context.page !== undefined && justBegun(context)) {
+        throw new Error(
+            "A new game has just begun on the board page, with no move yet: don't open another. Call status to see it; when the player wants another game, "
+                + "the page's New game button starts it. Nothing changed.",
+        );
     }
 
     if (context.askNewGame?.() === true) {
@@ -178,6 +186,13 @@ function askedOnPage(context: Context): Asked
         "There is no board page here: ask the player which colour they want, whether they want a clock and at which level you play, then call new_game with "
             + "them. Nothing changed.",
     );
+}
+
+/** Whether a game is going on with no move played yet. */
+function justBegun(context: Context): boolean
+{
+    const current = gameAt(gameFolder(context.home()), context.now());
+    return current !== undefined && endOf(current.game) === undefined && current.game.record.moves.length === 0;
 }
 
 function askedLine({ window, page }: Asked): string

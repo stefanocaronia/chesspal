@@ -16,6 +16,7 @@ import { testContext } from "./commands.ts";
 const folders: string[] = [];
 // Twenty plies: a game long enough to ask for a clean chat before the next (D-57).
 const longGame = "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Nf6 5. d3 d6 6. O-O O-O 7. a4 a6 8. Re1 Ba7 9. h3 h6 10. Nbd2 Re8 *";
+const startingPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const before = new Date(2026, 10, 2, 15, 0, 0);
 const after = new Date(2026, 10, 2, 15, 45, 0);
 
@@ -98,6 +99,17 @@ describe("a new game chosen on the board page", () => {
         expect(() => newGame.run({ replace: false, clock: "5+0" }, context)).toThrow(/ai_colour: say the colour you play/);
     });
 
+    it("refuses to open the window over a game just begun on the page, with no move yet, as the chat the table starts again finds it", async () => {
+        const context: Context = { ...chatWith(startingPosition), page: "http://127.0.0.1:5876", positionSeen: null };
+        let asked = 0;
+        const ask: Context = { ...context, askNewGame: () => (asked++, true) };
+
+        expect(() => newGame.run({ replace: false }, ask)).toThrow(/A new game has just begun on the board page, with no move yet: don't open another\. Call status/);
+        expect(asked).toBe(0);
+        // Without the page the player is asked in the chat, as before.
+        expect(() => newGame.run({ replace: false }, chatWith(startingPosition))).toThrow(/There is no board page here/);
+    });
+
     it("refuses to open the window in a chat still holding the game before (D-57)", async () => {
         const context = chatWith(longGame);
         await chatStarted(context, "startup", before);
@@ -111,6 +123,13 @@ describe("a game from before the chat", () => {
         await chatStarted(context, "clear", after);
 
         expect(status.format(await status.run({}, context))).toMatch(/A game from before this chat is going on: ask the player whether to go on with it/);
+        expect(status.format(await status.run({}, context))).not.toMatch(/from before this chat/);
+    });
+
+    it("is not told for a game with no move yet, as the one the table starts a clean chat for begins just before it (D-76)", async () => {
+        const context: Context = { ...chatWith(startingPosition), told: new Set(), positionSeen: null };
+        await chatStarted(context, "startup", after);
+
         expect(status.format(await status.run({}, context))).not.toMatch(/from before this chat/);
     });
 
