@@ -666,6 +666,13 @@
     .top:has(.verdict.idle, .verdict.over, .verdict.analysis) .verdict {
         margin-right: auto;
     }
+
+    /* Over a board of 760 px or less the sound and the theme leave their room to the chip, and stay in the settings; in a game they come back */
+    @container (max-width: 760px) {
+        .top:has(.verdict.idle, .verdict.over, .verdict.analysis) :is(.sound-button, .theme-button) {
+            display: none;
+        }
+    }
 }
 
 /* Beside the board, a column's content keeps its width and its outer edge while the column folds: it slides under the board, the text never flows again */
