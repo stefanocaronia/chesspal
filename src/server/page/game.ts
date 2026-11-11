@@ -46,6 +46,7 @@ import {
     WordsRefused,
 } from "../../games/index.ts";
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
+import { version } from "../../version.ts";
 import { asTheChatSees } from "./chat.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
@@ -408,6 +409,8 @@ function sendGame(response: ServerResponse, served: Served): void
     const analysis = current === undefined || endOf(current.game) !== undefined ? analysisShown(served) : undefined;
     const aiModel = aiModelOf(folder);
     const body = {
+        // The page loaded from another version loads again, its files and all (Federico).
+        version,
         game,
         ...(game === null && talk.length > 0 ? { talk } : {}),
         ...(analysis === undefined ? {} : { analysis }),

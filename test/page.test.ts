@@ -14,6 +14,7 @@ import { createProfile, gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { profilesShown } from "../src/server/page/profiles.ts";
+import { version } from "../src/version.ts";
 import { testContext } from "./commands.ts";
 
 const opened: Page[] = [];
@@ -69,7 +70,8 @@ describe("the page's server", () => {
         const folder = playerFolder();
         const page = await open(folder);
 
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, listening: false, ...firstProfile });
+        // The version that serves the page: a page loaded from another loads again.
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ version, game: null, listening: false, ...firstProfile });
         await run(folder, "new_game", { ai_colour: "black" });
         await run(folder, "player_move", { move: "e4" });
         await run(folder, "ai_move", { move: "e5", plan: "A secret plan.", comment: "The open game." });
@@ -87,11 +89,12 @@ describe("the page's server", () => {
         const folder = playerFolder();
         const page = await open(folder, () => host);
 
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, listening: false, ...firstProfile });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ version, game: null, listening: false, ...firstProfile });
         host = "Claude";
-        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ game: null, opponent: "Claude", listening: false, ...firstProfile });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({ version, game: null, opponent: "Claude", listening: false, ...firstProfile });
         noteAiModel(gameFolder(folder), { model: "claude-opus-5-5", effort: "xhigh" });
         expect(JSON.parse((await get(page, "/api/game")).body)).toEqual({
+            version,
             game: null,
             opponent: "Claude",
             aiModel: { model: "claude-opus-5-5", effort: "xhigh" },

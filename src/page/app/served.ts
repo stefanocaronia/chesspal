@@ -30,6 +30,8 @@ export function useServed(onNewGame: () => void): ServedPage
 
     useEffect(() => {
         let latest = 0;
+        // The Chesspal version of the first answer: a server of another, after an update, sends data this page may not read.
+        let pageVersion: string | undefined;
 
         const load = (): void => {
             // Two reads in flight may answer out of order: only the last one asked counts.
@@ -38,6 +40,13 @@ export function useServed(onNewGame: () => void): ServedPage
                 .then((response) => response.json() as Promise<PageData & { error?: string; }>)
                 .then((body) => {
                     if (asked !== latest) {
+                        return;
+                    }
+
+                    pageVersion ??= body.version;
+
+                    if (body.version !== undefined && body.version !== pageVersion) {
+                        window.location.reload();
                         return;
                     }
 
@@ -76,6 +85,8 @@ export function useServed(onNewGame: () => void): ServedPage
  */
 export interface PageData
 {
+    /** The Chesspal version that serves the page: a page loaded from another loads again. */
+    readonly version?: string;
     readonly game: {
         readonly pgn: string;
         readonly ai: Side;
