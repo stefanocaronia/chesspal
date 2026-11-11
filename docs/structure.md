@@ -17,7 +17,7 @@ The build (`npm run build`) compiles `src/` into `dist/`, the page apart with it
 
 ## 2. Inside `src/`
 
-Each folder is a module with one job, which exposes its API from its `index.ts`: new code imports from there. The last column says what a module may import; ESLint enforces the rules marked ✓.
+Each folder is a module with one job, which exposes its API from its `index.ts`: new code imports from there. The page is the exception (see below). The last column says what a module may import; ESLint enforces the rules marked ✓.
 
 | Path | What it holds | Depends on |
 |---|---|---|
@@ -39,6 +39,8 @@ Each folder is a module with one job, which exposes its API from its `index.ts`:
 
 ### The page's folders
 
+The page's folders have no `index.ts`: they import each other's files directly, as one Preact app built on its own.
+
 | Path | What it holds |
 |---|---|
 | [app/](../src/page/app/) | The app: what the server sends, the phase (game, analysis), the keys, the move kept in the address |
@@ -50,6 +52,7 @@ Each folder is a module with one job, which exposes its API from its `index.ts`:
 | [talk/](../src/page/talk/) | The talk with the AI on the page, and the voice that reads it |
 | [table/](../src/page/table/) | The table with no chat at it: the buttons that open one |
 | [dialogs/](../src/page/dialogs/) | The windows: who plays and the wizard, new game, settings, the analyses, a game to study |
+| [guide/](../src/page/guide/) | The guide from the header's book: its text in `it.md` and `en.md`, with the same headings, the markdown drawn as the page's elements, and its foot with the credits and the support |
 | [profile/](../src/page/profile/) | The profile and the settings as the server sends them, and the requests that change them |
 | [helps/](../src/page/helps/), [legend/](../src/page/legend/), [lead/](../src/page/lead/) | The helps' card, the legend of the board's marks, who is ahead |
 | [avatars/](../src/page/avatars/) | The player's drawn avatars and the AI's, the Torretta |
@@ -62,4 +65,4 @@ Each folder is a module with one job, which exposes its API from its `index.ts`:
 - **Something kept on disk** goes in `games/` or `profiles/`, behind their index, written whole or not at all; the AI and the page change it only through a command.
 - **Something from outside** (the time, randomness, folders, the network) comes in through `Context`, so the tests inject it.
 - **Something on the page** goes in the folder of its part, or a new folder for a new part; it asks the server for anything that is not chess.
-- **A new folder** gets its `index.ts` and a line on this page.
+- **A new folder** gets its `index.ts`, outside the page, and a line on this page.

@@ -172,6 +172,22 @@ export interface Text
     /** The helps' card (D-78): the facts the AI sees at the game's level. */
     readonly helpsCard: HelpsCardText;
     readonly legend: LegendText;
+    /** The guide, from the book in the header, and its foot. */
+    readonly guide: GuideText;
+}
+
+/** The words of the guide's dialog and of its foot. */
+export interface GuideText
+{
+    readonly title: string;
+    /** The index of its parts, for a screen reader. */
+    readonly contents: string;
+    readonly onGitHub: string;
+    readonly onNpm: string;
+    readonly support: string;
+    readonly credits: string;
+    /** The credits, as the README has them: each a line, with its links in markdown. */
+    readonly creditLines: readonly string[];
 }
 
 /** The words of the helps' card. */
@@ -774,6 +790,20 @@ const english: Text = {
         control: "How many of White's pieces and of Black's reach the square",
         ends: { crown: "Won", mate: "Checkmated", flag: "Resigned", half: "Draw, half a point each" },
     },
+    guide: {
+        title: "Guide",
+        contents: "Contents",
+        onGitHub: "Chesspal on GitHub",
+        onNpm: "Chesspal on npm",
+        support: "Support Chesspal",
+        credits: "Credits",
+        creditLines: [
+            "The rules: [chess.js](https://github.com/jhlywa/chess.js), under the BSD 2-Clause license.",
+            "The openings' names: Lichess's [chess-openings](https://github.com/lichess-org/chess-openings), under CC0.",
+            "The pieces: Nitida, Torretta and Capablanca are Chesspal's own, the last after the diagrams of Capablanca's *Chess Fundamentals* (1921), under CC BY 4.0: [their credits](https://github.com/stefanocaronia/chesspal/blob/main/src/page/pieces/CREDITS.md).",
+            "The sounds: Chesspal's own.",
+        ],
+    },
 };
 
 const italian: Text = {
@@ -1135,6 +1165,20 @@ const italian: Text = {
         drawnByCoach: "disegnato dall'allenatore",
         control: "Quanti pezzi del Bianco e del Nero raggiungono la casa",
         ends: { crown: "Ha vinto", mate: "Scacco matto", flag: "Ha abbandonato", half: "Patta, mezzo punto a testa" },
+    },
+    guide: {
+        title: "Guida",
+        contents: "Indice",
+        onGitHub: "Chesspal su GitHub",
+        onNpm: "Chesspal su npm",
+        support: "Sostieni Chesspal",
+        credits: "Crediti",
+        creditLines: [
+            "Le regole: [chess.js](https://github.com/jhlywa/chess.js), con licenza BSD 2-Clause.",
+            "I nomi delle aperture: [chess-openings](https://github.com/lichess-org/chess-openings) di Lichess, con licenza CC0.",
+            "I pezzi: Nitida, Torretta e Capablanca sono di Chesspal, l'ultimo dai diagrammi di *Chess Fundamentals* di Capablanca (1921), con licenza CC BY 4.0: [i loro crediti](https://github.com/stefanocaronia/chesspal/blob/main/src/page/pieces/CREDITS.md).",
+            "I suoni: di Chesspal.",
+        ],
     },
 };
 

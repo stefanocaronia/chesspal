@@ -43,6 +43,7 @@ import { howEnded, useDeclined, useJustEnded, useSawEnd } from "../game/ending.t
 import { Steps } from "../game/move-list.tsx";
 import { useOpeningBook } from "../game/opening-book.ts";
 import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
+import { GuideDialog } from "../guide/guide.tsx";
 import { BareButton, HelpsCard, HintLine, MapButton } from "../helps/helps.tsx";
 import { helpsOf } from "../helps/view.ts";
 import { FoldTab } from "../layout/fold-tab.tsx";
@@ -93,7 +94,7 @@ export function App({ start }: { start: Settings; })
         }
     };
 
-    const [dialog, setDialog] = useState<"profile" | "profiles" | "new-game" | "study" | undefined>(undefined);
+    const [dialog, setDialog] = useState<"profile" | "profiles" | "new-game" | "study" | "guide" | undefined>(undefined);
     const { data: served, problem, offline, reload } = useServed(() => setDialog("new-game"));
     const [selected, setSelected] = useState<string | undefined>(undefined);
     const [refusal, setRefusal] = useState<Notice | undefined>(undefined);
@@ -306,11 +307,14 @@ export function App({ start }: { start: Settings; })
             onSound={() => change({ ...settings, sound: !sound })}
             onTheme={switchTheme}
             onSettings={() => setSetting(true)}
+            onGuide={() => setDialog("guide")}
             {...(served === undefined ? {} : { profile: served.profile, onProfile: () => setDialog("profiles") })}
         />
     );
 
     const panel = <SettingsPanel open={setting} settings={settings} onChange={change} onClose={() => setSetting(false)} text={text} />;
+    // The guide opens before the page has its data too.
+    const guide = <GuideDialog open={dialog === "guide"} onClose={() => setDialog(undefined)} text={text} />;
 
     if (problem !== undefined) {
         return <p class="problem">{problem}</p>;
@@ -321,6 +325,7 @@ export function App({ start }: { start: Settings; })
             <>
                 {header}
                 {panel}
+                {guide}
             </>
         );
     }
@@ -554,6 +559,7 @@ export function App({ start }: { start: Settings; })
                     text={text}
                 />
                 <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
+                {guide}
                 <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} you={profile.name} accounts={profile.accounts} ai={name} text={text} />
                 {offline ? <p class="offline" role="alert">{text.offline(name)}</p> : null}
                 {served.outdated === true ? <p class="outdated" role="status">{text.outdated(name)}</p> : null}

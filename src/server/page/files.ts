@@ -72,7 +72,15 @@ const html = [
     "",
 ].join("\n");
 
-const types: Readonly<Record<string, string>> = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".webp": "image/webp", ".json": "application/json; charset=utf-8", ".ogg": "audio/ogg" };
+const types: Readonly<Record<string, string>> = {
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".json": "application/json; charset=utf-8",
+    ".ogg": "audio/ogg",
+    ".md": "text/markdown; charset=utf-8",
+};
 
 function builtFile(path: string): string | undefined
 {

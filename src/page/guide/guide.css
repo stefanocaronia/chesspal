@@ -1,0 +1,200 @@
+/* The guide: a tall dialog, an index of chips, each part folding under its title, and the foot with who made Chesspal and the credits (Zoe) */
+
+.dialog:has(> .guide) {
+    height: calc(100vh - 48px);
+    max-height: 90vh;
+}
+
+.guide {
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.guide p,
+.guide ul,
+.guide ol {
+    margin: 0 0 10px;
+}
+
+.guide ul,
+.guide ol {
+    padding-inline-start: 22px;
+}
+
+.guide li + li {
+    margin-top: 4px;
+}
+
+.guide a {
+    color: var(--accent);
+}
+
+.guide code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--quote);
+    font-size: 13px;
+}
+
+/* A heading a chip or a link brings into sight stays under the dialog's own title */
+.guide [id] {
+    scroll-margin-top: 64px;
+}
+
+.guide-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 14px;
+}
+
+.guide-chip {
+    min-height: 32px;
+    padding: 5px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+}
+
+.guide-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* A part: its title, a chevron that turns when it opens */
+.guide-part {
+    border-top: 1px solid var(--line);
+}
+
+.guide-part summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    cursor: pointer;
+    list-style: none;
+}
+
+.guide-part summary::-webkit-details-marker {
+    display: none;
+}
+
+.guide-part summary::before,
+.credits summary::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-right: 1.7px solid var(--soft);
+    border-bottom: 1.7px solid var(--soft);
+    transform: rotate(-45deg);
+    transition: transform 0.15s;
+}
+
+.guide-part[open] summary::before,
+.credits[open] summary::before {
+    transform: rotate(45deg);
+}
+
+.guide-part h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.guide-part[open] {
+    padding-bottom: 6px;
+}
+
+.guide-table {
+    overflow-x: auto;
+    margin: 0 0 10px;
+}
+
+.guide-table table {
+    border-collapse: collapse;
+}
+
+.guide-table th,
+.guide-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--line);
+    text-align: start;
+    vertical-align: top;
+}
+
+/* The foot: who made Chesspal, where it lives, the heart that supports it; the credits folded under it */
+.guide-foot {
+    display: grid;
+    gap: 6px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    color: var(--soft);
+    font-size: 12.5px;
+    text-align: center;
+}
+
+.guide-foot p {
+    margin: 0;
+}
+
+.foot-own {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 14px;
+}
+
+.guide .foot-own a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.guide .foot-own a:hover,
+.guide .foot-own a:focus-visible {
+    color: var(--ink);
+}
+
+.foot-own .icon {
+    width: 16px;
+    height: 16px;
+}
+
+.foot-support .icon {
+    color: var(--low-time);
+}
+
+.credits summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.credits summary::-webkit-details-marker {
+    display: none;
+}
+
+.credits ul {
+    margin: 8px auto 0;
+    max-width: 60ch;
+    text-align: start;
+}
+
+@media (max-width: 600px) {
+    .dialog:has(> .guide) {
+        width: 100vw;
+        max-width: 100vw;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+}

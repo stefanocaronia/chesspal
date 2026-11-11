@@ -657,13 +657,13 @@
     align-items: center;
 }
 
-/* Between games the chip is never cut: beside it the Torretta stands for the name at every width, and the flip keeps only its icon */
+/* Between games and in analysis the Torretta alone stands for the name, at every width, to leave the chip its room */
 @media (min-width: 841px) {
-    .top:has(.verdict.idle, .verdict.over) .title {
+    .top:has(.verdict.idle, .verdict.over, .verdict.analysis) .title {
         display: none;
     }
 
-    .top:has(.verdict.idle, .verdict.over) .verdict {
+    .top:has(.verdict.idle, .verdict.over, .verdict.analysis) .verdict {
         margin-right: auto;
     }
 }
@@ -928,10 +928,16 @@
     box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
 }
 
-/* On a phone the header's first line holds the Torretta, which stands for the name, and every button down to the player's picture, a little closer */
+/* On a phone the header's first line holds the Torretta, which stands for the name, and every button down to the player's picture, a little closer; the
+   sound and the theme stay in the settings */
 @media (max-width: 420px) {
     .top {
         column-gap: 4px;
+    }
+
+    .top .sound-button,
+    .top .theme-button {
+        display: none;
     }
 
     .top .title {

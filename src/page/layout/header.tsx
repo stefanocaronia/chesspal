@@ -22,9 +22,9 @@ export interface GameActions
 /**
  * The header, with how a game over ended, or that none goes on (D-77), or the AI's draw offer with the player's answer, the player's draw
  * and resignation in a game going on (D-65), a new game once the page has the folder's, the command that turns the board round and says whether it is
- * turned, the switches of the sounds and the theme, and the gear of the settings (D-56).
+ * turned, the switches of the sounds and the theme, the gear of the settings (D-56) and the book of the guide.
  */
-export function Header({ text, verdict, kind, who, actions, onNewGame, standOut = false, onStudy, flipped, onFlip, sound, onSound, onTheme, onSettings, profile, onProfile }: {
+export function Header({ text, verdict, kind, who, actions, onNewGame, standOut = false, onStudy, flipped, onFlip, sound, onSound, onTheme, onSettings, onGuide, profile, onProfile }: {
     text: Text;
     verdict?: string;
     /** What the verdict is about, which gives its chip a colour and an icon. */
@@ -43,6 +43,8 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
     onSound: () => void;
     onTheme: () => void;
     onSettings: () => void;
+    /** Opens the guide. */
+    onGuide: () => void;
     /** Who plays: their picture opens the menu of the players, in every phase. */
     profile?: ProfileShown;
     onProfile?: () => void;
@@ -85,13 +87,13 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
                 </Icon>
                 <span>{text.flip}</span>
             </button>
-            <button class="icon-button" type="button" title={text.sounds} aria-label={text.sounds} aria-pressed={sound} onClick={onSound}>
+            <button class="icon-button sound-button" type="button" title={text.sounds} aria-label={text.sounds} aria-pressed={sound} onClick={onSound}>
                 <Icon class="speaker">
                     <path d="M5 9.5H8.5L13 5.5V18.5L8.5 14.5H5Z" />
                     {sound ? <path d="M16.5 9A4 4 0 0 1 16.5 15M19 6.5A7.5 7.5 0 0 1 19 17.5" /> : <path d="M15.5 9L21.5 15M21.5 9L15.5 15" />}
                 </Icon>
             </button>
-            <button class="icon-button" type="button" title={text.theme} aria-label={text.theme} onClick={onTheme}>
+            <button class="icon-button theme-button" type="button" title={text.theme} aria-label={text.theme} onClick={onTheme}>
                 <Icon class="sun">
                     <circle cx="12" cy="12" r="4" />
                     <path d="M12 2V4M12 20V22M2 12H4M20 12H22M4.9 4.9L6.3 6.3M17.7 17.7L19.1 19.1M4.9 19.1L6.3 17.7M17.7 6.3L19.1 4.9" />
@@ -104,6 +106,11 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
                 <Icon class="gear">
                     <circle cx="12" cy="12" r="3" />
                     <path d="M9.72 5.38L10.19 2.67L13.81 2.67L14.28 5.38L15.07 5.71L17.31 4.12L19.88 6.69L18.29 8.93L18.62 9.72L21.33 10.19L21.33 13.81L18.62 14.28L18.29 15.07L19.88 17.31L17.31 19.88L15.07 18.29L14.28 18.62L13.81 21.33L10.19 21.33L9.72 18.62L8.93 18.29L6.69 19.88L4.12 17.31L5.71 15.07L5.38 14.28L2.67 13.81L2.67 10.19L5.38 9.72L5.71 8.93L4.12 6.69L6.69 4.12L8.93 5.71Z" />
+                </Icon>
+            </button>
+            <button class="icon-button guide-button" type="button" title={text.guide.title} aria-label={text.guide.title} aria-haspopup="dialog" onClick={onGuide}>
+                <Icon class="book">
+                    <path d="M12 6.5C10 5 7 4.5 3.5 5V18.5C7 18 10 18.5 12 20C14 18.5 17 18 20.5 18.5V5C17 4.5 14 5 12 6.5ZM12 6.5V20" />
                 </Icon>
             </button>
             {profile === undefined || onProfile === undefined ? null : (

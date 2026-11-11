@@ -103,6 +103,8 @@ async function tableStarted(): Promise<{ url: string; quit: () => Promise<boolea
         void exited.then(() => failed(new Error(`chesspal table left: ${said}`)));
     });
     check(`chesspal table serves the page at ${url}`, true);
+    const guide = await fetch(new URL("/page/guide/en.md", url)).then((response) => (response.ok ? response.text() : "")).catch(() => "");
+    check("the page serves its guide", guide.startsWith("# Chesspal"));
     return {
         url,
         quit: async () => {
