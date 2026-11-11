@@ -30,8 +30,8 @@ Each folder is a module with one job, which exposes its API from its `index.ts`:
 | [commands/](../src/commands/) | The commands, a file each, named as their tool: the only way the AI, the command line and the page change a game; [registry.ts](../src/commands/registry.ts) defines a command, [context.ts](../src/commands/context.ts) what it runs with (folders, time, randomness, the network) | core, games, profiles, sites, home, host-files |
 | [cli/](../src/cli/) | The `chesspal` binary: the commands from the arguments, the table's words (`open`, `table`, `icon`, `play`), `mcp`, `listen`, `chat` | commands through their index ✓, server, and the modules below them |
 | [server/](../src/server/) | [mcp.ts](../src/server/mcp.ts), the MCP server, every command as a tool; [bell.ts](../src/server/bell.ts), the doorbell that wakes a chat; [caller.ts](../src/server/caller.ts), who makes a tool call | commands through their index ✓, and the modules below them |
-| [server/page/](../src/server/page/) | The board page's server: its files, its routes for the game, the profiles and the analyses, the events the pages listen to, the chat attached to the table | commands, and the modules below them |
-| [server/table/](../src/server/table/) | The table, the page in a process of its own (D-104): started by `chesspal` alone, opened in the browser, attached to by the chats | server/page, commands, and the modules below them |
+| [server/page/](../src/server/page/) | The board page's server: its files, its routes for the game, the profiles and the analyses, the events the pages listen to, the chat attached to the table, a newer Chesspal on npm | commands, and the modules below them |
+| [server/table/](../src/server/table/) | The table, the page in a process of its own (D-104): started by `chesspal` alone, opened in the browser, attached to by the chats; it updates Chesspal with npm and starts again (D-108) | server/page, commands, and the modules below them |
 | [server/table/hosts/](../src/server/table/hosts/) | The chats the table opens: Claude Code and Codex found on this computer, the terminal they open in, `chesspal play` and its seat | server/page, the doorbell, commands, and the modules below them |
 | [server/table/icon/](../src/server/table/icon/) | Chesspal's icon on the desktop and in the menu, on Windows, macOS and Linux | games, home |
 | [page/](../src/page/) | The board page, in Preact: [main.tsx](../src/page/main.tsx) starts it, [text.ts](../src/page/text.ts) holds its words in Italian and English | the chess core alone ✓; the rest it asks the server for |
@@ -50,7 +50,7 @@ The page's folders have no `index.ts`: they import each other's files directly, 
 | [players/](../src/page/players/) | A player's card: picture, name, clock, pieces taken, the AI's model |
 | [game/](../src/page/game/) | The game's column: move list, badges, opening, result, browsing a game |
 | [talk/](../src/page/talk/) | The talk with the AI on the page, and the voice that reads it |
-| [table/](../src/page/table/) | The chat at the table (D-104, D-107): its window, from the AI's name, that opens one or starts it again with another model or host, and what the page says while it does |
+| [table/](../src/page/table/) | The chat at the table (D-104, D-107): its window, from the AI's name, that opens one or starts it again with another model or host, and what the page says while it does; the mark and the window of a newer Chesspal (D-108) |
 | [dialogs/](../src/page/dialogs/) | The windows: who plays and the wizard, new game, settings, the analyses, a game to study |
 | [guide/](../src/page/guide/) | The guide from the header's book: its text in `it.md` and `en.md`, with the same headings, the markdown drawn as the page's elements, and its foot with the credits and the support |
 | [profile/](../src/page/profile/) | The profile and the settings as the server sends them, and the requests that change them |

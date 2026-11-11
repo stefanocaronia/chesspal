@@ -1,12 +1,13 @@
 // What only the table's page answers (D-104): another Chesspal version asks it to quit, and the page opens a chat with no chat at the table, through the
-// hosts the table offers, starts it again for a new game, and with another model or host once it has done, or at once if the player says so (D-107); a
-// page a chat serves itself has none of these routes.
+// hosts the table offers, starts it again for a new game, and with another model or host once it has done, or at once if the player says so (D-107); it
+// installs a newer Chesspal between games (D-108). A page a chat serves itself has none of these routes.
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { samePosition } from "../../commands/index.ts";
-import { gameInAnalysis } from "../../games/index.ts";
+import { setTimeout as delay } from "node:timers/promises";
+import { gameAt, samePosition } from "../../commands/index.ts";
+import { endOf, gameInAnalysis } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { tellWatchers } from "./events.ts";
-import { bodyOf, isJson, jsonOf, runRoute, sendJson } from "./http.ts";
+import { bodyOf, isJson, jsonOf, type Refused, runRoute, sendJson } from "./http.ts";
 import type { Served } from "./page.ts";
 
 /** A host the table offers a chat in: whether it is installed, the models and efforts the player may choose, and the command to open one by hand. */
@@ -28,7 +29,8 @@ export interface TableChats
     hosts(): readonly ChatHost[];
     open(host: string): Promise<boolean>;
     held(folder: string): HeldChat | undefined;
-    relaunch(folder: string, host?: string): boolean;
+    /** Asks for the chat again: with another host, or `updated`, from the Chesspal just installed (D-108). */
+    relaunch(folder: string, host?: string, updated?: boolean): boolean;
 }
 
 /** The chat `chesspal play` holds: the model and effort its host started with, none for the host's own. */
@@ -100,8 +102,12 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
         runRoute(response, () => restartChat(request, response, served));
     } else if (path === "/api/table/waiting") {
         runRoute(response, () => endWaiting(request, response, served));
+    } else if (path === "/api/table/update") {
+        runRoute(response, () => updateChesspal(request, response, served));
     } else {
-        sendJson(response, 404, { error: `${path} is no route of the table's: it answers POST /api/table/chat, /api/table/restart, /api/table/waiting and /api/table/quit.` });
+        sendJson(response, 404, {
+            error: `${path} is no route of the table's: it answers POST /api/table/chat, /api/table/restart, /api/table/waiting, /api/table/update and /api/table/quit.`,
+        });
     }
 
     return true;
@@ -228,6 +234,86 @@ async function endWaiting(request: IncomingMessage, response: ServerResponse, se
         tellWatchers(served.watchers);
         sendJson(response, 200, now ? { restarting } : { waiting: false });
     }
+}
+
+/**
+ * Once npm has installed the newer Chesspal (D-108), and no game goes on and the chat is at rest, as a game or a chat may have started while npm worked:
+ * the chat `chesspal play` holds starts again from it, clean, and once it has left the table, the table closes to start again from it too.
+ */
+export function updateWhenAtRest(served: Served): void
+{
+    if (served.updating !== "installed" || gameGoingOn(served) || !tableAtRest(served)) {
+        return;
+    }
+
+    served.updating = "restarting";
+    tellWatchers(served.watchers);
+    const relaunched = served.table?.chats?.relaunch(served.folder, undefined, true) === true;
+    void restartOnceLeft(served, relaunched);
+}
+
+/**
+ * Installs the newer Chesspal npm has (D-108), asked by the table's own page alone, never while a game goes on, the chat is at work or one is opening;
+ * the table then starts again from it as soon as it is at rest. Whether npm installed it; when it did not, the page gives the command to type.
+ */
+async function updateChesspal(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
+{
+    await bodyOf(request);
+    const { newer, table } = served;
+
+    if (!fromTablePage(request, served)) {
+        sendJson(response, 403, { error: "Only the table's own page updates Chesspal." });
+    } else if (newer === undefined || table?.update === undefined) {
+        sendJson(response, 409, { error: "No newer Chesspal to install: this one is the latest npm has." });
+    } else if (served.updating !== undefined) {
+        sendJson(response, 409, { error: "Chesspal is being updated already: wait for the table to start again." });
+    } else if (gameGoingOn(served)) {
+        sendJson(response, 409, { error: "A game is going on: finish it, then update Chesspal.", refusal: "update-game" } satisfies Refused);
+    } else if (!tableAtRest(served)) {
+        sendJson(response, 409, { error: "The chat is at work, or opening: update Chesspal once it is at rest.", refusal: "update-chat" } satisfies Refused);
+    } else {
+        served.updating = "installing";
+        tellWatchers(served.watchers);
+        let installed = false;
+
+        try {
+            installed = await table.update.install(newer);
+        } finally {
+            served.updating = installed ? "installed" : undefined;
+        }
+
+        // Starting again ends every connection: once this answer has gone, or the page that asked has.
+        response.once("close", () => updateWhenAtRest(served));
+        tellWatchers(served.watchers);
+        sendJson(response, 200, { installed });
+    }
+}
+
+// The chat started again leaves the table as `chesspal play` ends its host: a table closed before would leave its server to serve its own page on the
+// table's ports, where the new table would then find them taken (Priya). One that does not leave in time is left to it.
+async function restartOnceLeft(served: Served, relaunched: boolean): Promise<void>
+{
+    for (let tries = 0; relaunched && served.attached !== undefined && tries < leaveTries; tries++) {
+        await delay(100);
+    }
+
+    served.table?.update?.restart();
+}
+
+// `chesspal play` sees the request within half a second and ends its host in a few more.
+const leaveTries = 100;
+
+// A game with moves still to come, a new one too: never an update meanwhile (D-108).
+function gameGoingOn(served: Served): boolean
+{
+    const current = gameAt(gameFolder(served.context.home()), served.context.now());
+    return current !== undefined && endOf(current.game) === undefined;
+}
+
+// No chat is at work at the table, and none is opening.
+function tableAtRest(served: Served): boolean
+{
+    return (served.attached === undefined || chatAtRest(served)) && opening(served) === undefined;
 }
 
 // The browser marks a request of the table's own page with its origin.

@@ -47,7 +47,7 @@ Chesspal works with any agent that supports MCP tools and can work with the file
 - **For the next game**, press New game: the AI the board page opened starts again with a clean chat by itself, once it has stopped working. In a chat you opened yourself, type `/clear` first: a long chat makes the AI slower and costs you more.
 - **To play in a folder of your own**, as with the Claude desktop app, type `chesspal init chess`, then open your agent in the folder `chess` and say hello: the AI answers with the link to the board page. Any name will do; your games are kept [elsewhere](#where-your-games-are).
 - **A move written in the chat** counts too: `e4`, `Nf3`, in the international notation (K Q R B N in every language), or in words.
-- **To update**, close the AI's terminal, run `npm install -g chesspal` again, then `chesspal`. In a folder of your own, run `chesspal init` there too: it updates its own lines and keeps what you wrote there. In Codex, allow the hooks again when it says so.
+- **To update**, when a new version is out the table's page shows an arrow at the top: press it between games, and the table installs it and starts again, with its chat. By hand: close the AI's terminal, run `npm install -g chesspal` again, then `chesspal`. In a folder of your own, run `chesspal init` there too: it updates its own lines and keeps what you wrote there. In Codex, allow the hooks again when it says so.
 
 ## Where your games are
 

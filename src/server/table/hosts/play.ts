@@ -28,7 +28,8 @@ export interface HostLaunch
 
 /**
  * Runs the host in the table's folder, in this terminal, until it ends: its exit code; started again, clean, when the table asks for a new game (D-57),
- * or for another model or host, which then takes its place (D-107). Ctrl+C is the host's: this process ignores it, or the terminal would close with the chat.
+ * or for another model or host, which then takes its place (D-107); after an update, by the Chesspal installed (D-108). Ctrl+C is the host's: this
+ * process ignores it, or the terminal would close with the chat.
  */
 export async function playHost(context: Context, host: HostName): Promise<number>
 {
@@ -46,6 +47,8 @@ export async function playHost(context: Context, host: HostName): Promise<number
     // The host before one asked in its place, until that one has started: it goes on when the other does not start.
     let before: HostName | undefined;
     let refreshed = Date.now();
+    // Chesspal was updated under this process (D-108): the new one plays on.
+    let updated = false;
 
     const asked = (): boolean => {
         if (Date.now() - refreshed >= seatTimes.refresh) {
@@ -55,6 +58,7 @@ export async function playHost(context: Context, host: HostName): Promise<number
 
         const again = askedAgain(folder, process.pid);
         next = again?.host !== undefined && isHostName(again.host) ? again.host : playing;
+        updated ||= again?.updated === true;
         return again !== undefined;
     };
 
@@ -81,6 +85,13 @@ export async function playHost(context: Context, host: HostName): Promise<number
 
             if (!ran.again) {
                 return ran.code;
+            }
+
+            if (updated) {
+                terminal.restore();
+                process.stdout.write(cleanScreen);
+                leaveSeat(folder, process.pid);
+                return await playUpdated(playing);
             }
 
             if (next !== playing) {
@@ -170,16 +181,47 @@ async function started(context: Context, host: HostName, again: () => boolean): 
     });
 }
 
+// The Chesspal just installed plays on in this terminal, in a process of its own with all its files new (D-108), which takes the seat; this one, with
+// the code it started with, waits for it to end.
+function playUpdated(host: HostName): Promise<number>
+{
+    return new Promise((done) => {
+        const startedAt = Date.now();
+        const play = spawn(process.execPath, [...process.execArgv, process.argv[1] ?? "", "play", host], { stdio: "inherit" });
+
+        const failed = (why: string): void => {
+            process.stderr.write(`Chesspal did not start again after its update (${why}): run chesspal play ${host}.\n`);
+        };
+
+        play.once("error", (error) => {
+            failed(error.message);
+            done(1);
+        });
+        // One that ended at once, failing, never showed its host: the player is told how to start it (Priya).
+        play.once("exit", (code) => {
+            if (code !== 0 && Date.now() - startedAt < quickExit) {
+                failed(`exit code ${code ?? "none"}`);
+            }
+
+            done(code ?? 1);
+        });
+    });
+}
+
 // A host that has not ended this long after it was asked is killed.
 const killAfter = 3_000;
+// A play process that ends sooner never got to its host.
+const quickExit = 10_000;
 
 // A host ended in the middle leaves the modes it set: colours, scroll region, synchronized output, bracketed paste, focus and mouse reports, kitty's
 // keyboard flags, its own screen, a hidden cursor (Priya). All off, and the screen cleared, as a new chat.
 const cleanScreen = "\x1b[0m\x1b[r\x1b[?2026l\x1b[?2004l\x1b[?1004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[<99u\x1b[?1049l\x1b[?25h\x1b[2J\x1b[3J\x1b[H";
 
-// The host and what it started, its MCP server among them: on Windows its whole tree, which taskkill ends, never the console (Priya); else the host,
-// which ends its own. A taskkill that failed leaves it to the kill that follows.
-function endTree(chat: ChildProcess, platform: string): void
+/**
+ * Ends a process and what it started, a host's MCP server among them: on Windows its whole tree, which taskkill ends, never the console (Priya); else the
+ * process, which ends its own. A taskkill that failed leaves it to a kill.
+ */
+export function endTree(chat: ChildProcess, platform: string): void
 {
     if (platform !== "win32" || chat.pid === undefined) {
         chat.kill("SIGTERM");

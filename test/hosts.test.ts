@@ -102,6 +102,9 @@ describe("a chat the table opens", () => {
         // Asked with another host, which takes its place (D-107).
         expect(chats.relaunch(table, "codex")).toBe(true);
         expect(askedAgain(table, process.pid)).toEqual({ host: "codex" });
+        // Asked after an update, from the Chesspal just installed (D-108).
+        expect(chats.relaunch(table, undefined, true)).toBe(true);
+        expect(askedAgain(table, process.pid)).toEqual({ updated: true });
     });
 
     it("keeps each host's choice in the page's settings, a word alone", () => {

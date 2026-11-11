@@ -56,13 +56,16 @@ export async function openTable(context: Context, launcher: TableLauncher = proc
     }
 }
 
-/** Notes why the icon could not open the table, whose console nobody sees, in open.log of the table's folder: the last of them. */
-export function noteOpenFailed(context: Context, message: string): void
+/**
+ * Notes what went wrong where nobody reads a console, in a log of the table's folder, the last time alone: open.log, why the icon could not open the table;
+ * update.log, why npm did not update Chesspal (D-108).
+ */
+export function noteFailure(context: Context, log: "open.log" | "update.log", message: string): void
 {
     try {
         const folder = tableFolder(context.home());
         mkdirSync(folder, { recursive: true });
-        writeFileSync(join(folder, "open.log"), `${context.now().toISOString()} ${message}\n`);
+        writeFileSync(join(folder, log), `${context.now().toISOString()} ${message}\n`);
     } catch {
         // A data folder that cannot be written has no other place for it.
     }

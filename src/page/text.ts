@@ -114,6 +114,25 @@ export interface Text
     offline(name: string): string;
     /** The player's folder was set up by an older Chesspal. */
     outdated(name: string): string;
+    /** A newer Chesspal on npm (D-108): the header's mark and its window on the table, which installs it between games; a chat's own page says the command. */
+    readonly update: {
+        mark(version: string): string;
+        readonly title: string;
+        /** The version out, and the one the table runs when the page knows it. */
+        offer(version: string, current: string | undefined): string;
+        /** What becomes of the chat at the table: the one Chesspal holds starts again, the one opened by hand is the player's to open again. */
+        chatAgain(name: string): string;
+        byHand(name: string): string;
+        readonly whilePlaying: string;
+        readonly install: string;
+        installing(version: string): string;
+        /** Installed while a game or the chat's answer went on: the table starts again once they end. */
+        readonly installed: string;
+        /** npm failed: the commands to type follow, each on its line. */
+        readonly failed: string;
+        /** On a chat's own page: the command to type follows. */
+        notice(version: string, name: string): string;
+    };
     /** The page is served, but no chat hears the player (never started, or just cleared): where to write to wake it; its clock waits. */
     asleep(name: string): string;
     /** The same over a game in analysis, where no clock waits (Zoe). */
@@ -426,7 +445,9 @@ export type ServerRefusal =
     | "draw-early"
     | "profile-game"
     | "game-going"
-    | "pgn-unreadable";
+    | "pgn-unreadable"
+    | "update-game"
+    | "update-chat";
 
 /**
  * A move the board refused, as the page names it: why, the piece moved, the square it went to and whether a piece stood there, the piece that forbids
@@ -622,6 +643,19 @@ const english: Text = {
     boardLabel: (turn, lastMove) => `Chessboard, ${english.toMove(turn)}${lastMove === undefined ? "" : `, last move ${lastMove}`}`,
     clearChat: (name) => `Before a new game, clear your chat with ${name}: in the window where you opened ${name}, not here, write /clear, then a message such as "new game". A clean chat plays faster.`,
     outdated: (name) => `Chesspal has been updated, but this folder still has its old files: close the chat with ${name}, run chesspal init in this folder, and open a new chat.`,
+    update: {
+        mark: (version) => `Chesspal ${version} is out: update`,
+        title: "Update Chesspal",
+        offer: (version, current) => `Chesspal ${version} is out${current === undefined ? "" : `; this is ${current}`}. The table installs it and starts again by itself.`,
+        chatAgain: (name) => `The chat with ${name} starts again too, clean.`,
+        byHand: (name) => `You opened the chat with ${name} yourself: afterwards, close it and open a new one.`,
+        whilePlaying: "A game is going on: finish it, then update.",
+        install: "Update",
+        installing: (version) => `Installing ${version}…`,
+        installed: "Installed: the table starts again by itself once the game is over.",
+        failed: "Chesspal was not updated: close the chat, then type in a terminal, one after the other:",
+        notice: (version, name) => `Chesspal ${version} is out: close the chat with ${name}, type this command in a terminal, then open a new chat.`,
+    },
     offline: (name) => `${name} is not connected. Write it a message in the window where you opened ${name}, not in this page's chat: the page connects again by itself.`,
     startClocks: "Start",
     thinking: { move: "Thinking about its move", ponder: "Thinking while you play" },
@@ -665,6 +699,8 @@ const english: Text = {
         "profile-game": () => english.profile.whilePlaying,
         "game-going": () => "A game is going on: finish it before you bring another to analyse.",
         "pgn-unreadable": () => "Chesspal cannot read this PGN: check you copied the whole game, its tags and its moves.",
+        "update-game": () => english.update.whilePlaying,
+        "update-chat": (most, name) => `${name} is answering: update once it has done.`,
     },
     piece: (letter, side) => `${side} ${englishNames[letter]}`,
     taken: (pieces, ahead) => `Pieces taken: ${pieces.length === 0 ? "none" : pieces.join(", ")}${ahead > 0 ? `; ahead by ${ahead}` : ""}`,
@@ -1011,6 +1047,19 @@ const italian: Text = {
     clearChat: (name) =>
         `Prima di una nuova partita azzera la conversazione con ${name}: nella finestra dove hai aperto ${name}, non qui, scrivi /clear e poi un messaggio, per esempio "nuova partita". Con la chat pulita l'AI gioca più veloce.`,
     outdated: (name) => `Chesspal è stato aggiornato, ma questa cartella ha ancora i file di prima: chiudi la chat con ${name}, esegui chesspal init in questa cartella e apri una chat nuova.`,
+    update: {
+        mark: (version) => `È uscito Chesspal ${version}: aggiorna`,
+        title: "Aggiorna Chesspal",
+        offer: (version, current) => `È uscita la versione ${version} di Chesspal${current === undefined ? "" : `; questa è la ${current}`}. Il tavolo la installa e riparte da solo.`,
+        chatAgain: (name) => `Anche la chat con ${name} riparte pulita.`,
+        byHand: (name) => `La chat con ${name} l'hai aperta tu: dopo, chiudila e aprine una nuova.`,
+        whilePlaying: "C'è una partita in corso: finiscila, poi aggiorna.",
+        install: "Aggiorna",
+        installing: (version) => `Installo la ${version}…`,
+        installed: "Installata: il tavolo riparte da solo a fine partita.",
+        failed: "Chesspal non si è aggiornato: chiudi la chat, poi scrivi in un terminale, uno dopo l'altro:",
+        notice: (version, name) => `È uscita la versione ${version} di Chesspal: chiudi la chat con ${name}, scrivi questo comando in un terminale e apri una chat nuova.`,
+    },
     offline: (name) => `${name} è scollegato. Scrivigli un messaggio nella finestra dove hai aperto ${name}, non nella chat di questa pagina: la pagina si ricollega da sola.`,
     startClocks: "Inizia",
     thinking: { move: "Sta pensando alla sua mossa", ponder: "Pensa mentre giochi tu" },
@@ -1054,6 +1103,8 @@ const italian: Text = {
         "profile-game": () => italian.profile.whilePlaying,
         "game-going": () => "C'è una partita in corso: finiscila prima di portarne un'altra da analizzare.",
         "pgn-unreadable": () => "Chesspal non riesce a leggere questo PGN: controlla di aver copiato la partita intera, intestazioni e mosse.",
+        "update-game": () => italian.update.whilePlaying,
+        "update-chat": (most, name) => `${name} sta rispondendo: aggiorna quando ha finito.`,
     },
     // Queen and rook are feminine in Italian.
     piece: (letter, side) => `${italianNames[letter]} ${side === "white" ? (letter === "Q" || letter === "R" ? "bianca" : "bianco") : (letter === "Q" || letter === "R" ? "nera" : "nero")}`,

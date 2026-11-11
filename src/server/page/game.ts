@@ -52,6 +52,7 @@ import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, te
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
 import { chatToRelaunch, relaunchChat, tableShown } from "./table.ts";
+import { updateShown } from "./update.ts";
 
 /** Answers the page's requests about the game: true when the request was one. */
 export function answerGame(request: IncomingMessage, response: ServerResponse, url: URL, served: Served): boolean
@@ -419,6 +420,7 @@ function sendGame(response: ServerResponse, served: Served): void
         listening: served.bell.listening,
         ...thinkingShown(served, current),
         ...(served.outdated ? { outdated: true } : {}),
+        ...updateShown(served),
         ...tableShown(served),
         ...profilesShown(served.context.home()),
     };

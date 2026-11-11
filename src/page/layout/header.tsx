@@ -5,6 +5,7 @@ import type { VerdictKind } from "../app/phase.ts";
 import { PlayerPicture } from "../avatars/avatars.tsx";
 import { Torretta } from "../avatars/torretta.tsx";
 import type { ProfileShown } from "../profile/profile.ts";
+import { UpdateMark } from "../table/update.tsx";
 import type { Text } from "../text.ts";
 
 /** What the player may do in a game going on (D-65): offer a draw on their turn, answer the AI's offer, resign. */
@@ -22,9 +23,10 @@ export interface GameActions
 /**
  * The header, with how a game over ended, or that none goes on (D-77), or the AI's draw offer with the player's answer, the player's draw
  * and resignation in a game going on (D-65), a new game once the page has the folder's, the command that turns the board round and says whether it is
- * turned, the switches of the sounds and the theme, the gear of the settings (D-56) and the book of the guide.
+ * turned, on the table the mark of a newer Chesspal (D-108), the switches of the sounds and the theme, the gear of the settings (D-56) and the book of
+ * the guide.
  */
-export function Header({ text, verdict, kind, who, actions, onNewGame, standOut = false, onStudy, flipped, onFlip, sound, onSound, onTheme, onSettings, onGuide, profile, onProfile }: {
+export function Header({ text, verdict, kind, who, actions, onNewGame, standOut = false, onStudy, flipped, onFlip, sound, onSound, onTheme, onSettings, onGuide, profile, onProfile, update, onUpdate }: {
     text: Text;
     verdict?: string;
     /** What the verdict is about, which gives its chip a colour and an icon. */
@@ -48,6 +50,9 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
     /** Who plays: their picture opens the menu of the players, in every phase. */
     profile?: ProfileShown;
     onProfile?: () => void;
+    /** On the table, a newer Chesspal: its mark opens the window that installs it, and spins while npm installs it (D-108). */
+    update?: { readonly version: string; readonly installing: boolean; };
+    onUpdate?: () => void;
 })
 {
     return (
@@ -87,6 +92,7 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
                 </Icon>
                 <span>{text.flip}</span>
             </button>
+            {update === undefined || onUpdate === undefined ? null : <UpdateMark version={update.version} installing={update.installing} onOpen={onUpdate} text={text} />}
             <button class="icon-button sound-button" type="button" title={text.sounds} aria-label={text.sounds} aria-pressed={sound} onClick={onSound}>
                 <Icon class="speaker">
                     <path d="M5 9.5H8.5L13 5.5V18.5L8.5 14.5H5Z" />

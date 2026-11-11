@@ -7,6 +7,7 @@ import { setUpHosts } from "../../host-files/index.ts";
 import { pageAt, pagePorts, samePath } from "../bell.ts";
 import { type Page, startPage } from "../page/page.ts";
 import type { TableChats } from "../page/table.ts";
+import type { TableUpdater } from "./update.ts";
 
 /** A table served: its address, and how to close it. */
 export interface Table
@@ -39,9 +40,9 @@ export interface TableFound
 /**
  * Starts the table on the context's data folder, its folder set up as init does, its page opening chats through `chats`: undefined when another table
  * started at the same time took a lower port, since a table's ports are its lock. It closes once no page has been open, no chat attached and no request
- * come, for `times.idle`.
+ * come, for `times.idle`; with `updater`, its page updates Chesspal, and a new table starts from it once this one has closed (D-108).
  */
-export async function startTable(context: Context, times: TableTimes = tableTimes, chats?: TableChats): Promise<Table | undefined>
+export async function startTable(context: Context, times: TableTimes = tableTimes, chats?: TableChats, updater?: TableUpdater): Promise<Table | undefined>
 {
     const folder = tableFolder(context.home());
     setUpHosts(folder, context.platform);
@@ -50,12 +51,19 @@ export async function startTable(context: Context, times: TableTimes = tableTime
         quit = done;
     });
     let lastUsed = context.now().getTime();
+    let startAgain = false;
 
     const used = (): void => {
         lastUsed = context.now().getTime();
     };
 
-    const page = await startPage({ ...context, folder }, { table: { used, quit, chats } });
+    const restart = (): void => {
+        startAgain = true;
+        quit();
+    };
+
+    const update = updater === undefined ? undefined : { install: (version: string) => updater.install(version), restart };
+    const page = await startPage({ ...context, folder }, { table: { used, quit, chats, update } });
 
     if (await lostTo(page.url, folder)) {
         await page.close();
@@ -65,7 +73,12 @@ export async function startTable(context: Context, times: TableTimes = tableTime
     const watch = closeWhenIdle(page, () => context.now().getTime() - lastUsed, used, times, quit);
     const closed = quitting.then(async () => {
         clearInterval(watch);
+        // Its ports free, the new table takes the first of them, where the pages open look for it.
         await page.close();
+
+        if (startAgain) {
+            updater?.startAgain();
+        }
     });
     return {
         url: page.url,
@@ -103,15 +116,6 @@ export function askToQuit(port: number): Promise<void>
 
 // A table answers at once: one stuck must not hold the chat's first tool, nor `chesspal`.
 const quitWait = 1_500;
-
-/** Whether a version is older than another, part by part: 0.2.4 is older than 0.10.0. */
-export function isOlder(one: string, other: string): boolean
-{
-    const parts = (version: string): number[] => version.split(/[.+-]/).slice(0, 3).map((part) => Number.parseInt(part, 10) || 0);
-    const [mine, theirs] = [parts(one), parts(other)];
-    const differs = mine.findIndex((part, index) => part !== theirs[index]);
-    return differs !== -1 && mine[differs]! < theirs[differs]!;
-}
 
 /** Whether a table of the same folder answers on a lower port than this one's: the other won, and this one goes. */
 async function lostTo(url: string, folder: string): Promise<boolean>

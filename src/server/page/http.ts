@@ -12,7 +12,7 @@ export const json = "application/json; charset=utf-8";
 export interface Refused
 {
     readonly error: string;
-    readonly refusal?: "no-game" | "ai-to-move" | "illegal" | "clear-chat" | `words-${WordsRefused["reason"]}` | `draw-${DrawRefused["reason"]}` | "profile-game" | "game-going" | "pgn-unreadable";
+    readonly refusal?: "no-game" | "ai-to-move" | "illegal" | "clear-chat" | `words-${WordsRefused["reason"]}` | `draw-${DrawRefused["reason"]}` | "profile-game" | "game-going" | "pgn-unreadable" | "update-game" | "update-chat";
     readonly most?: number;
 }
 

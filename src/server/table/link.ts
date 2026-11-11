@@ -6,10 +6,10 @@ import { aiHostOf, aiModelOf } from "../../games/index.ts";
 import { tableFolder } from "../../home/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { version } from "../../version.ts";
+import { isOlder, version } from "../../version.ts";
 import { jsonOf } from "../page/http.ts";
 import type { Page } from "../page/page.ts";
-import { askToQuit, isOlder, tableAt } from "./table.ts";
+import { askToQuit, tableAt } from "./table.ts";
 
 /**
  * Attaches the chat to the table of its data folder, when one of its version answers and no other chat is at it: the page the chat then uses, whose `lost`

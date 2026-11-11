@@ -909,6 +909,15 @@
     box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
 }
 
+/* On a phone it would cover the chat's line at the foot: it stands at the top of the column instead (Zoe) */
+@media (max-width: 840px) {
+    .outdated {
+        position: static;
+        margin: var(--between) var(--gap) 0;
+        box-shadow: none;
+    }
+}
+
 /* On a phone the header's first line holds the Torretta, which stands for the name, and every button down to the player's picture, a little closer; the
    sound and the theme stay in the settings */
 @media (max-width: 420px) {

@@ -58,6 +58,7 @@ import { signature } from "../players/model-name.ts";
 import { keepSettings, type ProfileShown } from "../profile/profile.ts";
 import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "../profile/settings.ts";
 import { endSoundOf, playSound, soundOf, wakeSounds } from "../sounds/sounds.ts";
+import { UpdateDialog } from "../table/update.tsx";
 import { AiNameButton, ChatDialog, tableNote } from "../table/window.tsx";
 import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
 import { textFor } from "../text.ts";
@@ -94,7 +95,7 @@ export function App({ start }: { start: Settings; })
         }
     };
 
-    const [dialog, setDialog] = useState<"profile" | "profiles" | "new-game" | "chat" | "study" | "guide" | undefined>(undefined);
+    const [dialog, setDialog] = useState<"profile" | "profiles" | "new-game" | "chat" | "study" | "guide" | "update" | undefined>(undefined);
     const { data: served, problem, offline, reload } = useServed(() => setDialog("new-game"));
     // Nuova partita with no chat at the table asks for one first (D-107): the chat's window, then the new game's, however the first closes.
     const [chatFirst, setChatFirst] = useState(false);
@@ -324,6 +325,7 @@ export function App({ start }: { start: Settings; })
             onSettings={() => setSetting(true)}
             onGuide={() => setDialog("guide")}
             {...(served === undefined ? {} : { profile: served.profile, onProfile: () => setDialog("profiles") })}
+            {...(served?.update === undefined || served.table === undefined || offline ? {} : { update: { version: served.update.version, installing: served.update.installing === true }, onUpdate: () => setDialog("update") })}
         />
     );
 
@@ -581,8 +583,34 @@ export function App({ start }: { start: Settings; })
                 <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
                 {guide}
                 <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} you={profile.name} accounts={profile.accounts} ai={name} text={text} />
+                {/* A newer Chesspal: the table's page installs it from the header's mark (D-108); a chat's own page says the command, in a strip */}
+                {served.update === undefined || served.table === undefined
+                    ? null
+                    : (
+                        <UpdateDialog
+                            open={dialog === "update"}
+                            version={served.update.version}
+                            current={served.version}
+                            installing={served.update.installing === true}
+                            installed={served.update.installed === true}
+                            going={going}
+                            chat={served.table.chat ? (served.table.held ? "held" : "byHand") : undefined}
+                            name={name}
+                            onClose={() => setDialog(undefined)}
+                            text={text}
+                        />
+                    )}
                 {offline ? <p class="offline" role="alert">{text.offline(name)}</p> : null}
-                {served.outdated === true ? <p class="outdated" role="status">{text.outdated(name)}</p> : null}
+                {served.outdated === true
+                    ? <p class="outdated" role="status">{text.outdated(name)}</p>
+                    : served.update !== undefined && served.table === undefined
+                    ? (
+                        <p class="outdated update-notice" role="status">
+                            {text.update.notice(served.update.version, name)}
+                            <code>npm install -g chesspal</code>
+                        </p>
+                    )
+                    : null}
                 <main class={`app${flipped ? " flipped" : ""}${folds.talk === "open" ? "" : ` talk-${folds.talk}`}${folds.game === "folded" ? " folded" : ""}`} inert={offline}>
                     {header}
                     {sides === undefined

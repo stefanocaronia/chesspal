@@ -75,23 +75,27 @@ export function askAgain(folder: string, now: Date = new Date(), again: Again = 
     return true;
 }
 
-/** What the table asks the play process in the seat: to start its host again, or the host named in its place (D-107). */
+/**
+ * What the table asks the play process in the seat: to start its host again, or the host named in its place (D-107); `updated`, from the Chesspal just
+ * installed, whose `chesspal play` then takes the seat (D-108).
+ */
 export interface Again
 {
     readonly host?: string;
+    readonly updated?: true;
 }
 
 /** What the table asked this play process, when it asked it to start its host again; the request is taken. */
 export function askedAgain(folder: string, pid: number): Again | undefined
 {
-    const asked = jsonIn(join(folder, againFile)) as { pid?: unknown; host?: unknown; } | undefined;
+    const asked = jsonIn(join(folder, againFile)) as { pid?: unknown; host?: unknown; updated?: unknown; } | undefined;
 
     if (asked?.pid !== pid) {
         return undefined;
     }
 
     rmSync(join(folder, againFile), { force: true });
-    return typeof asked.host === "string" ? { host: asked.host } : {};
+    return { ...(typeof asked.host === "string" ? { host: asked.host } : {}), ...(asked.updated === true ? { updated: true } : {}) };
 }
 
 /** How often a play process refreshes its seat, and how long the seat stays held without it. */

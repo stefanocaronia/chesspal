@@ -2,6 +2,7 @@
 export { appBrowser, openedAddress } from "./browser.ts";
 export { hostLaunch, isHostName, playHost, terminalChats } from "./hosts/index.ts";
 export { iconAsked, type IconCommand, iconCommand, type IconPlaces, iconToRemake, makeIcons, noteIconAsked, noteIconMade } from "./icon/index.ts";
-export { noteOpenFailed, openTable, processLauncher, type TableLauncher } from "./launch.ts";
+export { noteFailure, openTable, processLauncher, type TableLauncher } from "./launch.ts";
 export { attachTable, tableToJoin } from "./link.ts";
-export { isOlder, startTable, type Table, type TableTimes, tableTimes } from "./table.ts";
+export { startTable, type Table, type TableTimes, tableTimes } from "./table.ts";
+export { npmInstall, npmUpdater, type TableUpdater } from "./update.ts";

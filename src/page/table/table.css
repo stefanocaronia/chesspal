@@ -60,6 +60,61 @@
     font-size: 13px;
 }
 
+/* The header's mark of a newer Chesspal (D-108): its border as the other buttons', not the accent, which reads as focus; inside, a full accent disc with a
+   white arrow (Zoe) */
+.top .update-button .icon circle {
+    fill: var(--accent);
+    stroke: none;
+}
+
+.top .update-button .icon path {
+    stroke: var(--on-accent);
+}
+
+/* One button more: under 360px the header's buttons come a little closer, or the last one goes past the edge */
+@media (max-width: 359px) {
+    .top {
+        column-gap: 2px;
+    }
+}
+
+/* Its window, as narrow as the chat's; the spinner beside what npm does; npm's failure with a cross, and each command on its line */
+.dialog:has(> .update-offer) {
+    width: min(460px, calc(100vw - 32px));
+}
+
+.update-state {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.update-failed p {
+    margin: 0 0 6px;
+    color: var(--ink);
+    font-size: 14px;
+}
+
+.update-cross {
+    color: var(--low-time);
+    font-weight: 700;
+}
+
+.update-failed code,
+.update-notice code {
+    display: block;
+    margin-top: 4px;
+    font-family: ui-monospace, monospace;
+    white-space: nowrap;
+    user-select: all;
+}
+
+/* On a chat's own page, news and no warning: the card's ground and an accent border */
+.outdated.update-notice {
+    border-color: var(--accent);
+    background: var(--card);
+}
+
 /* Empty, the state takes no room */
 .chat-state:empty {
     display: none;

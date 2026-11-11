@@ -44,7 +44,7 @@ if (args.length === 0) {
  */
 async function openTableHere(fromTerminal: boolean): Promise<void>
 {
-    const [{ noteOpenFailed, openTable }, { defaultContext }, { offerIcon }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts"), import("./icon.ts")]);
+    const [{ noteFailure, openTable }, { defaultContext }, { offerIcon }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts"), import("./icon.ts")]);
     const context = defaultContext();
 
     try {
@@ -60,7 +60,7 @@ async function openTableHere(fromTerminal: boolean): Promise<void>
         process.exitCode = 1;
 
         if (!fromTerminal) {
-            noteOpenFailed(context, (error as Error).message);
+            noteFailure(context, "open.log", (error as Error).message);
         }
     }
 }
@@ -101,11 +101,11 @@ async function playHere(host: string): Promise<void>
 /** The table, until it closes: `chesspal` alone starts it apart from the terminal. */
 async function serveTable(): Promise<void>
 {
-    const [{ startTable, tableTimes, terminalChats }, { defaultContext }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts")]);
+    const [{ npmUpdater, startTable, tableTimes, terminalChats }, { defaultContext }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts")]);
 
     try {
         const context = defaultContext();
-        const table = await startTable(context, tableTimes, terminalChats(context));
+        const table = await startTable(context, tableTimes, terminalChats(context), npmUpdater(context));
         console.log(table === undefined ? "Another Chesspal table, started at the same time, is open: this one closes." : `Chesspal's table: ${table.url}`);
         await table?.closed;
     } catch (error) {

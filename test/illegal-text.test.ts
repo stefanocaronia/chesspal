@@ -58,6 +58,8 @@ describe("the page's words for a refusal", () => {
             "profile-game": true,
             "game-going": true,
             "pgn-unreadable": true,
+            "update-game": true,
+            "update-chat": true,
         };
 
         for (const language of ["en", "it"]) {

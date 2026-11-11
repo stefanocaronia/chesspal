@@ -114,6 +114,8 @@ export interface PageData
     readonly thinking?: Thinking;
     /** The player's folder was set up by an older Chesspal: init must run there again. */
     readonly outdated?: true;
+    /** A newer Chesspal on npm (D-108), and on the table whether it is being installed. */
+    readonly update?: { readonly version: string; readonly installing?: true; readonly installed?: true; };
     /** On the table's page alone (D-104): whether a chat is at it, the hosts it opens one in, and whether one is opening. */
     readonly table?: TableShown;
     readonly profile: ProfileShown;

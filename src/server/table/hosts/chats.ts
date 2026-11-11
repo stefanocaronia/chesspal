@@ -33,7 +33,7 @@ export function terminalChats(context: Context, chesspal: readonly string[] = [p
             const seat = samePath(folder, tableFolder(context.home())) ? seatHeld(folder, context.now()) : undefined;
             return seat === undefined ? undefined : { model: seat.model, effort: seat.effort };
         },
-        relaunch: (folder, host) => samePath(folder, tableFolder(context.home())) && askAgain(folder, context.now(), host === undefined ? {} : { host }),
+        relaunch: (folder, host, updated) => samePath(folder, tableFolder(context.home())) && askAgain(folder, context.now(), { ...(host === undefined ? {} : { host }), ...(updated === true ? { updated } : {}) }),
     };
 }
 

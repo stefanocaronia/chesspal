@@ -17,7 +17,8 @@ import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls } from "./game.ts";
 import { json, send } from "./http.ts";
 import { answerProfiles, readRatingsOf } from "./profiles.ts";
-import { answerTable, type Opening, restartWhenAtRest, type TableChats } from "./table.ts";
+import { answerTable, type Opening, restartWhenAtRest, type TableChats, updateWhenAtRest } from "./table.ts";
+import { watchForUpdates } from "./update.ts";
 
 /**
  * The page of a player's folder, served by the chat's process or by the table it is attached to (D-104): its address, how to tell it what the chat does
@@ -49,14 +50,22 @@ export interface PageOptions
 }
 
 /**
- * What the page tells the table that serves it: a request came, so the table is in use, or another Chesspal version asked it to quit; and how the table
- * opens a chat, which the page offers while none is at the table.
+ * What the page tells the table that serves it: a request came, so the table is in use, or another Chesspal version asked it to quit; how the table
+ * opens a chat, which the page offers while none is at the table, and how it updates Chesspal.
  */
 export interface TableEnd
 {
     used(): void;
     quit(): void;
     readonly chats?: TableChats | undefined;
+    readonly update?: TableUpdate | undefined;
+}
+
+/** How the table updates Chesspal (D-108): npm installs a version, whether it did, and the table closes to start again from it. */
+export interface TableUpdate
+{
+    install(version: string): Promise<boolean>;
+    restart(): void;
 }
 
 /**
@@ -75,9 +84,10 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
         context: pageContext(context),
         chat,
         opponent: options.opponent ?? (() => aiNameOf(chat.host())),
-        // A start again asked while the chat was at work comes once it has ended its answer (D-107).
+        // A start again asked while the chat was at work comes once it has ended its answer (D-107), as an update installed meanwhile (D-108).
         bell: new Bell(() => hasNews(context, chat), () => {
             restartWhenAtRest(served);
+            updateWhenAtRest(served);
             tellWatchers(watchers);
         }),
         watchers,
@@ -92,7 +102,14 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
         if (await listened(server, port)) {
             server.unref();
             served.port = portOf(server);
-            const stopWatching = watchGame(served);
+            const stopWatchingGame = watchGame(served);
+            const stopAskingNpm = watchForUpdates(served);
+
+            const stopWatching = (): void => {
+                stopWatchingGame();
+                stopAskingNpm();
+            };
+
             return {
                 url: `http://127.0.0.1:${served.port}/`,
                 heard: () => tellWatchers(watchers),
@@ -139,6 +156,9 @@ export interface Served
     chatOpened?: { readonly at: number; readonly how: Opening; } | undefined;
     /** The host the page asked the chat to start again with while it was at work (D-107). */
     restartWanted?: { readonly host: string; } | undefined;
+    /** The newer Chesspal npm has (D-108); the table installing it, installed and waiting to be at rest, or starting again from it. */
+    newer?: string;
+    updating?: "installing" | "installed" | "restarting" | undefined;
 }
 
 /**
@@ -287,6 +307,8 @@ function watchGame(served: Served): () => void
                 waiting = undefined;
                 watchAll();
                 tellWatchers(served.watchers);
+                // A game that has ended lets an update installed meanwhile start the table again (D-108).
+                updateWhenAtRest(served);
             }, 30);
         }
     };
