@@ -1,6 +1,8 @@
 // The chat at the table in a window of its own, opened from the AI's name as «Chi gioca?» is from the player's (D-107): a row for each host installed,
-// with its model and effort kept in the profile and the tick on the one at the table; a row opens a chat with no chat at the table, and starts the one
-// chesspal play holds again, clean, in the same terminal, once it has ended its answer.
+// with its model and effort kept in the profile and the tick on the one at the table, a ↻ once they differ from the ones it started with; a row opens a
+// chat with no chat at the table, and starts the one chesspal play holds again, clean, in the same terminal, once it has ended its answer, or at once if
+// the player says so where the page says it waits.
+import type { VNode } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { ChatHost, TableShown } from "../app/served.ts";
 import { Dialog } from "../dialogs/dialog.tsx";
@@ -52,6 +54,9 @@ export function ChatDialog({ open, table, settings, onChange, name, onClose, tex
         ? words.restartHint
         : words.choose;
     const offersChoices = installed.some((host) => host.models.length > 0 || host.efforts.length > 0);
+    // The chat at the table started with other choices than the ones kept now: its row starts it again with these, else it only closes the window.
+    const started = table.held ? table.started : undefined;
+    const changed = (host: ChatHost): boolean => started !== undefined && (chosen(host, "model", settings) !== (started.model ?? "") || chosen(host, "effort", settings) !== (started.effort ?? ""));
     return (
         <Dialog open={open} title={words.title} onClose={onClose} text={text}>
             <p class="note">{note}</p>
@@ -68,11 +73,19 @@ export function ChatDialog({ open, table, settings, onChange, name, onClose, tex
                 {installed.map((host) => {
                     const atTable = table.chat && table.host === host.name;
                     const off = busy || byHand;
+                    const again = !atTable || changed(host);
                     return (
                         <div class="chat-host" key={host.name}>
-                            <button class="choice" type="button" aria-current={atTable ? "true" : undefined} aria-disabled={off} onClick={off ? undefined : () => void choose(host.name)}>
+                            <button
+                                class="choice"
+                                type="button"
+                                title={atTable && again ? words.restartChanged : undefined}
+                                aria-current={atTable ? "true" : undefined}
+                                aria-disabled={off}
+                                onClick={off ? undefined : again ? () => void choose(host.name) : onClose}
+                            >
                                 <span>{hostTitles[host.name] ?? host.name}</span>
-                                {atTable ? checkIcon : null}
+                                {atTable ? (again ? restartIcon : checkIcon) : null}
                             </button>
                             <Choice host={host} kind="model" settings={settings} onChange={onChange} text={text} />
                             <Choice host={host} kind="effort" settings={settings} onChange={onChange} text={text} />
@@ -111,7 +124,50 @@ export function AiNameButton({ name, table, onOpen, text }: { name: string; tabl
     );
 }
 
-/** What the page says of the chat at the table where the asleep note stands: one opening, starting again, or waiting to; nothing else. */
+/**
+ * The note on the chat at the table where the asleep note stands: one opening or starting again; one waiting to, with a ↻ that starts it at once and a ×
+ * that lets the request go; in a game with no chat at the table, a line that opens the chat's window. None otherwise.
+ */
+export function tableNote({ table, name, inGame, onOpen, text }: { table: TableShown; name: string; inGame: boolean; onOpen: () => void; text: Text; }): VNode | null
+{
+    const words = text.table;
+    const state = chatState(table, name, text);
+
+    if (table.waiting === true) {
+        return (
+            <p class="asleep table-note" role="status">
+                <span>{state}</span>
+                <button class="icon-button" type="button" title={words.restartNow} aria-label={words.restartNow} onClick={() => void endWaiting(true)}>
+                    {restartIcon}
+                </button>
+                <button class="icon-button" type="button" title={words.cancel} aria-label={words.cancel} onClick={() => void endWaiting(false)}>
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 6L18 18M18 6L6 18" />
+                    </svg>
+                </button>
+            </p>
+        );
+    }
+
+    if (state !== undefined) {
+        return <p class="asleep" role="status">{state}</p>;
+    }
+
+    if (!table.chat && inGame) {
+        return (
+            <p class="asleep table-note" role="status">
+                <button class="no-chat-line" type="button" aria-haspopup="dialog" onClick={onOpen}>
+                    <span class="no-chat" aria-hidden="true" />
+                    {words.noChat}
+                </button>
+            </p>
+        );
+    }
+
+    return null;
+}
+
+/** What the page says of the chat at the table: one opening, starting again, or waiting to; nothing else. */
 export function chatState(table: TableShown, name: string, text: Text): string | undefined
 {
     const words = text.table;
@@ -131,12 +187,27 @@ const choiceKeys = {
     codex: { model: "codexModel", effort: "codexEffort" },
 } as const satisfies Record<string, Record<"model" | "effort", keyof Settings>>;
 
+/** The ↻ of a chat that starts again. */
+const restartIcon = (
+    <svg class="icon in-use" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4" />
+    </svg>
+);
+
+/** A host's model or effort as the settings keep it: "" for the host's own, and for a choice it no longer offers. */
+function chosen(host: ChatHost, kind: "model" | "effort", settings: Settings): string
+{
+    const key = choiceKeys[host.name as keyof typeof choiceKeys][kind];
+    const offered = kind === "model" ? host.models : host.efforts;
+    return offered.includes(settings[key]) ? settings[key] : "";
+}
+
 /** A host's model or effort: a dash keeps the host's own; a choice it no longer offers shows as the dash. Its title says what it stands at, the dash too. */
 function Choice({ host, kind, settings, onChange, text }: { host: ChatHost; kind: "model" | "effort"; settings: Settings; onChange: (settings: Settings) => void; text: Text; })
 {
     const key = choiceKeys[host.name as keyof typeof choiceKeys][kind];
     const offered = kind === "model" ? host.models : host.efforts;
-    const chosen = offered.includes(settings[key]) ? settings[key] : "";
+    const value = chosen(host, kind, settings);
     const title = hostTitles[host.name] ?? host.name;
 
     if (offered.length === 0) {
@@ -146,12 +217,12 @@ function Choice({ host, kind, settings, onChange, text }: { host: ChatHost; kind
     return (
         <select
             aria-label={`${text.table[kind]}, ${title}`}
-            title={`${text.table[kind]}: ${chosen === "" ? text.table.asHost(title) : chosen}`}
-            value={chosen}
+            title={`${text.table[kind]}: ${value === "" ? text.table.asHost(title) : value}`}
+            value={value}
             onChange={(event) => onChange({ ...settings, [key]: event.currentTarget.value })}
         >
             <option value="">—</option>
-            {offered.map((value) => <option key={value} value={value}>{shortName(value)}</option>)}
+            {offered.map((one) => <option key={one} value={one}>{shortName(one)}</option>)}
         </select>
     );
 }
@@ -165,19 +236,25 @@ function shortName(value: string): string
 /** Asks the table to open a terminal with a chat in the host: whether it did. */
 function openChat(host: string): Promise<boolean>
 {
-    return asked("/api/table/chat", host, (answer) => answer.opened === true);
+    return asked("/api/table/chat", { host }, (answer) => answer.opened === true);
+}
+
+/** Asks the table to start at once the chat that waits to start again, cutting its answer, or to let the request go. */
+function endWaiting(now: boolean): Promise<boolean>
+{
+    return asked("/api/table/waiting", { now }, () => true);
 }
 
 /** Asks the table to start its chat again with the host, at once or once it has ended its answer: whether it took the request. */
 function restartChat(host: string): Promise<boolean>
 {
-    return asked("/api/table/restart", host, (answer) => answer.restarting === true || answer.waiting === true);
+    return asked("/api/table/restart", { host }, (answer) => answer.restarting === true || answer.waiting === true);
 }
 
-async function asked(path: string, host: string, done: (answer: Record<string, unknown>) => boolean): Promise<boolean>
+async function asked(path: string, body: object, done: (answer: Record<string, unknown>) => boolean): Promise<boolean>
 {
     try {
-        const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host }) });
+        const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         return response.ok && done((await response.json()) as Record<string, unknown>);
     } catch {
         return false;

@@ -88,11 +88,14 @@ describe("a chat the table opens", () => {
         // Only the chat in the table's folder, and only while chesspal play holds its seat, starts again.
         const table = tableFolder(context.home());
         mkdirSync(table, { recursive: true });
-        expect(chats.holds(table)).toBe(false);
+        expect(chats.held(table)).toBeUndefined();
         expect(chats.relaunch(table)).toBe(false);
         takeSeat(table, { pid: process.pid, host: "claude" });
-        expect(chats.holds(bin)).toBe(false);
-        expect(chats.holds(table)).toBe(true);
+        expect(chats.held(bin)).toBeUndefined();
+        expect(chats.held(table)).toEqual({});
+        // With the model and effort its host started with, which the page compares with the ones chosen since (D-107).
+        takeSeat(table, { pid: process.pid, host: "claude", model: "opus", effort: "high" });
+        expect(chats.held(table)).toEqual({ model: "opus", effort: "high" });
         expect(chats.relaunch(bin)).toBe(false);
         expect(chats.relaunch(table)).toBe(true);
         expect(askedAgain(table, process.pid)).toEqual({});
@@ -222,7 +225,7 @@ const fakeHosts = [
 function fakeChats(opens = true, held = false): { chats: TableChats; opened: string[]; }
 {
     const opened: string[] = [];
-    return { chats: { hosts: () => fakeHosts, open: (host) => Promise.resolve(opened.push(host) > 0 && opens), holds: () => held, relaunch: () => false }, opened };
+    return { chats: { hosts: () => fakeHosts, open: (host) => Promise.resolve(opened.push(host) > 0 && opens), held: () => (held ? {} : undefined), relaunch: () => false }, opened };
 }
 
 async function tableWith({ chats, opened }: { chats: TableChats; opened: string[]; }): Promise<{ table: Table; opened: string[]; }>
@@ -253,7 +256,7 @@ async function openChat(url: string, host: string, origin?: string): Promise<{ s
 /** A Node script run as a host, in the folder given. */
 function nodeHost(folder: string, code: string): HostLaunch
 {
-    return { program: process.execPath, args: ["-e", code], folder, env: process.env, shell: false };
+    return { program: process.execPath, args: ["-e", code], folder, env: process.env, shell: false, choice: {} };
 }
 
 /** Whether a process is gone, within two seconds. */

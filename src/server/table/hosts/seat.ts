@@ -4,11 +4,13 @@ import { mkdirSync, readFileSync, rmSync, statSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomically } from "../../../games/index.ts";
 
-/** The play process in the seat: its process id and its host. */
+/** The play process in the seat: its process id, its host, and the model and effort it started that host with, none for the host's own. */
 export interface Seat
 {
     readonly pid: number;
     readonly host: string;
+    readonly model?: string | undefined;
+    readonly effort?: string | undefined;
 }
 
 /**
@@ -51,6 +53,15 @@ export function seatTaken(folder: string, now: Date = new Date()): boolean
     return seatHeld(folder, now) !== undefined;
 }
 
+/** The play process that holds the seat, with the model and effort it started its host with; none when no one holds it. */
+export function seatHeld(folder: string, now: Date = new Date()): Seat | undefined
+{
+    const seat = seatIn(folder);
+    // A file's time is finer than a Date's: it is compared to the millisecond, as the Date is.
+    const refreshed = statSync(join(folder, seatFile), { throwIfNoEntry: false })?.mtimeMs;
+    return seat !== undefined && refreshed !== undefined && now.getTime() - Math.floor(refreshed) < seatTimes.heldFor ? seat : undefined;
+}
+
 /** Asks the play process in the seat to start its host again, or `again.host` in its place: whether one holds it, and was asked. */
 export function askAgain(folder: string, now: Date = new Date(), again: Again = {}): boolean
 {
@@ -89,18 +100,16 @@ export const seatTimes = { refresh: 5_000, heldFor: 15_000 };
 const seatFile = "play.json";
 const againFile = "play-again.json";
 
-function seatHeld(folder: string, now: Date): Seat | undefined
-{
-    const seat = seatIn(folder);
-    // A file's time is finer than a Date's: it is compared to the millisecond, as the Date is.
-    const refreshed = statSync(join(folder, seatFile), { throwIfNoEntry: false })?.mtimeMs;
-    return seat !== undefined && refreshed !== undefined && now.getTime() - Math.floor(refreshed) < seatTimes.heldFor ? seat : undefined;
-}
-
 function seatIn(folder: string): Seat | undefined
 {
-    const seat = jsonIn(join(folder, seatFile)) as { pid?: unknown; host?: unknown; } | undefined;
-    return typeof seat?.pid === "number" && typeof seat.host === "string" ? { pid: seat.pid, host: seat.host } : undefined;
+    const seat = jsonIn(join(folder, seatFile)) as { pid?: unknown; host?: unknown; model?: unknown; effort?: unknown; } | undefined;
+
+    if (typeof seat?.pid !== "number" || typeof seat.host !== "string") {
+        return undefined;
+    }
+
+    const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
+    return { pid: seat.pid, host: seat.host, model: text(seat.model), effort: text(seat.effort) };
 }
 
 function jsonIn(path: string): unknown

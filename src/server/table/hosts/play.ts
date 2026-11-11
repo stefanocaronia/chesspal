@@ -8,11 +8,14 @@ import { tableFolder } from "../../../home/index.ts";
 import { setUpHosts } from "../../../host-files/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
 import { programPath } from "./find.ts";
-import { choiceIn, hostArgs, type HostName, isHostName, startMessage } from "./hosts.ts";
+import { choiceIn, hostArgs, type HostChoice, type HostName, isHostName, startMessage } from "./hosts.ts";
 import { askedAgain, leaveSeat, refreshSeat, seatTimes, takeSeat } from "./seat.ts";
 import { cmdQuoted } from "./terminal.ts";
 
-/** What `chesspal play` starts: the host's program, its arguments, folder and environment, and whether it needs cmd, as a .cmd shim does on Windows. */
+/**
+ * What `chesspal play` starts: the host's program, its arguments, folder and environment, whether it needs cmd, as a .cmd shim does on Windows, and the
+ * model and effort it is given, which the seat notes for the page (D-107).
+ */
 export interface HostLaunch
 {
     readonly program: string;
@@ -20,6 +23,7 @@ export interface HostLaunch
     readonly folder: string;
     readonly env: NodeJS.ProcessEnv;
     readonly shell: boolean;
+    readonly choice: HostChoice;
 }
 
 /**
@@ -70,7 +74,6 @@ export async function playHost(context: Context, host: HostName): Promise<number
             if (ran === undefined) {
                 playing = before ?? playing;
                 before = undefined;
-                takeSeat(folder, { pid: process.pid, host: playing });
                 continue;
             }
 
@@ -83,7 +86,6 @@ export async function playHost(context: Context, host: HostName): Promise<number
             if (next !== playing) {
                 before = playing;
                 playing = next;
-                takeSeat(folder, { pid: process.pid, host: playing });
             }
 
             terminal.restore();
@@ -150,18 +152,19 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     const script = npmScript(host, found, context.platform, exists ?? existsSync);
 
     if (script !== undefined) {
-        return { program: process.execPath, args: [script, ...args], folder, env: childEnv, shell: false };
+        return { program: process.execPath, args: [script, ...args], folder, env: childEnv, shell: false, choice };
     }
 
-    return { program: found, args, folder, env: childEnv, shell: context.platform === "win32" && /\.(cmd|bat)$/i.test(found) };
+    return { program: found, args, folder, env: childEnv, shell: context.platform === "win32" && /\.(cmd|bat)$/i.test(found), choice };
 }
 
 const hostTitle: Record<HostName, string> = { claude: "Claude Code", codex: "Codex" };
 
-// Runs the host as runHost does; one not installed, or that could not start, fails saying so.
+// Runs the host as runHost does, the seat noting the model and effort it is given; one not installed, or that could not start, fails saying so.
 async function started(context: Context, host: HostName, again: () => boolean): Promise<{ code: number; again: boolean; }>
 {
     const launch = hostLaunch(context, host);
+    takeSeat(launch.folder, { pid: process.pid, host, ...launch.choice });
     return runHost(launch, again, context.platform).catch((error: unknown) => {
         throw new Error(`${hostTitle[host]} did not start: ${(error as Error).message}`);
     });

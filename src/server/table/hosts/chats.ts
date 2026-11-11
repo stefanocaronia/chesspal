@@ -6,7 +6,7 @@ import { samePath } from "../../bell.ts";
 import type { ChatHost, TableChats } from "../../page/table.ts";
 import { programPath } from "./find.ts";
 import { hostChoices, hostNames, isHostName } from "./hosts.ts";
-import { askAgain, seatTaken } from "./seat.ts";
+import { askAgain, seatHeld } from "./seat.ts";
 import { openTerminal } from "./terminal.ts";
 
 /**
@@ -29,7 +29,10 @@ export function terminalChats(context: Context, chesspal: readonly string[] = [p
         },
         open: async (host) => isHostName(host) && await openTerminal(tableFolder(context.home()), [...chesspal, "play", host], context.platform, env),
         // Only a chat in the table's folder can be the one chesspal play holds.
-        holds: (folder) => samePath(folder, tableFolder(context.home())) && seatTaken(folder, context.now()),
+        held: (folder) => {
+            const seat = samePath(folder, tableFolder(context.home())) ? seatHeld(folder, context.now()) : undefined;
+            return seat === undefined ? undefined : { model: seat.model, effort: seat.effort };
+        },
         relaunch: (folder, host) => samePath(folder, tableFolder(context.home())) && askAgain(folder, context.now(), host === undefined ? {} : { host }),
     };
 }

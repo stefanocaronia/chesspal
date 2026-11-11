@@ -58,7 +58,7 @@ import { signature } from "../players/model-name.ts";
 import { keepSettings, type ProfileShown } from "../profile/profile.ts";
 import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "../profile/settings.ts";
 import { endSoundOf, playSound, soundOf, wakeSounds } from "../sounds/sounds.ts";
-import { AiNameButton, ChatDialog, chatState } from "../table/window.tsx";
+import { AiNameButton, ChatDialog, tableNote } from "../table/window.tsx";
 import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
 import { textFor } from "../text.ts";
 import { anchorName, useAnchor } from "./anchor.ts";
@@ -424,12 +424,11 @@ export function App({ start }: { start: Settings; })
             />
         );
     // Where to wake the chat, under the AI's card (over the board when the talk is folded); the button that starts the clocks, under the player's (Zoe).
-    // On the table with no chat at it, the note opens one instead (D-104).
-    // On the table, what its chat is doing stands there; with no chat at it, the AI's name says so, which opens the chat's window (D-107).
+    // On the table, what its chat is doing stands there, and in a game with no chat at it a line that opens the chat's window (D-107).
     const table = offline ? undefined : served.table;
-    const atTable = table === undefined ? undefined : chatState(table, name, text);
-    const asleepNote = atTable !== undefined
-        ? <p class="asleep" role="status">{atTable}</p>
+    const atTable = table === undefined ? null : tableNote({ table, name, inGame: going, onOpen: () => setDialog("chat"), text });
+    const asleepNote = atTable !== null
+        ? atTable
         : asleep && table?.chat !== false
         ? <p class="asleep" role="status">{sides === undefined ? text.asleep(name) : text.asleepInAnalysis(name)}</p>
         : null;

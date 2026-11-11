@@ -457,8 +457,33 @@ describe("the chat's window at the table", () => {
         await attached({ ...chatOn(other.home), host: () => "claude-code" });
 
         expect(await gameShown(other.table.url)).toMatchObject({ table: { chat: true, held: false } });
+        expect(await gameShown(other.table.url)).not.toHaveProperty("table.started");
         expect(await restartAt(other.table.url, "claude")).toMatchObject({ status: 409 });
         expect(byHand.relaunched).toEqual([]);
+    });
+
+    it("lets the page start a waiting request at once, cutting the chat's answer, or let it go; and shows the model the chat started with", async () => {
+        const { chats, relaunched, asked } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const page = await attached({ ...chatOn(home), host: () => "claude-code" });
+        await page.chatCalls();
+
+        expect(await gameShown(table.url)).toMatchObject({ table: { held: true, started: { model: "opus" } } });
+        expect(await waitingAt(table.url, true)).toMatchObject({ status: 409 });
+        expect(await restartAt(table.url, "claude")).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+        expect(await waitingAt(table.url, true, "http://example.com")).toMatchObject({ status: 403 });
+        expect(await waitingAt(table.url, "soon")).toMatchObject({ status: 400 });
+
+        // Let go: nothing starts.
+        expect(await waitingAt(table.url, false)).toEqual({ status: 200, text: JSON.stringify({ waiting: false }) });
+        expect(await gameShown(table.url)).not.toHaveProperty("table.waiting");
+        expect(relaunched).toEqual([]);
+
+        // At once, in the chat's turn: as after an Esc, which never ends it.
+        expect(await restartAt(table.url, "codex")).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+        expect(await waitingAt(table.url, true)).toEqual({ status: 200, text: JSON.stringify({ restarting: true }) });
+        expect(asked).toEqual(["codex"]);
+        expect(await gameShown(table.url)).not.toHaveProperty("table.waiting");
     });
 });
 
@@ -469,13 +494,19 @@ function playChats(held = true): { chats: TableChats; relaunched: string[]; aske
     const asked: (string | undefined)[] = [];
     const hosts = ["claude", "codex"].map((name) => ({ name, installed: true, models: [], efforts: [], command: `chesspal play ${name}` }));
     const relaunch = (folder: string, host?: string): boolean => relaunched.push(folder) > 0 && asked.push(host) > 0;
-    return { chats: { hosts: () => hosts, open: () => Promise.resolve(false), holds: () => held, relaunch }, relaunched, asked };
+    return { chats: { hosts: () => hosts, open: () => Promise.resolve(false), held: () => (held ? { model: "opus" } : undefined), relaunch }, relaunched, asked };
 }
 
 /** Asks the table to start its chat again with a host, as its page does, from the origin given, else the page's own: the answer's status and text. */
 async function restartAt(url: string, host: string, origin = new URL(url).origin): Promise<{ status: number; text: string; }>
 {
     return sent(new URL("/api/table/restart", url), { method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify({ host }) });
+}
+
+/** Ends the start again that waits, as the page does: at once, or let go; from the origin given, else the page's own: the answer's status and text. */
+async function waitingAt(url: string, now: unknown, origin = new URL(url).origin): Promise<{ status: number; text: string; }>
+{
+    return sent(new URL("/api/table/waiting", url), { method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify({ now }) });
 }
 
 /** A new game asked from the table's page, as its window sends it: the answer's status. */

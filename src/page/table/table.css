@@ -77,8 +77,43 @@
     user-select: all;
 }
 
-/* The AI's name with no chat at the table: a hollow ring before it */
-.ai-name .no-chat {
+/* The note on a start again that waits, with its ↻ and ×; in a game with no chat at the table, a line that opens the chat's window */
+.table-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.table-note > span {
+    flex: 1;
+}
+
+.table-note .icon-button {
+    flex: none;
+    width: 30px;
+    height: 30px;
+}
+
+.over-board > .table-note button {
+    pointer-events: auto;
+}
+
+.no-chat-line {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+/* No chat at the table: a hollow ring before the AI's name, and before the line that says so */
+.no-chat {
     flex: none;
     width: 8px;
     height: 8px;

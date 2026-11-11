@@ -1,6 +1,6 @@
 // What only the table's page answers (D-104): another Chesspal version asks it to quit, and the page opens a chat with no chat at the table, through the
-// hosts the table offers, starts it again for a new game, and with another model or host once it has done (D-107); a page a chat serves itself has none
-// of these routes.
+// hosts the table offers, starts it again for a new game, and with another model or host once it has done, or at once if the player says so (D-107); a
+// page a chat serves itself has none of these routes.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { gameInAnalysis } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
@@ -19,15 +19,22 @@ export interface ChatHost
 }
 
 /**
- * How the table opens a chat: the hosts it offers, and a terminal with one of them, whether one opened; whether `chesspal play` holds the chat of a folder,
- * and how it is asked to start it again.
+ * How the table opens a chat: the hosts it offers, and a terminal with one of them, whether one opened; the chat `chesspal play` holds in a folder, with
+ * the model and effort it started with, and how it is asked to start it again.
  */
 export interface TableChats
 {
     hosts(): readonly ChatHost[];
     open(host: string): Promise<boolean>;
-    holds(folder: string): boolean;
+    held(folder: string): HeldChat | undefined;
     relaunch(folder: string, host?: string): boolean;
+}
+
+/** The chat `chesspal play` holds: the model and effort its host started with, none for the host's own. */
+export interface HeldChat
+{
+    readonly model?: string | undefined;
+    readonly effort?: string | undefined;
 }
 
 /** A chat opening at the table: one the page asked for, the one started again for a new game, or with another model or host (D-107). */
@@ -39,11 +46,12 @@ export interface TableShown
     /** Whether a chat is at the table, and its host among those offered, when it says one. */
     readonly chat: boolean;
     readonly host?: string;
-    /** Whether `chesspal play` holds the chat, which the page can then start again; one opened by hand it cannot. */
+    /** Whether `chesspal play` holds the chat, which the page can then start again; one opened by hand it cannot. With the model and effort it started with. */
     readonly held: boolean;
+    readonly started?: HeldChat;
     readonly hosts: readonly ChatHost[];
     readonly opening?: Opening;
-    /** A start again asked while the chat was at work, waiting for it to end its answer. */
+    /** A start again asked while the chat was at work, waiting for it to end its answer, or to be started at once or let go from the page. */
     readonly waiting?: true;
 }
 
@@ -57,12 +65,14 @@ export function tableShown(served: Served): { table?: TableShown; }
     }
 
     const host = hostAtTable(served);
+    const held = heldChat(served);
     const now = opening(served);
     return {
         table: {
             chat: attached !== undefined,
             ...(host === undefined ? {} : { host }),
-            held: heldChat(served),
+            held: held !== undefined,
+            ...(held === undefined ? {} : { started: held }),
             hosts: table.chats?.hosts() ?? [],
             ...(now === undefined ? {} : { opening: now }),
             ...(served.restartWanted === undefined ? {} : { waiting: true }),
@@ -87,8 +97,10 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
         runRoute(response, () => openChat(request, response, served));
     } else if (path === "/api/table/restart") {
         runRoute(response, () => restartChat(request, response, served));
+    } else if (path === "/api/table/waiting") {
+        runRoute(response, () => endWaiting(request, response, served));
     } else {
-        sendJson(response, 404, { error: `${path} is no route of the table's: it answers POST /api/table/chat, /api/table/restart and /api/table/quit.` });
+        sendJson(response, 404, { error: `${path} is no route of the table's: it answers POST /api/table/chat, /api/table/restart, /api/table/waiting and /api/table/quit.` });
     }
 
     return true;
@@ -100,7 +112,7 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
  */
 export function chatToRelaunch(served: Served): boolean
 {
-    return heldChat(served) && chatAtRest(served) && served.chat.positionSeen?.started !== undefined;
+    return heldChat(served) !== undefined && chatAtRest(served) && served.chat.positionSeen?.started !== undefined;
 }
 
 /**
@@ -131,7 +143,7 @@ export function restartWhenAtRest(served: Served): void
         return;
     }
 
-    if (!heldChat(served)) {
+    if (heldChat(served) === undefined) {
         served.restartWanted = undefined;
     } else if (chatAtRest(served)) {
         served.restartWanted = undefined;
@@ -181,7 +193,7 @@ async function restartChat(request: IncomingMessage, response: ServerResponse, s
         sendJson(response, 403, { error: "Only the table's own page starts the chat again." });
     } else if (offered === undefined) {
         sendJson(response, 400, { error: hostsOffered(served) });
-    } else if (!heldChat(served)) {
+    } else if (heldChat(served) === undefined) {
         sendJson(response, 409, { error: "No chat the table opened is at it: open one from the page, or change the model with /model in a chat opened by hand." });
     } else if (chatAtRest(served)) {
         sendJson(response, 200, { restarting: relaunchChat(served, "restart", offered.name) });
@@ -189,6 +201,29 @@ async function restartChat(request: IncomingMessage, response: ServerResponse, s
         served.restartWanted = { host: offered.name };
         tellWatchers(served.watchers);
         sendJson(response, 200, { waiting: true });
+    }
+}
+
+/**
+ * Ends a start again the page asked while the chat was at work (D-107): `now` starts it at once, cutting the answer it gives, as after an Esc, when it would
+ * never end; else the request is let go. Asked by the table's own page alone.
+ */
+async function endWaiting(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
+{
+    const now = jsonOf(await bodyOf(request))?.now;
+    const wanted = served.restartWanted;
+
+    if (!fromTablePage(request, served)) {
+        sendJson(response, 403, { error: "Only the table's own page ends a start again that waits." });
+    } else if (typeof now !== "boolean") {
+        sendJson(response, 400, { error: "Say now: true to start the chat again at once, cutting its answer, or now: false to let the request go." });
+    } else if (wanted === undefined) {
+        sendJson(response, 409, { error: "No start again waits: ask for one from the chat's window." });
+    } else {
+        served.restartWanted = undefined;
+        const restarting = now && heldChat(served) !== undefined && relaunchChat(served, "restart", wanted.host);
+        tellWatchers(served.watchers);
+        sendJson(response, 200, now ? { restarting } : { waiting: false });
     }
 }
 
@@ -215,11 +250,11 @@ function hostAtTable(served: Served): string | undefined
     return served.attached === undefined ? undefined : served.table?.chats?.hosts().find((one) => said.includes(one.name))?.name;
 }
 
-// The chat at the table is one `chesspal play` holds, which the table can start again.
-function heldChat(served: Served): boolean
+// The chat at the table when `chesspal play` holds it, which the table can start again: the model and effort it started with.
+function heldChat(served: Served): HeldChat | undefined
 {
     const { attached } = served;
-    return attached !== undefined && served.table?.chats?.holds(attached.chat.folder) === true;
+    return attached === undefined ? undefined : served.table?.chats?.held(attached.chat.folder);
 }
 
 // The chat waits for the doorbell, out of a turn, and no analyst of it is at work: starting it again loses nothing.
@@ -256,5 +291,5 @@ function opening(served: Served): Opening | undefined
         return chatOpened.how;
     }
 
-    return served.table?.chats?.holds(context.folder) === true ? "chat" : undefined;
+    return served.table?.chats?.held(context.folder) === undefined ? undefined : "chat";
 }
