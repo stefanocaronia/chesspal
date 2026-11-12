@@ -16,10 +16,11 @@ concurrency:
 
 jobs:
   test:
-    # Linux and Windows while the repo is private, where macOS spends ten times the minutes; macOS joins when it is public.
+    # Linux, Windows and macOS, the three systems a player installs Chesspal on.
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
