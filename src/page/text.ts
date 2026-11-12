@@ -358,6 +358,20 @@ export interface StudyText
     askUnreview(game: string): { readonly question: string; readonly note: string; readonly yes: string; };
     askRemove(game: string, when: string | undefined): { readonly question: string; readonly note: string; readonly yes: string; };
     readonly cancel: string;
+    /**
+     * The player's latest games on the sites, above the paste field (D-110): the title, the lines while they come, with none, without a name on any site,
+     * with its button to the profile, and when both sites did not answer (one alone is said as the profile says it); why the server refused the list; the
+     * side the player had; a speed as the site names it, in the player's words.
+     */
+    readonly siteGames: string;
+    readonly siteGamesLoading: string;
+    readonly siteGamesNone: string;
+    readonly siteGamesNoAccount: string;
+    readonly siteGamesProfile: string;
+    readonly bothUnreached: string;
+    readonly siteGamesRefused: Readonly<Record<"game-going" | "no-accounts" | "no-network", string>>;
+    readonly playedAs: Readonly<Record<Side, string>>;
+    speed(name: string): string;
     /** The column's button that saves the game in analysis with its review, and its tooltip. */
     readonly download: string;
     readonly downloadHint: string;
@@ -817,7 +831,7 @@ const english: Text = {
         start: "Analyse",
         yours: "Your analyses",
         bring: "Load a game",
-        bringNote: "a PGN played elsewhere, pasted or from a file",
+        bringNote: "from Lichess or Chess.com, or a PGN pasted or from a file",
         search: "Names, models, openings…",
         noMatch: "No game found",
         reviewed: "reviewed",
@@ -838,6 +852,19 @@ const english: Text = {
         askUnreview: (game) => ({ question: `Delete the analysis of ${game}?`, note: "Its badges, notes and the coach's judgments go; the game stays.", yes: "Delete" }),
         askRemove: (game, when) => ({ question: `Delete the game ${game}${when === undefined ? "" : ` of ${when}`}?`, note: "With its analysis. It cannot be undone.", yes: "Delete" }),
         cancel: "Cancel",
+        siteGames: "Your latest games on the sites",
+        siteGamesLoading: "Asking Lichess and Chess.com…",
+        siteGamesNone: "No finished game on the sites.",
+        siteGamesNoAccount: "Your names on Lichess and Chess.com bring your latest games here.",
+        siteGamesProfile: "Add them",
+        bothUnreached: "Lichess and Chess.com aren't answering: we'll try again later",
+        siteGamesRefused: {
+            "game-going": "A game is going on: finish it to bring another.",
+            "no-accounts": "Your profile names no account on Lichess or Chess.com.",
+            "no-network": "Chesspal cannot reach the sites from here.",
+        },
+        playedAs: { white: "You played White", black: "You played Black" },
+        speed: (name) => ({ ultraBullet: "ultrabullet", correspondence: "correspondence", daily: "daily" } as Record<string, string>)[name] ?? readableSpeed(name),
         download: "Annotated PGN",
         downloadHint: "The game with the review's comments and judgments",
         analyseIt: "Analyse the game",
@@ -1237,7 +1264,7 @@ const italian: Text = {
         start: "Analizza",
         yours: "Le tue analisi",
         bring: "Carica una partita",
-        bringNote: "un PGN giocato altrove, incollato o da file",
+        bringNote: "da Lichess o Chess.com, o un PGN incollato o da file",
         search: "Nomi, modelli, aperture…",
         noMatch: "Nessuna partita trovata",
         reviewed: "commentata",
@@ -1258,6 +1285,19 @@ const italian: Text = {
         askUnreview: (game) => ({ question: `Eliminare l'analisi di ${game}?`, note: "Bollini, note e giudizi dell'allenatore si cancellano; la partita resta.", yes: "Elimina" }),
         askRemove: (game, when) => ({ question: `Eliminare la partita ${game}${when === undefined ? "" : ` del ${when}`}?`, note: "Con la sua analisi. Non si può annullare.", yes: "Elimina" }),
         cancel: "Annulla",
+        siteGames: "Le tue ultime partite sui siti",
+        siteGamesLoading: "Chiedo a Lichess e Chess.com…",
+        siteGamesNone: "Nessuna partita finita sui siti.",
+        siteGamesNoAccount: "I tuoi nomi su Lichess e Chess.com portano qui le tue ultime partite.",
+        siteGamesProfile: "Aggiungili",
+        bothUnreached: "Lichess e Chess.com non rispondono: riproviamo più tardi",
+        siteGamesRefused: {
+            "game-going": "C'è una partita in corso: finiscila per portarne un'altra.",
+            "no-accounts": "Il tuo profilo non ha nomi su Lichess o Chess.com.",
+            "no-network": "Da qui Chesspal non raggiunge i siti.",
+        },
+        playedAs: { white: "Hai giocato col Bianco", black: "Hai giocato col Nero" },
+        speed: (name) => ({ ultraBullet: "ultrabullet", classical: "classica", correspondence: "per corrispondenza", daily: "per corrispondenza" } as Record<string, string>)[name] ?? readableSpeed(name),
         download: "PGN annotato",
         downloadHint: "La partita con i commenti e i giudizi della revisione",
         analyseIt: "Analizza la partita",
@@ -1463,4 +1503,10 @@ function moveInWords(words: MoveWords, move: SaidMove): string
 function capital(words: string): string
 {
     return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** A speed the page does not know, as a word: ultraBullet as «ultra bullet». */
+function readableSpeed(name: string): string
+{
+    return name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
 }

@@ -171,6 +171,8 @@ describe("the MCP server", () => {
 
         expect(tools.find((tool) => tool.name === "status")?.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
         expect(tools.find((tool) => tool.name === "try_move")?.annotations).toEqual({ readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false });
+        // Only the tools that ask Lichess and Chess.com reach outside this computer (D-110).
+        expect(tools.filter((tool) => tool.annotations?.openWorldHint).map((tool) => tool.name)).toEqual(["analyse_game", "site_games"]);
     });
 
     it("runs a tool and answers with its text: status asks first for the instructions a new server has not given (D-102)", async () => {

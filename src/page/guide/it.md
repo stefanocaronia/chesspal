@@ -54,6 +54,7 @@ Nessun motore di scacchi gioca al posto dell'AI: ogni mossa e ogni giudizio sono
 
 - A partita finita premi **Analizza la partita**: l'AI la ripassa e mette sulle mosse i suoi giudizi e le sue note. Le leggi scorrendo le mosse con le frecce in fondo alla colonna, o cliccando una mossa.
 - **Analisi**, nell'intestazione, apre le tue analisi e carica una partita giocata altrove: incolla il suo PGN, o scegli un file .pgn.
+- Con i tuoi nomi su Lichess e Chess.com nel profilo, **Carica una partita** elenca le tue ultime partite là: clicca su una per analizzarla.
 - Chiedi all'AI della partita nella casella sotto il suo nome.
 - **PGN annotato** salva la partita coi commenti.
 

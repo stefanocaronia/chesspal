@@ -839,6 +839,97 @@ h3 + .switch {
     cursor: pointer;
 }
 
+/* The latest games on the sites above the paste field (D-110): the analyses' rows, lower, with the side the player had on a small tile; the list takes the
+   height the step leaves at the foot of one screen and scrolls with no scrollbar, fading at its foot as the side column does (Zoe) */
+.site-games .games {
+    max-height: max(174px, calc(100vh - 500px));
+    padding-bottom: 12px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
+}
+
+.site-games .games::-webkit-scrollbar {
+    display: none;
+}
+
+/* While the list comes, a box as tall as it will be, so that nothing moves when it arrives */
+.site-games .asking {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: max(174px, calc(100vh - 500px));
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    color: var(--soft);
+    font-size: 14px;
+}
+
+.analyses.site-games .reopen {
+    gap: 10px;
+    min-height: 52px;
+    padding-left: 8px;
+}
+
+.site-games .reopen:focus-visible {
+    outline-offset: -2px;
+    border-radius: 9px;
+}
+
+.analyses.site-games .tile {
+    width: 34px;
+    height: 34px;
+    border-radius: 7px;
+}
+
+.analyses.site-games .tile .piece {
+    width: 28px;
+    height: 28px;
+}
+
+/* The row picked keeps the accent and a spinner in its mark's place; the others wait, faded as a button that cannot be pressed */
+.site-games .game.picked {
+    border-color: var(--accent);
+}
+
+.site-games .picking .game:not(.picked) {
+    opacity: 0.6;
+}
+
+.site-games .reopen:disabled {
+    cursor: default;
+}
+
+.site-games .score .spinner {
+    justify-self: center;
+}
+
+.site-games > .site-problem {
+    margin: 0 0 8px;
+}
+
+.site-games > .none {
+    margin: 4px 0;
+    text-align: left;
+}
+
+.site-games .add-names {
+    margin-left: 4px;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+.site-games .add-names:hover {
+    border-color: var(--accent);
+}
+
 .ask button.yes {
     border-color: var(--asked);
     background: var(--asked);
@@ -881,6 +972,17 @@ h3 + .switch {
 
     .analyses .ask {
         grid-template-columns: 1fr;
+    }
+
+    /* On a phone the mark alone tells how it went, and the meta drops the site */
+    .site-games .score b,
+    .site-games .meta .site {
+        display: none;
+    }
+
+    .analyses.site-games .score {
+        grid-template-columns: 16px;
+        min-width: 0;
     }
 }
 

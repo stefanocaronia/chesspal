@@ -1,7 +1,7 @@
 // The analyses the page lists: the games brought to study and those played here, to analyse or open again on the board page, or to delete with their
-// review or the review alone (D-92).
+// review or the review alone (D-92); and the player's latest games on the sites, to bring one (D-110).
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { bookOpening, deleteGame, deleteReview } from "../../commands/index.ts";
+import { bookOpening, deleteGame, deleteReview, siteGames, SiteGamesRefused } from "../../commands/index.ts";
 import { type AiModel, aiModelIn, annotatorOf, type GameRecord, isReviewed, leadOf, reviewOf } from "../../core/index.ts";
 import { archivedGame, archivedGames, gameInAnalysis, gameStemOf, keptGame, keptGames } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
@@ -63,6 +63,25 @@ export function answerAnalyses(request: IncomingMessage, response: ServerRespons
         }
     });
     return true;
+}
+
+/**
+ * Sends the player's latest games on the sites, as site_games gives them with their PGNs (D-110); its refusal as a 409, with the code the page says it by in
+ * its own words: a game going on, no name on the sites, no network.
+ */
+export function sendSiteGames(response: ServerResponse, served: Served): void
+{
+    runRoute(response, async () => {
+        try {
+            sendJson(response, 200, await siteGames.run({}, served.context));
+        } catch (error) {
+            if (!(error instanceof SiteGamesRefused)) {
+                throw error;
+            }
+
+            sendJson(response, 409, { error: error.message, refusal: error.refusal });
+        }
+    });
 }
 
 const deletions: Readonly<Record<string, typeof deleteGame | typeof deleteReview>> = { "/api/delete-game": deleteGame, "/api/delete-review": deleteReview };

@@ -1,6 +1,6 @@
 // The players of a game in analysis (D-69), as the page shows them: a game played here names them Player and AI, one played elsewhere by their names; the
 // player's own, by their names on Lichess and chess.com (D-93).
-import type { Side } from "../../core/index.ts";
+import { accountSide, type Side, type SiteNames } from "../../core/index.ts";
 
 /** A side of the game in analysis: its player's name, and whose picture it takes: the player's, the AI's, or none. */
 export interface StudiedSide
@@ -10,11 +10,7 @@ export interface StudiedSide
 }
 
 /** The player's names on the sites they play on, from their profile. */
-export interface Accounts
-{
-    readonly lichess?: string;
-    readonly chesscom?: string;
-}
+export type Accounts = SiteNames;
 
 /** The player's side in a game in analysis: none when they played neither side, or both. */
 export function playerIn(sides: Record<Side, StudiedSide>): Side | undefined
@@ -53,20 +49,4 @@ export function studiedSides(
     const white = sideOf("white");
     const black = sideOf("black");
     return { white, black, bottom: black.who === "player" && white.who !== "player" ? "black" : "white" };
-}
-
-/**
- * The side a game loaded from elsewhere names by one of the player's names on the sites (D-93): the one of its site when the Site tag says Lichess or
- * chess.com, either otherwise; none when neither side, or both, has one.
- */
-export function accountSide(tags: Readonly<Record<string, string>>, accounts: Accounts | undefined): Side | undefined
-{
-    const site = (tags.Site ?? "").toLowerCase();
-    const names = [
-        site.includes("chess.com") ? undefined : accounts?.lichess,
-        site.includes("lichess") ? undefined : accounts?.chesscom,
-    ].filter((name) => name !== undefined).map((name) => name.trim().toLowerCase());
-    const white = names.includes(tags.White?.trim().toLowerCase() ?? "");
-    const black = names.includes(tags.Black?.trim().toLowerCase() ?? "");
-    return white === black ? undefined : white ? "white" : "black";
 }

@@ -9,7 +9,7 @@ import { forgetAnalyst, gameStamp, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { Bell, bellProbe, pagePorts, type TableChat } from "../bell/index.ts";
-import { analysesOf, answerAnalyses } from "./analyses.ts";
+import { analysesOf, answerAnalyses, sendSiteGames } from "./analyses.ts";
 import { answerChat } from "./attach.ts";
 import { type Attached, attachedSeen, type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";
 import { askNewGame, keepPosted, tellWatchers } from "./events.ts";
@@ -236,6 +236,8 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         sendHtml(response);
     } else if (path === "/api/analyses") {
         send(response, 200, json, JSON.stringify(analysesOf(served.context.home())));
+    } else if (path === "/api/site-games") {
+        sendSiteGames(response, served);
     } else if (path === "/api/events") {
         keepPosted(request, response, served.watchers);
         // A page that opens reads the player's ratings again after a day (D-106).

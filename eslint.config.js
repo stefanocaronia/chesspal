@@ -13,6 +13,9 @@ const boundaries = [
     },
 ];
 
+// The commands, the server and the command line, from a module below them at any depth of its folders.
+const aboveCommands = "^(?:\\.\\./)+(?:commands|server|cli)/";
+
 // no-restricted-imports does not see import(), with which the command line loads each module late: the same boundaries, through the syntax.
 const lateBoundaries = boundaries.map(({ regex, message }) => ({ selector: `ImportExpression[source.value=/${regex.replaceAll("/", "\\x2F")}/]`, message }));
 
@@ -116,8 +119,8 @@ export default [
             "no-console": "error",
             "no-restricted-imports": ["error", {
                 patterns: [
-                    { group: ["../commands/*", "../server/*", "../cli/*"], message: "The games module sits below the commands: they use it, never the other way." },
-                    { group: ["../profiles/*"], message: "The profiles use the games, never the other way: pass the game folder in." },
+                    { regex: aboveCommands, message: "The games module sits below the commands: they use it, never the other way." },
+                    { regex: "^(?:\\.\\./)+profiles/", message: "The profiles use the games, never the other way: pass the game folder in." },
                     ...boundaries,
                 ],
             }],
@@ -129,7 +132,7 @@ export default [
         rules: {
             "no-console": "error",
             "no-restricted-imports": ["error", {
-                patterns: [{ group: ["../commands/*", "../server/*", "../cli/*"], message: "The profiles module sits below the commands: they use it, never the other way." }, ...boundaries],
+                patterns: [{ regex: aboveCommands, message: "The profiles module sits below the commands: they use it, never the other way." }, ...boundaries],
             }],
         },
     },
@@ -139,7 +142,7 @@ export default [
         rules: {
             "no-console": "error",
             "no-restricted-imports": ["error", {
-                patterns: [{ group: ["../commands/*", "../server/*", "../cli/*"], message: "The sites module sits below the commands: they use it, never the other way." }, ...boundaries],
+                patterns: [{ regex: aboveCommands, message: "The sites module sits below the commands: they use it, never the other way." }, ...boundaries],
             }],
         },
     },

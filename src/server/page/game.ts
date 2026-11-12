@@ -356,7 +356,7 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
 
     try {
         // Without what the chat was told: the analyst's instructions stay for the AI's own analyse_game.
-        const opened = last ? lastPlayed(served.context) : game === undefined ? kept(served, pgn!) : namedGame(served.context, game);
+        const opened = last ? lastPlayed(served.context) : game === undefined ? await kept(served, pgn!) : namedGame(served.context, game);
         reviewed = isReviewed(opened.record);
         brought = !reviewed && !look;
         // A game not yet reviewed is marked as brought, for status to ask the AI to go over it; one reviewed is ready, and the chat sleeps on.
@@ -507,9 +507,9 @@ function lastPlayed(context: Context): { name: string; record: GameRecord; }
 }
 
 /** A game brought as a PGN, kept to study as analyse_game keeps it: the one already kept when it is the same game, with its review. */
-function kept(served: Served, pgn: string): { name: string; record: GameRecord; }
+async function kept(served: Served, pgn: string): Promise<{ name: string; record: GameRecord; }>
 {
-    analyseGame.run({ pgn }, served.context);
+    await analyseGame.run({ pgn }, served.context);
     return namedGame(served.context, gameInAnalysis(gameFolder(served.context.home()))!.game);
 }
 

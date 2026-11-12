@@ -37,6 +37,9 @@ export class GameGoingOn extends Error
     }
 }
 
+/** A site's name as the AI's lines write it. */
+export const siteText: Readonly<Record<RatingSite, string>> = { "lichess": "Lichess", "chess.com": "Chess.com" };
+
 /** The profiles, the one in use first. */
 export const profiles = defineCommand({
     name: "profiles",
@@ -202,7 +205,6 @@ function isPlaying(context: Context): boolean
 }
 
 const levelText: Readonly<Record<Level, string>> = { learning: "has just learned", casual: "plays now and then", regular: "plays often", tournament: "plays tournaments" };
-const siteText: Readonly<Record<RatingSite, string>> = { "lichess": "Lichess", "chess.com": "Chess.com" };
 
 function playerText(profile: PlayerProfile): string
 {

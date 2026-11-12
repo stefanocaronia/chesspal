@@ -604,7 +604,7 @@ export function App({ start }: { start: Settings; })
                 {table === undefined ? null : <ChatDialog open={dialog === "chat"} review={chatToReview} table={table} settings={settings} onChange={change} name={name} onClose={closeChat} text={text} />}
                 <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
                 {guide}
-                <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} you={profile.name} accounts={profile.accounts} ai={name} text={text} />
+                <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} onProfile={() => setDialog("profile")} you={profile.name} accounts={profile.accounts} ai={name} text={text} />
                 {/* A newer Chesspal: the table's page installs it from the header's mark (D-108); a chat's own page says the command, in a strip */}
                 {served.update === undefined || served.table === undefined
                     ? null

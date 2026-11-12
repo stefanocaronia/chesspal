@@ -2,7 +2,7 @@
 import type { Accounts, SiteReading, SiteReadings } from "../profiles/index.ts";
 import { chesscomReading } from "./chesscom.ts";
 import { lichessReading } from "./lichess.ts";
-import { answerTime, type Fetch } from "./request.ts";
+import { answerTime, type Fetch } from "./request/index.ts";
 
 /** What Lichess and Chess.com say now of the player's names there, at `now`; a site that cannot be reached keeps what it said before of the same name. */
 export async function readSites(accounts: Accounts, fetch: Fetch, before: SiteReadings | undefined, now: Date): Promise<SiteReadings>

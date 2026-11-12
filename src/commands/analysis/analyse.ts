@@ -1,6 +1,7 @@
 // The analyst's tool (D-21, D-68): a game over, move by move in one call, facts only and never a judgment, with the analyst's instructions once in a chat.
 import { z } from "zod";
 import {
+    accountSide,
     type AiLevel,
     clockOfComment,
     clockText,
@@ -28,10 +29,12 @@ import {
 } from "../../core/index.ts";
 import { gameInAnalysis, isGameName, keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis } from "../../games/index.ts";
 import { analystAgent, instructionsFile } from "../../host-files/index.ts";
-import { activeProfile, gameFolder } from "../../profiles/index.ts";
+import { activeProfile, gameFolder, type PlayerProfile } from "../../profiles/index.ts";
+import { pointsAtSite, siteGameName, siteOfGameName } from "../../sites/index.ts";
 import { analystOf, anotherAnalyst, balanceText, bookOpening, bookReaches, colourName, gameToStudy, knownTag, moveNumbers, namedGame, noGameGoingOn, riskLine, speechLine, speechOf, type Studied, tacticsText } from "../answers/index.ts";
-import { playerLine } from "../profiles/index.ts";
+import { playerLine, siteText } from "../profiles/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
+import { profileSiteGames } from "./site-games.ts";
 
 /** A move as the analysis gives it: what happened, never how good it was (D-6). */
 interface MoveFacts
@@ -106,34 +109,50 @@ interface Replay
     outcome: Outcome;
 }
 
-/** A game over move by move, for the analyst (D-68): the current one, one of the archive or kept to study, or one the player brings as a PGN, kept to study. */
+/**
+ * A game over move by move, for the analyst (D-68): the current one, one of the archive or kept to study, one the player brings as a PGN, or one of their latest
+ * on the sites (D-110), kept to study.
+ */
 export const analyseGame = defineCommand({
     name: "analyse_game",
     description: "Gives a game that is over move by move, to comment it with the player: each move with what it took and the time it took, the material "
         + "when it changes, the pieces at risk, the only legal move when there is one alone, the mates in one and what the next moves would do after it (forks, double attacks, discovered checks, "
         + "promotions, stalemates and stalemate traps), where the game left the opening book, and your comments and plans. Facts "
-        + "only: the judgment is yours. Without game or pgn, the game just over, or else the last one played; game: a name as past_games or study_games "
-        + "writes it; pgn: a game the player brings from elsewhere, kept to study in the profile. Never while a game goes on. The first time in a chat "
+        + "only: the judgment is yours. Without game or pgn, the game just over, or else the last one played; game: a name as past_games, study_games or "
+        + "site_games writes it; pgn: a game the player brings from elsewhere, kept to study in the profile. Never while a game goes on. The first time in a chat "
         + "it also says how to analyse. annotate_game then keeps your badges and notes for the board page. Example: analyse_game {}.",
     input: z.object({
-        game: z.string().optional().describe("a game's name, as past_games, study_games or analyse_game writes it"),
+        game: z.string().optional().describe("a game's name, as past_games, study_games, site_games or analyse_game writes it"),
         pgn: z.string().optional().describe("a game played elsewhere, in PGN: its tags and its moves, with their [%clk] and a review exported from the board page if it has them; other comments and evals can go"),
     }),
     sharedWith: [analystAgent],
-    run: ({ game, pgn }, context): Analysis => {
+    openWorld: true,
+    run: async ({ game, pgn }, context): Promise<Analysis> => {
         if (game !== undefined && pgn !== undefined) {
             throw new Error("Give game or pgn, not both: game names a game of the archive, pgn brings one played elsewhere.");
         }
 
+        const given = game?.trim();
+
+        // A link, or a name of a site's game that site_games does not write, is no game Chesspal can find (D-110).
+        if ([given, pgn].some((text) => text !== undefined && pointsAtSite(text))) {
+            throw new Error("Chesspal takes no link: site_games lists the player's latest games on Lichess and Chess.com; give the name it writes, as game.");
+        }
+
         // A game's name given as pgn, as an AI often gives it, is that game (Priya).
-        const named = pgn !== undefined && isGameName(pgn) ? pgn.trim() : game;
-        const studied = pgn === undefined || named !== game ? gameToStudy(context, named) : importedGame(context, pgn);
+        const fromSite = siteGameName(given ?? pgn ?? "");
+        const named = pgn !== undefined && isGameName(pgn) ? pgn.trim() : given;
+        const studied = fromSite !== undefined
+            ? importedGame(context, await siteGamePgn(context, fromSite))
+            : pgn === undefined || named !== given
+            ? gameToStudy(context, named)
+            : importedGame(context, pgn);
 
         if (context.agent === analystAgent) {
             oneAnalyst(context, studied);
         }
 
-        const analysis = analysisOf(studied, activeProfile(context.home()).name);
+        const analysis = analysisOf(studied, activeProfile(context.home()));
 
         if (studied.name !== undefined) {
             markBook(context, { record: studied.record, name: studied.name }, analysis.moves);
@@ -235,6 +254,31 @@ function importedGame(context: Context, pgn: string): Studied
     return namedGame(context, keepToStudy(gameFolder(context.home()), record, context.now()));
 }
 
+/** The PGN of one of the player's latest games on the sites, asked of them again by its name as site_games writes it (D-110). */
+async function siteGamePgn(context: Context, name: string): Promise<string>
+{
+    noGameGoingOn(context);
+    const site = siteOfGameName(name);
+    const profile = activeProfile(context.home()).id;
+    const { games, unreached } = await profileSiteGames(context, site);
+
+    if (activeProfile(context.home()).id !== profile) {
+        throw new Error("The profile in use changed while the site answered: call site_games again for the player's games now. Nothing changed.");
+    }
+
+    const found = games.find((one) => one.name === name);
+
+    if (found !== undefined) {
+        return found.pgn;
+    }
+
+    throw new Error(
+        unreached.includes(site)
+            ? `${siteText[site]} could not be reached: tell the player, and ask again when they ask. Nothing changed.`
+            : `${name} is not among the player's latest games on ${siteText[site]} any more: call site_games again and give a name it writes. Nothing changed.`,
+    );
+}
+
 /**
  * The opening book's moves marked as such in the game kept (D-69): a fact, not a judgment, so Chesspal puts the badge itself on each move from the start to the
  * last one the book knows, where the AI gave none; a game from another position has none.
@@ -263,7 +307,7 @@ function bookPliesOfFacts(record: GameRecord, moves: readonly MoveFacts[]): numb
     return record.tags.FEN !== undefined ? 0 : firstOut >= 0 ? firstOut : moves.length;
 }
 
-function analysisOf({ record, name }: Studied, playerName: string | undefined): Analysis
+function analysisOf({ record, name }: Studied, profile: PlayerProfile): Analysis
 {
     const { tags } = record;
     const ai = sideNamed(record, "AI");
@@ -278,7 +322,8 @@ function analysisOf({ record, name }: Studied, playerName: string | undefined): 
         black: tags.Black ?? "?",
         ai,
         level: ai === undefined ? undefined : levelOf(record),
-        player: ai === undefined && playerName !== undefined ? sideNamed(record, playerName) : undefined,
+        // The player by their name, or by their names on the sites (D-93).
+        player: ai === undefined ? sideNamed(record, profile.name) ?? accountSide(record.tags, profile.accounts) : undefined,
         date: knownTag(tags.Date),
         timeControl: control === undefined ? knownTag(tags.TimeControl) : timeControlText(control),
         result: ended?.result,

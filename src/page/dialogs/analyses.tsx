@@ -1,11 +1,13 @@
 // The list of the analyses (D-92): the games analysed or brought to study, found by a search, to open again, analyse again or delete, each row with its
 // menu over the dialog and the question it asks in its place.
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { accountSide } from "../../core/index.ts";
 import { ResultTile } from "../game/result-tile.tsx";
 import { signature } from "../players/model-name.ts";
 import type { StudyText, Text } from "../text.ts";
+import { type Outcome, OutcomeBadge, outcomeOf } from "./outcome.tsx";
 import { searched } from "./search.ts";
-import { type Accounts, accountSide, playerIn, studiedSides } from "./studied.ts";
+import { type Accounts, playerIn, studiedSides } from "./studied.ts";
 import type { AnalysisItem, Studied } from "./study.tsx";
 
 /** The list, read anew at each opening: the search, the row that loads a game, then a row for each game found, with its menu or its question. */
@@ -291,18 +293,6 @@ function searchText(item: AnalysisItem, sides: string, outcome: Outcome | undefi
     return [sides, item.aiModel?.model, by(item), item.annotator?.model, dayOf(item.date, text.language), item.opening, scoreOf(item.result), went, state].join(" ");
 }
 
-/** How a game went for the player, as chess.com marks it: a green square with a plus, a red one with a minus, a grey one with an equals sign. */
-function OutcomeBadge({ outcome, words }: { outcome: Outcome; words: StudyText; })
-{
-    return (
-        <svg class={`outcome ${outcome}`} viewBox="0 0 16 16" role="img" aria-label={words.outcome[outcome]}>
-            <title>{words.outcome[outcome]}</title>
-            <rect width="16" height="16" rx="4" />
-            <path d={outcomeSigns[outcome]} />
-        </svg>
-    );
-}
-
 /** A game the AI reviewed: its speech bubble, and the model that wrote the review when the tags say it. */
 function Reviewed({ by, words }: { by: string | undefined; words: StudyText; })
 {
@@ -315,10 +305,6 @@ function Reviewed({ by, words }: { by: string | undefined; words: StudyText; })
         </span>
     );
 }
-
-type Outcome = "won" | "lost" | "drawn";
-
-const outcomeSigns: Readonly<Record<Outcome, string>> = { won: "M5 8h6M8 5v6", lost: "M5 8h6", drawn: "M5 6.5h6M5 9.5h6" };
 
 /** The tags of a game listed that name its sides. */
 function tagsOf(item: AnalysisItem): Record<string, string>
@@ -336,16 +322,6 @@ function by(item: AnalysisItem): string | undefined
 function scoreOf(result: string): string
 {
     return result === "1/2-1/2" ? "½–½" : result.replace("-", "–");
-}
-
-/** How a game went for the player: won, lost or drawn; nothing for a game without a result. */
-function outcomeOf(result: string, you: "white" | "black"): Outcome | undefined
-{
-    if (result === "1/2-1/2") {
-        return "drawn";
-    }
-
-    return result === "1-0" || result === "0-1" ? (result === "1-0") === (you === "white") ? "won" : "lost" : undefined;
 }
 
 /** A PGN date, 2026.11.04, as the player reads it: «4 nov», with the year when it is not this one. */

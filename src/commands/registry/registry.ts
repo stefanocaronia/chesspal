@@ -15,6 +15,8 @@ export interface Command<Schema extends z.ZodObject = z.ZodObject, Result = unkn
     destructive?: boolean;
     /** Calling the command again with the same input changes nothing more. */
     idempotent?: boolean;
+    /** The command may ask a site outside this computer, as site_games asks Lichess and Chess.com (D-110); every other one stays local. */
+    openWorld?: true;
     /** Hosts load the tool at once instead of on demand: for the ones the AI calls at the start of every chat. */
     alwaysLoad?: boolean;
     /** Its answer shows the chat the game as it is: the chat may move on it, and on no other (D-71). */

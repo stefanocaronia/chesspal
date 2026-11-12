@@ -97,13 +97,15 @@ function readAgain(): number
 }
 
 /** The time of the analysis of a long game of the archive, a new random one each time: no position of it computed before, as for a game imported. */
-function analyseLong(): number
+async function analyseLong(): Promise<number>
 {
     const game = new Game({ tags: { Result: "1/2-1/2" }, moves: randomGame(seed++, 120).map((san) => ({ san })) });
     const study = testContext(studyFolder);
     mkdirSync(join(gameFolder(study.home()), "games"), { recursive: true });
     writeFileSync(join(gameFolder(study.home()), "games", "2026-11-02-153012.pgn"), writePgn(game.record));
-    return timed(1, () => call(study, "analyse_game", { game: "games/2026-11-02-153012.pgn" }));
+    const started = performance.now();
+    await callAwaited(study, "analyse_game", { game: "games/2026-11-02-153012.pgn" });
+    return performance.now() - started;
 }
 
 /** A command as the MCP server runs it: its input checked, its result as text. */
@@ -116,4 +118,16 @@ function call(at: Context, name: string, input: Record<string, unknown> = {}): s
     }
 
     return command.format(command.run(command.input.parse(input), at));
+}
+
+/** A command that answers later, as analyse_game, which may ask the sites: its result as text once it has it. */
+async function callAwaited(at: Context, name: string, input: Record<string, unknown> = {}): Promise<string>
+{
+    const command = commands.find((candidate) => candidate.name === name);
+
+    if (command === undefined) {
+        throw new Error(`There is no command ${name}.`);
+    }
+
+    return command.format(await command.run(command.input.parse(input), at));
 }

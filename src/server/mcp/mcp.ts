@@ -240,11 +240,11 @@ function track(call: Promise<CallToolResult>): Promise<CallToolResult>
     return call;
 }
 
-/** Every hint stated, since the spec reads a missing one as the worst case: everything is local, so no tool reaches the open world. */
+/** Every hint stated, since the spec reads a missing one as the worst case: everything is local, but for the tools that ask the sites the player plays on (D-110). */
 function toolConfig(command: AnyCommand)
 {
     const readOnly = command.readOnly === true;
-    const annotations = { readOnlyHint: readOnly, destructiveHint: command.destructive === true, idempotentHint: readOnly || command.idempotent === true, openWorldHint: false };
+    const annotations = { readOnlyHint: readOnly, destructiveHint: command.destructive === true, idempotentHint: readOnly || command.idempotent === true, openWorldHint: command.openWorld === true };
     const meta = command.alwaysLoad ? { "anthropic/alwaysLoad": true } : undefined;
     // The SDK writes the draft's address in every schema: it says nothing to an AI, and costs tokens in every tool.
     return { description: command.description, inputSchema: z.looseObject({}).meta({ ...shownInput(command), $schema: undefined }), annotations, _meta: meta };
