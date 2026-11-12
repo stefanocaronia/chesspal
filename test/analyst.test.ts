@@ -82,11 +82,13 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         await run(analyst, "annotate_game", { game, summary: "Corta." });
         expect(await run(context, "status")).toContain("don't start it for this review");
 
-        // The page's «Analyse again»: the review deleted, the game brought back.
+        // The page's «Analyse again»: the review deleted, the game brought back for a new review, which the chat starts without asking (Priya).
         await run(context, "delete_review", { game });
-        startAnalysis(gameFolder(context.home()), game, context.now(), { brought: true });
+        startAnalysis(gameFolder(context.home()), game, context.now(), { brought: true, redo: true });
         const status = await run(context, "status");
-        expect(status).toContain(`The player brought ${game} on the board page to analyse it. Next: start the chesspal-analyst agent`);
+        expect(status).toContain(
+            `\nThe player asked on the board page for a new review of ${game}. Next, at once, even if an analyst was stopped before: start the chesspal-analyst agent`,
+        );
         expect(status).not.toContain("don't start it for this review");
         expect(await run({ ...analyst, agentRun: "agent-second" }, "analyse_game", { game })).toMatch(/^You played Black/);
     });

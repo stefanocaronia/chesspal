@@ -320,6 +320,11 @@ describe("the page's server", () => {
         expect(await listed()).toEqual([expect.not.objectContaining({ begun: true })]);
         await run(folder, "annotate_game", { notes: [{ move: "2.", badge: "inaccuracy" }] });
         expect(await listed()).toMatchObject([{ reviewed: false, begun: true }]);
+        // «Analyse again» asks for a new review, which status tells the chat.
+        const [{ name }] = (await listed()) as [{ name: string; }];
+        await post(page, "/api/delete-review", { game: name });
+        expect(await post(page, "/api/study", { game: name, redo: true })).toMatchObject({ status: 200 });
+        expect(gameInAnalysis(gameFolder(folder))).toMatchObject({ game: name, brought: true, redo: true });
 
         const other = playerFolder();
         const shown = await open(other);

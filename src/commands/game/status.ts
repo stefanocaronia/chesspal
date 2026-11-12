@@ -53,8 +53,8 @@ interface Status
     problem?: string;
     /** What the player wrote on the board page that the AI has not answered yet, all of it. */
     words?: Written[];
-    /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there. */
-    analysis?: { game: string; brought?: true; analyst?: "done" | "offer"; codex?: true; review?: string; };
+    /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there, for a new review too. */
+    analysis?: { game: string; brought?: true; redo?: true; analyst?: "done" | "offer"; codex?: true; review?: string; };
     /** A game going on from before this chat, told once a chat: the player says whether to go on with it. */
     fromBefore?: true;
     /** The coach to start, once, for the player's move that ended the game (D-88). */
@@ -135,6 +135,7 @@ export const status = defineCommand({
                 status.analysis = {
                     game: analysis.game,
                     ...(analysis.brought === true ? { brought: true } : {}),
+                    ...(analysis.redo === true ? { redo: true } : {}),
                     ...(analystRuns(context) ? { analyst: goneOver(context, analysis.game) ? "done" as const : "offer" as const } : {}),
                     ...(analystRuns(context) && isCodex(context.host?.()) ? { codex: true as const } : {}),
                     ...(review === undefined ? {} : { review }),
@@ -191,10 +192,14 @@ function firstInChat(context: Context, chatStart: string | undefined): boolean
 
 /**
  * The game in analysis, with how far its review has got; the next step when the player has just brought it on the board page, unless an analyst is at it
- * already; the analyst agent for a game whose review was deleted, where it runs (Stefano).
+ * already, at once when they asked for a new review (Priya); the analyst agent for a game whose review was deleted, where it runs (Stefano).
  */
-function analysisLine({ game, brought, analyst, codex, review }: NonNullable<Status["analysis"]>): string
+function analysisLine({ game, brought, redo, analyst, codex, review }: NonNullable<Status["analysis"]>): string
 {
+    if (redo === true && analyst === "offer") {
+        return `The player asked on the board page for a new review of ${game}. Next, at once, even if an analyst was stopped before: ${analystLine(game, codex === true)}`;
+    }
+
     if (brought === true && analyst !== "done") {
         return analyst === "offer"
             ? `The player brought ${game} on the board page to analyse it. Next: ${analystLine(game, codex === true)}`

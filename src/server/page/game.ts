@@ -340,6 +340,8 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
     const last = body?.last === true;
     // A game a link of the page opens is there to look at: the chat is not asked to go over it.
     const look = body?.look === true;
+    // «Analyse again», the review just deleted: the chat starts the analyst without asking, even after one was stopped (Priya).
+    const redo = body?.redo === true;
 
     if (pgn === undefined && game === undefined && !last) {
         send(response, 400, json, JSON.stringify({ error: asked, refusal: "pgn-unreadable" }));
@@ -360,7 +362,7 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
         reviewed = isReviewed(opened.record);
         brought = !reviewed && !look;
         // A game not yet reviewed is marked as brought, for status to ask the AI to go over it; one reviewed is ready, and the chat sleeps on.
-        startAnalysis(gameFolder(served.context.home()), opened.name, served.context.now(), { brought });
+        startAnalysis(gameFolder(served.context.home()), opened.name, served.context.now(), { brought, redo });
     } catch (error) {
         send(response, 400, json, JSON.stringify({ error: (error as Error).message, refusal: "pgn-unreadable" }));
         return;

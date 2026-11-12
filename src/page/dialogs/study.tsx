@@ -25,8 +25,8 @@ export interface AnalysisItem
     readonly site?: string;
 }
 
-/** What the dialog sends: a PGN to bring, or the name of a game to open again. */
-export type Studied = { pgn: string; } | { game: string; } | { last: true; };
+/** What the dialog sends: a PGN to bring, or the name of a game to open again, to analyse again too. */
+export type Studied = { pgn: string; } | { game: string; redo?: true; } | { last: true; };
 
 /**
  * The dialog the header's button opens; `onStudy` sends the choice and gives back why the server refused it, or undefined once it took it. The games played

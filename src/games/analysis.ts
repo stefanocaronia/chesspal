@@ -6,13 +6,15 @@ import { writeAtomically } from "./files.ts";
 
 /**
  * The game in analysis: its name as the lists write it, when the analysis last changed it, whether the player brought it on the page and the AI has not
- * gone over it yet, the moves whose note the chat corrected with the player, which the analyst leaves (D-101), and the run of the analyst that took it.
+ * gone over it yet, and whether they asked there for a new review of it; the moves whose note the chat corrected with the player, which the analyst leaves
+ * (D-101), and the run of the analyst that took it.
  */
 export interface Analysis
 {
     readonly game: string;
     readonly at: string;
     readonly brought?: true;
+    readonly redo?: true;
     readonly corrected?: readonly string[];
     readonly analyst?: AnalystRun;
 }
@@ -26,12 +28,13 @@ export interface AnalystRun
 }
 
 /**
- * How a game is named in analysis: brought to the page by the player, with the moves the chat just corrected, taken by a run of the analyst, or afresh,
- * without the corrections and the analyst it had.
+ * How a game is named in analysis: brought to the page by the player, for a new review too, with the moves the chat just corrected, taken by a run of the
+ * analyst, or afresh, without the corrections and the analyst it had.
  */
 export interface AnalysisStart
 {
     readonly brought?: boolean;
+    readonly redo?: boolean;
     readonly corrected?: readonly string[];
     readonly analyst?: AnalystRun;
     readonly afresh?: boolean;
@@ -42,7 +45,7 @@ export interface AnalysisStart
  * unless it starts afresh, in one write, so that the page never sees it leave the analysis; the analyst stays with the game it took, whichever the page
  * opens meanwhile (Federico), and goes when that game starts afresh.
  */
-export function startAnalysis(folder: string, game: string, now: Date, { brought = false, corrected = [], analyst, afresh = false }: AnalysisStart = {}): void
+export function startAnalysis(folder: string, game: string, now: Date, { brought = false, redo = false, corrected = [], analyst, afresh = false }: AnalysisStart = {}): void
 {
     const before = gameInAnalysis(folder);
     const same = !afresh && before?.game === game;
@@ -52,6 +55,7 @@ export function startAnalysis(folder: string, game: string, now: Date, { brought
         game,
         at: now.toISOString(),
         ...(brought ? { brought: true } : {}),
+        ...(brought && redo ? { redo: true } : {}),
         ...(kept.length === 0 ? {} : { corrected: kept }),
         ...withAnalyst(analyst ?? held),
     });
@@ -63,8 +67,8 @@ export function forgetAnalyst(folder: string): void
     const analysis = gameInAnalysis(folder);
 
     if (analysis?.analyst !== undefined) {
-        const { game, at, brought, corrected } = analysis;
-        writeAnalysis(folder, { game, at, ...(brought === undefined ? {} : { brought }), ...(corrected === undefined ? {} : { corrected }) });
+        const { game, at, brought, redo, corrected } = analysis;
+        writeAnalysis(folder, { game, at, ...(brought === undefined ? {} : { brought }), ...(redo === undefined ? {} : { redo }), ...(corrected === undefined ? {} : { corrected }) });
     }
 }
 
@@ -79,6 +83,7 @@ export function gameInAnalysis(folder: string): Analysis | undefined
                 game: analysis.game,
                 at: analysis.at,
                 ...(analysis.brought === true ? { brought: true } : {}),
+                ...(analysis.brought === true && analysis.redo === true ? { redo: true } : {}),
                 ...(corrected.length === 0 ? {} : { corrected }),
                 ...withAnalyst(isAnalystRun(analysis.analyst) ? analysis.analyst : undefined),
             }
