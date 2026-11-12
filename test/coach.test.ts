@@ -64,7 +64,7 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         expect(start).toMatch(/^Game "\w+", position 18: the player \(White\) to move, move 10; the opponent plays Black at the strong level\.\nThe player speaks Italian\.\n/);
         expect(start).toMatch(/\nMoves: 1\.e4 e5 2\.Nf3 .* 9\.d5 Bf6\nOpening: C5\d /);
         expect(start).toContain("\nTheir move to judge: 9.d5. The position they played it in:\nFEN: ");
-        expect(start).toContain("\nMaterial: Black +4 (White took P, Black took N 2P)\n");
+        expect(start).toContain("\nMaterial: Black +4 in pawns (White took P, Black took N 2P)\n");
         expect(start).toMatch(/\nAfter their move: at risk .*; the opponent's checks: .*\.\nThe opponent answered 9\.\.\.Bf6 and said: «Ecco\.»\nNow, for who is ahead and your hint:\nFEN: /);
         // Every fact of the position they are to move in, the positional ones too, for who is ahead (D-90).
         expect(start).toMatch(/\nPhase: \w+\n[\s\S]*\nControl: only White \d+, only Black \d+, both \d+\n/);

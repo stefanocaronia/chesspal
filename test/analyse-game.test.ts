@@ -54,7 +54,7 @@ describe("the analysis of a game (D-68)", () => {
             "2...Nc6: spent 0:10, 4:50 left",
             "3.Qh5: spent 0:17, 4:40 left; at risk: outnumbered Black Pf7",
             "3...Nf6: spent 0:22, 4:30 left; at risk: undefended White Qh5 Pe4; outnumbered Black Pf7; mate in one: Qxf7#; out of book",
-            "4.Qxf7#: took P; spent 0:07, 4:35 left; material White +1",
+            "4.Qxf7#: took P; spent 0:07, 4:35 left; material White +1 in pawns",
         ].join("\n"));
 
         expect(await analyse({ ...context, now: () => new Date(2026, 10, 3) }, { pgn })).toBe(analysis);
@@ -105,7 +105,7 @@ describe("the analysis of a game (D-68)", () => {
         expect(await analyse(context, { pgn: fromBlack })).toMatch(/\n1\.\.\.e5\n2\.Nf3: at risk: undefended Black Pe5\n2\.\.\.Nc6: at risk: none$/);
         expect(await lookAt(context, { game: imported, move: "2." })).toMatch(/^After 2\.Nf3 in /);
         expect(await analyse({ ...context, now: () => new Date(2026, 10, 3) }, { pgn: promotion })).toMatch(
-            /\n1\.\.\.bxc3: took P; material Black \+5; at risk: undefended Black Ra8; tactics: promote b8=Q\+, bxa8=Q\+\n2\.bxa8=Q\+: took R; material White \+8; at risk: none$/,
+            /\n1\.\.\.bxc3: took P; material Black \+5 in pawns; at risk: undefended Black Ra8; tactics: promote b8=Q\+, bxa8=Q\+\n2\.bxa8=Q\+: took R; material White \+8 in pawns; at risk: none$/,
         );
     });
 
@@ -143,7 +143,7 @@ describe("the analysis of a game (D-68)", () => {
         const context = playerFolder();
         const analysis = await analyse(context, { pgn: "1. e4 d5 2. a3 dxe4 3. Nc3 Nf6 *" });
 
-        expect(analysis).toMatch(/\n1\.\.\.d5: at risk: undefended White Pe4\n2\.a3: out of book\n2\.\.\.dxe4: took P; material Black \+1; at risk: none\n3\.Nc3: at risk: undefended Black Pe4\n/);
+        expect(analysis).toMatch(/\n1\.\.\.d5: at risk: undefended White Pe4\n2\.a3: out of book\n2\.\.\.dxe4: took P; material Black \+1 in pawns; at risk: none\n3\.Nc3: at risk: undefended Black Pe4\n/);
     });
 
     it("gives the game played here once it is over, with what the AI said and planned, and nothing while a game goes on", async () => {

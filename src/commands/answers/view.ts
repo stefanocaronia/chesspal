@@ -82,10 +82,10 @@ export function materialText(material: Material): string
     return `${ahead} (White took ${takenText(material.taken.white)}, Black took ${takenText(material.taken.black)})`;
 }
 
-/** Who is ahead in material, and by how many pawns: White +2, or even. */
+/** Who is ahead in material, and by how many pawns, with the unit, so that no AI reads it as pieces: White +2 in pawns, or even. */
 export function balanceText(balance: number): string
 {
-    return balance === 0 ? "even" : `${balance > 0 ? "White" : "Black"} +${Math.abs(balance)}`;
+    return balance === 0 ? "even" : `${balance > 0 ? "White" : "Black"} +${Math.abs(balance)} in pawns`;
 }
 
 /** The pieces taken, counted by kind: Q 2R 7P. */

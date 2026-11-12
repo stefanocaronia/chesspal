@@ -46,7 +46,7 @@ interface MoveFacts
     /** The time it took and the time left after it, in milliseconds, where the record has the clock. */
     spent?: number;
     left?: number;
-    /** Who is ahead in material after it, when it changed: White +1. */
+    /** Who is ahead in material after it, when it changed: White +1 in pawns. */
     material?: string;
     /** After it, the pieces at risk of either side when they changed from the line before ("none" once no piece is), and the mates the side to move has; none once the board ends the game. */
     atRisk?: string;
@@ -422,7 +422,7 @@ function analysisHead(analysis: Analysis): string[]
     return [head, ...opening, ...review, `${name}.`, ...start];
 }
 
-/** 12...Nxe5: took P; spent 0:12, 4:32 left; material White +1; at risk: undefended Black Nf6; mate in one: Qh7#; tactics: fork Nc7+ (Ke8 Ra8); out of book; you said "…"; your plan: …; ahead -1.5 */
+/** 12...Nxe5: took P; spent 0:12, 4:32 left; material White +1 in pawns; at risk: undefended Black Nf6; mate in one: Qh7#; tactics: fork Nc7+ (Ke8 Ra8); out of book; you said "…"; your plan: …; ahead -1.5 */
 function moveLine(move: MoveFacts): string
 {
     const left = move.left === undefined ? undefined : `${clockText(move.left)} left`;

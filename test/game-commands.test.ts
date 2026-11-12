@@ -49,7 +49,7 @@ describe("a game in chat", () => {
         expect(await run(playerFolder(0.2), "new_game", { ai_colour: "random" })).toContain("you play White");
         expect(await run(playerFolder(0.7), "new_game", { ai_colour: "random" })).toContain("you play Black");
         expect(await run(playerFolder(), "new_game", { ai_colour: "white", from: "4k3/8/8/8/8/8/4P3/4K3 w - - 0 40" })).toContain(
-            "You (White) to move, move 40.\nMaterial: White +1 (White took Q 2R 2B 2N 8P, Black took Q 2R 2B 2N 7P)\nFEN: 4k3/8/8/8/8/8/4P3/4K3 w - - 0 40\nChecks: none for either side\nCaptures: none\n",
+            "You (White) to move, move 40.\nMaterial: White +1 in pawns (White took Q 2R 2B 2N 8P, Black took Q 2R 2B 2N 7P)\nFEN: 4k3/8/8/8/8/8/4P3/4K3 w - - 0 40\nChecks: none for either side\nCaptures: none\n",
         );
 
         const context = playerFolder();
