@@ -50,6 +50,7 @@ import { FoldTab } from "../layout/fold-tab.tsx";
 import { type Column, nextFold, rememberFold, startFolds } from "../layout/folds.ts";
 import { PageFoot } from "../layout/footer.tsx";
 import { type GameActions, Header } from "../layout/header.tsx";
+import { LeadChart } from "../lead/lead.tsx";
 import { standingsOf } from "../lead/view.ts";
 import { MarksLegend } from "../legend/legend.tsx";
 import { legendOf } from "../legend/view.ts";
@@ -63,7 +64,7 @@ import { UpdateDialog, UpdateNotice } from "../table/update.tsx";
 import { AiNameButton, ChatDialog, tableNote } from "../table/window.tsx";
 import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
 import { textFor } from "../text.ts";
-import { anchorName, useAnchor } from "./anchor.ts";
+import { anchorName, type LinkIgnored, useAnchor } from "./anchor.ts";
 import { useBrowseKeys, useFoldKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
 import { phaseOf, verdictOf } from "./phase.ts";
 import { ask, type PageData, post, sendMessage, sendMove, useServed } from "./served.ts";
@@ -129,6 +130,23 @@ export function App({ start }: { start: Settings; })
 
     const [selected, setSelected] = useState<string | undefined>(undefined);
     const [refusal, setRefusal] = useState<Notice | undefined>(undefined);
+    // A link the page did not follow says why on the board, in the language of the settings the page has by then, until the player's next click or key.
+    const [linkIgnored, setLinkIgnored] = useState<LinkIgnored | undefined>(undefined);
+
+    useEffect(() => {
+        if (linkIgnored === undefined) {
+            return;
+        }
+
+        const dismiss = (): void => setLinkIgnored(undefined);
+        window.addEventListener("pointerdown", dismiss, { once: true });
+        window.addEventListener("keydown", dismiss, { once: true });
+
+        return () => {
+            window.removeEventListener("pointerdown", dismiss);
+            window.removeEventListener("keydown", dismiss);
+        };
+    }, [linkIgnored]);
     // A pawn taken to the last rank waits for the player to choose what it becomes.
     const [promoting, setPromoting] = useState<{ from: string; to: string; } | undefined>(undefined);
     const [flipped, setFlipped] = useState(false);
@@ -283,6 +301,7 @@ export function App({ start }: { start: Settings; })
         viewing,
         (plies) => goTo(plies ?? total),
         async (wanted) => await post("/api/study", { game: wanted, look: true }, text, name) === undefined,
+        setLinkIgnored,
     );
     // The tab names the game and the move shown, as the cards name its players; between games, Chesspal alone.
     const titled = idle || served === undefined ? undefined : studiedSides(live.record.tags, served.profile.name, playedAs, text.sides, served.profile.accounts, othersOf(served.profiles, served.profile.id));
@@ -313,11 +332,8 @@ export function App({ start }: { start: Settings; })
         canOffer: offer === undefined && pending === undefined && live.position.turn !== played.ai && total >= 2,
         onOffer: () => act("/api/draw", { action: "offer" }),
         onAnswer: (accept) => act("/api/draw", { action: accept ? "accept" : "decline" }),
-        onResign: () => {
-            if (window.confirm(text.resignGame)) {
-                act("/api/resign", {});
-            }
-        },
+        // The header asks first, in its own words (D-65).
+        onResign: () => act("/api/resign", {}),
     };
 
     const { kind, verdict } = aborted && phase === "over" ? { kind: "over" as const, verdict: text.aborted } : verdictOf(phase, how, winner, offer, declined, text);
@@ -808,7 +824,7 @@ export function App({ start }: { start: Settings; })
                             targets={selected === undefined || viewing !== undefined ? [] : live.legalMoves(selected as Square)}
                             dots={settings.dots}
                             names={settings.squareNames}
-                            notice={viewing === undefined ? refusal : undefined}
+                            notice={viewing !== undefined ? undefined : refusal ?? (linkIgnored === undefined ? undefined : { text: text.link[linkIgnored] })}
                             promotion={promoting === undefined || viewing !== undefined || !playerToMove ? undefined : { ...promoting, side: player }}
                             onPromote={(piece) => piece === undefined ? setPromoting(undefined) : play(promoting!.from, promoting!.to, piece)}
                             onSelect={select}
@@ -826,10 +842,14 @@ export function App({ start }: { start: Settings; })
                             )
                             : null}
                     </div>
-                    {/* On a phone the steps of a game in analysis sit under the board, by the thumb (Zoe) */}
+                    {
+                        /* On a phone the steps of a game in analysis sit under the board, by the thumb, and the chart of the game under them, the board in sight
+                        while a finger runs along it (Zoe) */
+                    }
                     {studied === undefined ? null : (
                         <div class="board-steps">
                             <Steps shown={at} total={total} onStep={step} text={text} />
+                            {standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={at} onShow={goTo} text={text} />}
                         </div>
                     )}
                     {/* On a phone the helps' map sits under the board too, turned on and off by a touch (D-78), and the coach's hint beside it, its drawings in sight (Zoe) */}

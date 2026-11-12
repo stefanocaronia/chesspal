@@ -29,7 +29,9 @@ export interface Text
     readonly declineDraw: string;
     readonly declineDrawTitle: string;
     readonly resign: string;
+    /** The header's question once the flag is pressed, and its answer that plays on. */
     readonly resignGame: string;
+    readonly keepPlaying: string;
     readonly settings: string;
     readonly close: string;
     readonly look: string;
@@ -181,6 +183,8 @@ export interface Text
     readonly startClocks: string;
     /** A command such as /clear written in the page's talk, which is for the host's window. */
     commandHere(name: string): string;
+    /** A link to a game the page did not open: one goes on, or the game is not in the profile. */
+    readonly link: { readonly going: string; readonly gone: string; };
     /** The choice of the piece a pawn becomes on the last rank. */
     readonly promoteTo: string;
     /** A square the piece picked may go to, for a screen reader. */
@@ -567,6 +571,7 @@ const english: Text = {
     declineDrawTitle: "Decline: moving declines it too",
     resign: "Resign",
     resignGame: "Resign this game?",
+    keepPlaying: "Play on",
     settings: "Settings",
     close: "Close",
     look: "Look",
@@ -722,6 +727,10 @@ const english: Text = {
         typeIt: "Or type in a terminal:",
     },
     commandHere: (name) => `/clear and the other commands go in the window where you opened ${name}, not here.`,
+    link: {
+        going: "A game is going on: finish it, then open the link again.",
+        gone: "The game of this link is not here: it was deleted, or it is another profile's.",
+    },
     refused: {
         "no-game": () => "There is no game going on: press + to start one, or ask for one in the chat.",
         "ai-to-move": () => "Wait for the AI's move.",
@@ -998,6 +1007,7 @@ const italian: Text = {
     declineDrawTitle: "Rifiuta: anche muovere rifiuta",
     resign: "Abbandona",
     resignGame: "Abbandonare la partita?",
+    keepPlaying: "Continua",
     settings: "Impostazioni",
     close: "Chiudi",
     look: "Aspetto",
@@ -1154,6 +1164,10 @@ const italian: Text = {
         typeIt: "Oppure scrivi in un terminale:",
     },
     commandHere: (name) => `/clear e gli altri comandi vanno scritti nella finestra dove hai aperto ${name}, non qui.`,
+    link: {
+        going: "C'è una partita in corso: finiscila, poi riapri il link.",
+        gone: "La partita di questo link non c'è: è stata cancellata, o è di un altro profilo.",
+    },
     refused: {
         "no-game": () => "Nessuna partita in corso: premi + per iniziarne una, o chiedila nella chat.",
         "ai-to-move": () => "Aspetta la mossa dell'AI.",

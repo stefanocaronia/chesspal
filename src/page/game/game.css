@@ -129,8 +129,8 @@
     height: 14px;
     margin-top: 6px;
     border-radius: 7px;
-    background: #3b4048;
-    box-shadow: 0 0 0 1px rgb(138 144 153 / 0.6);
+    background: var(--side-black);
+    box-shadow: 0 0 0 1px var(--side-edge);
     overflow: hidden;
 }
 
@@ -139,7 +139,7 @@
     position: absolute;
     inset: 3px auto 3px calc(50% - 0.5px);
     width: 1px;
-    background: #8a9099;
+    background: var(--side-both);
 }
 
 /* On a position after the one the AI estimated: the player's move, until the coach speaks again */
@@ -150,7 +150,7 @@
 .lead-bar .white {
     position: absolute;
     inset: 0 auto 0 0;
-    background: #f5f5f2;
+    background: var(--side-white);
     transition: width 400ms ease;
 }
 
@@ -172,12 +172,12 @@
 .lead-bar .figure.white,
 .lead-bar .figure.even {
     left: 6px;
-    color: #2a2f36;
+    color: var(--fixed-ink);
 }
 
 .lead-bar .figure.black {
     right: 6px;
-    color: #f5f5f2;
+    color: var(--side-white);
 }
 
 /* The chart of the game in analysis: the white area is White's share, the line in the middle an even game; a dot on a move a badge marks, a line on the move
@@ -191,10 +191,13 @@
     position: relative;
     height: 72px;
     border-radius: 6px;
-    background: #3b4048;
-    box-shadow: 0 0 0 1px rgb(138 144 153 / 0.6);
+    background: var(--side-black);
+    box-shadow: 0 0 0 1px var(--side-edge);
     overflow: hidden;
     cursor: pointer;
+    /* A finger drawn across it runs through the game; up and down it scrolls the page */
+    touch-action: pan-y;
+    user-select: none;
 }
 
 .lead-chart svg {
@@ -204,7 +207,7 @@
 }
 
 .lead-chart .white-area {
-    fill: #f5f5f2;
+    fill: var(--side-white);
 }
 
 .lead-chart .pending {
@@ -212,7 +215,7 @@
 }
 
 .lead-chart .even {
-    stroke: #8a9099;
+    stroke: var(--side-both);
     stroke-width: 1;
     stroke-dasharray: 3 3;
     fill: none;
@@ -227,6 +230,11 @@
     background: #ffc450;
     box-shadow: 0 0 0 1px rgb(20 23 27 / 0.6);
     pointer-events: none;
+}
+
+/* The move a click would show, under the mouse: the same line, fainter (Zoe) */
+.lead-chart .ghost {
+    opacity: 0.5;
 }
 
 .lead-chart .dot {
@@ -394,6 +402,8 @@
     overflow: hidden auto;
     scrollbar-width: none;
     font-size: 14px;
+    /* A row too long for a phone never makes the page wider */
+    contain: inline-size;
 }
 
 .moves ol {
@@ -436,6 +446,11 @@
     color: inherit;
     font: inherit;
     cursor: pointer;
+}
+
+/* A move never breaks, its piece always beside its square: a long one takes room from its neighbour in the row */
+.moves .ply {
+    white-space: nowrap;
 }
 
 /* The move under the pointer in a neutral grey, never the accent, so it never reads as the move shown (Stefano) */
@@ -549,6 +564,32 @@
 
     .moves li {
         break-inside: avoid;
+    }
+}
+
+/* On a phone the rows give the moves all the room they can, so that two columns hold a move with its badge on one line (Zoe) */
+@media (max-width: 479px) {
+    .moves ol {
+        column-gap: 8px;
+    }
+
+    .moves li {
+        grid-template-columns: 22px 1fr 1fr;
+        column-gap: 4px;
+        padding: 3px 4px;
+    }
+
+    .moves .ply {
+        gap: 3px;
+        padding: 1px 4px;
+        margin-left: -4px;
+    }
+}
+
+/* On the narrowest phones two columns would leave a move no room: one column */
+@media (max-width: 359px) {
+    .moves ol {
+        columns: 1;
     }
 }
 

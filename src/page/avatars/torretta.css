@@ -1,0 +1,108 @@
+/* The Torretta, whose eyes blink now and then, and its moods (D-70): a new face that pops in, never fading out, a red light when worried, out when sad, a light that breathes when
+   thoughtful */
+.torretta .antenna {
+    fill: none;
+    stroke: var(--torretta-shade);
+    stroke-width: 4;
+    stroke-linecap: round;
+}
+
+.torretta .light {
+    fill: var(--torretta-light);
+    transition: fill 0.2s;
+}
+
+.torretta.mood-worried .light {
+    fill: var(--torretta-alarm);
+}
+
+.torretta.mood-thoughtful .light {
+    animation: ponder 2.4s ease-in-out infinite;
+}
+
+.torretta.mood-sad .light {
+    fill: var(--torretta-shade);
+}
+
+@keyframes ponder {
+    50% {
+        fill: var(--torretta-ponder);
+    }
+}
+
+.torretta .expression.changed {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: face-in 0.16s ease-out;
+}
+
+@keyframes face-in {
+    from {
+        transform: scale(0.8);
+    }
+}
+
+/* Its bust on a player's card: a disc of the player's picture's colour, which cuts what falls out of it */
+.torretta.bust {
+    clip-path: circle(50%);
+}
+
+.torretta .back {
+    fill: var(--say);
+}
+
+.torretta .shade {
+    fill: var(--torretta-shade);
+}
+
+.torretta .body {
+    fill: var(--torretta-body);
+}
+
+.torretta .screen {
+    fill: var(--torretta-screen);
+}
+
+.torretta .eyes,
+.torretta .mouth {
+    fill: var(--torretta-face);
+}
+
+.torretta .expression .line,
+.torretta .brows {
+    fill: none;
+    stroke: var(--torretta-face);
+    stroke-width: 3.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.torretta .eyes {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: blink 6s infinite;
+}
+
+@keyframes blink {
+    0%,
+    95%,
+    100% {
+        transform: scaleY(1);
+    }
+
+    97% {
+        transform: scaleY(0.1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .torretta .eyes,
+    .torretta .expression.changed,
+    .torretta.mood-thoughtful .light {
+        animation: none;
+    }
+
+    .torretta .light {
+        transition: none;
+    }
+}

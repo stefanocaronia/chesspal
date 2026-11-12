@@ -975,12 +975,14 @@
         margin: 0;
     }
 
+    /* The steps, and under them the chart of the game */
     .board-steps {
-        display: block;
+        display: grid;
+        gap: var(--between);
         grid-area: steps;
     }
 
-    .app:has(.talk.studied) .side .steps {
+    .app:has(.talk.studied) .side :is(.steps, .lead-card) {
         display: none;
     }
 }
@@ -1039,5 +1041,18 @@
         height: 32px;
         padding: 0;
         justify-content: center;
+    }
+}
+
+/* On the narrowest phones a table's header holds one more button, the newer Chesspal's: the buttons draw a little closer and smaller, the picture stays on the line */
+@media (max-width: 359px) {
+    .top {
+        column-gap: 2px;
+    }
+
+    .top .command,
+    .top .icon-button {
+        width: 30px;
+        height: 30px;
     }
 }

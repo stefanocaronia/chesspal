@@ -4,6 +4,7 @@ import type { Side } from "../../core/index.ts";
 import { Piece } from "../pieces/pieces.tsx";
 import type { Text } from "../text.ts";
 import { OutcomeBadge, outcomeOf } from "./outcome.tsx";
+import { useRowKeys } from "./rows.ts";
 import type { Accounts } from "./studied.ts";
 
 /** A game of the list as the server gives it (`GET /api/site-games`), with the side the player had when their name there tells it. */
@@ -39,6 +40,7 @@ export function SiteGameList({ accounts, picked, problem, onPick, onProfile, tex
     const words = text.study;
     const named = accounts?.lichess !== undefined || accounts?.chesscom !== undefined;
     const answer = useSiteGames(named, words.siteGamesRefused);
+    const rowKeys = useRowKeys();
 
     if (!named) {
         return (
@@ -70,7 +72,7 @@ export function SiteGameList({ accounts, picked, problem, onPick, onProfile, tex
                         {answer.games.length === 0
                             ? (answer.answered.length === 0 ? null : <p class="none">{words.siteGamesNone}</p>)
                             : (
-                                <ul class={`games${picked === undefined ? "" : " picking"}`} aria-label={words.siteGames}>
+                                <ul class={`games${picked === undefined ? "" : " picking"}`} aria-label={words.siteGames} {...rowKeys}>
                                     {answer.games.map((game) => <GameRow key={game.name} game={game} picked={picked} onPick={onPick} text={text} />)}
                                 </ul>
                             )}
