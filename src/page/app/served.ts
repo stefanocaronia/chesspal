@@ -7,6 +7,10 @@ import type { CoachShown, TalkLine } from "../game/plies.ts";
 import type { ProfileShown } from "../profile/profile.ts";
 import type { ServerRefusal, Text } from "../text.ts";
 
+// How many times, and how far apart in milliseconds, the page reads the game again after a read failed on the way.
+const readTries = 5;
+const readTryWait = 1000;
+
 /** What the page knows from the server: what it sent last, why it could not read it, whether the server is gone, and how to read it again. */
 export interface ServedPage
 {
@@ -32,8 +36,14 @@ export function useServed(onNewGame: () => void): ServedPage
         let latest = 0;
         // The Chesspal version of the first answer: a server of another, after an update, sends data this page may not read.
         let pageVersion: string | undefined;
+        // The reads of the game asked last that failed, and the next try.
+        let failures = 0;
+        let retry: number | undefined;
+        const events = new EventSource("/api/events");
 
-        const load = (): void => {
+        const load = (again = false): void => {
+            window.clearTimeout(retry);
+            failures = again ? failures : 0;
             // Two reads in flight may answer out of order: only the last one asked counts.
             const asked = ++latest;
             fetch("/api/game")
@@ -56,13 +66,24 @@ export function useServed(onNewGame: () => void): ServedPage
                         setData(body);
                     }
                 })
-                .catch((error: unknown) => setProblem(String(error)));
+                .catch((error: unknown) => {
+                    if (asked !== latest) {
+                        return;
+                    }
+
+                    // A read lost on the way while the server is there, as when an old table hands the page to the new one, is tried again shortly.
+                    if (events.readyState === EventSource.OPEN && ++failures <= readTries) {
+                        retry = window.setTimeout(() => load(true), readTryWait);
+                        return;
+                    }
+
+                    setProblem(String(error));
+                });
         };
 
         // The server says when the game changes, whoever changed it: the page reads it again, and as it connects, the first time or to a new chat's server.
         // The server lives in the chat's MCP server: when the chat ends, after /clear in Claude's app too, the page waits for the next one and says so.
         reload.current = load;
-        const events = new EventSource("/api/events");
 
         events.onopen = () => {
             setOffline(false);
@@ -72,7 +93,11 @@ export function useServed(onNewGame: () => void): ServedPage
         // The chat asks for a new game: the player chooses it in the New game window, which opens here.
         events.onmessage = (event) => event.data === "new-game" ? onNewGame() : load();
         events.onerror = () => setOffline(events.readyState !== EventSource.OPEN);
-        return () => events.close();
+
+        return () => {
+            window.clearTimeout(retry);
+            events.close();
+        };
     }, []);
 
     return { data, problem, offline, reload: () => reload.current() };
