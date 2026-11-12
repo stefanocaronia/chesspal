@@ -7,17 +7,17 @@ const wanted = { width: 1600, height: 900 };
 /** Sizes the window the table opened and takes the mark off the address, so that a reload keeps the size the player gave it. */
 export function fitOpenedWindow(): void
 {
-    const address = new URL(location.href);
+    const address = new URL(window.location.href);
 
     if (!address.searchParams.has(mark)) {
         return;
     }
 
     address.searchParams.delete(mark);
-    history.replaceState(history.state, "", address.pathname + address.search + address.hash);
-    const place = windowPlace(screen.availWidth, screen.availHeight);
+    window.history.replaceState(window.history.state, "", address.pathname + address.search + address.hash);
+    const place = windowPlace(window.screen.availWidth, window.screen.availHeight);
     // Chrome and Edge say where the window's screen starts: on a second screen the window stays there (Zoe).
-    const { availLeft = 0, availTop = 0 } = screen as Screen & { availLeft?: number; availTop?: number; };
+    const { availLeft = 0, availTop = 0 } = window.screen as Screen & { availLeft?: number; availTop?: number; };
     window.resizeTo(place.width, place.height);
     window.moveTo(availLeft + place.left, availTop + place.top);
 }

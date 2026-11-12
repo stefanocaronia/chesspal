@@ -198,8 +198,8 @@ export function PromotionChoice({ side, column, down, onPick, text }: { side: Si
             }
         };
 
-        addEventListener("keydown", escape);
-        return () => removeEventListener("keydown", escape);
+        window.addEventListener("keydown", escape);
+        return () => window.removeEventListener("keydown", escape);
     }, []);
 
     return (

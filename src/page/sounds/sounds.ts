@@ -36,7 +36,7 @@ export function endSoundOf(how: HowEnded | undefined): Sound | undefined
 export function wakeSounds(): void
 {
     loadRecordings();
-    addEventListener("pointerdown", () => void audio()?.resume(), { once: true });
+    window.addEventListener("pointerdown", () => void audio()?.resume(), { once: true });
 }
 
 /** Plays a sound: its recordings together, else its tone; a browser without Web Audio plays none. */

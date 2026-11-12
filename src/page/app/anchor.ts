@@ -76,13 +76,13 @@ export function shownHash(games: AnchoredGames, viewing: number | undefined): st
 export function useAnchor(games: AnchoredGames, viewing: number | undefined, view: (plies: number | undefined) => void, open: (game: string) => Promise<boolean>): void
 {
     const { ready, shown, played, going } = games;
-    const [wanted, setWanted] = useState(() => anchorOf(location.hash));
+    const [wanted, setWanted] = useState(() => anchorOf(window.location.hash));
     const asked = useRef<string | undefined>(undefined);
 
     useEffect(() => {
         const heard = (): void => {
             asked.current = undefined;
-            setWanted(anchorOf(location.hash));
+            setWanted(anchorOf(window.location.hash));
         };
 
         window.addEventListener("hashchange", heard);
@@ -125,8 +125,8 @@ export function useAnchor(games: AnchoredGames, viewing: number | undefined, vie
 
         const hash = shownHash(games, viewing);
 
-        if (hash !== location.hash) {
-            history.replaceState(history.state, "", hash === "" ? location.pathname + location.search : hash);
+        if (hash !== window.location.hash) {
+            window.history.replaceState(window.history.state, "", hash === "" ? window.location.pathname + window.location.search : hash);
         }
     }, [ready, shown, going, viewing, wanted]);
 }

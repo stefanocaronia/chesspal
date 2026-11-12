@@ -314,7 +314,7 @@ export function App({ start }: { start: Settings; })
         onOffer: () => act("/api/draw", { action: "offer" }),
         onAnswer: (accept) => act("/api/draw", { action: accept ? "accept" : "decline" }),
         onResign: () => {
-            if (confirm(text.resignGame)) {
+            if (window.confirm(text.resignGame)) {
                 act("/api/resign", {});
             }
         },
