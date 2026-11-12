@@ -36,8 +36,11 @@ describe("the table", () => {
     });
 
     it("closes when another table of the same folder started at the same time has a lower port: the ports are the lock", async () => {
-        const { context, table } = await freshTable();
-        const second = await startTable(context, patient);
+        // On another data folder while pages of other tests hold the ports left to the second table.
+        const { table, second } = await onFreePorts(async () => {
+            const { context, table } = await freshTable();
+            return { table, second: await startTable(context, patient) };
+        });
 
         if (second !== undefined) {
             tables.push(second);
@@ -59,15 +62,7 @@ describe("the table", () => {
     });
 
     it("never serves on a port of no table's, where neither chesspal nor another table would find it", async () => {
-        const context = homeContext();
-        const others = await Promise.all(
-            pagePorts(tableFolder(context.home())).map(async (port) => {
-                const other = createServer((_, answer) => answer.end());
-                // A port another program holds already is just as taken.
-                await listenedOn(other, port);
-                return other;
-            }),
-        );
+        const { context, others } = await allPortsHeld();
 
         try {
             await expect(startTable(context, patient)).rejects.toThrow("are taken by other programs");
@@ -236,6 +231,30 @@ function listening(url: string): Promise<ClientRequest>
     return new Promise((done) => {
         const events = get(new URL("/api/events", url), () => done(events));
     });
+}
+
+/**
+ * A data folder whose table's ports are all held by servers of this test, another program's to the table: a port a page of another test holds might be
+ * freed before the table starts, so a new folder is taken until this test holds the three.
+ */
+async function allPortsHeld(tries = 20): Promise<{ context: Context; others: Server[]; }>
+{
+    for (let tried = 1;; tried++) {
+        const context = homeContext();
+        const ports = pagePorts(tableFolder(context.home()));
+        const others = ports.map(() => createServer((_, answer) => answer.end()));
+        const held = await Promise.all(others.map((other, index) => listenedOn(other, ports[index]!)));
+
+        if (held.every(Boolean)) {
+            return { context, others };
+        }
+
+        others.forEach((other) => other.close());
+
+        if (tried === tries) {
+            throw new Error("Pages of other tests hold a port of every data folder tried: run this test alone.");
+        }
+    }
 }
 
 /** Whether a server could listen on a port of this computer: false when another holds it. */

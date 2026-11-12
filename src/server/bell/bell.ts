@@ -2,7 +2,7 @@
 // the player moves or writes there, tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { get, type IncomingMessage, type ServerResponse } from "node:http";
+import { type ClientRequest, get, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
 import { writeAtomically } from "../../games/index.ts";
 import { dataFolder, samePath, tableFolder } from "../../home/index.ts";
@@ -375,7 +375,7 @@ function body(port: number, path: string, wait?: number): Promise<string | undef
 {
     return new Promise((done) => {
         // A connection of its own: Node's shared one ends a request idle for five seconds, and the doorbell waits for hours.
-        const request = get({ host: "127.0.0.1", port, path, agent: false, ...(wait === undefined ? {} : { timeout: wait }) }, (response) => {
+        const request = get({ host: "127.0.0.1", port, path, agent: false }, (response) => {
             let text = "";
             response.setEncoding("utf8");
             response.on("data", (chunk: string) => {
@@ -386,9 +386,26 @@ function body(port: number, path: string, wait?: number): Promise<string | undef
         });
 
         if (wait !== undefined) {
-            request.on("timeout", () => request.destroy());
+            giveUpAfterTurns(request, wait);
         }
 
         request.on("error", () => done(undefined));
     });
+}
+
+/**
+ * Ends a request still unanswered after `wait`, counted in ten turns of this process's clock: after a stall (a busy computer, one waking up), a timer
+ * fires before the answer waiting is read, and a page of this process, or one that answered meanwhile, would be taken for one that does not answer.
+ */
+function giveUpAfterTurns(request: ClientRequest, wait: number): void
+{
+    let turns = 0;
+    const timer = setInterval(() => {
+        turns++;
+
+        if (turns === 10) {
+            request.destroy();
+        }
+    }, wait / 10);
+    request.on("close", () => clearInterval(timer));
 }
