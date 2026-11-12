@@ -1,7 +1,7 @@
 // The agents that work beside the chat in Claude Code and Codex (D-98): the analyst that goes over a game over (D-89) and the coach that judges the player's moves (D-88).
 import { isReviewed } from "../../core/index.ts";
 import { archivedName, coachStarted, type CurrentGame, gameInAnalysis, lastChatStart } from "../../games/index.ts";
-import { agentHosts, analystAgent, coachAgent, hasAgent } from "../../host-files/index.ts";
+import { agentHosts, analystAgent, coachAgent, hasAgent, isCodex } from "../../host-files/index.ts";
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
 import type { Context } from "../registry/index.ts";
 import { namedGame } from "./study.ts";
@@ -27,15 +27,22 @@ export function withAnalyst(summary: GameSummary, context: Context, over?: Curre
     }
 
     const archived = over === undefined ? undefined : archivedName(gameFolder(context.home()), over);
-    return { ...summary, end: { ...end, analyst: archived !== undefined && goneOver(context, archived) ? "done" : "offer" } };
+    const analyst = archived !== undefined && goneOver(context, archived) ? "done" : "offer";
+    return { ...summary, end: { ...end, analyst, ...(isCodex(context.host?.()) ? { codex: true } : {}) } };
 }
 
-/** How the chat has a game over gone over by the analyst agent, on the player's yes or for the game they brought (D-89). */
-export function analystLine(game?: string): string
+/**
+ * How the chat has a game over gone over by the analyst agent, on the player's yes or for the game they brought (D-89); in Codex with spawn_agent by name,
+ * since a chat there called analyse_game itself instead (Priya).
+ */
+export function analystLine(game?: string, codex = false): string
 {
-    return `start the chesspal-analyst agent in the background with the prompt "Analyse${game === undefined ? "" : ` ${game}`}. The player speaks <their language>.": it writes its review on the board `
-        + "page, which shows it at work; tell the player in a word, talk the game over with them meanwhile whenever they ask, and when it ends go over it with them "
-        + "from what it tells you.";
+    const prompt = `Analyse${game === undefined ? "" : ` ${game}`}. The player speaks <their language>.`;
+    const start = codex
+        ? `start the ${analystAgent} agent with spawn_agent {"agent_type": "${analystAgent}", "message": "${prompt}", "fork_turns": "none"}`
+        : `start the ${analystAgent} agent in the background with the prompt "${prompt}"`;
+    return `${start}: it writes its review on the board page, which shows it at work; tell the player in a word, talk the game over with them meanwhile whenever `
+        + "they ask, and when it ends go over it with them from what it tells you.";
 }
 
 /** How the chat goes over a game the analyst agent has reviewed, or is reviewing: from that review, never with another agent (Stefano). */

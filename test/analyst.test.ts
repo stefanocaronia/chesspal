@@ -270,6 +270,19 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         expect(await run(analyst, "annotate_game", { game, notes: [{ move: "2.", badge: "mistake" }] })).not.toContain("keeps the note");
     });
 
+    it("is started in Codex with spawn_agent, which the line names", async () => {
+        const context = { ...playerFolder(), host: () => "codex-mcp-client" };
+        setUpHosts(context.folder, "linux");
+        await mate(context);
+        const spawn = 'start the chesspal-analyst agent with spawn_agent {"agent_type": "chesspal-analyst", "message": "Analyse games/2026-11-02-153012.pgn. The player '
+            + 'speaks <their language>.", "fork_turns": "none"}: it writes its review on the board page';
+
+        expect(await run(context, "ai_move", { move: "Qh4", plan: "Mate." })).toContain(`To go over it, on their yes, ${spawn}`);
+        expect(await run(context, "ai_say", { text: "Mate!" })).toContain(`\nNext: when the player wants this game gone over, ${spawn}`);
+        startAnalysis(gameFolder(context.home()), "games/2026-11-02-153012.pgn", context.now(), { brought: true });
+        expect(await run(context, "status")).toContain(`on the board page to analyse it. Next: ${spawn}`);
+    });
+
     it("ends the review of a resigned game only with who is ahead after its last move", async () => {
         const context = claudeFolder();
         await run(context, "new_game", { ai_colour: "black" });
