@@ -270,6 +270,22 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         expect(await run(analyst, "annotate_game", { game, notes: [{ move: "2.", badge: "mistake" }] })).not.toContain("keeps the note");
     });
 
+    it("ends the review of a resigned game only with who is ahead after its last move", async () => {
+        const context = claudeFolder();
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "e4" });
+        await run(context, "ai_move", { move: "e5", plan: "Centre." });
+        await run(context, "end_game", { result: "player_resigns" });
+        const game = "games/2026-11-02-153012.pgn";
+        const analyst = { ...context, agent: "chesspal-analyst" };
+        await run(analyst, "analyse_game", { game });
+
+        await run(analyst, "annotate_game", { game, summary: "Short.", ahead: { "1.": 0 } });
+        expect(await run(context, "status")).toContain(`${game} (its review so far: notes on 0 moves, who is ahead after 1 of 2, its word on the game written)`);
+        await run(analyst, "annotate_game", { game, ahead: { "1...": 0 } });
+        expect(await run(context, "status")).toContain(`${game} (its review is done)`);
+    });
+
     it("calls the tools it shares with the chat without counting as the chat that has read the game", async () => {
         const context: Context = { ...claudeFolder(), calls: vi.fn() };
         await mate(context);

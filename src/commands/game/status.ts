@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { gameReviewOf, leadOf, reviewOf } from "../../core/index.ts";
+import { Game, gameReviewOf, leadOf, reviewOf } from "../../core/index.ts";
 import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
@@ -210,8 +210,8 @@ function analysisLine({ game, brought, analyst, review }: NonNullable<Status["an
 }
 
 /**
- * How far the review of a game has got, as the board page shows it (Priya): done once it holds the word on the whole game and who is ahead after every move
- * but the last; the analyst may still write notes after its word, so that alone is not the end.
+ * How far the review of a game has got, as the board page shows it (Priya): done once it holds the word on the whole game and who is ahead after every move,
+ * but the last when the board ended the game there, which says it; the analyst may still write notes after its word, so that alone is not the end.
  */
 function reviewProgress(context: Context, game: string): string | undefined
 {
@@ -219,8 +219,10 @@ function reviewProgress(context: Context, game: string): string | undefined
         const { record } = namedGame(context, game);
         const worded = gameReviewOf(record) !== undefined;
         const estimated = record.moves.filter(({ comment }) => leadOf(comment) !== undefined).length;
+        // A game resigned or lost on time needs who is ahead after its last move too.
+        const needed = new Game(record).outcome.over ? record.moves.length - 1 : record.moves.length;
 
-        if (worded && estimated >= record.moves.length - 1) {
+        if (worded && estimated >= needed) {
             return "its review is done";
         }
 
