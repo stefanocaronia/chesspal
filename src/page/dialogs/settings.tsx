@@ -1,9 +1,10 @@
 // The settings' panel (D-56): a dialog over the page, opened from the header's gear, which shows each choice at once and closes with Esc. Its sections are cards
 // in two columns, one under 600px, and its choices short: segments, tiles, dots and switches (Stefano).
 import type { ComponentChildren, JSX } from "preact";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { Piece } from "../pieces/pieces.tsx";
 import { type Look, looks, pieceSets, type Settings } from "../profile/settings.ts";
+import { hasVoice, onVoices } from "../talk/voice.ts";
 import type { Text } from "../text.ts";
 
 /** The panel of the settings, open while `open` is true: every change goes to `onChange` at once. */
@@ -16,6 +17,7 @@ export function SettingsPanel({ open, settings, onChange, onClose, text }: {
 })
 {
     const dialog = useRef<HTMLDialogElement>(null);
+    const voiced = useVoiced(text.language);
 
     useEffect(() => {
         const element = dialog.current!;
@@ -86,7 +88,7 @@ export function SettingsPanel({ open, settings, onChange, onClose, text }: {
                         <Switch on={settings.book} onSwitch={(on) => set("book", on)}>{text.bookBadges}</Switch>
                         <Switch on={settings.helps} onSwitch={(on) => set("helps", on)}>{text.helps}</Switch>
                         <Switch on={settings.sound} onSwitch={(on) => set("sound", on)}>{text.sounds}</Switch>
-                        <Switch on={settings.voice} onSwitch={(on) => set("voice", on)}>{text.voice}</Switch>
+                        <Switch on={settings.voice} onSwitch={(on) => set("voice", on)} {...(voiced ? {} : { unavailable: text.noVoice })}>{text.voice}</Switch>
                     </Section>
                     <Section title={text.languageChoice} icon={languageIcon}>
                         <Segments label={text.languageChoice}>
@@ -174,14 +176,31 @@ function Choice({ on, onPick, children }: { on: boolean; onPick: () => void; chi
     );
 }
 
-function Switch({ on, onSwitch, children }: { on: boolean; onSwitch: (on: boolean) => void; children: ComponentChildren; })
+/** A switch; one that cannot be used here is off and disabled, and its tooltip says why. */
+function Switch({ on, onSwitch, unavailable, children }: { on: boolean; onSwitch: (on: boolean) => void; unavailable?: string; children: ComponentChildren; })
 {
+    const usable = unavailable === undefined;
+
     return (
-        <label class="switch">
+        <label class="switch" title={unavailable}>
             <span>{children}</span>
-            <input type="checkbox" role="switch" checked={on} onChange={(event) => onSwitch(event.currentTarget.checked)} />
+            <input type="checkbox" role="switch" checked={on && usable} disabled={!usable} title={unavailable} onChange={(event) => onSwitch(event.currentTarget.checked)} />
         </label>
     );
+}
+
+/** Whether the browser has a voice for the language, looked at again whenever its voices change. */
+function useVoiced(language: string): boolean
+{
+    const [voiced, setVoiced] = useState(() => hasVoice(language));
+
+    useEffect(() => {
+        const look = (): void => setVoiced(hasVoice(language));
+        look();
+        return onVoices(look);
+    }, [language]);
+
+    return voiced;
 }
 
 function nameOf(id: string, text: Text): string

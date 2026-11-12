@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { spokenMoves } from "../src/page/talk/voice.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { hasVoice, spokenMoves } from "../src/page/talk/voice.ts";
 import { textFor } from "../src/page/text.ts";
 
 const italian = textFor(["it"]).saidMove;
@@ -15,5 +15,20 @@ describe("the moves the voice reads", () => {
 
     it("leaves a square alone, and words that only look like a move", () => {
         expect(spokenMoves("The pawn on e4 holds d5. OK, B4 paper.", english)).toBe("The pawn on e4 holds d5. OK, B4 paper.");
+    });
+});
+
+describe("the voices of the browser", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("has no voice where the browser cannot speak", () => {
+        expect(hasVoice("en")).toBe(false);
+    });
+
+    it("has a voice only for the languages the browser lists", () => {
+        vi.stubGlobal("speechSynthesis", { getVoices: () => [{ lang: "it-IT", localService: true, default: false }] });
+
+        expect(hasVoice("it")).toBe(true);
+        expect(hasVoice("en")).toBe(false);
     });
 });

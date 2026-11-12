@@ -291,6 +291,16 @@ h3 + .switch {
     translate: 14px 0;
 }
 
+/* A switch that cannot be used here: faded, and its tooltip says why */
+.switch:has(input:disabled),
+.switch input:disabled {
+    cursor: help;
+}
+
+.switch:has(input:disabled) > * {
+    opacity: 0.5;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .switch input,
     .switch input::after {

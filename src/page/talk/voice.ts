@@ -44,6 +44,23 @@ export function hush(): void
     }
 }
 
+/** Whether the browser has a voice for the language: without one the words cannot be read. */
+export function hasVoice(language: string): boolean
+{
+    return typeof speechSynthesis !== "undefined" && readerFor(language) !== undefined;
+}
+
+/** Calls the listener whenever the browser's voices change, since Chrome lists them late: what it returns stops it. */
+export function onVoices(listener: () => void): () => void
+{
+    if (typeof speechSynthesis === "undefined") {
+        return () => undefined;
+    }
+
+    speechSynthesis.addEventListener("voiceschanged", listener);
+    return () => speechSynthesis.removeEventListener("voiceschanged", listener);
+}
+
 /**
  * The words with each move the AI wrote said in words, since a voice reads ♟g4 as "chess pawn g4": ♞xf6+, Nxf6+, exd5, O-O, e8=♛. A square alone, e4,
  * stays as it is; a pawn's move becomes words only with its figurine, a capture, a promotion or a check, and without the file it takes from.
