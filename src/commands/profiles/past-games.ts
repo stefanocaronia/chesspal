@@ -11,10 +11,11 @@ type Past = { games: string[]; searched: true | undefined; } | { pgn: string; };
 export const pastGames = defineCommand({
     name: "past_games",
     description: "Lists the games played with this player, the latest first: when, your colour, the result, the opening, how long, and its name in the "
-        + "archive. With search, only the games whose line holds every word of it. With game, that game's PGN with your comments and plans; to comment a "
-        + 'game with the player, analyse_game. new_game already gives the last three. Example: past_games {search: "Sicilian lost"}.',
+        + "archive. With search, only the games whose line holds every word of it; the colour and the result are yours, the AI's. With game, that game's "
+        + "PGN with your comments and plans; to comment a game with the player, analyse_game. new_game already gives the last three. Example, the "
+        + 'Sicilians the player lost: past_games {search: "Sicilian won"}.',
     input: z.object({
-        search: z.string().optional().describe("words the game's line must all hold: a date, a colour, won, lost, drew, unfinished, an opening"),
+        search: z.string().optional().describe("words the game's line must all hold: a date, your colour, won, lost, drew or unfinished as you did, an opening"),
         game: z.string().optional().describe("a game's name, as the list writes it: its PGN"),
     }),
     readOnly: true,
@@ -49,8 +50,10 @@ export function pastGameLines(folder: string, count: number, search = ""): strin
         try {
             const record = archivedGame(folder, name);
             const line = record.moves.length > 0 ? pastGameLine(name, record) : undefined;
+            // The ending names the player's colour too, as "(Black resigns)": a colour searched is the AI's alone.
+            const searched = line?.replace(/ \((?:White|Black) [^)]*\)/, "").toLowerCase();
 
-            if (line !== undefined && words.every((word) => line.toLowerCase().includes(word))) {
+            if (line !== undefined && words.every((word) => searched!.includes(word))) {
                 lines.push(line);
             }
         } catch {

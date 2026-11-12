@@ -29,6 +29,8 @@ describe("the games played (D-57)", async () => {
         expect(pastGames.format(await pastGames.run(pastGames.input.parse({}), context))).toBe(line);
         expect(pastGames.format(await pastGames.run(pastGames.input.parse({ search: "sicilian  WON" }), context))).toBe(line);
         expect(pastGames.format(await pastGames.run(pastGames.input.parse({ search: "Sicilian lost" }), context))).toBe("No game played holds all those words.");
+        // White is the player's colour here, named only in how the game ended.
+        expect(pastGames.format(await pastGames.run(pastGames.input.parse({ search: "white" }), context))).toBe("No game played holds all those words.");
         expect(pastGames.format(await pastGames.run(pastGames.input.parse({ game: "games/2026-11-02-153012.pgn" }), context))).toMatch(/\[Result "0-1"\][\s\S]*1\. e4 c5 2\. Nf3 d6 0-1/);
     });
 
