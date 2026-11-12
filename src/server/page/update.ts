@@ -1,4 +1,4 @@
-// A newer Chesspal on npm (D-108): the page's server asks as it starts and once a day after; the table's page offers to install it, a chat's own page says
+// A newer Chesspal on npm (D-108): the page's server asks as it starts and every hour after; the table's page offers to install it, a chat's own page says
 // the command to type.
 import { answerTime, askSite } from "../../sites/index.ts";
 import { isOlder, version } from "../../version.ts";
@@ -16,8 +16,8 @@ export interface UpdateShown
     readonly installed?: true;
 }
 
-/** Asks npm for Chesspal's latest version now and once a day after, the pages told when it is newer than this one; how to stop. None in the tests. */
-export function watchForUpdates(served: Served, every: number = aDay): () => void
+/** Asks npm for Chesspal's latest version now and every hour after, the pages told when it is newer than this one; how to stop. None in the tests. */
+export function watchForUpdates(served: Served, every: number = anHour): () => void
 {
     const fetch = served.context.fetch;
 
@@ -62,4 +62,4 @@ export async function latestVersion(fetch: typeof globalThis.fetch): Promise<str
 }
 
 const latestUrl = "https://registry.npmjs.org/chesspal/latest";
-const aDay = 24 * 60 * 60 * 1000;
+const anHour = 60 * 60 * 1000;
