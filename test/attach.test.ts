@@ -298,7 +298,8 @@ describe("a chat at the table", () => {
 
         try {
             expect(await server.call("status")).toContain(table.url);
-            expect(await pageAt(portOf(table.url))).toMatchObject({ chat: resolve(folder), session: "a-chat" });
+            // The MCP server says its working folder, by its real path: on macOS the temporary folder is under a link, /var to /private/var.
+            expect(await pageAt(portOf(table.url))).toMatchObject({ chat: realpathSync(folder), session: "a-chat" });
         } finally {
             await server.close();
         }
@@ -319,7 +320,7 @@ describe("a chat at the table", () => {
             expect(first).not.toContain(table.url);
             // The look for a table comes after a tool, the move to it at the next one.
             await until(async () => (await server.call("status")).includes(table.url) && (await pageAt(portOf(table.url)))?.chat !== undefined, 10_000);
-            expect(await pageAt(portOf(table.url))).toMatchObject({ chat: resolve(folder) });
+            expect(await pageAt(portOf(table.url))).toMatchObject({ chat: realpathSync(folder) });
         } finally {
             await server.close();
         }
@@ -609,8 +610,7 @@ function homeContext(home: string): Context
 
 function temporary(): string
 {
-    // macOS's temporary folder is under a link, /var to /private/var: a chat says its folder by the real path, as its working folder.
-    const folder = realpathSync(mkdtempSync(join(tmpdir(), "chesspal-attach-")));
+    const folder = mkdtempSync(join(tmpdir(), "chesspal-attach-"));
     folders.push(folder);
     return folder;
 }
