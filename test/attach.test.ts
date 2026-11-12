@@ -1,6 +1,6 @@
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { createServer, get, type Server } from "node:http";
 import type { Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -609,7 +609,8 @@ function homeContext(home: string): Context
 
 function temporary(): string
 {
-    const folder = mkdtempSync(join(tmpdir(), "chesspal-attach-"));
+    // macOS's temporary folder is under a link, /var to /private/var: a chat says its folder by the real path, as its working folder.
+    const folder = realpathSync(mkdtempSync(join(tmpdir(), "chesspal-attach-")));
     folders.push(folder);
     return folder;
 }
