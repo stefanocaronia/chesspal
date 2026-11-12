@@ -1,13 +1,14 @@
 import { z } from "zod";
 import { type PieceLetter, type Profile, type Side, type SideProfile } from "../../core/index.ts";
+import { archivedName, endOf } from "../../games/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { colourName, gameAt, gameShown, materialText, positionAfter, positionLine, studyInput } from "../answers/index.ts";
+import { analystOnView, colourName, gameAt, gameShown, materialText, positionAfter, positionLine, studyInput } from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
 import { refuseUnseen } from "./levels.ts";
 
-/** The positional profile of a position: of a game studied, with where it stands. */
-type Described = Profile & { where?: string; };
+/** The positional profile of a position: of a game studied, with where it stands; with the analyst's line for a game in analysis without its review. */
+type Described = Profile & { where?: string; analyst?: string; };
 
 /** The positional profile of the game in progress (D-19), or of any position of a game over (D-68): separate facts, never a score. */
 export const position = defineCommand({
@@ -26,7 +27,7 @@ export const position = defineCommand({
         if (game !== undefined || move !== undefined) {
             const studied = gameShown(context, game);
             const at = positionAfter(studied.record, move);
-            return { ...at.game.profile, where: positionLine(at, studied.name) };
+            return withAnalystLine({ ...at.game.profile, where: positionLine(at, studied.name) }, analystOnView(context, studied.name));
         }
 
         const current = gameAt(gameFolder(context.home()), context.now());
@@ -36,10 +37,16 @@ export const position = defineCommand({
         }
 
         refuseUnseen(current, "strategy", "position");
-        return current.game.profile;
+        const over = endOf(current.game) === undefined ? undefined : archivedName(gameFolder(context.home()), current);
+        return withAnalystLine(current.game.profile, analystOnView(context, over));
     },
-    format: (described) => [...(described.where === undefined ? [] : [described.where]), ...profileLines(described)].join("\n"),
+    format: (described) => [...(described.where === undefined ? [] : [described.where]), ...profileLines(described), ...(described.analyst === undefined ? [] : [described.analyst])].join("\n"),
 });
+
+function withAnalystLine(described: Described, analyst: string | undefined): Described
+{
+    return analyst === undefined ? described : { ...described, analyst };
+}
 
 /** The profile as lines for the AI, White's facts before Black's; a line with nothing to say is left out. */
 export function profileLines(profile: Profile): string[]

@@ -1,16 +1,17 @@
 import { z } from "zod";
 import { boardText, type Chances, type Facts, materialOf, type Possibilities, sees, type Side } from "../../core/index.ts";
+import { archivedName, endOf } from "../../games/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { fullView, gameAt, gameShown, type GameSummary, headLines, materialText, newWords, positionAfter, positionLine, studyInput, summaryOf, wordLines, type Written } from "../answers/index.ts";
+import { analystOnView, fullView, gameAt, gameShown, type GameSummary, headLines, materialText, newWords, positionAfter, positionLine, studyInput, summaryOf, wordLines, type Written } from "../answers/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
 import { refuseUnseen } from "./levels.ts";
 
 /**
  * The whole view of the position, with what the player wrote on the board page the AI has not been given yet; the same view of a position of a game
- * studied; or only the board as text for the player.
+ * studied, with the analyst's line for a game in analysis without its review; or only the board as text for the player.
  */
-type Look = { board: string; } | { game: Viewed; words: Written[]; } | { study: StudyView; words: Written[]; };
+type Look = { board: string; } | (({ game: Viewed; words: Written[]; } | { study: StudyView; words: Written[]; }) & { analyst?: string; });
 
 /** The game with the facts, the possibilities and the threats of its position, whoever is to move. */
 type Viewed = GameSummary & { facts: Facts; possibilities: Possibilities; };
@@ -60,14 +61,15 @@ export const look = defineCommand({
 
         const { threats } = current.game;
         const viewed = { ...summaryOf(current, context.now()), facts: current.game.facts, possibilities: current.game.possibilities };
-        return { game: threats === undefined ? viewed : { ...viewed, threats }, words: newWords(context) };
+        const over = endOf(current.game) === undefined ? undefined : archivedName(gameFolder(context.home()), current);
+        return withAnalystLine({ game: threats === undefined ? viewed : { ...viewed, threats }, words: newWords(context) }, analystOnView(context, over));
     },
     format: (look) => {
         if ("board" in look) {
             return look.board;
         }
 
-        return [...("game" in look ? gameLines(look.game) : studyLines(look.study)), ...wordLines(look.words)].join("\n");
+        return [...("game" in look ? gameLines(look.game) : studyLines(look.study)), ...wordLines(look.words), ...(look.analyst === undefined ? [] : [look.analyst])].join("\n");
     },
 });
 
@@ -83,7 +85,12 @@ function studyLook(context: Context, only: "board" | undefined, name: string | u
     }
 
     const view = { where: positionLine(at, studied.name), turn: position.turn, fen: position.fen, facts: at.game.facts, possibilities: at.game.possibilities, threats: at.game.threats };
-    return { study: view, words: newWords(context) };
+    return withAnalystLine({ study: view, words: newWords(context) }, analystOnView(context, studied.name));
+}
+
+function withAnalystLine<T extends object>(look: T, analyst: string | undefined): T & { analyst?: string; }
+{
+    return analyst === undefined ? look : { ...look, analyst };
 }
 
 /** The game going on: its head and the whole view, with the other side's chances from the strong level (D-100). */

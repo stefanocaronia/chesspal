@@ -270,6 +270,31 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         expect(await run(analyst, "annotate_game", { game, notes: [{ move: "2.", badge: "mistake" }] })).not.toContain("keeps the note");
     });
 
+    it("is offered by look and position once the review is deleted, since the deletion rings no doorbell", async () => {
+        const context = { ...claudeFolder(), told: new Set<string>() };
+        await mate(context);
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+        const game = "games/2026-11-02-153012.pgn";
+        const analyst = { ...context, agent: "chesspal-analyst", agentRun: "agent-first" };
+        await run(analyst, "analyse_game", { game });
+        expect(await run(context, "look", { move: "2." })).not.toContain("chesspal-analyst");
+        await run(analyst, "annotate_game", { game, summary: "Short." });
+        expect(await run(context, "position", { move: "2." })).not.toContain("chesspal-analyst");
+
+        await run(context, "delete_review", { game });
+        const offer = `\n${game} has no review. When the player wants it gone over, start the chesspal-analyst agent in the background with the prompt "Analyse ${game}.`;
+        expect(await run(analyst, "look", { move: "2." })).not.toContain("chesspal-analyst");
+        expect(await run(context, "look", { move: "2." })).toContain(offer);
+        // Once a change of the analysis: told again after the next.
+        expect(await run(context, "position", {})).not.toContain("chesspal-analyst");
+        const later = { ...context, now: () => new Date(context.now().getTime() + 60_000) };
+        await run(later, "delete_review", { game });
+        expect(await run(later, "position", {})).toContain(offer);
+        // Not while an analyst is at it.
+        await run({ ...analyst, agentRun: "agent-second", now: () => new Date(context.now().getTime() + 120_000) }, "analyse_game", { game });
+        expect(await run(context, "look", {})).not.toContain("chesspal-analyst");
+    });
+
     it("is started in Codex with spawn_agent, which the line names", async () => {
         const context = { ...playerFolder(), host: () => "codex-mcp-client" };
         setUpHosts(context.folder, "linux");

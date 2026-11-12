@@ -45,6 +45,27 @@ export function analystLine(game?: string, codex = false): string
         + "they ask, and when it ends go over it with them from what it tells you.";
 }
 
+/**
+ * The analyst's line for the chat that looks at the game in analysis with no review and no analyst at it, as after «Delete the analysis», which rings no
+ * doorbell (Priya): once a change of the analysis, where the server keeps what it told.
+ */
+export function analystOnView(context: Context, game: string | undefined): string | undefined
+{
+    if (game === undefined || context.agent !== undefined || !analystRuns(context)) {
+        return undefined;
+    }
+
+    const analysis = gameInAnalysis(gameFolder(context.home()));
+    const key = `analyst on view ${game} ${analysis?.at ?? ""}`;
+
+    if (analysis?.game !== game || context.told?.has(key) === true || goneOver(context, game)) {
+        return undefined;
+    }
+
+    context.told?.add(key);
+    return `${game} has no review. When the player wants it gone over, ${analystLine(game, isCodex(context.host?.()))}`;
+}
+
 /** How the chat goes over a game the analyst agent has reviewed, or is reviewing: from that review, never with another agent (Stefano). */
 export function reviewedLine(game?: string): string
 {
