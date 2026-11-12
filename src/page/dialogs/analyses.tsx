@@ -7,15 +7,16 @@ import { signature } from "../players/model-name.ts";
 import type { StudyText, Text } from "../text.ts";
 import { type Outcome, OutcomeBadge, outcomeOf } from "./outcome.tsx";
 import { searched } from "./search.ts";
-import { type Accounts, playerIn, studiedSides } from "./studied.ts";
+import { type Accounts, type OtherProfile, playerIn, studiedSides } from "./studied.ts";
 import type { AnalysisItem, Studied } from "./study.tsx";
 
 /** The list, read anew at each opening: the search, the row that loads a game, then a row for each game found, with its menu or its question. */
-export function Analyses({ onStudy, onLoad, you, accounts, ai, text }: {
+export function Analyses({ onStudy, onLoad, you, accounts, others, ai, text }: {
     onStudy: (studied: Studied) => Promise<string | undefined>;
     onLoad: () => void;
     you: string;
     accounts: Accounts | undefined;
+    others: readonly OtherProfile[];
     ai: string;
     text: Text;
 })
@@ -50,7 +51,7 @@ export function Analyses({ onStudy, onLoad, you, accounts, ai, text }: {
     };
 
     const rows = analyses.map((item) => {
-        const named = namedSides(item, you, accounts, ai, text);
+        const named = namedSides(item, you, accounts, others, ai, text);
         // How it went only for the player's own games: played here, or loaded and named by their name on the site (D-93).
         const played = item.name.startsWith("games/") ? named.you : accountSide(tagsOf(item), accounts);
         const outcome = played === undefined ? undefined : outcomeOf(item.result, played);
@@ -276,10 +277,17 @@ function placeUnder(menu: HTMLElement, anchor: HTMLElement): void
 }
 
 /** Who played a game listed, as its analysis names them, «Stefano – Opus 5.5 · xhigh», and the player's side when they played one. */
-function namedSides(item: AnalysisItem, you: string, accounts: Accounts | undefined, ai: string, text: Text): { sides: string; you?: "white" | "black"; }
+function namedSides(
+    item: AnalysisItem,
+    you: string,
+    accounts: Accounts | undefined,
+    others: readonly OtherProfile[],
+    ai: string,
+    text: Text,
+): { sides: string; you?: "white" | "black"; }
 {
     const model = item.aiModel === undefined ? ai : signature(item.aiModel.model, item.aiModel.effort);
-    const sides = studiedSides(tagsOf(item), you, model, text.sides, accounts);
+    const sides = studiedSides(tagsOf(item), you, model, text.sides, accounts, others);
     const side = playerIn(sides);
     return { sides: `${sides.white.name} – ${sides.black.name}`, ...(side === undefined ? {} : { you: side }) };
 }

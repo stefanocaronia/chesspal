@@ -6,7 +6,7 @@ import type { Text } from "../text.ts";
 import { Analyses } from "./analyses.tsx";
 import { Dialog } from "./dialog.tsx";
 import { type SiteGame, SiteGameList } from "./site-games.tsx";
-import type { Accounts } from "./studied.ts";
+import type { Accounts, OtherProfile } from "./studied.ts";
 
 /** An analysis as the server lists it (`GET /api/analyses`). */
 export interface AnalysisItem
@@ -32,7 +32,7 @@ export type Studied = { pgn: string; } | { game: string; } | { last: true; };
  * The dialog the header's button opens; `onStudy` sends the choice and gives back why the server refused it, or undefined once it took it. The games played
  * here name their sides as their analysis does: the player by `you`, the AI by its model when the game keeps it (D-82), else by `ai`.
  */
-export function StudyDialog({ open, onStudy, onClose, onProfile, you, accounts, ai, text }: {
+export function StudyDialog({ open, onStudy, onClose, onProfile, you, accounts, others, ai, text }: {
     open: boolean;
     onStudy: (studied: Studied) => Promise<string | undefined>;
     onClose: () => void;
@@ -41,6 +41,8 @@ export function StudyDialog({ open, onStudy, onClose, onProfile, you, accounts, 
     you: string;
     /** The player's names on the sites, by which the games they load are theirs (D-93). */
     accounts: Accounts | undefined;
+    /** The other profiles here, named in the list by their names on the sites too. */
+    others: readonly OtherProfile[];
     ai: string;
     text: Text;
 })
@@ -56,7 +58,7 @@ export function StudyDialog({ open, onStudy, onClose, onProfile, you, accounts, 
 
     return (
         <Dialog open={open} title={loading ? text.study.bring : text.study.title} onBack={loading ? () => setLoading(false) : undefined} onClose={onClose} text={text}>
-            {loading ? <LoadForm onStudy={onStudy} onProfile={onProfile} accounts={accounts} text={text} /> : <Analyses onStudy={onStudy} onLoad={() => setLoading(true)} you={you} accounts={accounts} ai={ai} text={text} />}
+            {loading ? <LoadForm onStudy={onStudy} onProfile={onProfile} accounts={accounts} text={text} /> : <Analyses onStudy={onStudy} onLoad={() => setLoading(true)} you={you} accounts={accounts} others={others} ai={ai} text={text} />}
         </Dialog>
     );
 }

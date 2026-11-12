@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { accountSide, readPgn } from "../src/core/index.ts";
-import { playerIn, studiedSides } from "../src/page/dialogs/studied.ts";
+import { othersOf, playerIn, studiedSides } from "../src/page/dialogs/studied.ts";
 import { pliesOf } from "../src/page/game/plies.ts";
 
 const sides = { white: "White", black: "Black" };
@@ -13,10 +13,30 @@ describe("a game loaded by the player, by their names on the sites (D-93)", () =
         expect(accountSide({ White: "Sebysa13", Black: "stefano_c", Site: "Chess.com" }, accounts)).toBe("black");
         expect(accountSide({ White: "Sebysa13", Black: "stefano_c" }, accounts)).toBe("black");
         expect(studiedSides({ White: "lesfrondes", Black: "Sebysa13", Site: "lichess.org" }, "Stefano", "Claude", sides, accounts)).toEqual({
-            white: { name: "lesfrondes", who: "player" },
+            white: { name: "Stefano", who: "player" },
             black: { name: "Sebysa13", who: "other" },
             bottom: "white",
         });
+    });
+
+    it("names another profile here by its name, when a side the player did not play bears its name on the site", () => {
+        const others = [{ id: "seba", name: "Seba", accounts: { lichess: "sebysa13" } }, { id: "ann", name: "Ann" }];
+        expect(studiedSides({ White: "lesfrondes", Black: "Sebysa13", Site: "lichess.org" }, "Stefano", "Claude", sides, accounts, others)).toEqual({
+            white: { name: "Stefano", who: "player" },
+            black: { name: "Seba", who: "other", profile: "seba" },
+            bottom: "white",
+        });
+        expect(studiedSides({ White: "Sebysa13", Black: "Magnus", Site: "lichess.org" }, "Stefano", "Claude", sides, accounts, others)).toEqual({
+            white: { name: "Seba", who: "other", profile: "seba" },
+            black: { name: "Magnus", who: "other" },
+            bottom: "white",
+        });
+        expect(studiedSides({ White: "Sebysa13", Black: "Magnus", Site: "Chess.com" }, "Stefano", "Claude", sides, accounts, others).white).toEqual({ name: "Sebysa13", who: "other" });
+    });
+
+    it("leaves the profile in use out of the others", () => {
+        expect(othersOf([{ id: "stefano", name: "Stefano" }, { id: "seba", name: "Seba" }], "stefano")).toEqual([{ id: "seba", name: "Seba" }]);
+        expect(othersOf(undefined, "stefano")).toEqual([]);
     });
 
     it("is nobody's when the name is theirs on another site, on both sides, or they gave none", () => {

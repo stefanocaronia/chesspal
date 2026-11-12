@@ -34,7 +34,7 @@ import { piecesOf } from "../board/squares.ts";
 import { type NewGameChoice, NewGameDialog } from "../dialogs/new-game.tsx";
 import { NameButton, ProfileDialog, ProfilesDialog, Wizard } from "../dialogs/profiles.tsx";
 import { SettingsPanel } from "../dialogs/settings.tsx";
-import { playerIn, type StudiedSide, studiedSides } from "../dialogs/studied.ts";
+import { othersOf, playerIn, type StudiedSide, studiedSides } from "../dialogs/studied.ts";
 import { type Studied, StudyDialog } from "../dialogs/study.tsx";
 import { BadgeCounts } from "../game/badges.tsx";
 import { type Step, stepped } from "../game/browse.ts";
@@ -285,7 +285,7 @@ export function App({ start }: { start: Settings; })
         async (wanted) => await post("/api/study", { game: wanted, look: true }, text, name) === undefined,
     );
     // The tab names the game and the move shown, as the cards name its players; between games, Chesspal alone.
-    const titled = idle || served === undefined ? undefined : studiedSides(live.record.tags, served.profile.name, playedAs, text.sides, served.profile.accounts);
+    const titled = idle || served === undefined ? undefined : studiedSides(live.record.tags, served.profile.name, playedAs, text.sides, served.profile.accounts, othersOf(served.profiles, served.profile.id));
     useTabTitle(titled === undefined ? undefined : tabTitle(titled.white.name, titled.black.name, at === 0 ? undefined : plies[at - 1]));
 
     // The header's theme switch picks the other of the two the page shows, leaving the system's.
@@ -370,7 +370,7 @@ export function App({ start }: { start: Settings; })
     const profile = served.profile;
     const picture = <PlayerPicture profile={profile} />;
     // In analysis the cards name the players of the game, the player's side at the bottom when they played it (D-69).
-    const sides = studied === undefined ? undefined : studiedSides(live.record.tags, profile.name, playedAs, text.sides, profile.accounts);
+    const sides = studied === undefined ? undefined : studiedSides(live.record.tags, profile.name, playedAs, text.sides, profile.accounts, othersOf(served.profiles, profile.id));
 
     const player = sides?.bottom ?? (game === null || game.ai === "black" ? "white" : "black");
     const ai = player === "white" ? "black" : "white";
@@ -560,7 +560,7 @@ export function App({ start }: { start: Settings; })
         sides === undefined ? null : (
             <PlayerCard
                 place={place}
-                picture={pictureOf(sides[side], profile, 48, mood)}
+                picture={pictureOf(sides[side], profile, served.profiles, 48, mood)}
                 name={sides[side].name}
                 signed={sides[side].who === "ai" && playedBy !== undefined ? signature(playedBy.model, playedBy.effort) : undefined}
                 side={side}
@@ -604,7 +604,17 @@ export function App({ start }: { start: Settings; })
                 {table === undefined ? null : <ChatDialog open={dialog === "chat"} review={chatToReview} table={table} settings={settings} onChange={change} name={name} onClose={closeChat} text={text} />}
                 <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
                 {guide}
-                <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} onProfile={() => setDialog("profile")} you={profile.name} accounts={profile.accounts} ai={name} text={text} />
+                <StudyDialog
+                    open={dialog === "study"}
+                    onStudy={studyGame}
+                    onClose={() => setDialog(undefined)}
+                    onProfile={() => setDialog("profile")}
+                    you={profile.name}
+                    accounts={profile.accounts}
+                    others={othersOf(served.profiles, profile.id)}
+                    ai={name}
+                    text={text}
+                />
                 {/* A newer Chesspal: the table's page installs it from the header's mark (D-108); a chat's own page says the command, in a strip */}
                 {served.update === undefined || served.table === undefined
                     ? null
@@ -647,9 +657,9 @@ export function App({ start }: { start: Settings; })
                         : (
                             <TalkFaces
                                 name={sides[ai].name}
-                                aiPicture={pictureOf(sides[ai], profile, 40, mood)}
+                                aiPicture={pictureOf(sides[ai], profile, served.profiles, 40, mood)}
                                 you={sides[player].name}
-                                picture={pictureOf(sides[player], profile, 40, mood)}
+                                picture={pictureOf(sides[player], profile, served.profiles, 40, mood)}
                                 ai={ai}
                                 player={player}
                                 aiMoves={false}
@@ -881,10 +891,11 @@ export function App({ start }: { start: Settings; })
     );
 }
 
-/** The picture of a player of the game in analysis: the player's own, the AI's Torretta with its mood, or the plain face of someone else. */
-function pictureOf({ who }: StudiedSide, profile: ProfileShown, size: number, mood: Mood): ComponentChildren
+/** The picture of a player of the game in analysis: the player's own, the AI's Torretta with its mood, another profile's, or the plain face of someone else. */
+function pictureOf({ who, profile: other }: StudiedSide, profile: ProfileShown, profiles: readonly ProfileShown[], size: number, mood: Mood): ComponentChildren
 {
-    return who === "ai" ? <Torretta size={size} mood={mood} bust /> : <PlayerPicture profile={who === "player" ? profile : undefined} size={size} />;
+    const shown = who === "player" ? profile : profiles.find(({ id }) => id === other);
+    return who === "ai" ? <Torretta size={size} mood={mood} bust /> : <PlayerPicture profile={shown} size={size} />;
 }
 
 /**
