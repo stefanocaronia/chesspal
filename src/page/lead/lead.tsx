@@ -1,5 +1,6 @@
 // Who is ahead as the AI estimates it (D-90): a two-colour bar in the game's card, with the helps on and in analysis, and in analysis a chart of the game,
 // as chess.com draws them, that goes to the move clicked. The page draws the AI's figures, never computes them (D-6, D-19).
+import { useState } from "preact/hooks";
 import { FoldButton, useCardFold } from "../game/card-fold.tsx";
 import type { Ply } from "../game/plies.ts";
 import type { Text } from "../text.ts";
@@ -24,11 +25,12 @@ export function LeadBar({ standing, shown, text }: { standing: Standing | undefi
 
 /**
  * The chart of the game in analysis, in a card that folds: White's share as the white area, the moves marked by a badge as dots, kept whole inside its
- * edges, the move shown as a line.
+ * edges, the move shown as a line, and under the mouse a fainter line on the move a click would show.
  */
 export function LeadChart({ plies, standings, shown, onShow, text }: { plies: readonly Ply[]; standings: readonly Standing[]; shown: number; onShow: (plies: number) => void; text: Text; })
 {
     const [folded, fold] = useCardFold("chart");
+    const [pointed, setPointed] = useState<number | undefined>(undefined);
     const width = Math.max(plies.length, 1);
     const heightOf = (share: number) => 1 - share;
     const first = standings[0];
@@ -47,10 +49,13 @@ export function LeadChart({ plies, standings, shown, onShow, text }: { plies: re
         return badge === undefined || at === undefined || !chartBadges.has(badge) ? [] : [{ badge, at }];
     });
 
-    const go = (event: MouseEvent): void => {
+    // The move at the pointer: how many moves the board would show.
+    const plyAt = (event: MouseEvent): number => {
         const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
-        onShow(Math.round(((event.clientX - box.left) / box.width) * width));
+        return Math.min(width, Math.max(0, Math.round(((event.clientX - box.left) / box.width) * width)));
     };
+
+    const point = (event: PointerEvent): void => setPointed(event.pointerType === "mouse" ? plyAt(event) : undefined);
 
     return (
         <section class={`card lead-card${folded ? " folded" : ""}`}>
@@ -61,13 +66,22 @@ export function LeadChart({ plies, standings, shown, onShow, text }: { plies: re
                 </FoldButton>
             </h3>
             {folded ? null : (
-                <div class="lead-chart" role="img" aria-label={text.lead.chartHint} title={text.lead.chartHint} onClick={go}>
+                <div
+                    class="lead-chart"
+                    role="img"
+                    aria-label={text.lead.chartHint}
+                    title={text.lead.chartHint}
+                    onClick={(event) => onShow(plyAt(event))}
+                    onPointerMove={point}
+                    onPointerLeave={() => setPointed(undefined)}
+                >
                     <svg viewBox={`0 0 ${width} 2`} preserveAspectRatio="none" aria-hidden="true">
                         <path class="white-area" d={area} />
                         {/* The moves not estimated yet, while the AI goes over the game: grey, never Black's (Zoe) */}
                         {last.plies < width ? <rect class="pending" x={last.plies} y="0" width={width - last.plies} height="2" /> : null}
                         <path class="even" d={`M0 1 L${width} 1`} vector-effect="non-scaling-stroke" />
                     </svg>
+                    {pointed === undefined || pointed === shown ? null : <span class="shown ghost" style={{ left: inside((pointed / width) * 100, 2) }} aria-hidden="true" />}
                     <span class="shown" style={{ left: inside((shown / width) * 100, 2) }} aria-hidden="true" />
                     {dots.map(({ badge, at }) => (
                         <span

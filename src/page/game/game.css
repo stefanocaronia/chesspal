@@ -229,6 +229,11 @@
     pointer-events: none;
 }
 
+/* The move a click would show, under the mouse: the same line, fainter (Zoe) */
+.lead-chart .ghost {
+    opacity: 0.5;
+}
+
 .lead-chart .dot {
     position: absolute;
     width: 8px;
