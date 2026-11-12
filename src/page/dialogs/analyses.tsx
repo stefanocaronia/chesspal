@@ -6,6 +6,7 @@ import { ResultTile } from "../game/result-tile.tsx";
 import { signature } from "../players/model-name.ts";
 import type { StudyText, Text } from "../text.ts";
 import { type Outcome, OutcomeBadge, outcomeOf } from "./outcome.tsx";
+import { useRowKeys } from "./rows.ts";
 import { searched } from "./search.ts";
 import { type Accounts, type OtherProfile, playerIn, studiedSides } from "./studied.ts";
 import type { AnalysisItem, Studied } from "./study.tsx";
@@ -28,6 +29,7 @@ export function Analyses({ onStudy, onLoad, you, accounts, others, ai, text }: {
     const [asking, setAsking] = useState<{ name: string; asked: Asked; } | undefined>(undefined);
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<string | undefined>(undefined);
+    const rowKeys = useRowKeys();
     useClosing(menu !== undefined, () => setMenu(undefined));
     useClosing(asking !== undefined, () => setAsking(undefined));
 
@@ -81,7 +83,7 @@ export function Analyses({ onStudy, onLoad, you, accounts, others, ai, text }: {
             {problem === undefined ? null : <p class="problem" role="alert">{problem}</p>}
             {analyses.length > 0 && found.length === 0 ? <p class="none">{words.noMatch}</p> : null}
             {found.length === 0 ? null : (
-                <ul class="games" aria-label={words.yours}>
+                <ul class="games" aria-label={words.yours} {...rowKeys}>
                     {found.map(({ item, named, outcome }) =>
                         asking?.name === item.name
                             ? (
