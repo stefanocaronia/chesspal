@@ -44,7 +44,7 @@ The page's folders have no `index.ts`: they import each other's files directly, 
 
 | Path | What it holds |
 |---|---|
-| [app/](../src/page/app/) | The app: what the server sends, the phase (game, analysis), the keys, the move kept in the address |
+| [app/](../src/page/app/) | The app: what the server sends and how the page keeps hearing it across tables and lost connections, the phase (game, analysis), the keys, the move kept in the address |
 | [layout/](../src/page/layout/) | The header, the side columns and their drawers, the foot under the board with the version, the window the table opens, the icons of the app |
 | [board/](../src/page/board/) | The board: squares, pieces in motion, the pointer, the marks and arrows |
 | [pieces/](../src/page/pieces/) | The sets of pieces, one vector map each |
