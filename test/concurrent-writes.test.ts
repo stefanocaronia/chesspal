@@ -17,8 +17,11 @@ afterEach(() => {
 describe("two processes writing the same game", () => {
     it("loses no save: one made on a game another process changed since is refused, and made again on the game read anew", async () => {
         const folder = await gameOnDisk();
-        const lines = 150;
-        const refused = await Promise.all(["white", "black"].map((name) => writer(folder, name, lines)));
+        const lines = 60;
+        // The two start together, however long each takes to load.
+        const gate = mkdtempSync(join(tmpdir(), "chesspal-gate-"));
+        folders.push(gate);
+        const refused = await Promise.all(["white", "black"].map((name) => writer(folder, name, lines, [gate, "2"])));
         const talk = loadGame(folder)!.talk.map((line) => line.text);
 
         expect(talk).toHaveLength(2 * lines);
@@ -58,11 +61,11 @@ async function gameOnDisk(): Promise<string>
     return gameFolder(context.home());
 }
 
-/** Runs a writer in a process of its own: how many of its saves were refused before they were made. */
-function writer(folder: string, name: string, lines: number): Promise<number>
+/** Runs a writer in a process of its own, at a gate shared with the others when given: how many of its saves were refused before they were made. */
+function writer(folder: string, name: string, lines: number, gate: string[] = []): Promise<number>
 {
     const script = join(import.meta.dirname, "concurrent", "talk-writer.ts");
-    const child = spawn(process.execPath, ["--experimental-strip-types", "--no-warnings", script, folder, name, String(lines)], { stdio: ["ignore", "pipe", "inherit"] });
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--no-warnings", script, folder, name, String(lines), ...gate], { stdio: ["ignore", "pipe", "inherit"] });
     let output = "";
     child.stdout.on("data", (chunk: Buffer) => output += chunk.toString());
     return new Promise((done, failed) => {
