@@ -1,4 +1,4 @@
-/* The helps (D-78): their signs on the board, their card, the coach and the strategy's table */
+/* The helps (D-78): their signs on the board, their card, the coach and the strategy's rows */
 
 /* A piece at risk: a corner folded, bottom left, the square's free corner; in ink, or in the player's red and green (D-91) */
 .help-notch {
@@ -362,16 +362,10 @@
     content: "▾";
 }
 
-/* A finger needs a taller line, and the whole of a strategy's name (Zoe) */
+/* A finger needs a taller line (Zoe) */
 @media (pointer: coarse) {
     .help-rows .line-head {
         padding-block: 7px;
-    }
-
-    .strategy-table .term {
-        display: block;
-        width: 100%;
-        padding: 6px 0;
     }
 }
 
@@ -552,31 +546,81 @@
     border-color: var(--accent);
 }
 
-.strategy-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12.5px;
+/* The strategy (Stefano): the phases, the bar of the squares controlled, the lines in groups apart only by the gap, each a name and its tile, then the notes */
+.strategy {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* The three phases in a row, joined by a thin line; the current one in a pill */
+.phases {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
     color: var(--soft);
 }
 
-.strategy-table th,
-.strategy-table td {
-    padding: 2px 4px;
-    text-align: left;
-    font-weight: 400;
+.phases li + li {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 6px;
 }
 
-.strategy-table thead th {
+.phases li + li::before {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+}
+
+.phases li span {
+    padding: 1px 9px;
+    white-space: nowrap;
+}
+
+.phases li[aria-current="step"] span {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
     color: var(--ink);
     font-weight: 700;
 }
 
-.strategy-table tbody tr + tr {
-    border-top: 1px solid var(--line);
+/* A group of lines, 3px apart (1px of gap and the heads' 1px of padding), with no line between them */
+.strategy-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12.5px;
+    color: var(--soft);
+}
+
+.strategy-rows .row-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    margin: 0 -4px;
+    padding: 1px 4px;
+    border-radius: 6px;
+}
+
+/* A soft ground under the pointer and on the open line, as the tactics' lines have */
+.strategy-rows .row-head:hover,
+.strategy-rows li.open .row-head {
+    background: color-mix(in srgb, var(--soft) 12%, transparent);
 }
 
 /* A term with its meaning under the pointer, and under its line at a click or a tap (Rosa). */
-.strategy-table .term {
+.strategy-rows .term {
     padding: 0;
     border: 0;
     background: none;
@@ -588,58 +632,30 @@
     cursor: help;
 }
 
-.strategy-table tbody tr.meaning {
-    border-top: 0;
+/* A finger needs the whole of a strategy's name, after the base rule so that it wins */
+@media (pointer: coarse) {
+    .strategy-rows .term {
+        display: block;
+        width: 100%;
+        padding: 6px 0;
+    }
 }
 
-.strategy-table tr.meaning td {
-    padding-bottom: 4px;
+.strategy-rows li.open .term {
+    color: var(--ink);
+}
+
+.strategy-rows .meaning {
+    padding: 2px 0 4px;
     font-size: 12px;
     font-style: italic;
 }
 
 /* Under the meaning, each side's squares or files (Stefano) */
-.strategy-table tr.meaning .listed {
+.strategy-rows .meaning .listed {
     display: block;
     margin-top: 3px;
     font-style: normal;
-}
-
-/* The table's groups under their figure, in the accent; the sides' heads with their pawn */
-.strategy-table tr.group th {
-    padding-top: 7px;
-    color: var(--accent);
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.strategy-table tbody tr.group + tr {
-    border-top: 0;
-}
-
-/* The strategy (Stefano): the phase in a pill and the open files on top, then the bar of the squares controlled, the table in groups, the notes */
-.strategy {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.strategy-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 10px;
-    margin: 0;
-    font-size: 12px;
-    color: var(--soft);
-}
-
-.strategy .phase {
-    padding: 1px 9px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--accent) 20%, transparent);
-    color: var(--ink);
-    font-weight: 700;
 }
 
 /* Squares and files in chips, a count in bold, a yes as a green tick, nothing as a faint dash, no more as a faint cross */
@@ -689,23 +705,12 @@
 }
 
 /* The squares each side controls: White's in white, both in grey, Black's in black, each as long as its count */
-.control {
-    display: grid;
-    gap: 3px;
-    font-size: 11px;
-    color: var(--soft);
-}
-
-.control-title {
-    font-size: 12px;
-}
-
 .control-bar {
     display: flex;
     height: 18px;
-    border: 1px solid var(--line);
     border-radius: 5px;
     overflow: hidden;
+    font-size: 11px;
     font-weight: 700;
 }
 
@@ -716,28 +721,67 @@
     min-width: 20px;
 }
 
-.control-bar .white {
+/* The thread that keeps the black half in sight on the dark theme, as the lead bar's */
+.control-bar,
+.row-tile {
+    border: 1px solid rgb(138 144 153 / 0.6);
+}
+
+/* The bar's colours, which the lines' tiles share */
+.control-bar .white,
+.row-tile .white {
     background: #f4f6f8;
     color: var(--fixed-ink);
 }
 
-.control-bar .both {
+.control-bar .both,
+.row-tile .both {
     background: #8d98a7;
-    color: #fff;
+    color: var(--fixed-ink);
 }
 
-.control-bar .black {
+.control-bar .black,
+.row-tile .black {
     background: var(--fixed-ink);
     color: #f4f6f8;
 }
 
-.control-legend {
+/* A line's tile: a half for each side, the player's first; the open files in one half as wide as the two */
+.row-tile {
     display: flex;
-    justify-content: space-between;
+    height: 20px;
+    border-radius: 5px;
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
 
-.strategy-table .figurine {
-    margin-right: 3px;
+.row-tile > span {
+    display: grid;
+    place-items: center;
+    width: 42px;
+}
+
+.row-tile > .both {
+    width: 84px;
+}
+
+/* In a tile the marks take the half's colour, but the tick, green */
+.strategy .row-tile .count {
+    color: inherit;
+}
+
+.strategy .row-tile .chip {
+    margin: 0;
+    padding: 0;
+    background: none;
+    color: inherit;
+}
+
+.strategy .row-tile .no svg {
+    stroke: currentColor;
+    opacity: 0.6;
 }
 
 /* On a phone, or in a narrow window, the map of the squares and the coach's hint go under the board, out of the helps' card */

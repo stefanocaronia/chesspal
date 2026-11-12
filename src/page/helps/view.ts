@@ -131,26 +131,27 @@ export function pinSquares(pin: PinnedPiece): readonly string[]
     return [pin.piece.square, pin.by.square, pin.to.square];
 }
 
-/** A line of the strategy's table: one fact of the profile for each side. */
-export interface StrategyLine
-{
-    readonly row: StrategyRow;
-    readonly white: StrategyCell;
-    readonly black: StrategyCell;
-}
+/** A line of the strategy: one fact of the profile for each side, or the open files, which are both sides'. */
+export type StrategyLine =
+    | { readonly row: SideRow; readonly white: StrategyCell; readonly black: StrategyCell; }
+    | { readonly row: "openFiles"; readonly both: readonly string[]; };
 
-export type StrategyRow = keyof typeof cells;
+/** A line of the strategy with a cell for each side. */
+export type SideRow = keyof typeof cells;
 
-/** The groups the strategy's lines stand in on the card, each under its figure (Stefano). */
+export type StrategyRow = SideRow | "openFiles";
+
+/** The groups the strategy's lines stand in on the card, pawns, pieces and king (Stefano). */
 export type StrategyGroup = "pawns" | "pieces" | "king";
 
-/** Which group each line of the strategy's table stands in. */
+/** Which group each line of the strategy stands in. */
 export const groupOf: Readonly<Record<StrategyRow, StrategyGroup>> = {
     isolated: "pawns",
     doubled: "pawns",
     backward: "pawns",
     passed: "pawns",
     islands: "pawns",
+    openFiles: "pieces",
     halfOpen: "pieces",
     heavyOnFiles: "pieces",
     onSeventh: "pieces",
@@ -165,12 +166,23 @@ export const groupOf: Readonly<Record<StrategyRow, StrategyGroup>> = {
 /** Squares or files, a count, a yes or no, or how a side castled: "unknown" when the game began from a FEN and the side has no right left. */
 export type StrategyCell = readonly string[] | number | boolean | "O-O" | "O-O-O" | "not-yet" | "no-more" | "unknown";
 
-/** The strategy's table: only the lines where a side has something; the pawn islands only when a side has more than one. */
+/**
+ * The strategy's lines: only those where a side has something, the pawn islands only when a side has more than one; the open files, when there are any,
+ * first among the pieces' lines.
+ */
 export function strategyOf(profile: Profile): StrategyLine[]
 {
-    const lines = Object.entries(cells).map(([row, cell]) => ({ row: row as StrategyRow, white: cell(profile.white), black: cell(profile.black) }));
+    const lines = Object.entries(cells).map(([row, cell]) => ({ row: row as SideRow, white: cell(profile.white), black: cell(profile.black) }));
     const split = profile.white.pawns.islands.length > 1 || profile.black.pawns.islands.length > 1;
-    return lines.filter((line) => line.row === "islands" ? split : something(line.white) || something(line.black));
+    const shown: StrategyLine[] = lines.filter((line) => line.row === "islands" ? split : something(line.white) || something(line.black));
+
+    if (profile.openFiles.length === 0) {
+        return shown;
+    }
+
+    const pawnLines = shown.filter((line) => groupOf[line.row] === "pawns");
+    const otherLines = shown.filter((line) => groupOf[line.row] !== "pawns");
+    return [...pawnLines, { row: "openFiles", both: profile.openFiles }, ...otherLines];
 }
 
 const cells = {

@@ -15,7 +15,7 @@ export function Talk()
             </Board>
 
             <Card x={16} y={10} width={220} height={46} />
-            <Torretta x={18} y={13} size={36} />
+            <Torretta x={18} y={13} size={36} bust />
             <Bar x={58} y={24} width={56} strong />
             <Bar x={58} y={35} width={34} />
 

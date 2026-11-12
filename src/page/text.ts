@@ -3,7 +3,7 @@ import type { AiLevel, Badge, DrawColour, IllegalReason, Phase, PieceLetter, Sid
 import type { BadgeKind } from "./board/signs.ts";
 import type { Step } from "./game/browse.ts";
 import type { HowEnded } from "./game/ending.ts";
-import type { StrategyGroup, StrategyRow, Tone } from "./helps/view.ts";
+import type { StrategyRow, Tone } from "./helps/view.ts";
 import type { AvatarId, Level, Speed } from "./profile/profile.ts";
 
 /** The words of the page in one language. */
@@ -277,24 +277,21 @@ export interface HelpsCardText
     /** The loose pieces' counts, the player's and the other side's. */
     readonly yours: string;
     readonly theirs: string;
-    /** After the player's side in the strategy's head. */
+    /** After the player's side's name in the strategy. */
     readonly you: string;
     readonly white: string;
     readonly black: string;
-    /** Each line of the strategy's table: its name, and what it means for whoever does not know the word (Rosa). */
+    /** Each line of the strategy: its name, and what it means for whoever does not know the word (Rosa). */
     readonly rows: Readonly<Record<StrategyRow, readonly [name: string, meaning: string]>>;
-    /** The groups the lines stand in, each under its figure. */
-    readonly groups: Readonly<Record<StrategyGroup, string>>;
     readonly yes: string;
     readonly notYet: string;
     readonly noMore: string;
     readonly phases: Readonly<Record<Phase, string>>;
-    /** Before the open files, beside the phase. */
-    readonly openFiles: string;
-    /** The bar of the squares each side controls: its title, the word under its middle, and the sentence that says it whole. */
-    readonly control: string;
-    readonly both: string;
+    /** The bar of the squares each side controls: the sentence that says it whole, and each part's title, "(you)" after the player's side. */
     controlled(white: number, black: number, both: number): string;
+    controlledBy(who: Side | "both", count: number, you: boolean): string;
+    /** The open files' tile, which counts both sides' together. */
+    readonly bothSides: string;
     readonly oppositeBishops: string;
     repetitions(times: number): string;
     fiftyMoves(halfMoves: number): string;
@@ -881,25 +878,30 @@ const english: Text = {
             backward: ["Backward pawns", "A pawn left behind the pawns beside it, with the square in front of it attacked by an enemy pawn."],
             passed: ["Passed pawns", "No enemy pawn in front of it, on its file or the files beside it."],
             islands: ["Pawn islands", "Groups of pawns on neighbouring files, apart from each other."],
+            openFiles: ["Open files", "Files with no pawn of either side."],
             halfOpen: ["Half-open files", "Files with enemy pawns and none of one's own."],
             heavyOnFiles: ["Rooks and queens on open files", "Rooks and queens on open or half-open files."],
             onSeventh: ["Rooks and queens on the seventh", "Rooks and queens on the enemy's second rank: the seventh for White, the second for Black."],
             outposts: ["Outposts", "Squares on one's ranks 4 to 6, defended by a pawn, that no enemy pawn can ever attack."],
             bishopPair: ["Bishop pair", "Both bishops still on the board."],
-            space: ["Space (squares in the enemy's half)", "How many squares of the enemy's half one's pieces attack."],
+            space: ["Space", "How many squares of the enemy's half one's pieces attack."],
             undeveloped: ["Minor pieces not developed", "Knights and bishops still on their first squares."],
             castled: ["Castling", "How it castled; a dash while it still can, a cross once the king or the rooks have moved."],
             kingAttacks: ["Enemy attacks around the king", "How many enemy attacks fall on the squares next to the king."],
         },
-        groups: { pawns: "Pawns", pieces: "Pieces", king: "King" },
         yes: "yes",
         notYet: "not yet",
         noMore: "no more",
         phases: { opening: "Opening", middlegame: "Middlegame", endgame: "Endgame" },
-        openFiles: "Open files",
-        control: "Squares controlled",
-        both: "both",
         controlled: (white, black, both) => `Squares only White's ${white}, only Black's ${black}, both ${both}`,
+        controlledBy: (who, count, you) => {
+            if (who === "both") {
+                return `Squares both control: ${count}`;
+            }
+
+            return `Squares only ${who === "white" ? "White" : "Black"}${you ? " (you)" : ""} controls: ${count}`;
+        },
+        bothSides: "both sides",
         oppositeBishops: "Bishops of opposite colours",
         repetitions: (times) => `This position has stood ${times} times`,
         fiftyMoves: (halfMoves) => `${halfMoves} half-moves left before the fifty-move draw`,
@@ -1291,25 +1293,30 @@ const italian: Text = {
             backward: ["Pedoni arretrati", "Un pedone rimasto indietro rispetto a quelli accanto, con la casa davanti attaccata da un pedone nemico."],
             passed: ["Pedoni passati", "Nessun pedone nemico davanti a lui, né sulla sua colonna né su quelle accanto."],
             islands: ["Isole di pedoni", "Gruppi di pedoni su colonne vicine, separati fra loro."],
+            openFiles: ["Colonne aperte", "Colonne senza pedoni di nessuno dei due."],
             halfOpen: ["Colonne semiaperte", "Colonne con pedoni nemici e nessuno dei propri."],
             heavyOnFiles: ["Torri e donna su colonne aperte", "Torri e donna su colonne aperte o semiaperte."],
             onSeventh: ["Torri e donna in settima", "Torri e donna sulla seconda traversa del nemico: la settima per il Bianco, la seconda per il Nero."],
             outposts: ["Avamposti", "Case sulle proprie traverse dalla quarta alla sesta, difese da un pedone, che nessun pedone nemico potrà mai attaccare."],
             bishopPair: ["Coppia degli alfieri", "Tutti e due gli alfieri ancora sulla scacchiera."],
-            space: ["Spazio (case nella metà avversaria)", "Quante case della metà avversaria attaccano i propri pezzi."],
+            space: ["Spazio", "Quante case della metà avversaria attaccano i propri pezzi."],
             undeveloped: ["Pezzi minori non sviluppati", "Cavalli e alfieri ancora sulle case di partenza."],
             castled: ["Arrocco", "Come ha arroccato; un trattino finché può ancora farlo, una croce quando il re o le torri si sono già mossi."],
             kingAttacks: ["Attacchi nemici attorno al re", "Quanti attacchi nemici cadono sulle case accanto al re."],
         },
-        groups: { pawns: "Pedoni", pieces: "Pezzi", king: "Re" },
         yes: "sì",
         notYet: "non ancora",
         noMore: "non più",
         phases: { opening: "Apertura", middlegame: "Mediogioco", endgame: "Finale" },
-        openFiles: "Colonne aperte",
-        control: "Case controllate",
-        both: "tutti e due",
         controlled: (white, black, both) => `Case solo del Bianco ${white}, solo del Nero ${black}, di tutti e due ${both}`,
+        controlledBy: (who, count, you) => {
+            if (who === "both") {
+                return `Case controllate da tutti e due: ${count}`;
+            }
+
+            return `Case controllate solo dal ${who === "white" ? "Bianco" : "Nero"}${you ? " (tu)" : ""}: ${count}`;
+        },
+        bothSides: "tutti e due",
         oppositeBishops: "Alfieri di colore contrario",
         repetitions: (times) => `Questa posizione si è vista ${times} volte`,
         fiftyMoves: (halfMoves) => `Mancano ${halfMoves} semimosse alla patta delle cinquanta mosse`,

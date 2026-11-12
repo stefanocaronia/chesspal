@@ -310,6 +310,15 @@
     }
 }
 
+/* Its bust on a player's card: a disc of the player's picture's colour, which cuts what falls out of it */
+.torretta.bust {
+    clip-path: circle(50%);
+}
+
+.torretta .back {
+    fill: var(--say);
+}
+
 .torretta .shade {
     fill: var(--torretta-shade);
 }

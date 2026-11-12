@@ -1,8 +1,8 @@
 // The helps on the page (D-78, Zoe's sketch B): the board says where, the card says what, the facts the AI sees at the game's level and only those; and
 // the coach's words (D-88).
-import { type ComponentChildren, Fragment } from "preact";
+import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
-import type { PieceFacts, Profile, Side } from "../../core/index.ts";
+import type { Phase, PieceFacts, Profile, Side } from "../../core/index.ts";
 import { Notch, Pushpin, Skewer } from "../board/marks.tsx";
 import { BadgeIcon, NoteIcon } from "../game/badges.tsx";
 import { FoldButton, useCardFold } from "../game/card-fold.tsx";
@@ -14,7 +14,7 @@ import type { HelpsCardText, Text } from "../text.ts";
 import { groupOf, type HelpsView, pinSquares, riskSquares, squaresOf, type StrategyCell, type StrategyGroup, type StrategyLine, strategyOf, type StrategyRow, type TacticLine } from "./view.ts";
 
 /**
- * The helps' card, between the opening and the moves: the coach's words, then the tactics in lines, the strategy in a table and the control map, seen while
+ * The helps' card, between the opening and the moves: the coach's words, then the tactics in lines, the strategy in rows and the control map, seen while
  * its button or M is held, and the board without its drawings while their button is. A line under the pointer lights its squares on the board. Its title
  * folds it to the title and opens it again (Stefano).
  */
@@ -418,8 +418,8 @@ function Squares({ squares }: { squares: readonly string[]; })
 }
 
 /**
- * The strategy (Stefano): the phase and the open files on top, the squares each side controls in a bar, the table in groups each under its figure, a count
- * or a tick in each cell, and the notes in lines as the tactics'. The player's side comes first, with no colour of good or bad (D-91).
+ * The strategy (Stefano): the phases with the current one in a pill, the bar of the squares each side controls, then the lines in groups, each a name and a
+ * tile of a half per side, and the notes as the tactics'. The player's side comes first, with no colour of good or bad (D-91).
  */
 function Strategy({ helps, onPoint, text }: { helps: HelpsView; onPoint: (squares: readonly string[]) => void; text: Text; })
 {
@@ -442,74 +442,30 @@ function Strategy({ helps, onPoint, text }: { helps: HelpsView; onPoint: (square
 
     return (
         <div class="strategy">
-            <p class="strategy-head">
-                <span class="phase">{words.phases[profile.phase]}</span>
-                <span>
-                    {words.openFiles}: <Chips items={profile.openFiles} />
-                </span>
-            </p>
-            <ControlBar controlled={profile.controlled} sides={helps.sides} sideName={sideName} words={words} />
-            <table class="strategy-table">
-                <thead>
-                    <tr>
-                        <th />
-                        {helps.sides.map((side) => (
-                            <th key={side}>
-                                <Figurine letter="P" side={side} />
-                                {sideName(side)}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                {groups.map(({ group, letter }) => {
-                    const shown = lines.filter((line) => groupOf[line.row] === group);
-                    return shown.length === 0 ? null : (
-                        <tbody key={group}>
-                            <tr class="group">
-                                <th colSpan={3}>
-                                    <Figurine letter={letter} side="white" />
-                                    {words.groups[group]}
-                                </th>
-                            </tr>
-                            {shown.map((line) => {
-                                const [name, meaning] = words.rows[line.row];
-                                const open = explained === line.row;
-                                const listed = helps.sides.filter((side) => typeof line[side] === "object");
-                                return (
-                                    <Fragment key={line.row}>
-                                        <tr class={open ? "open" : undefined} {...point(squaresIn(line))}>
-                                            <th>
-                                                <button type="button" class="term" title={meaning} aria-expanded={open} onClick={() => setExplained(open ? undefined : line.row)}>
-                                                    {name}
-                                                </button>
-                                            </th>
-                                            {helps.sides.map((side) => (
-                                                <td key={side}>
-                                                    <Cell cell={line[side]} words={words} />
-                                                </td>
-                                            ))}
-                                        </tr>
-                                        {open
-                                            ? (
-                                                <tr class="meaning">
-                                                    <td colSpan={3}>
-                                                        {meaning}
-                                                        {listed.map((side) => (
-                                                            <span key={side} class="listed">
-                                                                {sideName(side)}: <Chips items={line[side] as readonly string[]} />
-                                                            </span>
-                                                        ))}
-                                                    </td>
-                                                </tr>
-                                            )
-                                            : null}
-                                    </Fragment>
-                                );
-                            })}
-                        </tbody>
-                    );
-                })}
-            </table>
+            <Phases phase={profile.phase} words={words} />
+            <ControlBar controlled={profile.controlled} sides={helps.sides} you={helps.you} words={words} />
+            {groups.map((group) => {
+                const shown = lines.filter((line) => groupOf[line.row] === group);
+                return shown.length === 0 ? null : (
+                    <ul key={group} class="strategy-rows">
+                        {shown.map((line) => {
+                            const [name, meaning] = words.rows[line.row];
+                            const open = explained === line.row;
+                            return (
+                                <li key={line.row} class={open ? "open" : undefined} {...point(squaresIn(line))}>
+                                    <div class="row-head">
+                                        <button type="button" class="term" title={meaning} aria-expanded={open} onClick={() => setExplained(open ? undefined : line.row)}>
+                                            {name}
+                                        </button>
+                                        <Tile line={line} sides={helps.sides} sideName={sideName} words={words} />
+                                    </div>
+                                    {open ? <Meaning line={line} meaning={meaning} sides={helps.sides} sideName={sideName} /> : null}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                );
+            })}
             {notes.length === 0 ? null : (
                 <ul class="help-rows">
                     {notes.map((note) => (
@@ -524,8 +480,10 @@ function Strategy({ helps, onPoint, text }: { helps: HelpsView; onPoint: (square
     );
 }
 
-// The groups of the strategy's table in their order, each with its figure.
-const groups: readonly { group: StrategyGroup; letter: string; }[] = [{ group: "pawns", letter: "P" }, { group: "pieces", letter: "N" }, { group: "king", letter: "K" }];
+// The strategy's groups in their order, apart only by a gap.
+const groups: readonly StrategyGroup[] = ["pawns", "pieces", "king"];
+
+const phases: readonly Phase[] = ["opening", "middlegame", "endgame"];
 
 // The fifty-move count shows only when the draw is near: ten moves each, or less.
 const fiftyMovesShown = 20;
@@ -533,35 +491,94 @@ const fiftyMovesShown = 20;
 /** The squares a side's cells of a strategy's line name, to light on the board; files and islands light none. */
 function squaresIn(line: StrategyLine): readonly string[]
 {
+    if (line.row === "openFiles") {
+        return [];
+    }
+
     return [line.white, line.black].flatMap((cell) => typeof cell === "object" ? cell.filter((item) => /^[a-h][1-8]$/.test(item)) : []);
 }
 
-/**
- * The squares only one side controls and those both do, in a bar as long as their counts, the player's side on the left; its title says it in words.
- */
-function ControlBar({ controlled, sides, sideName, words }: {
-    controlled: Profile["controlled"];
-    sides: readonly [Side, Side];
-    /** A side's name, "(you)" after the player's, as the table under it says (Zoe). */
-    sideName: (side: Side) => string;
-    words: HelpsCardText;
-})
+/** The game's three phases in a row, the current one in a pill. */
+function Phases({ phase, words }: { phase: Phase; words: HelpsCardText; })
+{
+    return (
+        <ol class="phases">
+            {phases.map((each) => (
+                <li key={each} aria-current={each === phase ? "step" : undefined}>
+                    <span>{words.phases[each]}</span>
+                </li>
+            ))}
+        </ol>
+    );
+}
+
+/** The squares only one side controls and those both do, in a bar as long as their counts, the player's side on the left; each part's title says it in words. */
+function ControlBar({ controlled, sides, you, words }: { controlled: Profile["controlled"]; sides: readonly [Side, Side]; you: Side | undefined; words: HelpsCardText; })
 {
     const { white, black, contested } = controlled;
     const [left, right] = sides;
-    const parts = [{ side: left, count: controlled[left] }, { side: "both", count: contested }, { side: right, count: controlled[right] }].filter(({ count }) => count > 0);
+    const parts: { who: Side | "both"; count: number; }[] = [{ who: left, count: controlled[left] }, { who: "both", count: contested }, { who: right, count: controlled[right] }];
 
     return (
-        <div class="control" title={words.controlled(white, black, contested)}>
-            <span class="control-title">{words.control}</span>
-            <span class="control-bar" role="img" aria-label={words.controlled(white, black, contested)}>
-                {parts.map(({ side, count }) => <span key={side} class={side} style={{ flexGrow: count }}>{count}</span>)}
+        <span class="control-bar" role="img" aria-label={words.controlled(white, black, contested)}>
+            {parts.filter(({ count }) => count > 0).map(({ who, count }) => <span key={who} class={who} style={{ flexGrow: count }} title={words.controlledBy(who, count, who === you)}>{count}</span>)}
+        </span>
+    );
+}
+
+/** A line's tile: a half for each side, the player's first, in the bar's colours; the open files, both sides', in one half as wide as the two. */
+function Tile({ line, sides, sideName, words }: { line: StrategyLine; sides: readonly [Side, Side]; sideName: (side: Side) => string; words: HelpsCardText; })
+{
+    if (line.row === "openFiles") {
+        return (
+            <span class="row-tile">
+                <span class="both" title={words.bothSides}>
+                    <span class="visually-hidden">{`${words.bothSides} `}</span>
+                    <b class="count">{line.both.length}</b>
+                </span>
             </span>
-            <span class="control-legend" aria-hidden="true">
-                <span>{sideName(left)}</span>
-                <span>{words.both}</span>
-                <span>{sideName(right)}</span>
-            </span>
+        );
+    }
+
+    return (
+        <span class="row-tile">
+            {sides.map((side) => (
+                <span key={side} class={side} title={sideName(side)}>
+                    <span class="visually-hidden">{`${sideName(side)} `}</span>
+                    <Cell cell={line[side]} words={words} />
+                </span>
+            ))}
+        </span>
+    );
+}
+
+/** A line opened: its meaning, then each listed side's squares or files in chips; the open files with no side's name. */
+function Meaning({ line, meaning, sides, sideName }: { line: StrategyLine; meaning: string; sides: readonly [Side, Side]; sideName: (side: Side) => string; })
+{
+    if (line.row === "openFiles") {
+        return (
+            <div class="meaning">
+                {meaning}
+                <span class="listed">
+                    <Chips items={line.both} />
+                </span>
+            </div>
+        );
+    }
+
+    return (
+        <div class="meaning">
+            {meaning}
+            {sides.map((side) => {
+                const cell = line[side];
+                return typeof cell === "object"
+                    ? (
+                        <span key={side} class="listed">
+                            {sideName(side)}: <Chips items={cell} />
+                        </span>
+                    )
+                    : null;
+            })}
         </div>
     );
 }

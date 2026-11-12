@@ -468,6 +468,13 @@
 
 .fold-tab button.unread::after {
     top: -4px;
+/* On the Torretta's disc, clear of its battlement, ringed in the card's colour */
+.face.unread::after {
+    top: -2px;
+    right: -2px;
+    box-shadow: 0 0 0 2px var(--card);
+}
+
     right: auto;
     left: -4px;
 }
@@ -480,11 +487,11 @@
     flex: none;
 }
 
-/* Its trail clear of the battlements' corner, which the halo would bite */
+/* The trail's dot on the disc's edge, clear of the battlement */
 .thought {
     position: absolute;
-    top: -8px;
-    left: -10px;
+    top: -9px;
+    left: -12px;
     width: 24px;
     height: 20px;
     overflow: visible;

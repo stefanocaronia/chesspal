@@ -2,14 +2,26 @@
 import { useRef } from "preact/hooks";
 import type { Mood } from "../../core/index.ts";
 
-/** The Torretta at a size in pixels, with the face of a mood (neutral by default); with a label it is an image a screen reader names, else a decoration. */
-export function Torretta({ size, label, mood = "neutral" }: { size: number; label?: string; mood?: Mood; })
+/**
+ * The Torretta at a size in pixels, with the face of a mood (neutral by default); with a label it is an image a screen reader names, else a decoration.
+ * As a bust it is its own profile picture, on a player's card: a disc that frames it from the antenna to the screen, so that its face reads (Stefano).
+ */
+export function Torretta({ size, label, mood = "neutral", bust = false }: { size: number; label?: string; mood?: Mood; bust?: boolean; })
 {
     // The face pops in when the mood changes, never when the Torretta first shows (the logo, a card, a dialog).
     const changed = useChanged(mood);
 
     return (
-        <svg class={`torretta mood-${mood}`} viewBox="0 0 128 128" width={size} height={size} role={label === undefined ? undefined : "img"} aria-label={label} aria-hidden={label === undefined ? "true" : undefined}>
+        <svg
+            class={`torretta mood-${mood}${bust ? " bust" : ""}`}
+            viewBox={bust ? bustFrame : fullFrame}
+            width={size}
+            height={size}
+            role={label === undefined ? undefined : "img"}
+            aria-label={label}
+            aria-hidden={label === undefined ? "true" : undefined}
+        >
+            {bust ? <circle class="back" cx="64" cy="56" r="48" /> : null}
             <path class="antenna" d="M64 31V19" />
             <circle class="light" cx="64" cy="16" r="5" />
             <rect class="shade" x="29" y="64" width="12" height="26" rx="2" />
@@ -23,6 +35,12 @@ export function Torretta({ size, label, mood = "neutral" }: { size: number; labe
         </svg>
     );
 }
+
+// The whole figure's frame: the square around it, from the antenna's light (y 11) to the base (y 116), two units clear of each, so that it fills its size.
+const fullFrame = "9.5 9 109 109";
+
+// The bust's frame, the square around its disc: the antenna's light three units under its top, the base left out below.
+const bustFrame = "16 8 96 96";
 
 /** Whether the mood has changed since the Torretta first showed: true from its first change on, so a face already shown never starts its entrance again. */
 function useChanged(mood: Mood): boolean

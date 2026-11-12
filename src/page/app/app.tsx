@@ -410,7 +410,7 @@ export function App({ start }: { start: Settings; })
     const thinking = going && !asleep && !offline && studied === undefined ? served.thinking : undefined;
     const thinker = (size: number): ComponentChildren => (
         <Thinker thinking={thinking} words={text.thinking}>
-            <Torretta size={size} mood={mood} />
+            <Torretta size={size} mood={mood} bust />
         </Thinker>
     );
     // The clocks wait for the player from the game's start: when the AI moves first, a button gives it the start; else the player's first move does (Stefano).
@@ -854,7 +854,7 @@ export function App({ start }: { start: Settings; })
 /** The picture of a player of the game in analysis: the player's own, the AI's Torretta with its mood, or the plain face of someone else. */
 function pictureOf({ who }: StudiedSide, profile: ProfileShown, size: number, mood: Mood): ComponentChildren
 {
-    return who === "ai" ? <Torretta size={size} mood={mood} /> : <PlayerPicture profile={who === "player" ? profile : undefined} size={size} />;
+    return who === "ai" ? <Torretta size={size} mood={mood} bust /> : <PlayerPicture profile={who === "player" ? profile : undefined} size={size} />;
 }
 
 /**

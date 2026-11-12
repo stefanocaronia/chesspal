@@ -25,7 +25,7 @@ export function Game()
             <path class="pointer" transform={`translate(${over.x + 17} ${over.y + 8})`} d="M0 0V13L3.5 10L6 15.5L8.2 14.5L5.8 9.3H10Z" />
 
             <Card x={16} y={10} width={112} height={48} />
-            <Torretta x={18} y={14} size={32} />
+            <Torretta x={18} y={14} size={32} bust />
             <Bar x={54} y={20} width={46} strong />
             <Bar x={54} y={30} width={30} />
             <rect class="quote" x="54" y="40" width="44" height="12" rx="6" />

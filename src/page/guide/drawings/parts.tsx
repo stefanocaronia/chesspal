@@ -1,6 +1,6 @@
 // What the guide's drawings are made of: cards, lines of text, a board and what sits on it, the Torretta, a face and the move badges, coloured by the theme
 import type { ComponentChildren } from "preact";
-import { useContext } from "preact/hooks";
+import { useContext, useId } from "preact/hooks";
 import { ChosenSet, pieceSymbol } from "../../pieces/pieces.tsx";
 
 /** Where a board's top-left corner is and how wide its squares are; a board that runs off the drawing is cut by it. */
@@ -93,21 +93,28 @@ export function Arrow({ from, to, width, class: name }: { from: Point; to: Point
     return <polygon class={name} points={arrowPoints(from, to, width)} />;
 }
 
-/** The Torretta with its neutral face, `size` wide, its top-left corner at x, y. */
-export function Torretta({ x, y, size }: { x: number; y: number; size: number; })
+/** The Torretta with its neutral face, `size` wide, its top-left corner at x, y; as a `bust`, as on a player's card, in a disc `size` wide, clipped to it. */
+export function Torretta({ x, y, size, bust = false }: { x: number; y: number; size: number; bust?: boolean; })
 {
+    const clip = useId();
+
+    if (bust) {
+        return (
+            <g transform={`translate(${x} ${y}) scale(${size / 96}) translate(-16 -8)`}>
+                <clipPath id={clip}>
+                    <circle cx="64" cy="56" r="48" />
+                </clipPath>
+                <circle class="words" cx="64" cy="56" r="48" />
+                <g clip-path={`url(#${clip})`}>
+                    <Figure />
+                </g>
+            </g>
+        );
+    }
+
     return (
-        <g class="tower" transform={`translate(${x} ${y}) scale(${size / 128})`}>
-            <path class="antenna" d="M64 31V19" />
-            <circle class="light-bulb" cx="64" cy="16" r="5" />
-            <rect class="shade" x="29" y="64" width="12" height="26" rx="2" />
-            <rect class="shade" x="87" y="64" width="12" height="26" rx="2" />
-            <path class="body" d="M34 30H47V40H57V30H71V40H81V30H94V54L89 58L92 106H36L39 58L34 54Z" />
-            <rect class="shade" x="30" y="104" width="68" height="12" rx="4" />
-            <rect class="screen" x="44" y="63" width="40" height="32" rx="7" />
-            <circle class="features" cx="55" cy="76" r="4.6" />
-            <circle class="features" cx="73" cy="76" r="4.6" />
-            <rect class="features" x="58" y="85.4" width="12" height="3.2" rx="1.6" />
+        <g transform={`translate(${x} ${y}) scale(${size / 128})`}>
+            <Figure />
         </g>
     );
 }
@@ -161,6 +168,25 @@ export function Chevron({ x, y, size, left = false }: { x: number; y: number; si
 {
     const reach = left ? -size / 2 : size / 2;
     return <path d={`M${x - reach / 2} ${y - size / 2}L${x + reach / 2} ${y}L${x - reach / 2} ${y + size / 2}`} />;
+}
+
+/** The Torretta's figure on its own grid of 128, its disc's frame 16 8 96 96 as the page's bust. */
+function Figure()
+{
+    return (
+        <g class="tower">
+            <path class="antenna" d="M64 31V19" />
+            <circle class="light-bulb" cx="64" cy="16" r="5" />
+            <rect class="shade" x="29" y="64" width="12" height="26" rx="2" />
+            <rect class="shade" x="87" y="64" width="12" height="26" rx="2" />
+            <path class="body" d="M34 30H47V40H57V30H71V40H81V30H94V54L89 58L92 106H36L39 58L34 54Z" />
+            <rect class="shade" x="30" y="104" width="68" height="12" rx="4" />
+            <rect class="screen" x="44" y="63" width="40" height="32" rx="7" />
+            <circle class="features" cx="55" cy="76" r="4.6" />
+            <circle class="features" cx="73" cy="76" r="4.6" />
+            <rect class="features" x="58" y="85.4" width="12" height="3.2" rx="1.6" />
+        </g>
+    );
 }
 
 /** A question mark on a grid of one, `size` wide, centred on x, y. */

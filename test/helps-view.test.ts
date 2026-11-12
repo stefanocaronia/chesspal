@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game, readPgn } from "../src/core/index.ts";
-import { helpsOf, pinOn, riskOn, skewerOn, squaresOf, strategyOf } from "../src/page/helps/view.ts";
+import { groupOf, helpsOf, pinOn, riskOn, skewerOn, squaresOf, strategyOf } from "../src/page/helps/view.ts";
 
 // White's knight on f3 pinned to its queen by the bishop on g4, which h3 attacks undefended.
 const pinned = game("1. e4 e5 2. Nf3 d6 3. Bc4 Bg4 4. Nc3 Nc6 5. h3 *");
@@ -157,6 +157,20 @@ describe("the strategy's table (D-78)", () => {
         expect(castling("1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O *")).toMatchObject({ white: "O-O", black: "not-yet" });
         expect(castling("1. e4 e5 2. Ke2 *")).toMatchObject({ white: "no-more", black: "not-yet" });
         expect(castling('[FEN "4k3/8/8/8/8/8/8/4K3 w - - 0 1"]\n\n*')).toBeUndefined();
+    });
+
+    it("puts the open files, both sides' in one line, first among the pieces' lines, and only when there are any", () => {
+        // The d-file has lost both its pawns.
+        const open = game("1. e4 d5 2. exd5 Qxd5 3. d4 e5 4. dxe5 *");
+        const lines = strategyOf(open.profile);
+        const at = lines.findIndex((line) => line.row === "openFiles");
+
+        expect(open.profile.openFiles).toContain("d");
+        expect(lines[at]).toEqual({ row: "openFiles", both: open.profile.openFiles });
+        expect(lines.slice(0, at).every((line) => groupOf[line.row] === "pawns")).toBe(true);
+        expect(lines.slice(at + 1).every((line) => groupOf[line.row] !== "pawns")).toBe(true);
+        expect(lines[at + 1]?.row).toBe("halfOpen");
+        expect(strategyOf(pinned.profile).map((line) => line.row)).not.toContain("openFiles");
     });
 });
 

@@ -293,7 +293,7 @@ export function TalkFaces({ name, aiPicture, you, picture, ai, player, aiMoves, 
 {
     return (
         <div class="faces">
-            <RailPlayer place="ai" picture={aiPicture ?? <Torretta size={40} />} name={name} {...(ai === undefined ? {} : { side: text.sides[ai] })} moves={aiMoves} unread={unread} />
+            <RailPlayer place="ai" picture={aiPicture ?? <Torretta size={40} bust />} name={name} {...(ai === undefined ? {} : { side: text.sides[ai] })} moves={aiMoves} unread={unread} />
             <RailPlayer place="you" picture={picture} name={you} {...(player === undefined ? {} : { side: text.sides[player] })} moves={playerMoves} />
         </div>
     );
