@@ -133,7 +133,7 @@ describe("the helps from the player's side (D-91)", () => {
     });
 });
 
-describe("the strategy's table (D-78)", () => {
+describe("the strategy's lines (D-78)", () => {
     it("keeps only the lines where a side has something", () => {
         const rows = strategyOf(pinned.profile).map((line) => line.row);
 

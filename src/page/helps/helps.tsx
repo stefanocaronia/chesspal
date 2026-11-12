@@ -442,7 +442,7 @@ function Strategy({ helps, onPoint, text }: { helps: HelpsView; onPoint: (square
 
     return (
         <div class="strategy">
-            <Phases phase={profile.phase} words={words} />
+            <Phases current={profile.phase} words={words} />
             <ControlBar controlled={profile.controlled} sides={helps.sides} you={helps.you} words={words} />
             {groups.map((group) => {
                 const shown = lines.filter((line) => groupOf[line.row] === group);
@@ -499,13 +499,13 @@ function squaresIn(line: StrategyLine): readonly string[]
 }
 
 /** The game's three phases in a row, the current one in a pill. */
-function Phases({ phase, words }: { phase: Phase; words: HelpsCardText; })
+function Phases({ current, words }: { current: Phase; words: HelpsCardText; })
 {
     return (
         <ol class="phases">
-            {phases.map((each) => (
-                <li key={each} aria-current={each === phase ? "step" : undefined}>
-                    <span>{words.phases[each]}</span>
+            {phases.map((phase) => (
+                <li key={phase} aria-current={phase === current ? "step" : undefined}>
+                    <span>{words.phases[phase]}</span>
                 </li>
             ))}
         </ol>
