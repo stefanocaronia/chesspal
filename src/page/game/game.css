@@ -195,6 +195,9 @@
     box-shadow: 0 0 0 1px rgb(138 144 153 / 0.6);
     overflow: hidden;
     cursor: pointer;
+    /* A finger drawn across it runs through the game; up and down it scrolls the page */
+    touch-action: pan-y;
+    user-select: none;
 }
 
 .lead-chart svg {

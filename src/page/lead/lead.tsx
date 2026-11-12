@@ -1,6 +1,6 @@
 // Who is ahead as the AI estimates it (D-90): a two-colour bar in the game's card, with the helps on and in analysis, and in analysis a chart of the game,
 // as chess.com draws them, that goes to the move clicked. The page draws the AI's figures, never computes them (D-6, D-19).
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import { FoldButton, useCardFold } from "../game/card-fold.tsx";
 import type { Ply } from "../game/plies.ts";
 import type { Text } from "../text.ts";
@@ -25,12 +25,15 @@ export function LeadBar({ standing, shown, text }: { standing: Standing | undefi
 
 /**
  * The chart of the game in analysis, in a card that folds: White's share as the white area, the moves marked by a badge as dots, kept whole inside its
- * edges, the move shown as a line, and under the mouse a fainter line on the move a click would show.
+ * edges, the move shown as a line, and under the mouse a fainter line on the move a click would show. A finger or the mouse drawn along it runs through the
+ * game.
  */
 export function LeadChart({ plies, standings, shown, onShow, text }: { plies: readonly Ply[]; standings: readonly Standing[]; shown: number; onShow: (plies: number) => void; text: Text; })
 {
     const [folded, fold] = useCardFold("chart");
     const [pointed, setPointed] = useState<number | undefined>(undefined);
+    // A finger or the pressed mouse on the chart: where it went down, whether it runs through the game yet, and the move it showed last.
+    const pressed = useRef<{ x: number; y: number; along: boolean; showed?: number; } | undefined>(undefined);
     const width = Math.max(plies.length, 1);
     const heightOf = (share: number) => 1 - share;
     const first = standings[0];
@@ -55,7 +58,44 @@ export function LeadChart({ plies, standings, shown, onShow, text }: { plies: re
         return Math.min(width, Math.max(0, Math.round(((event.clientX - box.left) / box.width) * width)));
     };
 
-    const point = (event: PointerEvent): void => setPointed(event.pointerType === "mouse" ? plyAt(event) : undefined);
+    const showAt = (at: number): void => {
+        if (pressed.current !== undefined && pressed.current.showed !== at) {
+            pressed.current.showed = at;
+            onShow(at);
+        }
+    };
+
+    // The mouse shows its move as it goes down; a finger once it runs across, as one that runs up or down scrolls the page, or as it lifts, a tap.
+    const press = (event: PointerEvent): void => {
+        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+        pressed.current = { x: event.clientX, y: event.clientY, along: event.pointerType === "mouse" };
+        setPointed(undefined);
+
+        if (pressed.current.along) {
+            showAt(plyAt(event));
+        }
+    };
+
+    const point = (event: PointerEvent): void => {
+        const press = pressed.current;
+
+        if (press === undefined) {
+            setPointed(event.pointerType === "mouse" ? plyAt(event) : undefined);
+            return;
+        }
+
+        const across = Math.abs(event.clientX - press.x);
+        press.along ||= across > 8 && across > Math.abs(event.clientY - press.y);
+
+        if (press.along) {
+            showAt(plyAt(event));
+        }
+    };
+
+    const lift = (event: PointerEvent): void => {
+        showAt(plyAt(event));
+        pressed.current = undefined;
+    };
 
     return (
         <section class={`card lead-card${folded ? " folded" : ""}`}>
@@ -71,8 +111,10 @@ export function LeadChart({ plies, standings, shown, onShow, text }: { plies: re
                     role="img"
                     aria-label={text.lead.chartHint}
                     title={text.lead.chartHint}
-                    onClick={(event) => onShow(plyAt(event))}
+                    onPointerDown={press}
                     onPointerMove={point}
+                    onPointerUp={lift}
+                    onPointerCancel={() => void (pressed.current = undefined)}
                     onPointerLeave={() => setPointed(undefined)}
                 >
                     <svg viewBox={`0 0 ${width} 2`} preserveAspectRatio="none" aria-hidden="true">

@@ -975,12 +975,14 @@
         margin: 0;
     }
 
+    /* The steps, and under them the chart of the game */
     .board-steps {
-        display: block;
+        display: grid;
+        gap: var(--between);
         grid-area: steps;
     }
 
-    .app:has(.talk.studied) .side .steps {
+    .app:has(.talk.studied) .side :is(.steps, .lead-card) {
         display: none;
     }
 }

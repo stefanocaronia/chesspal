@@ -50,6 +50,7 @@ import { FoldTab } from "../layout/fold-tab.tsx";
 import { type Column, nextFold, rememberFold, startFolds } from "../layout/folds.ts";
 import { PageFoot } from "../layout/footer.tsx";
 import { type GameActions, Header } from "../layout/header.tsx";
+import { LeadChart } from "../lead/lead.tsx";
 import { standingsOf } from "../lead/view.ts";
 import { MarksLegend } from "../legend/legend.tsx";
 import { legendOf } from "../legend/view.ts";
@@ -844,10 +845,14 @@ export function App({ start }: { start: Settings; })
                             )
                             : null}
                     </div>
-                    {/* On a phone the steps of a game in analysis sit under the board, by the thumb (Zoe) */}
+                    {
+                        /* On a phone the steps of a game in analysis sit under the board, by the thumb, and the chart of the game under them, the board in sight
+                        while a finger runs along it (Zoe) */
+                    }
                     {studied === undefined ? null : (
                         <div class="board-steps">
                             <Steps shown={at} total={total} onStep={step} text={text} />
+                            {standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={at} onShow={goTo} text={text} />}
                         </div>
                     )}
                     {/* On a phone the helps' map sits under the board too, turned on and off by a touch (D-78), and the coach's hint beside it, its drawings in sight (Zoe) */}
