@@ -136,17 +136,19 @@ function Move({ ply, current, onShow, text }: { ply: Ply | undefined; current: b
     );
 }
 
-/** Scrolls the list, and only the list, as little as it takes to show its current move. */
+/** Scrolls the list, and only the list, as little as it takes to show the whole row of its current move, and the result under the last one. */
 function keepInSight(list: HTMLDivElement | null): void
 {
-    const box = list?.getBoundingClientRect();
-    const move = list?.querySelector(".current")?.getBoundingClientRect();
+    const row = list?.querySelector(".current")?.closest("li");
 
-    if (box === undefined || move === undefined) {
+    if (list === null || !row) {
         return;
     }
 
-    list!.scrollTop += Math.min(0, move.top - box.top) + Math.max(0, move.bottom - box.bottom);
+    const box = list.getBoundingClientRect();
+    const top = row.getBoundingClientRect().top;
+    const bottom = (row.nextElementSibling === null ? list.lastElementChild ?? row : row).getBoundingClientRect().bottom;
+    list.scrollTop += Math.min(0, top - box.top) + Math.max(0, bottom - box.bottom);
 }
 
 /** The plies in rows of one number: White's move and Black's. */
