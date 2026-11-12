@@ -1,7 +1,7 @@
 // The player's rating on Lichess (D-105): their profile, then the date of their last game at the speed that counts.
-import type { SiteReading } from "../profiles/index.ts";
+import type { SiteReading } from "../../profiles/index.ts";
+import { askSite, type Fetch } from "../request/index.ts";
 import { counted, type Played } from "./choice.ts";
-import { askSite, type Fetch } from "./request/index.ts";
 
 /** What Lichess says of a name: undefined when it could not be reached. */
 export async function lichessReading(account: string, fetch: Fetch, signal: AbortSignal): Promise<SiteReading | undefined>
