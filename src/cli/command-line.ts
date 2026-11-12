@@ -19,7 +19,10 @@ const chatDescription = "Note how the chat started: new, cleared, resumed or com
 const tableDescription = "Serve the board page with no chat, until no browser has had it open for five minutes. `chesspal` alone starts it apart and opens the page.";
 const openDescription = "Open the board page as `chesspal` alone does, without asking about the icon: what the icon runs.";
 const iconDescription = "Put Chesspal's icon on the desktop and in the menu: it opens the board page as `chesspal` alone does, with no terminal. `chesspal icon --remove` takes it away.";
-const playDescription = "Play at the table in Claude Code or Codex, in this terminal: what the page's buttons open, with the model and effort chosen there; New game on the page starts the chat again, clean.";
+const playDescription = "Start the AI in this terminal, in Claude Code or Codex, as the page's buttons do. It plays with the model and effort chosen on the page; New game there starts the chat again, clean.";
+// What init and the icon's removal are to a player, in the general help: the command's own help says the files.
+const initForPlayer = "Set up a folder of your own to play in, from Claude Code, Codex or the Claude desktop app.";
+const iconRemoveForPlayer = "Take Chesspal's icon away, before you uninstall it.";
 // Those of them that take no options, by name.
 const plainCommands = new Map([["mcp", mcpDescription], ["chat", chatDescription], ["table", tableDescription], ["open", openDescription], ["icon", iconDescription]]);
 
@@ -207,7 +210,7 @@ function inputFields(command: AnyCommand): [string, z.ZodType][]
 /** The commands, each with the first sentence of its description: the player's first, then those of the AI and of whoever develops Chesspal. */
 function generalHelp(list: AnyCommand[]): string
 {
-    const width = Math.max("listen".length, ...list.map((command) => command.name.length));
+    const width = Math.max("icon --remove".length, ...list.map((command) => command.name.length));
     const line = (name: string, description: string): string => `  ${name.padEnd(width)} ${firstSentence(description)}`;
     const init = list.find((command) => command.name === "init");
     return [
@@ -217,8 +220,9 @@ function generalHelp(list: AnyCommand[]): string
         "",
         "For the player:",
         line("play", playDescription),
-        ...(init === undefined ? [] : [line(init.name, init.description)]),
+        ...(init === undefined ? [] : [line(init.name, initForPlayer)]),
         line("icon", iconDescription),
+        line("icon --remove", iconRemoveForPlayer),
         "",
         "For the AI, and for whoever develops Chesspal:",
         ...list.filter((command) => command !== init).map((command) => line(command.name, command.description)),

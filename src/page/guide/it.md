@@ -18,7 +18,7 @@ Nessun motore di scacchi gioca al posto dell'AI: ogni mossa e ogni giudizio sono
 
 ### Per cominciare
 
-1. Clicca il **nome dell'AI**, in alto a sinistra, e scegli la chat fra quelle che hai sul computer: **Claude Code** o **Codex**. Si apre in una finestra sua: tienila aperta mentre giochi. La prima volta fa qualche domanda: se ti fidi della cartella, scegli **Sì**; con Codex, sugli hook di Chesspal scegli **Trust all and continue**, e su Windows, quando chiede se preparare la sua sandbox, scegli la prima opzione e rispondi sì quando Windows chiede il permesso.
+1. Clicca il **nome dell'AI**, in alto a sinistra, e scegli la chat fra quelle che hai sul computer: **Claude Code** o **Codex**. Si apre in una finestra sua: tienila aperta mentre giochi. La prima volta fa qualche domanda. Se ti fidi della cartella: **Sì**. Con Codex, sugli hook, i due aiutanti di Chesspal: **Trust all and continue**. Su Windows Codex chiede anche se preparare la sua sandbox, lo spazio protetto dove lavora: scegli la prima opzione, e sì quando Windows chiede il permesso.
 2. Premi **Nuova partita**, scegli il colore, l'orologio e il livello dell'AI, e premi **Inizia**.
 3. Muovi: l'AI risponde sulla scacchiera, e con qualche parola sotto il suo nome.
 

@@ -112,7 +112,7 @@ function wordsFor(context: Context): IconWords
             made: `Fatto: Chesspal è sul desktop e ${where}.`,
             later: "Va bene, niente icona. Se la vuoi più avanti, scrivi chesspal icon.",
             failed: (reason) => `Chesspal non è riuscito a mettere l'icona (${reason}). Riprova con chesspal icon.`,
-            removed: `Fatto: l'icona di Chesspal non è più sul desktop né ${where}.`,
+            removed: `Fatto: l'icona di Chesspal non è più sul desktop né ${where}. Per togliere Chesspal: npm uninstall -g chesspal. Le tue partite restano dove sono.`,
             noneRemoved: "Chesspal non ha trovato sue icone su questo computer.",
         };
     }
@@ -123,7 +123,7 @@ function wordsFor(context: Context): IconWords
         made: `Done: Chesspal is on your desktop and in ${where}.`,
         later: "All right, no icon. To add it later, type chesspal icon.",
         failed: (reason) => `Chesspal could not add its icon (${reason}). Try again with chesspal icon.`,
-        removed: `Done: Chesspal's icon is gone from your desktop and ${where}.`,
+        removed: `Done: Chesspal's icon is gone from your desktop and ${where}. To remove Chesspal: npm uninstall -g chesspal. Your games stay where they are.`,
         noneRemoved: "Chesspal found no icon of its own on this computer.",
     };
 }
