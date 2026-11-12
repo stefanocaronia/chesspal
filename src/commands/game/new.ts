@@ -141,7 +141,7 @@ function startedLines({ game, archived, past, player, speech, closedPage: closed
         `New game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`,
         ...(player === undefined ? [] : [player]),
         ...(speech === undefined ? [] : [speechLine(speech)]),
-        ...(archived === undefined ? [] : [`The game before is in ${archived.name}${archived.finished ? "" : ", unfinished"}.`]),
+        ...(archived === undefined ? [] : [`The game before is saved with the player's games${archived.finished ? "" : ", unfinished"}.`]),
         ...(past.length === 0 ? [] : ["Last games with this player (past_games gives more, and their moves):", ...past]),
         ...positionLines(game),
         ...(closed === undefined ? [] : [pageLine(closed, true)]),

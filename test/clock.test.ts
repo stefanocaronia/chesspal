@@ -77,7 +77,7 @@ describe("a game with a clock (D-13)", () => {
     it("ends the game when the side to move runs out of time, at the first command that reads it, and archives it", async () => {
         const game = clockGame("1+0");
         await run(game.at(5), "player_move", { move: "e4" });
-        expect(await run(game.at(70), "status")).toMatch(/Game over: 1-0, Black lost on time\. Archived in games\//);
+        expect(await run(game.at(70), "status")).toMatch(/Game over: 1-0, Black lost on time\. Saved with the player's games\./);
         await expect(run(game.at(71), "ai_move", { move: "e5", plan: "Too late." })).rejects.toThrow(/The game is over \(1-0, Black lost on time\)/);
         expect(readdirSync(join(gameFolder(game.context.home()), "games"))).toHaveLength(1);
     });

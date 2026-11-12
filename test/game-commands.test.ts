@@ -216,7 +216,7 @@ describe("a game in chat", () => {
             "A game is going on, at move 1: end it with end_game, or call new_game with replace: true, which archives it unfinished. Nothing changed.",
         );
 
-        expect(await run(context, "new_game", { ai_colour: "black", replace: true })).toContain(`The game before is in ${archive}, unfinished.`);
+        expect(await run(context, "new_game", { ai_colour: "black", replace: true })).toContain("The game before is saved with the player's games, unfinished.");
         expect(readArchive(context)).toContain('[Result "*"]');
         expect(readArchive(context)).toContain("1. e4 {The king's pawn. [%plan Take the centre.]} *");
         // Started in the same second, the new game takes the next one: its name in the archive is its own.
@@ -246,7 +246,7 @@ describe("a game in chat", () => {
         rmSync(games);
 
         expect(await run(context, "new_game", { ai_colour: "white" })).toContain(
-            `New game: you play White, the player Black, at the strong level (board, tactical and positional facts).\nThe game before is in ${archive}.\n`,
+            `New game: you play White, the player Black, at the strong level (board, tactical and positional facts).\nThe game before is saved with the player's games.\n`,
         );
         expect(readArchive(context)).toContain("[%plan Mate.]");
     });
@@ -262,12 +262,13 @@ describe("a game in chat", () => {
             await run(at("2026-10-25T00:30:00Z"), "new_game", { ai_colour: "black" });
             await run(at("2026-10-25T00:30:00Z"), "player_move", { move: "e4" });
 
-            expect(await run(at("2026-10-25T01:30:00Z"), "new_game", { ai_colour: "black", replace: true })).toContain("The game before is in games/2026-10-25-023000.pgn");
+            expect(await run(at("2026-10-25T01:30:00Z"), "new_game", { ai_colour: "black", replace: true })).toContain("The game before is saved with the player's games, unfinished.");
+            expect(readdirSync(join(gameFolder(context.home()), "games"))).toEqual(["2026-10-25-023000.pgn"]);
             expect(gameFile(context).started).toBe("2026-10-25T01:30:01.000Z");
             await run(at("2026-10-25T01:30:01Z"), "player_move", { move: "e4" });
 
             // The clock set back an hour: 02:30:00 is taken in the archive, 02:30:01 by the game going on.
-            expect(await run(at("2026-10-25T00:30:00Z"), "new_game", { ai_colour: "black", replace: true })).toContain("The game before is in games/2026-10-25-023001.pgn");
+            expect(await run(at("2026-10-25T00:30:00Z"), "new_game", { ai_colour: "black", replace: true })).toContain("The game before is saved with the player's games, unfinished.");
             expect(gameFile(context).started).toBe("2026-10-25T00:30:02.000Z");
             expect(readdirSync(join(gameFolder(context.home()), "games"))).toEqual(["2026-10-25-023000.pgn", "2026-10-25-023001.pgn"]);
         } finally {
@@ -304,7 +305,7 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "g4" });
 
         expect(await run(context, "ai_move", { move: "Qh4+", plan: "Mate.", comment: "The fool's mate.", offer_draw: true })).toBe(
-            `Played 2...♛h4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Archived in ${archive}.\n`
+            `Played 2...♛h4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Saved with the player's games.\n`
                 + "No board page is open: copy this board into your message.\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n8 ♜ ♞ ♝ ⊙ ♚ ♝ ♞ ♜ 8\n7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7\n6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6\n5 ⊙ ⊙ ⊙ ⊙ ♟︎ ⊙ ⊙ ⊙ 5\n"
                 + "4 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ♛ 4\n3 ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ⊙ ⊙ 3\n2 ♙ ♙ ♙ ♙ ♙ ⊙ ⊙ ♙ 2\n1 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 1\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n"
                 + "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one "
@@ -316,7 +317,7 @@ describe("a game in chat", () => {
         expect(readArchive(context)).not.toContain("(=)");
         expect(gameFile(context).drawOffer).toBeUndefined();
         await expect(run(context, "player_move", { move: "a3" })).rejects.toThrow("The game is over (0-1, checkmate): new_game starts another. Nothing changed.");
-        expect(await run(context, "status")).toContain(`Moves: 1.f3 e5 2.g4 ♛h4#\nGame over: 0-1, checkmate. Archived in ${archive}.`);
+        expect(await run(context, "status")).toContain(`Moves: 1.f3 e5 2.g4 ♛h4#\nGame over: 0-1, checkmate. Saved with the player's games.`);
         expect(await run(context, "new_game", { ai_colour: "white" })).toContain("New game: you play White");
     });
 
@@ -330,7 +331,7 @@ describe("a game in chat", () => {
         };
 
         expect(await ended("player_resigns")).toBe(
-            `Game over: 0-1, White resigns. Archived in ${archive}.\nNext: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one `
+            `Game over: 0-1, White resigns. Saved with the player's games.\nNext: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one `
                 + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.",
         );
         expect(await ended("ai_resigns")).toContain("Game over: 1-0, Black resigns.");

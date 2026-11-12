@@ -214,7 +214,8 @@ function clockLines(game: GameSummary): string[]
 function whereLine(game: GameSummary): string
 {
     if (game.end !== undefined) {
-        const archived = game.end.archive === undefined ? "" : ` Archived in ${game.end.archive}.`;
+        // Saved where the player's games are: the AI says so, never the file, which past_games names when it is needed.
+        const archived = game.end.archive === undefined ? "" : " Saved with the player's games.";
         return `Game over: ${endText(game.end)}.${archived}`;
     }
 
