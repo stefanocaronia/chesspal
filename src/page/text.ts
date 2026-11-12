@@ -29,7 +29,9 @@ export interface Text
     readonly declineDraw: string;
     readonly declineDrawTitle: string;
     readonly resign: string;
+    /** The header's question once the flag is pressed, and its answer that plays on. */
     readonly resignGame: string;
+    readonly keepPlaying: string;
     readonly settings: string;
     readonly close: string;
     readonly look: string;
@@ -569,6 +571,7 @@ const english: Text = {
     declineDrawTitle: "Decline: moving declines it too",
     resign: "Resign",
     resignGame: "Resign this game?",
+    keepPlaying: "Play on",
     settings: "Settings",
     close: "Close",
     look: "Look",
@@ -1004,6 +1007,7 @@ const italian: Text = {
     declineDrawTitle: "Rifiuta: anche muovere rifiuta",
     resign: "Abbandona",
     resignGame: "Abbandonare la partita?",
+    keepPlaying: "Continua",
     settings: "Impostazioni",
     close: "Chiudi",
     look: "Aspetto",

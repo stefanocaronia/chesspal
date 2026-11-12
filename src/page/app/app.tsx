@@ -332,11 +332,8 @@ export function App({ start }: { start: Settings; })
         canOffer: offer === undefined && pending === undefined && live.position.turn !== played.ai && total >= 2,
         onOffer: () => act("/api/draw", { action: "offer" }),
         onAnswer: (accept) => act("/api/draw", { action: accept ? "accept" : "decline" }),
-        onResign: () => {
-            if (confirm(text.resignGame)) {
-                act("/api/resign", {});
-            }
-        },
+        // The header asks first, in its own words (D-65).
+        onResign: () => act("/api/resign", {}),
     };
 
     const { kind, verdict } = aborted && phase === "over" ? { kind: "over" as const, verdict: text.aborted } : verdictOf(phase, how, winner, offer, declined, text);

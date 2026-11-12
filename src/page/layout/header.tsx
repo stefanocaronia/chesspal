@@ -1,6 +1,7 @@
 // The page's header: the Torretta and the name, the word on a game over or on the AI's draw offer, the player's draw and resignation, then the commands for
 // the board, the sounds, the theme and the settings, and the player's picture.
 import type { ComponentChildren } from "preact";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { VerdictKind } from "../app/phase.ts";
 import { PlayerPicture } from "../avatars/avatars.tsx";
 import { Torretta } from "../avatars/torretta.tsx";
@@ -17,12 +18,13 @@ export interface GameActions
     readonly canOffer: boolean;
     onOffer(): void;
     onAnswer(accept: boolean): void;
+    /** Resigns at once: the header has asked the player already. */
     onResign(): void;
 }
 
 /**
  * The header, with how a game over ended, or that none goes on (D-77), or the AI's draw offer with the player's answer, the player's draw
- * and resignation in a game going on (D-65), a new game once the page has the folder's, the command that turns the board round and says whether it is
+ * and resignation in a game going on (D-65), which the header asks to confirm in the place of the word and the commands, a new game once the page has the folder's, the command that turns the board round and says whether it is
  * turned, on the table the mark of a newer Chesspal (D-108), the switches of the sounds and the theme, the gear of the settings (D-56) and the book of
  * the guide.
  */
@@ -55,20 +57,45 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
     onUpdate?: () => void;
 })
 {
+    // The flag pressed asks the player in the header, as the AI's draw offer does; a game that ends meanwhile drops the question.
+    const [resigning, setResigning] = useState(false);
+    const asking = resigning && actions !== undefined;
+    // After "play on" the flag takes the focus back.
+    const backToFlag = useRef(false);
+
+    useEffect(() => {
+        if (actions === undefined) {
+            setResigning(false);
+        }
+    }, [actions === undefined]);
+
+    const answer = (resign: boolean): void => {
+        setResigning(false);
+        backToFlag.current = !resign;
+
+        if (resign) {
+            actions?.onResign();
+        }
+    };
+
+    const shownKind = asking ? "over" : kind;
+    const shownVerdict = asking ? text.resignGame : verdict;
+    const shownWho = asking ? undefined : who;
+
     return (
         <header class="top">
             <Torretta size={34} />
             <b class="title">Chesspal</b>
-            <p class={`verdict${kind === undefined ? "" : ` ${kind}`}`} role="status">
-                {verdict === undefined || kind === undefined ? null : <Icon class="kind">{kindIcons[kind]}</Icon>}
-                {who === undefined || verdict === undefined ? verdict : (
+            <p class={`verdict${shownKind === undefined ? "" : ` ${shownKind}`}`} role="status">
+                {shownVerdict === undefined || shownKind === undefined ? null : <Icon class="kind">{kindIcons[shownKind]}</Icon>}
+                {shownWho === undefined || shownVerdict === undefined ? shownVerdict : (
                     <>
-                        <span class="ai-name">{who}</span>
-                        <span>{verdict}</span>
+                        <span class="ai-name">{shownWho}</span>
+                        <span>{shownVerdict}</span>
                     </>
                 )}
             </p>
-            {actions === undefined ? null : <Actions actions={actions} text={text} />}
+            {actions === undefined ? null : asking ? <ResignQuestion onAnswer={answer} text={text} /> : <Actions actions={actions} onResign={() => setResigning(true)} backToFlag={backToFlag} text={text} />}
             {onNewGame === undefined ? null : (
                 <button class={standOut ? "command primary" : "command"} type="button" title={text.newGame} onClick={onNewGame}>
                     <Icon class="new">
@@ -133,10 +160,18 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
     );
 }
 
-/** The answer to the AI's draw offer while it stands, else the player's own offer; then the resignation. */
-function Actions({ actions, text }: { actions: GameActions; text: Text; })
+/** The answer to the AI's draw offer while it stands, else the player's own offer; then the flag, which asks before the player resigns. */
+function Actions({ actions, onResign, backToFlag, text }: { actions: GameActions; onResign: () => void; backToFlag: { current: boolean; }; text: Text; })
 {
-    const { offer, canOffer, onOffer, onAnswer, onResign } = actions;
+    const { offer, canOffer, onOffer, onAnswer } = actions;
+    const flag = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        if (backToFlag.current) {
+            backToFlag.current = false;
+            flag.current?.focus();
+        }
+    }, []);
 
     return (
         <>
@@ -173,11 +208,47 @@ function Actions({ actions, text }: { actions: GameActions; text: Text; })
                         <span>{text.offerDraw}</span>
                     </button>
                 )}
-            <button class="command" type="button" title={text.resign} onClick={onResign}>
+            <button ref={flag} class="command" type="button" title={text.resign} onClick={onResign}>
                 <Icon class="resign">
                     <path d="M6 21V4M6 4H18L15.5 8.5L18 13H6" />
                 </Icon>
                 <span>{text.resign}</span>
+            </button>
+        </>
+    );
+}
+
+/** The question the flag asks, as the answer to a draw offer: resign, or play on, which has the focus and Esc too. */
+function ResignQuestion({ onAnswer, text }: { onAnswer: (resign: boolean) => void; text: Text; })
+{
+    const playOn = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        playOn.current?.focus();
+
+        const escape = (event: KeyboardEvent): void => {
+            if (event.key === "Escape") {
+                onAnswer(false);
+            }
+        };
+
+        window.addEventListener("keydown", escape);
+        return () => window.removeEventListener("keydown", escape);
+    }, []);
+
+    return (
+        <>
+            <button class="command answer" type="button" title={text.resign} onClick={() => onAnswer(true)}>
+                <Icon class="accept">
+                    <path d="M5 12.5L10 17L19 7" />
+                </Icon>
+                <span>{text.resign}</span>
+            </button>
+            <button ref={playOn} class="command answer" type="button" title={text.keepPlaying} onClick={() => onAnswer(false)}>
+                <Icon class="decline">
+                    <path d="M7 7L17 17M17 7L7 17" />
+                </Icon>
+                <span>{text.keepPlaying}</span>
             </button>
         </>
     );
