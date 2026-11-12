@@ -1,11 +1,19 @@
-/* The guide: a tall dialog, an index of chips, each part folding under its title, and the foot with who made Chesspal and the credits (Zoe) */
+/* The guide: a wide dialog, the index of its pages beside the page shown, and at the dialog's foot, on every page, the arrows to the one before and after
+   (Zoe) */
 
 .dialog:has(> .guide) {
+    width: min(900px, calc(100vw - 32px));
     height: calc(100vh - 48px);
     max-height: 90vh;
 }
 
+/* As tall as the dialog under its title, so that a short page keeps its arrows at the foot */
 .guide {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+    min-height: calc(100% - 60px);
     font-size: 14px;
     line-height: 1.55;
 }
@@ -36,74 +44,69 @@
     font-size: 13px;
 }
 
-/* A heading a chip or a link brings into sight stays under the dialog's own title */
+/* A heading a link brings into sight stays under the dialog's own title */
 .guide [id] {
     scroll-margin-top: 64px;
 }
 
+/* The index: the pages' titles, the one shown marked by a bar at its start; it stays in sight while the page scrolls */
 .guide-index {
+    position: sticky;
+    top: 60px;
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 4px 0 14px;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 4px;
 }
 
 .guide-chip {
     min-height: 32px;
-    padding: 5px 12px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: var(--card);
-    color: var(--ink);
+    padding: 6px 12px;
+    border: 0;
+    border-radius: 0 8px 8px 0;
+    background: none;
+    color: var(--soft);
     font: inherit;
-    font-size: 13px;
+    font-size: 13.5px;
+    text-align: start;
+    cursor: pointer;
 }
 
 .guide-chip:hover {
-    border-color: var(--accent);
-    color: var(--accent);
+    color: var(--ink);
 }
 
-/* A part: its title, a chevron that turns when it opens */
-.guide-part {
-    border-top: 1px solid var(--line);
-}
-
-.guide-part summary {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 0;
-    cursor: pointer;
-    list-style: none;
-}
-
-.guide-part summary::-webkit-details-marker {
-    display: none;
-}
-
-.guide-part summary::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    border-right: 1.7px solid var(--soft);
-    border-bottom: 1.7px solid var(--soft);
-    transform: rotate(-45deg);
-    transition: transform 0.15s;
-}
-
-.guide-part[open] summary::before {
-    transform: rotate(45deg);
-}
-
-.guide-part h3 {
-    margin: 0;
-    font-size: 16px;
+.guide-chip[aria-current="page"] {
+    background: var(--quote);
+    box-shadow: inset 3px 0 0 var(--accent);
+    color: var(--ink);
     font-weight: 600;
 }
 
-.guide-part[open] {
-    padding-bottom: 6px;
+.guide-page {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+}
+
+/* The page's text grows to push the arrows to the foot */
+.guide-text {
+    flex: 1 0 auto;
+    margin-bottom: 22px;
+}
+
+/* The page's title takes the focus when the page turns, for a screen reader: no ring, since no key brought it there */
+.guide-page h3 {
+    margin: 4px 0 12px;
+    font-size: 19px;
+    font-weight: 600;
+    outline: none;
+}
+
+.guide-page h4 {
+    margin: 16px 0 6px;
+    font-size: 15px;
+    font-weight: 600;
 }
 
 .guide-table {
@@ -123,22 +126,99 @@
     vertical-align: top;
 }
 
-/* The foot: the credits */
-.guide-foot {
-    margin-top: 18px;
-    padding-top: 14px;
+/* The arrows to the page before and after, each with its title: at the foot of a short page, and at the dialog's foot over a long one */
+.guide-turn {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    gap: 12px;
+    padding: 14px 0 4px;
     border-top: 1px solid var(--line);
-    color: var(--soft);
-    font-size: 12.5px;
+    background: var(--card);
 }
 
-.guide-foot h3 {
-    margin: 0 0 6px;
-    font-size: 13px;
+.guide-turn button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13.5px;
+    cursor: pointer;
 }
 
-.guide-foot ul {
-    margin: 0;
+.guide-turn button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.guide-turn .next {
+    margin-inline-start: auto;
+}
+
+.guide-turn .icon {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* On a narrow screen the index is one row of chips over the page, scrolled sideways, its end fading where more follow; the arrows share the page's
+   width at its foot, each title by its arrow */
+@media (max-width: 640px) {
+    .guide {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 1fr;
+        gap: 14px;
+    }
+
+    .guide-index {
+        position: static;
+        flex-direction: row;
+        gap: 6px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    }
+
+    .guide-index::-webkit-scrollbar {
+        display: none;
+    }
+
+    .guide-chip {
+        flex: none;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+
+    .guide-chip[aria-current="page"] {
+        box-shadow: none;
+        border-color: var(--accent);
+    }
+
+    .guide-turn {
+        position: static;
+    }
+
+    .guide-turn button {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .guide-turn .next {
+        justify-content: flex-end;
+        text-align: end;
+    }
 }
 
 @media (max-width: 600px) {

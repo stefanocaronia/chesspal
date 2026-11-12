@@ -52,19 +52,7 @@ export function Wizard({ text, hasGame, account, dataFolder, onMade }: {
     );
 }
 
-/** The player's picture on their card: a click opens their profile; a mark on it says so where nothing hovers. */
-export function PictureButton({ profile, onOpen, text }: { profile: ProfileShown; onOpen: () => void; text: Text; })
-{
-    return (
-        <button class="me" type="button" title={text.profile.editProfile} aria-label={text.profile.yourPicture} aria-haspopup="dialog" onClick={onOpen}>
-            <PlayerPicture profile={profile} />
-            <span class="me-cover">{pencilIcon}</span>
-            <span class="me-badge">{pencilIcon}</span>
-        </button>
-    );
-}
-
-/** The player's name on their card: a click opens the menu of the players. */
+/** The player's name on their card: a click opens the menu of the players, as their picture in the header does; from there the pencil opens their profile. */
 export function NameButton({ profile, onOpen, text }: { profile: ProfileShown; onOpen: () => void; text: Text; })
 {
     return (

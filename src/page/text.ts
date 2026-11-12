@@ -219,8 +219,11 @@ export interface Text
 export interface GuideText
 {
     readonly title: string;
-    /** The index of its parts, for a screen reader. */
+    /** The index of its pages, for a screen reader. */
     readonly contents: string;
+    /** The arrows at a page's foot, for a screen reader: the previous page, the next. */
+    readonly previous: string;
+    readonly next: string;
     readonly credits: string;
     /** The credits, as the README has them: each a line, with its links in markdown. */
     readonly creditLines: readonly string[];
@@ -421,9 +424,8 @@ export interface ProfileText
     readonly back: string;
     /** The profile window's title. */
     readonly yourProfile: string;
-    /** On the player's picture and the pencil beside them in the menu. */
+    /** On the pencil beside the player in the menu. */
     readonly editProfile: string;
-    readonly yourPicture: string;
     readonly avatars: Readonly<Record<AvatarId, string>>;
     readonly whilePlaying: string;
     /** Above the names on Lichess and Chess.com and the FIDE rating, in the wizard and the profile window. */
@@ -769,7 +771,6 @@ const english: Text = {
         back: "Back",
         yourProfile: "Your profile",
         editProfile: "Edit your profile",
-        yourPicture: "Your picture: edit your profile",
         avatars: { "short-hair": "Short hair", bun: "Bun", glasses: "Glasses", beanie: "Beanie", beard: "Beard", curls: "Curls", moustache: "Moustache", "silver-bob": "Silver bob", cat: "Cat", owl: "Owl" },
         whilePlaying: "Finish the game, or resign, before changing player.",
         accounts: "Do you play on Lichess, Chess.com or in FIDE tournaments?",
@@ -919,6 +920,8 @@ const english: Text = {
     guide: {
         title: "Guide",
         contents: "Contents",
+        previous: "Previous page",
+        next: "Next page",
         credits: "Credits",
         creditLines: [
             "The rules: [chess.js](https://github.com/jhlywa/chess.js), under the BSD 2-Clause license.",
@@ -1177,7 +1180,6 @@ const italian: Text = {
         back: "Indietro",
         yourProfile: "Il tuo profilo",
         editProfile: "Modifica il profilo",
-        yourPicture: "La tua immagine: modifica il profilo",
         avatars: { "short-hair": "Capelli corti", bun: "Chignon", glasses: "Occhiali", beanie: "Berretto", beard: "Barba", curls: "Ricci", moustache: "Baffi", "silver-bob": "Caschetto grigio", cat: "Gatto", owl: "Gufo" },
         whilePlaying: "Finisci la partita, o abbandona, prima di cambiare giocatore.",
         accounts: "Giochi su Lichess, Chess.com o nei tornei FIDE?",
@@ -1327,6 +1329,8 @@ const italian: Text = {
     guide: {
         title: "Guida",
         contents: "Indice",
+        previous: "Pagina precedente",
+        next: "Pagina seguente",
         credits: "Crediti",
         creditLines: [
             "Le regole: [chess.js](https://github.com/jhlywa/chess.js), con licenza BSD 2-Clause.",

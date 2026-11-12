@@ -233,65 +233,6 @@
     background: var(--say);
 }
 
-.me {
-    position: relative;
-    flex: none;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: none;
-    line-height: 0;
-    cursor: pointer;
-}
-
-.me-cover {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.45);
-    color: #fff;
-    opacity: 0;
-    transition: opacity 0.12s;
-}
-
-.me-cover .icon {
-    width: 45%;
-    height: 45%;
-}
-
-.me:hover .me-cover,
-.me:focus-visible .me-cover {
-    opacity: 1;
-}
-
-/* Where nothing hovers, a camera in the corner says the picture changes */
-.me-badge {
-    position: absolute;
-    right: -2px;
-    bottom: -2px;
-    display: none;
-    place-items: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--on-accent);
-    box-shadow: 0 0 0 2px var(--card);
-}
-
-.me-badge .icon {
-    width: 12px;
-    height: 12px;
-}
-
-@media (hover: none) {
-    .me-badge {
-        display: grid;
-    }
-}
-
 .profile-name {
     display: inline-flex;
     align-items: center;

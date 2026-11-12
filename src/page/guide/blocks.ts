@@ -1,4 +1,5 @@
-// The markdown the guide is written in, read into blocks: headings, paragraphs, lists, tables, quotes, code; its comments left out. markdown.tsx draws them.
+// The markdown the guide is written in, read into blocks: headings, paragraphs, lists, tables, quotes, code and drawings; its comments left out. markdown.tsx
+// draws them.
 // Copied from rpg-engine's guide (src/dashboard/help/blocks.ts), without the headings' icons and the cards' previews.
 
 /** A block of a markdown text. */
@@ -9,6 +10,8 @@ export type Block =
     | { kind: "table"; head: string[]; rows: string[][]; }
     | { kind: "quote"; blocks: Block[]; }
     | { kind: "code"; text: string; }
+    /** A drawing of the guide, on a line of its own: ![what it shows](its name). */
+    | { kind: "drawing"; name: string; alt: string; }
     | { kind: "rule"; };
 
 /** The blocks of a markdown text. */
@@ -32,8 +35,12 @@ export function markdownBlocks(text: string): Block[]
 
     for (let line = lines[index]; line !== undefined; line = lines[index]) {
         const heading = /^(#{1,6})\s+(.*?)\s*$/.exec(line);
+        const drawing = drawingOf(line);
 
         if (line.trim() === "") {
+            index += 1;
+        } else if (drawing !== undefined) {
+            blocks.push(drawing);
             index += 1;
         } else if (heading !== null) {
             blocks.push({ kind: "heading", level: heading[1]?.length ?? 1, text: heading[2] ?? "" });
@@ -56,7 +63,7 @@ export function markdownBlocks(text: string): Block[]
             const items = run((one) => one.trim() !== "" && (listItem(one)?.ordered === ordered || (listItem(one) === undefined && /^\s/.test(one))));
             blocks.push({ kind: "list", ordered, items: items.reduce<string[]>((all, one) => (listItem(one) === undefined ? [...all.slice(0, -1), `${all.at(-1) ?? ""} ${one.trim()}`] : [...all, listItem(one)?.text ?? ""]), []) });
         } else {
-            const paragraph = run((one) => one.trim() !== "" && !/^(#{1,6}\s|```|>|\|)/.test(one) && listItem(one) === undefined);
+            const paragraph = run((one) => one.trim() !== "" && !/^(#{1,6}\s|```|>|\|)/.test(one) && listItem(one) === undefined && drawingOf(one) === undefined);
             blocks.push({ kind: "paragraph", text: paragraph.map((one) => one.trim()).join(" ") });
         }
     }
@@ -68,6 +75,13 @@ export function markdownBlocks(text: string): Block[]
 export function anchorOf(heading: string): string
 {
     return heading.trim().toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, "").replace(/\s/g, "-");
+}
+
+/** A drawing on a line of its own: ![what it shows](its name); undefined for another line. */
+function drawingOf(line: string): Extract<Block, { kind: "drawing"; }> | undefined
+{
+    const drawing = /^!\[([^\]]*)\]\(([\w-]+)\)$/.exec(line.trim());
+    return drawing === null ? undefined : { kind: "drawing", name: drawing[2] ?? "", alt: drawing[1] ?? "" };
 }
 
 /** A list item's mark and text: - text, or 1. text; undefined for another line. */

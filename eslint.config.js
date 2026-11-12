@@ -75,7 +75,7 @@ export default [
             }],
         },
     },
-    // The page runs in the browser: it uses the chess core and asks the server for the rest. Its files sit in src/page and in one level of folders below.
+    // The page runs in the browser: it uses the chess core and asks the server for the rest. Its files sit in src/page and in two levels of folders below.
     {
         files: ["src/page/*.ts", "src/page/*.tsx"],
         rules: {
@@ -94,6 +94,17 @@ export default [
                 patterns: [
                     { group: ["node:*", ...builtinModules], message: "The page runs in the browser: no Node." },
                     { regex: "^\\.\\./\\.\\./(?!core/index\\.ts$)", message: "The page imports only its own files and the chess core: the rest it asks the server for." },
+                ],
+            }],
+        },
+    },
+    {
+        files: ["src/page/*/*/**/*.ts", "src/page/*/*/**/*.tsx"],
+        rules: {
+            "no-restricted-imports": ["error", {
+                patterns: [
+                    { group: ["node:*", ...builtinModules], message: "The page runs in the browser: no Node." },
+                    { regex: "^\\.\\./\\.\\./\\.\\./(?!core/index\\.ts$)", message: "The page imports only its own files and the chess core: the rest it asks the server for." },
                 ],
             }],
         },

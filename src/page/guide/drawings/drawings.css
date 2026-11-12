@@ -1,0 +1,329 @@
+/* The guide's drawings (Zoe): sketches of the page on its own ground, every colour from the theme, so one drawing serves light and dark */
+
+.guide-drawing {
+    max-width: 520px;
+    margin: 6px auto 16px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--page);
+}
+
+.guide-art {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 480 / 220;
+}
+
+/* The page's cards and what is written on them, as bars */
+.guide-art .paper {
+    fill: var(--card);
+    stroke: var(--line);
+    stroke-width: 1.5;
+}
+
+.guide-art .quote {
+    fill: var(--quote);
+}
+
+.guide-art .words {
+    fill: var(--say);
+}
+
+.guide-art .field {
+    fill: var(--page);
+    stroke: var(--line);
+    stroke-width: 1.5;
+}
+
+.guide-art .bar {
+    fill: color-mix(in oklab, var(--soft) 45%, var(--card));
+}
+
+.guide-art .bar.strong {
+    fill: color-mix(in oklab, var(--ink) 70%, var(--card));
+}
+
+.guide-art .bar.on-words {
+    fill: color-mix(in oklab, var(--say-ink) 55%, var(--say));
+}
+
+.guide-art .rule {
+    stroke: var(--line);
+    stroke-width: 1.5;
+}
+
+.guide-art .bullet {
+    fill: color-mix(in oklab, var(--soft) 60%, var(--card));
+}
+
+.guide-art .button,
+.guide-art .soft-line {
+    fill: none;
+    stroke: var(--soft);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+}
+
+/* What the page speaks of, in the accent */
+.guide-art .accent {
+    fill: var(--accent);
+}
+
+.guide-art .bar.on-last {
+    fill: color-mix(in oklab, var(--fixed-ink) 70%, transparent);
+}
+
+.guide-art .bar.on-accent {
+    fill: var(--on-accent);
+}
+
+.guide-art .accent-line,
+.guide-art .on-accent-line,
+.guide-art .thread {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.guide-art .on-accent-line {
+    stroke: var(--on-accent);
+    stroke-width: 2;
+}
+
+/* The tick of the player in use and the pencil to their profile, as the window of the players draws them */
+.guide-art .tick,
+.guide-art .pencil {
+    fill: none;
+    stroke: var(--accent);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.guide-art .tick {
+    stroke-width: 2;
+}
+
+.guide-art .pencil {
+    stroke-width: 2.4;
+}
+
+
+.guide-art .knot,
+.guide-art .caret {
+    fill: var(--accent);
+}
+
+.guide-art .focused,
+.guide-art .call {
+    fill: var(--card);
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+
+.guide-art .call-square,
+.guide-art .chosen {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+}
+
+.guide-art .chosen {
+    stroke-width: 2.5;
+}
+
+/* The board and what the page draws on it */
+.guide-art .light {
+    fill: var(--light-square);
+}
+
+.guide-art .dark {
+    fill: var(--dark-square);
+}
+
+.guide-art .last {
+    fill: var(--last-move);
+}
+
+.guide-art .hint {
+    fill: var(--hint);
+}
+
+.guide-art .over {
+    fill: none;
+    stroke: var(--hover-edge);
+    stroke-width: 2.5;
+}
+
+.guide-art .ghost {
+    opacity: var(--ghost);
+}
+
+.guide-art .lift-shadow {
+    fill: var(--lift-shadow);
+    opacity: 0.6;
+}
+
+.guide-art .pointer {
+    fill: var(--ink);
+    stroke: var(--card);
+    stroke-width: 1.2;
+    stroke-linejoin: round;
+}
+
+.guide-art .drawn {
+    stroke: var(--help-halo);
+    stroke-width: 1.2;
+    stroke-linejoin: round;
+    opacity: 0.85;
+}
+
+.guide-art .drawn.green {
+    fill: var(--drawn-green);
+}
+
+.guide-art .help-halo,
+.guide-art .help-line {
+    fill: none;
+    stroke-linecap: round;
+}
+
+.guide-art .help-halo {
+    stroke: var(--help-halo);
+    stroke-width: 4.5;
+}
+
+.guide-art .help-line {
+    stroke: var(--help-line);
+    stroke-width: 2.2;
+    stroke-dasharray: 5 4;
+}
+
+.guide-art .danger {
+    fill: var(--drawn-red);
+}
+
+.guide-art .danger-line {
+    stroke: var(--drawn-red);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+.guide-art .danger-dot {
+    fill: var(--help-on);
+}
+
+.guide-art .danger-row {
+    fill: color-mix(in oklab, var(--drawn-red) 12%, var(--card));
+}
+
+/* The move badges: a disc in the colour of the judgement, a white sign */
+.guide-art .judgement.best {
+    fill: var(--badge-best);
+}
+
+.guide-art .judgement.mistake {
+    fill: var(--badge-mistake);
+}
+
+.guide-art .judgement.blunder {
+    fill: var(--badge-blunder);
+}
+
+.guide-art .sign {
+    fill: none;
+    stroke: var(--badge-ink);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.guide-art .sign .dot {
+    fill: var(--badge-ink);
+    stroke: none;
+}
+
+.guide-art .clock {
+    fill: none;
+    stroke: var(--soft);
+    stroke-width: 1.3;
+    stroke-linecap: round;
+}
+
+.guide-art .clock.on-accent {
+    stroke: var(--on-accent);
+}
+
+/* The Torretta, and the players' faces on their discs */
+.guide-art .tower .antenna {
+    fill: none;
+    stroke: var(--torretta-shade);
+    stroke-width: 4;
+    stroke-linecap: round;
+}
+
+.guide-art .tower .light-bulb {
+    fill: var(--torretta-light);
+}
+
+.guide-art .tower .shade {
+    fill: var(--torretta-shade);
+}
+
+.guide-art .tower .body {
+    fill: var(--torretta-body);
+}
+
+.guide-art .tower .screen {
+    fill: var(--torretta-screen);
+}
+
+.guide-art .tower .features {
+    fill: var(--torretta-face);
+}
+
+.guide-art .person {
+    fill: var(--card);
+}
+
+.guide-art .tone-player {
+    fill: var(--badge-brilliant);
+}
+
+.guide-art .tone-1 {
+    fill: var(--badge-great);
+}
+
+.guide-art .tone-2 {
+    fill: var(--badge-book);
+}
+
+.guide-art .tone-3 {
+    fill: var(--badge-excellent);
+}
+
+.guide-art .tone-4 {
+    fill: var(--badge-miss);
+}
+
+.guide-art .tone-5 {
+    fill: var(--badge-note);
+}
+
+.guide-art .tone-6 {
+    fill: var(--badge-mistake);
+}
+
+.guide-art .tone-7 {
+    fill: var(--badge-good);
+}
+
+.guide-art .tone-8 {
+    fill: var(--badge-inaccuracy);
+}
+
+.guide-art .tone-9 {
+    fill: var(--torretta-body);
+}

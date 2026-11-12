@@ -1,11 +1,11 @@
-// The guide, from the book in the header: how to play, in the page's language (guide/<code>.md), an index of chips, its parts folding, the first two
-// open, and its foot; its anchors are the English guide's, so that a link finds its heading in both languages.
-import { useEffect, useMemo, useState } from "preact/hooks";
+// The guide, from the book in the header: how to play, in the page's language (guide/<code>.md), a page at a time, chosen in its index or with the arrows at
+// its foot, the credits the last; its anchors are the English guide's, so that a link finds its heading in both languages.
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Dialog } from "../dialogs/dialog.tsx";
 import type { Text } from "../text.ts";
 import { anchorOf, type Block, markdownBlocks } from "./blocks.ts";
-import { GuideFoot } from "./foot.tsx";
-import { Blocks, Inline } from "./markdown.tsx";
+import { GuideCredits } from "./credits.tsx";
+import { Blocks } from "./markdown.tsx";
 
 /** The guide in its dialog. */
 export function GuideDialog({ open, onClose, text }: { open: boolean; onClose: () => void; text: Text; })
@@ -17,8 +17,8 @@ export function GuideDialog({ open, onClose, text }: { open: boolean; onClose: (
     );
 }
 
-/** A part of the guide: its heading and its blocks. */
-interface Part
+/** A page of the guide: its heading and its blocks. */
+interface Page
 {
     heading: Extract<Block, { kind: "heading"; }>;
     blocks: Block[];
@@ -26,57 +26,99 @@ interface Part
 
 function Guide({ text }: { text: Text; })
 {
+    const words = text.guide;
     const guide = useGuide(text.language);
-    const [open, setOpen] = useState(() => new Set([0, 1]));
+    const { lead, pages, anchors } = useMemo(() => guidePages(guide.own, guide.english), [guide]);
+    const [shown, setShown] = useState(0);
+    // The heading to bring into sight once its page is drawn: "" for the page's top.
     const [sought, setSought] = useState<string>();
-    const { lead, parts, anchors } = useMemo(() => guideParts(guide.own, guide.english), [guide]);
+    const top = useRef<HTMLDivElement>(null);
+    const title = useRef<HTMLHeadingElement>(null);
+    const titles = [...pages.map((page) => page.heading.text), words.credits];
+    const page = pages[shown];
 
-    const toggle = (index: number, event: MouseEvent): void => {
-        event.preventDefault();
-        setOpen((before) => new Set(before.has(index) ? [...before].filter((one) => one !== index) : [...before, index]));
+    const show = (index: number, id = ""): void => {
+        setShown(index);
+        setSought(id);
     };
 
-    // A chip of the index, or a link to a heading, opens its part and brings the heading into sight.
-    const go = (id: string): void => {
-        const index = parts.findIndex((part) => [part.heading, ...part.blocks].some((block) => anchors.get(block) === id));
+    // A link to a heading shows its page, and the heading in it.
+    const go = (anchor: string): void => {
+        const id = idOf(anchor);
+        const index = pages.findIndex((one) => [one.heading, ...one.blocks].some((block) => anchors.get(block) === id));
 
         if (index >= 0) {
-            setOpen((before) => new Set([...before, index]));
-            setSought(id);
+            show(index, id);
         }
     };
 
-    const goToAnchor = (anchor: string): void => go(idOf(anchor));
-
+    // A page turned: its chip in sight in the index, the focus on its title, which a screen reader says, and its top or the heading sought in sight.
     useEffect(() => {
         if (sought === undefined) {
             return;
         }
 
         setSought(undefined);
-        document.getElementById(sought)?.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        top.current?.querySelector(".guide-chip[aria-current]")?.scrollIntoView({ inline: "center", block: "nearest" });
+        title.current?.focus({ preventScroll: true });
+        const heading = sought === "" ? null : document.getElementById(sought);
+
+        if (heading === null) {
+            top.current?.closest("dialog")?.scrollTo({ top: 0 });
+        } else {
+            heading.scrollIntoView({ block: "start" });
+        }
     }, [sought]);
 
+    if (pages.length === 0) {
+        return <div class="guide" ref={top} />;
+    }
+
     return (
-        <div class="guide">
-            <Blocks blocks={lead} anchors={anchors} go={goToAnchor} />
-            <nav class="guide-index" aria-label={text.guide.contents}>
-                {parts.map((part) => (
-                    <button key={part.heading.text} type="button" class="guide-chip" onClick={() => go(anchors.get(part.heading) ?? "")}>
-                        <Inline text={part.heading.text} go={goToAnchor} />
+        <div class="guide" ref={top}>
+            <nav class="guide-index" aria-label={words.contents}>
+                {titles.map((title, index) => (
+                    <button key={title} type="button" class="guide-chip" aria-current={index === shown ? "page" : undefined} onClick={() => show(index)}>
+                        {title}
                     </button>
                 ))}
             </nav>
-            {parts.map((part, index) => (
-                <details key={part.heading.text} id={anchors.get(part.heading)} class="guide-part" open={open.has(index)}>
-                    <summary onClick={(event) => toggle(index, event)}>
-                        <h3>{part.heading.text}</h3>
-                    </summary>
-                    <Blocks blocks={part.blocks} anchors={anchors} go={goToAnchor} />
-                </details>
-            ))}
-            <GuideFoot text={text} />
+            <article class="guide-page">
+                <div class="guide-text">
+                    <h3 id={page === undefined ? undefined : anchors.get(page.heading)} ref={title} tabIndex={-1}>
+                        {titles[shown]}
+                    </h3>
+                    {page === undefined ? <GuideCredits text={text} /> : (
+                        <>
+                            {shown === 0 ? <Blocks blocks={lead} anchors={anchors} go={go} /> : null}
+                            <Blocks blocks={page.blocks} anchors={anchors} go={go} />
+                        </>
+                    )}
+                </div>
+                <div class="guide-turn">
+                    {shown === 0 ? null : <TurnButton back title={titles[shown - 1] ?? ""} label={words.previous} onTurn={() => show(shown - 1)} />}
+                    {shown === titles.length - 1 ? null : <TurnButton title={titles[shown + 1] ?? ""} label={words.next} onTurn={() => show(shown + 1)} />}
+                </div>
+            </article>
         </div>
+    );
+}
+
+/** An arrow at a page's foot, with the title of the page it shows. */
+function TurnButton({ back = false, title, label, onTurn }: { back?: boolean; title: string; label: string; onTurn: () => void; })
+{
+    const arrow = (
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d={back ? "M14.5 6L8.5 12L14.5 18" : "M9.5 6L15.5 12L9.5 18"} />
+        </svg>
+    );
+
+    return (
+        <button type="button" class={back ? "back" : "next"} aria-label={`${label}: ${title}`} onClick={onTurn}>
+            {back ? arrow : null}
+            {title}
+            {back ? null : arrow}
+        </button>
     );
 }
 
@@ -114,8 +156,8 @@ function guideIn(language: string): Promise<string>
     });
 }
 
-/** The guide's lead, the lines before its first part, its title aside; its parts; and each heading's anchor, the English one at its place. */
-function guideParts(own: string, english: string): { lead: Block[]; parts: Part[]; anchors: Map<Block, string>; }
+/** The guide's lead, the lines before its first page, its title aside; its pages; and each heading's anchor, the English one at its place. */
+function guidePages(own: string, english: string): { lead: Block[]; pages: Page[]; anchors: Map<Block, string>; }
 {
     const blocks = markdownBlocks(own);
     const headings = blocks.filter((block) => block.kind === "heading");
@@ -124,17 +166,17 @@ function guideParts(own: string, english: string): { lead: Block[]; parts: Part[
     const anchors = new Map<Block, string>(headings.map((heading, index) => [heading, idOf(anchorOf((sameShape ? englishHeadings[index] : heading)?.text ?? heading.text))]));
     const first = blocks.findIndex((block) => block.kind === "heading" && block.level === 2);
     const lead = (first < 0 ? blocks : blocks.slice(0, first)).filter((block) => !(block.kind === "heading" && block.level === 1));
-    const parts: Part[] = [];
+    const pages: Page[] = [];
 
     for (const block of first < 0 ? [] : blocks.slice(first)) {
         if (block.kind === "heading" && block.level === 2) {
-            parts.push({ heading: block, blocks: [] });
+            pages.push({ heading: block, blocks: [] });
         } else {
-            parts.at(-1)?.blocks.push(block);
+            pages.at(-1)?.blocks.push(block);
         }
     }
 
-    return { lead, parts, anchors };
+    return { lead, pages, anchors };
 }
 
 // A heading's id on the page, apart from the page's own.

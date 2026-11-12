@@ -16,8 +16,13 @@ const folder = "/page/pieces/";
 export function Piece({ letter, set, small = false }: { letter: string; set?: PieceSet; small?: boolean; })
 {
     const chosen = useContext(ChosenSet);
-    const white = letter === letter.toUpperCase();
-    return <Drawing href={`${folder}${set ?? chosen}${small ? "-small" : ""}.svg#${white ? "w" : "b"}${letter.toUpperCase()}`} class={`piece ${white ? "white" : "black"}`} />;
+    return <Drawing href={pieceSymbol(letter, set ?? chosen, small)} class={`piece ${letter === letter.toUpperCase() ? "white" : "black"}`} />;
+}
+
+/** Where a piece is drawn, by its FEN letter: its symbol in the set's map, or in the map of the set's small pieces. */
+export function pieceSymbol(letter: string, set: PieceSet, small = false): string
+{
+    return `${folder}${set}${small ? "-small" : ""}.svg#${letter === letter.toUpperCase() ? "w" : "b"}${letter.toUpperCase()}`;
 }
 
 /** A piece as the notation shows it (D-50): the chosen set's small piece, White's white and Black's black. */

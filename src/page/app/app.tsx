@@ -32,7 +32,7 @@ import { explain } from "../board/explain.ts";
 import { kingSigns } from "../board/signs.ts";
 import { piecesOf } from "../board/squares.ts";
 import { type NewGameChoice, NewGameDialog } from "../dialogs/new-game.tsx";
-import { NameButton, PictureButton, ProfileDialog, ProfilesDialog, Wizard } from "../dialogs/profiles.tsx";
+import { NameButton, ProfileDialog, ProfilesDialog, Wizard } from "../dialogs/profiles.tsx";
 import { SettingsPanel } from "../dialogs/settings.tsx";
 import { playerIn, type StudiedSide, studiedSides } from "../dialogs/studied.ts";
 import { type Studied, StudyDialog } from "../dialogs/study.tsx";
@@ -542,8 +542,7 @@ export function App({ start }: { start: Settings; })
         sides === undefined ? null : (
             <PlayerCard
                 place={place}
-                // The player opens their profile in analysis too, from their own side's card.
-                picture={sides[side].who === "player" ? <PictureButton profile={profile} onOpen={() => setDialog("profile")} text={text} /> : pictureOf(sides[side], profile, 48, mood)}
+                picture={pictureOf(sides[side], profile, 48, mood)}
                 name={sides[side].name}
                 signed={sides[side].who === "ai" && playedBy !== undefined ? signature(playedBy.model, playedBy.effort) : undefined}
                 side={side}
@@ -731,7 +730,7 @@ export function App({ start }: { start: Settings; })
                                         />
                                         <PlayerCard
                                             place="you"
-                                            picture={<PictureButton profile={profile} onOpen={() => setDialog("profile")} text={text} />}
+                                            picture={picture}
                                             name={<NameButton profile={profile} onOpen={() => setDialog("profiles")} text={text} />}
                                             side={idle ? undefined : player}
                                             taken={material.taken[player]}

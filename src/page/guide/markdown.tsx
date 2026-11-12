@@ -1,7 +1,8 @@
-// The guide's blocks (blocks.ts) drawn as the page's own elements, never as HTML; in a line bold, italic, code and links, to a page of the web or to a heading
-// by its anchor. Copied from rpg-engine's guide (src/dashboard/help/markdown.tsx).
+// The guide's blocks (blocks.ts) drawn as the page's own elements, never as HTML, its drawings by their name; in a line bold, italic, code and links, to a
+// page of the web or to a heading by its anchor. Copied from rpg-engine's guide (src/dashboard/help/markdown.tsx).
 import type { ComponentChildren } from "preact";
 import type { Block } from "./blocks.ts";
+import { drawings } from "./drawings/drawings.tsx";
 
 /** Blocks drawn as the page's elements: headings one level under the part's, each with the anchor given by its place among them; a link to an anchor calls go. */
 export function Blocks({ blocks, anchors, go }: { blocks: Block[]; anchors: Map<Block, string>; go: (anchor: string) => void; })
@@ -109,6 +110,16 @@ function BlockView({ block, anchors, go }: { block: Block; anchors: Map<Block, s
             );
         case "code":
             return <pre><code>{block.text}</code></pre>;
+
+        case "drawing": {
+            const Drawing = drawings[block.name];
+            return Drawing === undefined ? null : (
+                <figure class="guide-drawing" role="img" aria-label={block.alt}>
+                    <Drawing />
+                </figure>
+            );
+        }
+
         case "rule":
             return null;
     }
