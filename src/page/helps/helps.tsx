@@ -504,14 +504,14 @@ function squaresIn(line: StrategyLine): readonly string[]
     return [line.white, line.black].flatMap((cell) => typeof cell === "object" ? cell.filter((item) => /^[a-h][1-8]$/.test(item)) : []);
 }
 
-/** The game's three phases in a row, the current one in a pill. */
+/** The game's three phases in a row of arrows: the current one full, those gone by lit, those to come not. */
 function Phases({ current, words }: { current: Phase; words: HelpsCardText; })
 {
     return (
         <ol class="phases">
-            {phases.map((phase) => (
-                <li key={phase} aria-current={phase === current ? "step" : undefined}>
-                    <span>{words.phases[phase]}</span>
+            {phases.map((phase, at) => (
+                <li key={phase} class={at < phases.indexOf(current) ? "done" : undefined} aria-current={phase === current ? "step" : undefined}>
+                    {words.phases[phase]}
                 </li>
             ))}
         </ol>

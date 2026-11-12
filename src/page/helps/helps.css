@@ -622,41 +622,49 @@
     gap: 10px;
 }
 
-/* The three phases in a row, joined by a thin line; the current one in a pill */
+/* The three phases in a row of arrows, each set in the next: the current one full in the accent, those gone by in its tint, those to come unlit */
 .phases {
     display: flex;
-    align-items: center;
     margin: 0;
     padding: 0;
     list-style: none;
     font-size: 12px;
+    line-height: 22px;
+    text-align: center;
     color: var(--soft);
 }
 
-.phases li + li {
-    flex: 1 1 auto;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: 6px;
-}
-
-.phases li + li::before {
-    content: "";
+.phases li {
     flex: 1;
-    height: 1px;
-    background: var(--line);
-}
-
-.phases li span {
-    padding: 1px 9px;
+    padding: 0 6px 0 12px;
+    background: color-mix(in srgb, var(--soft) 14%, transparent);
     white-space: nowrap;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%);
 }
 
-.phases li[aria-current="step"] span {
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--accent) 20%, transparent);
+.phases li + li {
+    margin-left: -5px;
+}
+
+.phases li:first-child {
+    padding-left: 8px;
+    border-radius: 5px 0 0 5px;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%);
+}
+
+.phases li:last-child {
+    border-radius: 0 5px 5px 0;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 8px 50%);
+}
+
+.phases li.done {
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
     color: var(--ink);
+}
+
+.phases li[aria-current="step"] {
+    background: var(--accent);
+    color: var(--on-accent);
     font-weight: 700;
 }
 
