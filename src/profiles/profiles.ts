@@ -66,9 +66,14 @@ export function listProfiles(root: string): PlayerProfile[]
  */
 export function ensureProfile(root: string, account: string): void
 {
+    // Every command asks, so the common answer comes first: a profile is there.
+    if (profileIds(root).length > 0) {
+        return;
+    }
+
     const id = freeId(root, slugOf(account));
 
-    if (profileIds(root).length === 0 && claimed(root, id)) {
+    if (claimed(root, id)) {
         fillProfile(root, id, { name: account }, true);
     }
 }
