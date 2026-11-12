@@ -118,8 +118,8 @@ export function BareButton({ bare, onBare, text }: { bare: boolean; onBare: (on:
 }
 
 /**
- * The coach's hint, a line that opens on its words and the legend of what it draws (D-88): in the helps' card, and on a phone under the board, beside the
- * map, where its drawings are in sight (Zoe).
+ * The coach's hint, a line that opens on its words and the legend of what it draws (D-88): in the helps' card a tinted row behind a bulb, as the tactics',
+ * and on a phone under the board, beside the map, where its drawings are in sight (Zoe).
  */
 export function HintLine({ hint, open, onOpen, text }: { hint: CoachHint; open: boolean; onOpen: (open: boolean) => void; text: Text; })
 {
@@ -127,7 +127,13 @@ export function HintLine({ hint, open, onOpen, text }: { hint: CoachHint; open: 
 
     return (
         <details class="coach-hint" open={open} onToggle={(event) => onOpen(event.currentTarget.open)}>
-            <summary>{open ? words.hideHint : words.showHint}</summary>
+            <summary>
+                <RowIcon>
+                    <path d="M5.5 10.5C4.3 9.7 3.5 8.4 3.5 7a4.5 4.5 0 0 1 9 0c0 1.4-.8 2.7-2 3.5V12h-5Z" />
+                    <path d="M6.5 14.2h3" />
+                </RowIcon>
+                {open ? words.hideHint : words.showHint}
+            </summary>
             <span class="note">
                 <Marked text={hint.text} />
             </span>
@@ -166,7 +172,7 @@ function HoldButton({ on, onHold, title, label, kind, children }: {
     );
 }
 
-/** The coach's judgment of the player's move: its badge and the move in a line, which opens on its note (D-78, D-88). */
+/** The coach's judgment of the player's move: its badge and the move in a row tinted in the badge's colour, which opens on its note (D-78, D-88). */
 function Judged({ ply, text }: { ply: Ply; text: Text; })
 {
     const { badge, note } = ply.review ?? {};
@@ -182,7 +188,7 @@ function Judged({ ply, text }: { ply: Ply; text: Text; })
     );
 
     return (
-        <div class={`move-note judged ${badge ?? ""}`}>
+        <div class={`move-note judged ${badge ?? ""}`} style={badge === undefined ? undefined : { "--row": `var(--badge-${badge})` }}>
             {note === undefined ? <span class="head">{head}</span> : (
                 <details>
                     <summary class="head">{head}</summary>
