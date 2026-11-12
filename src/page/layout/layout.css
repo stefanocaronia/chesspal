@@ -1041,3 +1041,16 @@
         justify-content: center;
     }
 }
+
+/* On the narrowest phones a table's header holds one more button, the newer Chesspal's: the buttons draw a little closer and smaller, the picture stays on the line */
+@media (max-width: 359px) {
+    .top {
+        column-gap: 2px;
+    }
+
+    .top .command,
+    .top .icon-button {
+        width: 30px;
+        height: 30px;
+    }
+}
