@@ -20,8 +20,11 @@ export function thoughtKey(current: CurrentGame, ply = current.game.record.moves
     return `${current.started}#${ply}`;
 }
 
-/** Keeps a thought for a position, in place of one for the same reply; thoughts of another position go. The thoughts kept now. */
-export function keepThought(folder: string, key: string, thought: Thought): Thought[]
+/**
+ * Keeps a thought for a position, in place of one for the same reply; thoughts of another position go. The thoughts kept now. A thought kept while the AI
+ * ponders shows it still at work.
+ */
+export function keepThought(folder: string, key: string, thought: Thought, now: Date): Thought[]
 {
     const kept = keptAt(folder, key);
     const thoughts = [...kept.thoughts.filter((one) => one.reply !== thought.reply), thought];
@@ -30,7 +33,7 @@ export function keepThought(folder: string, key: string, thought: Thought): Thou
         throw new Error(`You have ${mostThoughts} thoughts for this position already: they are enough. Nothing changed.`);
     }
 
-    write(folder, { ...kept, thoughts });
+    write(folder, { ...kept, thoughts, ...(kept.pondering === undefined ? {} : { pondering: now.toISOString() }) });
     return thoughts;
 }
 
@@ -59,21 +62,36 @@ export function waitingSince(folder: string, key: string, now: Date): Date
  * Notes whether the AI thinks on the player's time in a position now, from its first look until it waits for their move, for the page's sign: in the file,
  * since in Codex the agent that thinks has a process of its own (D-98).
  */
-export function notePondering(folder: string, key: string, pondering: boolean): void
+export function notePondering(folder: string, key: string, pondering: boolean, now: Date): void
 {
     const { pondering: before, ...kept } = keptAt(folder, key);
 
-    if ((before === true) !== pondering) {
-        write(folder, pondering ? { ...kept, pondering: true } : kept);
+    if (pondering) {
+        write(folder, { ...kept, pondering: now.toISOString() });
+    } else if (before !== undefined) {
+        write(folder, kept);
     }
 }
 
-/** Whether the AI thinks on the player's time in a position now, as noted. */
-export function ponderingOn(folder: string, key: string): boolean
+/**
+ * Until when the AI is seen thinking on the player's time in a position, as noted: a while after its last look or thought, so that an agent stopped before
+ * it waits (Esc, its host closed) does not leave the sign on until the player moves.
+ */
+export function ponderingUntil(folder: string, key: string): Date | undefined
 {
     const kept = read(folder);
-    return kept?.key === key && kept.pondering === true;
+    return kept?.key === key && kept.pondering !== undefined ? new Date(new Date(kept.pondering).getTime() + ponderSignFor) : undefined;
 }
+
+/** Whether the AI thinks on the player's time in a position now, as noted. */
+export function ponderingOn(folder: string, key: string, now: Date): boolean
+{
+    const until = ponderingUntil(folder, key);
+    return until !== undefined && now < until;
+}
+
+// An agent thinks on one reply in well under this; one silent for longer has stopped.
+const ponderSignFor = 5 * 60_000;
 
 /** The most thoughts kept for a position: a few likely replies, not every legal one. */
 const mostThoughts = 8;
@@ -84,7 +102,8 @@ const thoughtsFile = z.object({
     key: z.string(),
     thoughts: z.array(z.object({ reply: z.string(), move: z.string(), why: z.string() })),
     since: z.iso.datetime().optional(),
-    pondering: z.boolean().optional(),
+    // The time of the AI's last look or thought while it ponders.
+    pondering: z.iso.datetime().optional(),
 });
 
 type ThoughtsFile = z.infer<typeof thoughtsFile>;

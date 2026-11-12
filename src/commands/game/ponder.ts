@@ -62,7 +62,7 @@ export const ponder = defineCommand({
                 throw new Error("Give the position's number with it: call ponder {} first, which gives it. Nothing changed.");
             }
 
-            notePondering(folder, thoughtKey(current), true);
+            notePondering(folder, thoughtKey(current), true, context.now());
             return { start: startOf(current) };
         }
 
@@ -76,7 +76,7 @@ export const ponder = defineCommand({
         }
 
         if (done) {
-            notePondering(folder, thoughtKey(current), false);
+            notePondering(folder, thoughtKey(current), false, context.now());
             return await waitForMove(folder, context, current);
         }
 
@@ -109,7 +109,7 @@ export const ponder = defineCommand({
             throw new Error(`${answer.message} Your legal moves after ${played.move.san}: ${answer.legal.join(" ")}. Nothing changed.`);
         }
 
-        return { kept: keepThought(folder, thoughtKey(current), { reply: played.move.san, move: answer.move.san, why }), position };
+        return { kept: keepThought(folder, thoughtKey(current), { reply: played.move.san, move: answer.move.san, why }, context.now()), position };
     },
     format: (pondered) => {
         if ("stop" in pondered) {

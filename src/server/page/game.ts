@@ -37,7 +37,7 @@ import {
     loadGame,
     loadTableTalk,
     playerPgn,
-    ponderingOn,
+    ponderingUntil,
     rerunIfChanged,
     saveGame,
     startAnalysis,
@@ -49,6 +49,7 @@ import {
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
 import { asTheChatSees } from "./chat.ts";
+import { tellWatchers } from "./events.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
@@ -446,7 +447,24 @@ function thinkingShown(served: Served, current: CurrentGame | undefined): { thin
         return served.bell.inTurn && onIt ? { thinking: "move" } : {};
     }
 
-    return ponderingOn(gameFolder(served.context.home()), thoughtKey(current)) ? { thinking: "ponder" } : {};
+    const until = ponderingUntil(gameFolder(served.context.home()), thoughtKey(current));
+    const left = until === undefined ? 0 : until.getTime() - served.context.now().getTime();
+
+    if (left <= 0) {
+        return {};
+    }
+
+    signGoesIn(served, left);
+    return { thinking: "ponder" };
+}
+
+// The pages hear when the sign of an agent that stopped pondering without a word goes, which no file tells: one timer a table, the latest.
+const signTimers = new WeakMap<Served, NodeJS.Timeout>();
+
+function signGoesIn(served: Served, wait: number): void
+{
+    clearTimeout(signTimers.get(served));
+    signTimers.set(served, setTimeout(() => tellWatchers(served.watchers), wait + 100).unref());
 }
 
 /**

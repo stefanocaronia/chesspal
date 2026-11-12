@@ -857,12 +857,12 @@ describe("the doorbell of the chat", () => {
         expect(await thinking()).toBeUndefined();
         // The ponder agent notes it on disk, as in Codex, where it has a process of its own (D-98).
         const games = gameFolder(context.home());
-        notePondering(games, `${started}#1`, true);
+        notePondering(games, `${started}#1`, true, context.now());
         expect(await thinking()).toBe("ponder");
-        notePondering(games, `${started}#0`, true);
+        notePondering(games, `${started}#0`, true, context.now());
         expect(await thinking()).toBeUndefined();
-        notePondering(games, `${started}#1`, true);
-        notePondering(games, `${started}#1`, false);
+        notePondering(games, `${started}#1`, true, context.now());
+        notePondering(games, `${started}#1`, false, context.now());
         expect(await thinking()).toBeUndefined();
     });
 

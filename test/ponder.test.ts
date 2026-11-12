@@ -59,10 +59,17 @@ describe("the AI thinking on the player's time (D-72)", () => {
         const folder = gameFolder(context.folder);
         const key = thoughtKey(loadGame(folder)!);
 
-        expect(ponderingOn(folder, key)).toBe(false);
+        expect(ponderingOn(folder, key, context.now())).toBe(false);
         await run(context, "ponder");
+        // Each thought shows it still at work; an agent silent for long has stopped, as one ended with Esc, and its sign goes.
+        time += 4 * 60_000;
         await run(context, "ponder", { position: 0, reply: "e4", move: "e5", why: "The centre." });
-        expect(ponderingOn(folder, key)).toBe(true);
+        time += 4 * 60_000;
+        expect(ponderingOn(folder, key, context.now())).toBe(true);
+        time += 2 * 60_000;
+        expect(ponderingOn(folder, key, context.now())).toBe(false);
+        await run(context, "ponder", { position: 0, reply: "d4", move: "d5", why: "The centre too." });
+        expect(ponderingOn(folder, key, context.now())).toBe(true);
 
         context.pause = (milliseconds) => {
             time += milliseconds;
@@ -70,7 +77,7 @@ describe("the AI thinking on the player's time (D-72)", () => {
         };
 
         await run(context, "ponder", { position: 0, done: true });
-        expect(ponderingOn(folder, key)).toBe(false);
+        expect(ponderingOn(folder, key, context.now())).toBe(false);
         // Its thoughts stay, for its next move.
         expect(await run(context, "player_move", { move: "e4" })).toContain("Thought on their time by your model (legal, not checked): e5");
     });

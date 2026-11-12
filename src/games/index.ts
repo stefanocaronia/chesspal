@@ -30,4 +30,4 @@ export { makeFolder, renameOver, writeAtomically } from "./files.ts";
 export { commentWithPlan, currentPlan, planOf, withoutPlans } from "./plans.ts";
 export { endTableTalk, loadTableTalk, saveTableTalk, type TableTalk, tableTalkStamp } from "./table-talk.ts";
 export { type Heard, heardLines, type Sayer, type Talk, talkLimits, talkLine, unheardWords, wakesTheChat, type Words, WordsRefused } from "./talk.ts";
-export { keepThought, notePondering, ponderingOn, type Thought, thoughtForLastMove, thoughtKey, waitingSince } from "./thoughts.ts";
+export { keepThought, notePondering, ponderingOn, ponderingUntil, type Thought, thoughtForLastMove, thoughtKey, waitingSince } from "./thoughts.ts";
