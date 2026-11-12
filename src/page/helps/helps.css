@@ -801,26 +801,26 @@
 /* The thread that keeps the black half in sight on the dark theme, as the lead bar's */
 .control-bar,
 .row-tile {
-    border: 1px solid rgb(138 144 153 / 0.6);
+    border: 1px solid var(--side-edge);
 }
 
 /* The bar's colours, which the lines' tiles share */
 .control-bar .white,
 .row-tile .white {
-    background: #f4f6f8;
+    background: var(--side-white);
     color: var(--fixed-ink);
 }
 
 .control-bar .both,
 .row-tile .both {
-    background: #8d98a7;
+    background: var(--side-both);
     color: var(--fixed-ink);
 }
 
 .control-bar .black,
 .row-tile .black {
-    background: var(--fixed-ink);
-    color: #f4f6f8;
+    background: var(--side-black);
+    color: var(--side-white);
 }
 
 /* A line's tile: a half for each side, the player's first; the open files in one half as wide as the two */

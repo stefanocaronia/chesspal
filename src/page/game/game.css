@@ -129,8 +129,8 @@
     height: 14px;
     margin-top: 6px;
     border-radius: 7px;
-    background: #3b4048;
-    box-shadow: 0 0 0 1px rgb(138 144 153 / 0.6);
+    background: var(--side-black);
+    box-shadow: 0 0 0 1px var(--side-edge);
     overflow: hidden;
 }
 
@@ -139,7 +139,7 @@
     position: absolute;
     inset: 3px auto 3px calc(50% - 0.5px);
     width: 1px;
-    background: #8a9099;
+    background: var(--side-both);
 }
 
 /* On a position after the one the AI estimated: the player's move, until the coach speaks again */
@@ -150,7 +150,7 @@
 .lead-bar .white {
     position: absolute;
     inset: 0 auto 0 0;
-    background: #f5f5f2;
+    background: var(--side-white);
     transition: width 400ms ease;
 }
 
@@ -172,12 +172,12 @@
 .lead-bar .figure.white,
 .lead-bar .figure.even {
     left: 6px;
-    color: #2a2f36;
+    color: var(--fixed-ink);
 }
 
 .lead-bar .figure.black {
     right: 6px;
-    color: #f5f5f2;
+    color: var(--side-white);
 }
 
 /* The chart of the game in analysis: the white area is White's share, the line in the middle an even game; a dot on a move a badge marks, a line on the move
@@ -191,8 +191,8 @@
     position: relative;
     height: 72px;
     border-radius: 6px;
-    background: #3b4048;
-    box-shadow: 0 0 0 1px rgb(138 144 153 / 0.6);
+    background: var(--side-black);
+    box-shadow: 0 0 0 1px var(--side-edge);
     overflow: hidden;
     cursor: pointer;
     /* A finger drawn across it runs through the game; up and down it scrolls the page */
@@ -207,7 +207,7 @@
 }
 
 .lead-chart .white-area {
-    fill: #f5f5f2;
+    fill: var(--side-white);
 }
 
 .lead-chart .pending {
@@ -215,7 +215,7 @@
 }
 
 .lead-chart .even {
-    stroke: #8a9099;
+    stroke: var(--side-both);
     stroke-width: 1;
     stroke-dasharray: 3 3;
     fill: none;
