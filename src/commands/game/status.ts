@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { gameReviewOf, leadOf, reviewOf } from "../../core/index.ts";
+import { Game, gameReviewOf, leadOf, reviewOf } from "../../core/index.ts";
 import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "../../games/index.ts";
-import { outdatedHostFiles } from "../../host-files/index.ts";
+import { isCodex, outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
 import {
@@ -53,8 +53,8 @@ interface Status
     problem?: string;
     /** What the player wrote on the board page that the AI has not answered yet, all of it. */
     words?: Written[];
-    /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there. */
-    analysis?: { game: string; brought?: true; analyst?: "done" | "offer"; review?: string; };
+    /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there, for a new review too. */
+    analysis?: { game: string; brought?: true; redo?: true; analyst?: "done" | "offer"; codex?: true; review?: string; };
     /** A game going on from before this chat, told once a chat: the player says whether to go on with it. */
     fromBefore?: true;
     /** The coach to start, once, for the player's move that ended the game (D-88). */
@@ -135,7 +135,9 @@ export const status = defineCommand({
                 status.analysis = {
                     game: analysis.game,
                     ...(analysis.brought === true ? { brought: true } : {}),
+                    ...(analysis.redo === true ? { redo: true } : {}),
                     ...(analystRuns(context) ? { analyst: goneOver(context, analysis.game) ? "done" as const : "offer" as const } : {}),
+                    ...(analystRuns(context) && isCodex(context.host?.()) ? { codex: true as const } : {}),
                     ...(review === undefined ? {} : { review }),
                 };
             }
@@ -190,13 +192,19 @@ function firstInChat(context: Context, chatStart: string | undefined): boolean
 
 /**
  * The game in analysis, with how far its review has got; the next step when the player has just brought it on the board page, unless an analyst is at it
- * already; the analyst agent for a game whose review was deleted, where it runs (Stefano).
+ * already, at once when they asked for a new review (Priya); the analyst agent for a game whose review was deleted, where it runs (Stefano).
  */
-function analysisLine({ game, brought, analyst, review }: NonNullable<Status["analysis"]>): string
+function analysisLine({ game, brought, redo, analyst, codex, review }: NonNullable<Status["analysis"]>): string
 {
+    // A chat that remembered the old review put its notes back with annotate_game, and its corrections stand over every review after (Priya).
+    if (redo === true && analyst === "offer") {
+        return `The player asked on the board page for a new review of ${game}. Next, at once, even if an analyst was stopped before: ${analystLine(game, codex === true)} `
+            + "The new review replaces the old one: correct a note with annotate_game only when the player shows it wrong.";
+    }
+
     if (brought === true && analyst !== "done") {
         return analyst === "offer"
-            ? `The player brought ${game} on the board page to analyse it. Next: ${analystLine(game)}`
+            ? `The player brought ${game} on the board page to analyse it. Next: ${analystLine(game, codex === true)}`
             : `The player brought ${game} on the board page to analyse it. Next: call analyse_game {"game": "${game}"}, then keep your review on that page with annotate_game, and go over it with them.`;
     }
 
@@ -206,12 +214,12 @@ function analysisLine({ game, brought, analyst, review }: NonNullable<Status["an
         return `${shown}. ${reviewedLine(game)}`;
     }
 
-    return analyst === "offer" ? `${shown}. When the player wants it gone over, ${analystLine(game)}` : `${shown}; analyse_game {"game": "${game}"} goes over it with the player.`;
+    return analyst === "offer" ? `${shown}. When the player wants it gone over, ${analystLine(game, codex === true)}` : `${shown}; analyse_game {"game": "${game}"} goes over it with the player.`;
 }
 
 /**
- * How far the review of a game has got, as the board page shows it (Priya): done once it holds the word on the whole game and who is ahead after every move
- * but the last; the analyst may still write notes after its word, so that alone is not the end.
+ * How far the review of a game has got, as the board page shows it (Priya): done once it holds the word on the whole game and who is ahead after every move,
+ * but the last when the board ended the game there, which says it; the analyst may still write notes after its word, so that alone is not the end.
  */
 function reviewProgress(context: Context, game: string): string | undefined
 {
@@ -219,8 +227,10 @@ function reviewProgress(context: Context, game: string): string | undefined
         const { record } = namedGame(context, game);
         const worded = gameReviewOf(record) !== undefined;
         const estimated = record.moves.filter(({ comment }) => leadOf(comment) !== undefined).length;
+        // A game resigned or lost on time needs who is ahead after its last move too.
+        const needed = new Game(record).outcome.over ? record.moves.length - 1 : record.moves.length;
 
-        if (worded && estimated >= record.moves.length - 1) {
+        if (worded && estimated >= needed) {
             return "its review is done";
         }
 

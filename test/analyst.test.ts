@@ -82,11 +82,15 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         await run(analyst, "annotate_game", { game, summary: "Corta." });
         expect(await run(context, "status")).toContain("don't start it for this review");
 
-        // The page's «Analyse again»: the review deleted, the game brought back.
+        // The page's «Analyse again»: the review deleted, the game brought back for a new review, which the chat starts without asking (Priya).
         await run(context, "delete_review", { game });
-        startAnalysis(gameFolder(context.home()), game, context.now(), { brought: true });
+        startAnalysis(gameFolder(context.home()), game, context.now(), { brought: true, redo: true });
         const status = await run(context, "status");
-        expect(status).toContain(`The player brought ${game} on the board page to analyse it. Next: start the chesspal-analyst agent`);
+        expect(status).toContain(
+            `\nThe player asked on the board page for a new review of ${game}. Next, at once, even if an analyst was stopped before: start the chesspal-analyst agent`,
+        );
+        // The chat that remembers the old review leaves the new one to the analyst.
+        expect(status).toContain("from what it tells you. The new review replaces the old one: correct a note with annotate_game only when the player shows it wrong.");
         expect(status).not.toContain("don't start it for this review");
         expect(await run({ ...analyst, agentRun: "agent-second" }, "analyse_game", { game })).toMatch(/^You played Black/);
     });
@@ -268,6 +272,60 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         await run(context, "delete_review", { game });
         await run(analyst, "analyse_game", { game });
         expect(await run(analyst, "annotate_game", { game, notes: [{ move: "2.", badge: "mistake" }] })).not.toContain("keeps the note");
+    });
+
+    it("is offered by look and position once the review is deleted, since the deletion rings no doorbell", async () => {
+        const context = { ...claudeFolder(), told: new Set<string>() };
+        await mate(context);
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+        const game = "games/2026-11-02-153012.pgn";
+        const analyst = { ...context, agent: "chesspal-analyst", agentRun: "agent-first" };
+        await run(analyst, "analyse_game", { game });
+        expect(await run(context, "look", { move: "2." })).not.toContain("chesspal-analyst");
+        await run(analyst, "annotate_game", { game, summary: "Short." });
+        expect(await run(context, "position", { move: "2." })).not.toContain("chesspal-analyst");
+
+        await run(context, "delete_review", { game });
+        const offer = `\n${game} has no review. When the player wants it gone over, start the chesspal-analyst agent in the background with the prompt "Analyse ${game}.`;
+        expect(await run(analyst, "look", { move: "2." })).not.toContain("chesspal-analyst");
+        expect(await run(context, "look", { move: "2." })).toContain(offer);
+        // Once a change of the analysis: told again after the next.
+        expect(await run(context, "position", {})).not.toContain("chesspal-analyst");
+        const later = { ...context, now: () => new Date(context.now().getTime() + 60_000) };
+        await run(later, "delete_review", { game });
+        expect(await run(later, "position", {})).toContain(offer);
+        // Not while an analyst is at it.
+        await run({ ...analyst, agentRun: "agent-second", now: () => new Date(context.now().getTime() + 120_000) }, "analyse_game", { game });
+        expect(await run(context, "look", {})).not.toContain("chesspal-analyst");
+    });
+
+    it("is started in Codex with spawn_agent, which the line names", async () => {
+        const context = { ...playerFolder(), host: () => "codex-mcp-client" };
+        setUpHosts(context.folder, "linux");
+        await mate(context);
+        const spawn = 'start the chesspal-analyst agent with spawn_agent {"agent_type": "chesspal-analyst", "message": "Analyse games/2026-11-02-153012.pgn. The player '
+            + 'speaks <their language>.", "fork_turns": "none"}: it writes its review on the board page';
+
+        expect(await run(context, "ai_move", { move: "Qh4", plan: "Mate." })).toContain(`To go over it, on their yes, ${spawn}`);
+        expect(await run(context, "ai_say", { text: "Mate!" })).toContain(`\nNext: when the player wants this game gone over, ${spawn}`);
+        startAnalysis(gameFolder(context.home()), "games/2026-11-02-153012.pgn", context.now(), { brought: true });
+        expect(await run(context, "status")).toContain(`on the board page to analyse it. Next: ${spawn}`);
+    });
+
+    it("ends the review of a resigned game only with who is ahead after its last move", async () => {
+        const context = claudeFolder();
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "e4" });
+        await run(context, "ai_move", { move: "e5", plan: "Centre." });
+        await run(context, "end_game", { result: "player_resigns" });
+        const game = "games/2026-11-02-153012.pgn";
+        const analyst = { ...context, agent: "chesspal-analyst" };
+        await run(analyst, "analyse_game", { game });
+
+        await run(analyst, "annotate_game", { game, summary: "Short.", ahead: { "1.": 0 } });
+        expect(await run(context, "status")).toContain(`${game} (its review so far: notes on 0 moves, who is ahead after 1 of 2, its word on the game written)`);
+        await run(analyst, "annotate_game", { game, ahead: { "1...": 0 } });
+        expect(await run(context, "status")).toContain(`${game} (its review is done)`);
     });
 
     it("calls the tools it shares with the chat without counting as the chat that has read the game", async () => {

@@ -31,7 +31,25 @@ import { gameInAnalysis, isGameName, keepToStudy, lastChatStart, planOf, rewrite
 import { analystAgent, instructionsFile } from "../../host-files/index.ts";
 import { activeProfile, gameFolder, type PlayerProfile } from "../../profiles/index.ts";
 import { pointsAtSite, siteGameName, siteOfGameName } from "../../sites/index.ts";
-import { analystOf, anotherAnalyst, balanceText, bookOpening, bookReaches, colourName, gameToStudy, knownTag, moveNumbers, namedGame, noGameGoingOn, riskLine, speechLine, speechOf, type Studied, tacticsText } from "../answers/index.ts";
+import {
+    analystOf,
+    anotherAnalyst,
+    balanceText,
+    bookOpening,
+    bookReaches,
+    colourName,
+    gameToStudy,
+    knownTag,
+    moveNumbers,
+    namedGame,
+    noGameGoingOn,
+    riskLine,
+    shownMove,
+    speechLine,
+    speechOf,
+    type Studied,
+    tacticsText,
+} from "../answers/index.ts";
 import { playerLine, siteText } from "../profiles/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
 import { profileSiteGames } from "./site-games.ts";
@@ -39,7 +57,7 @@ import { profileSiteGames } from "./site-games.ts";
 /** A move as the analysis gives it: what happened, never how good it was (D-6). */
 interface MoveFacts
 {
-    /** The move, numbered: 12...Nxe5. */
+    /** The move, numbered, with the pieces' figurines as the other tools write moves (D-86), since the analyst copies them into its notes: 12...♞xe5. */
     move: string;
     /** The piece it took. */
     took?: PieceLetter;
@@ -370,7 +388,7 @@ function movesOf(record: GameRecord, ai: Side | undefined): Replay
         const previous = left[side];
         const risks = riskLine(facts);
         const move: MoveFacts = {
-            move: `${numbers[ply]}${san}`,
+            move: shownMove(`${numbers[ply]}${san}`),
             took: before.pieces.find((piece) => piece.square === played.move.to)?.piece ?? (san.includes("x") ? "P" : undefined),
             spent: clock === undefined || previous === undefined || increment === undefined ? undefined : Math.max(0, previous - clock + increment),
             left: clock,
@@ -422,7 +440,7 @@ function analysisHead(analysis: Analysis): string[]
     return [head, ...opening, ...review, `${name}.`, ...start];
 }
 
-/** 12...Nxe5: took P; spent 0:12, 4:32 left; material White +1 in pawns; at risk: undefended Black Nf6; mate in one: Qh7#; tactics: fork Nc7+ (Ke8 Ra8); out of book; you said "…"; your plan: …; ahead -1.5 */
+/** 12...♞xe5: took P; spent 0:12, 4:32 left; material White +1 in pawns; at risk: undefended Black Nf6; mate in one: Qh7#; tactics: fork Nc7+ (Ke8 Ra8); out of book; you said "…"; your plan: …; ahead -1.5 */
 function moveLine(move: MoveFacts): string
 {
     const left = move.left === undefined ? undefined : `${clockText(move.left)} left`;

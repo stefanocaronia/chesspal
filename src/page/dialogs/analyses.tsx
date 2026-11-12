@@ -34,8 +34,8 @@ export function Analyses({ onStudy, onLoad, you, accounts, others, ai, text }: {
     const act = async (name: string, asked: Asked): Promise<void> => {
         setBusy(true);
         const refused = asked === "remove" ? await deletion("/api/delete-game", name) : await deletion("/api/delete-review", name);
-        // Analysing again opens the game without its review: the chat's analyst goes over it (D-89).
-        const after = refused === undefined && asked === "redo" ? await onStudy({ game: name }) : refused;
+        // Analysing again opens the game without its review: the chat's analyst goes over it (D-89), asked for by the player.
+        const after = refused === undefined && asked === "redo" ? await onStudy({ game: name, redo: true }) : refused;
         setBusy(false);
         setAsking(undefined);
         setProblem(after);

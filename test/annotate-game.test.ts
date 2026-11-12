@@ -83,10 +83,10 @@ describe("annotate_game (D-69)", () => {
 
         const analysis = await analyse(context, { game: kept });
         // A note alone on a move of the book keeps its book badge.
-        expect(analysis).toContain('\n2.Bc4: you marked book: "the bishop eyes f7"\n');
+        expect(analysis).toContain('\n2.♝c4: you marked book: "the bishop eyes f7"\n');
         expect(analysis).toContain("\nYour review: Black missed the threat on f7. A quick win.\n");
-        expect(analysis).toMatch(/\n3\.\.\.Nf6: .*; you marked mistake\n/);
-        expect(analysis).toMatch(/\n4\.Qxf7#: .*; you marked best\n?$/);
+        expect(analysis).toMatch(/\n3\.\.\.♞f6: .*; you marked mistake\n/);
+        expect(analysis).toMatch(/\n4\.♛xf7#: .*; you marked best\n?$/);
         expect(readFileSync(join(gameFolder(context.folder), kept), "utf8").replace(/\s+/g, " ")).toContain(
             "{[%review Black missed the threat on f7.] [%closing A quick win.]} 1. e4 {[%badge book]} 1... e5 {[%badge book]} 2. Bc4 {[%badge book] [%review the bishop eyes f7]} 2... Nc6 {[%badge book]} 3. Qh5 {[%badge book]} 3... Nf6? {[%badge mistake]}",
         );
@@ -160,7 +160,7 @@ describe("annotate_game (D-69)", () => {
 
         const analysis = await analyse(context, { game: kept });
         expect(analysis).toMatch(/\n1\.e4: .*ahead -0\.3\n/);
-        expect(analysis).toMatch(/\n3\.\.\.Nf6: .*; you marked blunder; ahead #1\n/);
+        expect(analysis).toMatch(/\n3\.\.\.♞f6: .*; you marked blunder; ahead #1\n/);
         expect(analysis).not.toContain("[%lead");
 
         // A figure that is no lead, or a move not in the game, changes nothing.
@@ -198,7 +198,7 @@ describe("annotate_game (D-69)", () => {
         const again = await analyse(context, { pgn });
         expect(readFileSync(join(gameFolder(context.folder), kept), "utf8")).toBe(before);
         expect(again).toContain("\nYour review: Black missed the threat on f7.\n");
-        expect(again).toMatch(/\n3\.\.\.Nf6: .*; you marked blunder\n/);
+        expect(again).toMatch(/\n3\.\.\.♞f6: .*; you marked blunder\n/);
     });
 
     it("keeps one copy when the same game is brought again after a review the AI signed, with the Annotator it came with or without", async () => {

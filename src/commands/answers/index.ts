@@ -1,6 +1,6 @@
 // What the commands share to answer the AI: the lines it reads, the game's summary and view, the clock, the talk, the moves played, the games to study.
 // Above the registry only, below every other command folder.
-export { agentRuns, agentsLine, analystLine, analystOf, analystRuns, anotherAnalyst, coachOnEnd, coachOnEndLine, coachRuns, goneOver, reviewedLine, withAnalyst } from "./agents.ts";
+export { agentRuns, agentsLine, analystLine, analystOf, analystOnView, analystRuns, anotherAnalyst, coachOnEnd, coachOnEndLine, coachRuns, goneOver, reviewedLine, withAnalyst } from "./agents.ts";
 export { clockLine, clockSummaryOf, gameAt } from "./clock.ts";
 export { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
 export { aheadWords, leadFrom, leadInput } from "./lead-input.ts";

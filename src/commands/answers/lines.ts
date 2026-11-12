@@ -134,7 +134,7 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
 
     if (game.end !== undefined) {
         const analysis = game.end.analyst === "offer"
-            ? ` To go over it, on their yes, ${analystLine(game.end.archive)}`
+            ? ` To go over it, on their yes, ${analystLine(game.end.archive, game.end.codex === true)}`
             : game.end.analyst === "done"
             ? ` ${reviewedLine(game.end.archive)}`
             : "";

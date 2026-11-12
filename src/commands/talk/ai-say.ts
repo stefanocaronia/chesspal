@@ -61,7 +61,7 @@ function afterWords(game: GameSummary | undefined, words: readonly Written[]): s
         }
 
         return game.end.analyst === "offer"
-            ? `Next: when the player wants this game gone over, ${analystLine(game.end.archive)} When they want another game, ${newGameStep}`
+            ? `Next: when the player wants this game gone over, ${analystLine(game.end.archive, game.end.codex === true)} When they want another game, ${newGameStep}`
             : `Next: when the player wants another game, ${newGameStep}`;
     }
 

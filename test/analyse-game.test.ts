@@ -46,15 +46,15 @@ describe("the analysis of a game (D-68)", () => {
 
         expect(analysis).toBe([
             "White: Ann; Black: Bob. 2026.10.01, time control 5+2. Result: 1-0 (checkmate), after 4 moves.",
-            "Opening: C23 Bishop's Opening, in the book to 3.Qh5: those moves have the book badge, unless you give another",
+            "Opening: C23 Bishop's Opening, in the book to 3.♛h5: those moves have the book badge, unless you give another",
             `Look and position take it as game "${imported}".`,
             "1.e4: 5:00 left",
             "1...e5: 4:58 left",
-            "2.Bc4: spent 0:07, 4:55 left",
-            "2...Nc6: spent 0:10, 4:50 left",
-            "3.Qh5: spent 0:17, 4:40 left; at risk: outnumbered Black Pf7",
-            "3...Nf6: spent 0:22, 4:30 left; at risk: undefended White Qh5 Pe4; outnumbered Black Pf7; mate in one: Qxf7#; out of book",
-            "4.Qxf7#: took P; spent 0:07, 4:35 left; material White +1 in pawns",
+            "2.♝c4: spent 0:07, 4:55 left",
+            "2...♞c6: spent 0:10, 4:50 left",
+            "3.♛h5: spent 0:17, 4:40 left; at risk: outnumbered Black Pf7",
+            "3...♞f6: spent 0:22, 4:30 left; at risk: undefended White Qh5 Pe4; outnumbered Black Pf7; mate in one: Qxf7#; out of book",
+            "4.♛xf7#: took P; spent 0:07, 4:35 left; material White +1 in pawns",
         ].join("\n"));
 
         expect(await analyse({ ...context, now: () => new Date(2026, 10, 3) }, { pgn })).toBe(analysis);
@@ -73,7 +73,7 @@ describe("the analysis of a game (D-68)", () => {
             `Look and position take it as game "${imported}".`,
             "1.e4: 3:00 left",
             "1...e5: 3:00 left",
-            "2.Nf3: spent 0:05, 2:55 left; at risk: undefended Black Pe5",
+            "2.♞f3: spent 0:05, 2:55 left; at risk: undefended Black Pe5",
         ].join("\n"));
         expect(readFileSync(join(gameFolder(context.folder), imported), "utf8")).toMatch(/2\.\s+Nf3 \{\[%clk 0:02:55\] \[%badge book\]\} \*/);
     });
@@ -102,10 +102,10 @@ describe("the analysis of a game (D-68)", () => {
         const fromBlack = `[FEN "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"]\n[SetUp "1"]\n\n1... e5 2. Nf3 Nc6 *`;
         const promotion = `[FEN "r3k3/1P6/8/8/1p6/8/2P5/4K3 w - - 0 1"]\n[SetUp "1"]\n\n1. c4 bxc3 2. bxa8=Q+ *`;
 
-        expect(await analyse(context, { pgn: fromBlack })).toMatch(/\n1\.\.\.e5\n2\.Nf3: at risk: undefended Black Pe5\n2\.\.\.Nc6: at risk: none$/);
+        expect(await analyse(context, { pgn: fromBlack })).toMatch(/\n1\.\.\.e5\n2\.♞f3: at risk: undefended Black Pe5\n2\.\.\.♞c6: at risk: none$/);
         expect(await lookAt(context, { game: imported, move: "2." })).toMatch(/^After 2\.Nf3 in /);
         expect(await analyse({ ...context, now: () => new Date(2026, 10, 3) }, { pgn: promotion })).toMatch(
-            /\n1\.\.\.bxc3: took P; material Black \+5 in pawns; at risk: undefended Black Ra8; tactics: promote b8=Q\+, bxa8=Q\+\n2\.bxa8=Q\+: took R; material White \+8 in pawns; at risk: none$/,
+            /\n1\.\.\.bxc3: took P; material Black \+5 in pawns; at risk: undefended Black Ra8; tactics: promote b8=Q\+, bxa8=Q\+\n2\.bxa8=♛\+: took R; material White \+8 in pawns; at risk: none$/,
         );
     });
 
@@ -127,7 +127,7 @@ describe("the analysis of a game (D-68)", () => {
             "1...h6",
         ].join("\n"));
         expect(await analyse({ ...context, now: () => new Date(2026, 10, 3) }, { pgn: fools })).toMatch(
-            /^White: \?; Black: \?\. Result: 0-1 \(checkmate\), after 2 moves\.\n[\s\S]*\n2\.g4: mate in one: Qh4#\n2\.\.\.Qh4#$/,
+            /^White: \?; Black: \?\. Result: 0-1 \(checkmate\), after 2 moves\.\n[\s\S]*\n2\.g4: mate in one: Qh4#\n2\.\.\.♛h4#$/,
         );
     });
 
@@ -135,7 +135,7 @@ describe("the analysis of a game (D-68)", () => {
         const context = playerFolder();
         const analysis = await analyse(context, { pgn: "1. e4 e5 2. Nf3 d6 3. Bc4 Bg4 4. Nc3 g6 5. Nxe5 Bxd1 6. Bxf7+ Ke7 7. Nd5# 1-0" });
 
-        expect(analysis).toMatch(/\n6\.Bxf7\+: [^\n]*; one legal move: Ke7[;\n]/);
+        expect(analysis).toMatch(/\n6\.♝xf7\+: [^\n]*; one legal move: Ke7[;\n]/);
         expect(analysis.match(/one legal move/g)).toHaveLength(1);
     });
 
@@ -143,7 +143,7 @@ describe("the analysis of a game (D-68)", () => {
         const context = playerFolder();
         const analysis = await analyse(context, { pgn: "1. e4 d5 2. a3 dxe4 3. Nc3 Nf6 *" });
 
-        expect(analysis).toMatch(/\n1\.\.\.d5: at risk: undefended White Pe4\n2\.a3: out of book\n2\.\.\.dxe4: took P; material Black \+1 in pawns; at risk: none\n3\.Nc3: at risk: undefended Black Pe4\n/);
+        expect(analysis).toMatch(/\n1\.\.\.d5: at risk: undefended White Pe4\n2\.a3: out of book\n2\.\.\.dxe4: took P; material Black \+1 in pawns; at risk: none\n3\.♞c3: at risk: undefended Black Pe4\n/);
     });
 
     it("gives the game played here once it is over, with what the AI said and planned, and nothing while a game goes on", async () => {
