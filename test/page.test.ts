@@ -8,7 +8,7 @@ import { PositionChanged } from "../src/commands/answers/play-move.ts";
 import { status } from "../src/commands/game/status.ts";
 import { commands } from "../src/commands/index.ts";
 import { type Context, withProfile } from "../src/commands/registry/context.ts";
-import { archivedGames, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
+import { archivedGames, gameInAnalysis, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell/bell.ts";
@@ -114,15 +114,18 @@ describe("the page's server", () => {
     it("gives the game in analysis, with the AI's review, once no game goes on (D-69)", async () => {
         const folder = playerFolder();
         const page = await open(folder);
-        const served = async (): Promise<{ game: object | null; analysis?: { name: string; pgn: string; reviewing?: true; }; }> => JSON.parse((await get(page, "/api/game")).body);
+        const served = async (): Promise<{ game: object | null; analysis?: { name: string; pgn: string; reviewing?: true; incomplete?: true; }; }> => JSON.parse((await get(page, "/api/game")).body);
 
         await run(folder, "analyse_game", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' });
-        // Without its review, an AI goes over the game only while a chat is at work: with none at the table, nobody does.
+        // Without its review, an AI goes over the game only while a chat is at work: with none at the table, nobody does, and the analysis is incomplete.
+        expect((await served()).analysis).toMatchObject({ incomplete: true });
         expect((await served()).analysis?.reviewing).toBeUndefined();
         await page.chatCalls();
-        expect((await served()).analysis?.reviewing).toBe(true);
+        expect((await served()).analysis).toMatchObject({ reviewing: true });
+        expect((await served()).analysis?.incomplete).toBeUndefined();
         await run(folder, "annotate_game", { notes: [{ move: "2.", badge: "inaccuracy", note: "early queen" }], summary: "A quiet start." });
         expect((await served()).analysis?.reviewing).toBeUndefined();
+        expect((await served()).analysis?.incomplete).toBeUndefined();
         expect(await served()).toMatchObject({ game: null, analysis: { name: "study/2026-11-02-153012.pgn", book: 4 } });
         expect((await served()).analysis?.pgn.replace(/\s+/g, " ")).toContain("{[%review A quiet start.]} 1. e4 {[%badge book]} 1... e5 {[%badge book]} 2. Qh5?! {[%badge inaccuracy] [%review early queen]} 2... Nc6 {[%badge book]}");
 
@@ -148,6 +151,47 @@ describe("the page's server", () => {
         // A chat started clean since has no analyst at work any more.
         saveChatStart(folder, { source: "clear", at: new Date(context.now().getTime() + 60_000).toISOString() });
         expect(await reviewing()).toBeUndefined();
+    });
+
+    it("lets the analyst go when the chat's Stop hook lists no analyst running, as Claude Code does after it ends, is stopped or fails", async () => {
+        const folder = playerFolder();
+        const context = testContext(folder);
+        const page = await open(folder, undefined, context);
+        const kept = "study/2026-11-02-153012.pgn";
+        const port = Number(new URL(page.url).port);
+        const shown = async (): Promise<unknown> => JSON.parse((await get(page, "/api/game")).body).analysis;
+        const running = [{ id: "a1", type: "subagent", status: "running", agent_type: "chesspal-analyst" }];
+
+        await run(folder, "analyse_game", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' }, context);
+        startAnalysis(gameFolder(context.home()), kept, context.now(), { analyst: { game: kept, run: "analyst-1", since: context.now().toISOString() } });
+        expect(await shortly(waitForBell(JSON.stringify({ cwd: folder, background_tasks: running }), [port]))).toBe("waiting");
+        expect(await shown()).toMatchObject({ reviewing: true });
+
+        // Another agent still running is no analyst.
+        const other = [{ ...running[0], agent_type: "chesspal-coach" }];
+        expect(await shortly(waitForBell(JSON.stringify({ cwd: folder, background_tasks: other }), [port]))).toBe("waiting");
+        expect(await shown()).toMatchObject({ incomplete: true });
+        expect(gameInAnalysis(gameFolder(context.home()))?.analyst).toBeUndefined();
+    });
+
+    it("counts an analyst that has written nothing for half an hour as gone: the analysis is then incomplete", async () => {
+        const folder = playerFolder();
+        const started = testContext(folder);
+        let now = started.now();
+        const context = { ...started, now: () => now };
+        const page = await open(folder, undefined, context);
+        const kept = "study/2026-11-02-153012.pgn";
+        const shown = async (): Promise<unknown> => JSON.parse((await get(page, "/api/game")).body).analysis;
+
+        await run(folder, "analyse_game", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' }, context);
+        startAnalysis(gameFolder(context.home()), kept, now, { analyst: { game: kept, run: "analyst-1", since: now.toISOString() } });
+        expect(await shortly(waitForBell(JSON.stringify({ cwd: folder }), [Number(new URL(page.url).port)]))).toBe("waiting");
+
+        // Thinking long without a write is still at work.
+        now = new Date(started.now().getTime() + 29 * 60_000);
+        expect(await shown()).toMatchObject({ reviewing: true });
+        now = new Date(started.now().getTime() + 31 * 60_000);
+        expect(await shown()).toMatchObject({ incomplete: true });
     });
 
     it("keeps a game the player brings to analyse and puts it in analysis, refusing a PGN it cannot read or a game going on", async () => {

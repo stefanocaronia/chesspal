@@ -66,7 +66,7 @@ import { textFor } from "../text.ts";
 import { anchorName, useAnchor } from "./anchor.ts";
 import { useBrowseKeys, useFoldKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
 import { phaseOf, verdictOf } from "./phase.ts";
-import { type PageData, post, sendMessage, sendMove, useServed } from "./served.ts";
+import { ask, type PageData, post, sendMessage, sendMove, useServed } from "./served.ts";
 import { tabTitle, useTabTitle } from "./title.ts";
 
 /**
@@ -101,11 +101,25 @@ export function App({ start }: { start: Settings; })
     // Nuova partita with no chat at the table asks for one first (D-107): the chat's window, then the new game's, however the first closes.
     const [chatFirst, setChatFirst] = useState(false);
 
-    const askNewGame = (): void => {
+    // At the table with no chat, and none opening: what asks for the AI opens the chat's window first, to choose its host and model (D-107, D-109).
+    const chatMissing = (): boolean => {
         const table = offline ? undefined : served?.table;
-        const first = table !== undefined && !table.chat && table.opening === undefined;
+        return table !== undefined && !table.chat && table.opening === undefined;
+    };
+
+    // The chat's window opened for an analysis asks who reviews the game, not whom the player plays (Rosa, Zoe).
+    const [chatToReview, setChatToReview] = useState(false);
+
+    const askNewGame = (): void => {
+        const first = chatMissing();
         setChatFirst(first);
+        setChatToReview(false);
         setDialog(first ? "chat" : "new-game");
+    };
+
+    const askChat = (): void => {
+        setChatToReview(false);
+        setDialog("chat");
     };
 
     const closeChat = (): void => {
@@ -399,6 +413,8 @@ export function App({ start }: { start: Settings; })
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
     // An AI is going over the game only when the server says so: with no chat at it, nobody is (Stefano).
     const reviewing = summary === undefined && studied?.reviewing === true && !offline;
+    // With nobody at it, a review not finished says so, and the player brings the game back to the AI (D-109).
+    const completeIt = summary === undefined && studied?.incomplete === true && !offline ? () => void studyGame({ game: studied.name }) : undefined;
     const closing = studied === undefined ? undefined : closingOf(live.record);
     // In analysis the AI's card says who played that game, as its PGN keeps it (D-82), not who plays now.
     const playedBy = studied === undefined ? undefined : aiModelIn(live.record);
@@ -431,7 +447,7 @@ export function App({ start }: { start: Settings; })
     // Where to wake the chat, under the AI's card (over the board when the talk is folded); the button that starts the clocks, under the player's (Zoe).
     // On the table, what its chat is doing stands there, and in a game with no chat at it a line that opens the chat's window (D-107).
     const table = offline ? undefined : served.table;
-    const atTable = table === undefined ? null : tableNote({ table, name, inGame: going, onOpen: () => setDialog("chat"), text });
+    const atTable = table === undefined ? null : tableNote({ table, name, inGame: going, onOpen: askChat, text });
     const asleepNote = atTable !== null
         ? atTable
         : asleep && table?.chat !== false
@@ -555,15 +571,19 @@ export function App({ start }: { start: Settings; })
             />
         );
 
-    // A game brought to analyse: the page shows it once the server has it in analysis; a refusal stays in the dialog.
+    // A game brought to analyse: the page shows it once the server has it in analysis; a refusal stays in the dialog. One the AI has to go over, with no
+    // chat at the table, opens the chat's window: the analyst works with the chat's model (D-109).
     const studyGame = async (studied: Studied): Promise<string | undefined> => {
-        const refused = await post("/api/study", studied, text, name);
+        const sent = await ask("/api/study", studied, text, name);
 
-        if (refused === undefined) {
-            setDialog(undefined);
+        if ("refused" in sent) {
+            return sent.refused.text;
         }
 
-        return refused?.text;
+        const toReview = sent.answer.reviewed === false && chatMissing();
+        setChatToReview(toReview);
+        setDialog(toReview ? "chat" : undefined);
+        return undefined;
     };
 
     return (
@@ -581,7 +601,7 @@ export function App({ start }: { start: Settings; })
                     onClose={() => setDialog(undefined)}
                     text={text}
                 />
-                {table === undefined ? null : <ChatDialog open={dialog === "chat"} table={table} settings={settings} onChange={change} name={name} onClose={closeChat} text={text} />}
+                {table === undefined ? null : <ChatDialog open={dialog === "chat"} review={chatToReview} table={table} settings={settings} onChange={change} name={name} onClose={closeChat} text={text} />}
                 <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
                 {guide}
                 <StudyDialog open={dialog === "study"} onStudy={studyGame} onClose={() => setDialog(undefined)} you={profile.name} accounts={profile.accounts} ai={name} text={text} />
@@ -661,6 +681,7 @@ export function App({ start }: { start: Settings; })
                                             {...(at === total && closing !== undefined ? { closing } : {})}
                                             {...(at === 0 && summary !== undefined ? { summary } : {})}
                                             {...(reviewing ? { reviewing: true } : {})}
+                                            {...(completeIt === undefined ? {} : { onComplete: completeIt })}
                                             name={analyst}
                                             by={annotator}
                                             mood={mood}
@@ -697,7 +718,7 @@ export function App({ start }: { start: Settings; })
                                         <PlayerCard
                                             place="ai"
                                             picture={thinker(48)}
-                                            name={table === undefined ? name : <AiNameButton name={name} table={table} onOpen={() => setDialog("chat")} text={text} />}
+                                            name={table === undefined ? name : <AiNameButton name={name} table={table} onOpen={askChat} text={text} />}
                                             signed={signed}
                                             side={idle ? undefined : ai}
                                             {...(idle ? {} : { level: text.start.levels[level] })}
@@ -837,7 +858,14 @@ export function App({ start }: { start: Settings; })
                         )}
                         {...(helps === undefined && legendRows.length > 0 ? { legend } : {})}
                         {...(standings === undefined ? {} : { standings })}
-                        {...(studied === undefined ? {} : { analysis: { by: analyst, ...(summary === undefined ? {} : { summary }), ...(reviewing ? { reviewing: true } : {}) } })}
+                        {...(studied === undefined ? {} : {
+                            analysis: {
+                                by: analyst,
+                                ...(summary === undefined ? {} : { summary }),
+                                ...(reviewing ? { reviewing: true } : {}),
+                                ...(completeIt === undefined ? {} : { onComplete: completeIt }),
+                            },
+                        })}
                         shownPlies={at}
                         onShow={goTo}
                         onStep={step}

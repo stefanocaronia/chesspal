@@ -87,6 +87,10 @@ export interface Text
         mated(side: Side): string;
     };
     reviewing(name: string): string;
+    /** A game in analysis whose review nobody is finishing, and the button that brings it back to the AI, with its tooltip (D-109). */
+    readonly incomplete: string;
+    readonly complete: string;
+    readonly completeHint: string;
     readonly you: string;
     readonly ai: string;
     readonly sides: Readonly<Record<Side, string>>;
@@ -146,6 +150,9 @@ export interface Text
         /** The chat's window (D-107): its title, and what it says with no chat at the table, with one it can start again, and with one opened by hand. */
         readonly title: string;
         readonly choose: string;
+        /** The same, opened to have a game analysed (D-109). */
+        readonly reviewTitle: string;
+        readonly reviewChoose: string;
         readonly restartHint: string;
         byHand(name: string): string;
         /** The title of the AI's name, which opens the window: with no chat at the table, and with one. */
@@ -593,7 +600,7 @@ const english: Text = {
     saveMoves: "PGN",
     saveMovesHint: "The moves alone, to open on Lichess or chess.com",
     noGameNow: "No game in progress",
-    analysing: "Analysis in progress",
+    analysing: "Analysis",
     badges: {
         brilliant: "Brilliant",
         great: "Great move",
@@ -621,6 +628,9 @@ const english: Text = {
         mated: (side) => `${side === "white" ? "White" : "Black"} is mated`,
     },
     reviewing: (name) => `${name} is going over the game…`,
+    incomplete: "Analysis not complete",
+    complete: "Complete it",
+    completeHint: "Complete the analysis",
     you: "You",
     ai: "AI",
     sides: { white: "White", black: "Black" },
@@ -676,6 +686,8 @@ const english: Text = {
     table: {
         title: "Who are you playing?",
         choose: "Choose the chat to play with: it opens in a window of its own, to keep open.",
+        reviewTitle: "Who reviews the game?",
+        reviewChoose: "Choose the chat that reviews the game: it opens in a window of its own, to keep open.",
         restartHint: "Choose the model and effort, then press Claude Code or Codex: the chat starts again, clean, in the same window, once it has ended its answer. The game stays as it is.",
         byHand: (name) => `You opened this chat yourself: change ${name}'s model with /model in its window, or close it and open one from here, with the choices below.`,
         noChat: "No chat at the table: choose one",
@@ -1006,7 +1018,7 @@ const italian: Text = {
     saveMoves: "PGN",
     saveMovesHint: "Solo le mosse, da aprire su Lichess o chess.com",
     noGameNow: "Nessuna partita in corso",
-    analysing: "Analisi in corso",
+    analysing: "Analisi",
     badges: {
         brilliant: "Geniale",
         great: "Ottima mossa",
@@ -1034,6 +1046,9 @@ const italian: Text = {
         mated: (side) => `Matto al ${side === "white" ? "Bianco" : "Nero"}`,
     },
     reviewing: (name) => `${name} sta analizzando la partita…`,
+    incomplete: "Analisi non completa",
+    complete: "Completa",
+    completeHint: "Completa l'analisi",
     you: "Tu",
     ai: "AI",
     sides: { white: "Bianco", black: "Nero" },
@@ -1090,6 +1105,8 @@ const italian: Text = {
     table: {
         title: "Contro chi giochi?",
         choose: "Scegli la chat con cui giocare: parte in una finestra a parte, da tenere aperta.",
+        reviewTitle: "Chi analizza la partita?",
+        reviewChoose: "Scegli la chat che analizza la partita: parte in una finestra a parte, da tenere aperta.",
         restartHint: "Scegli modello e ragionamento, poi premi Claude Code o Codex: la chat riparte pulita nella stessa finestra, appena ha finito di rispondere. La partita resta com'è.",
         byHand: (name) => `Questa chat l'hai aperta tu: cambia il modello di ${name} con /model nella sua finestra, oppure chiudila e aprine una da qui, con le scelte qui sotto.`,
         noChat: "Nessuna chat al tavolo: scegline una",

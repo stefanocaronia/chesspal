@@ -10,7 +10,7 @@ import { newGame, startNewGame } from "../src/commands/game/new.ts";
 import { status } from "../src/commands/game/status.ts";
 import type { Context } from "../src/commands/index.ts";
 import { aiNameOf } from "../src/core/index.ts";
-import { loadGame, noteAiModel, saveTableTalk, startAnalysis, type TableTalk, talkLine } from "../src/games/index.ts";
+import { gameInAnalysis, loadGame, noteAiModel, saveTableTalk, startAnalysis, type TableTalk, talkLine } from "../src/games/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { bellHeard, pageAt, pagePorts } from "../src/server/bell/bell.ts";
@@ -226,15 +226,18 @@ describe("a chat at the table", () => {
         }
     });
 
-    it("forgets who played as the AI when the chat leaves: the next may be another", async () => {
+    it("forgets who played as the AI, and the analyst that went with it, when the chat leaves: the next may be another", async () => {
         const { home, table } = await tableOn();
         const chat = chatOn(home);
         const page = await attached(chat);
+        const kept = "study/2026-11-02-153012.pgn";
         noteAiModel(gameFolder(chat.home()), { model: "claude-opus-5-5" });
+        startAnalysis(gameFolder(chat.home()), kept, chat.now(), { analyst: { game: kept, run: "analyst-1", since: chat.now().toISOString() } });
         expect(await gameShown(table.url)).toMatchObject({ aiModel: { model: "claude-opus-5-5" } });
 
         await page.close();
         await until(async () => (await gameShown(table.url)).aiModel === undefined);
+        expect(gameInAnalysis(gameFolder(chat.home()))).toEqual({ game: kept, at: chat.now().toISOString() });
     });
 
     it("has the hook of the chat at the table wait there, and the hook of another chat of its folder at that chat's own page", async () => {

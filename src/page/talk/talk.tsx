@@ -35,13 +35,15 @@ export function AiWords({ words, newestFirst, voice }: { words: readonly string[
  * The AI's word on the move shown of a game in analysis (D-69), in a bubble under the Torretta beside the AI's name, pointing up at it: the move, its badge by name,
  * and its note when it wrote one; read out as the player steps through the game. The Torretta and the name stay when the move has no word.
  */
-export function AiNote({ ply, opening, closing, summary, reviewing, name, by, mood, voice, text }: {
+export function AiNote({ ply, opening, closing, summary, reviewing, onComplete, name, by, mood, voice, text }: {
     ply?: Ply;
     opening?: Opening;
     closing?: string;
     summary?: string;
     /** The AI is still reviewing the game: the Torretta says so too. */
     reviewing?: true;
+    /** Nobody is finishing the review: the note says so, with the button that brings the game back to the AI (D-109). */
+    onComplete?: () => void;
     name: string;
     /** Who made the analysis, signed under the Torretta (D-81); none in a game no host signed. */
     by?: { annotator: string; effort?: string; } | undefined;
@@ -112,6 +114,12 @@ export function AiNote({ ply, opening, closing, summary, reviewing, name, by, mo
                     </p>
                 )
                 : null}
+            {onComplete === undefined ? null : (
+                <p class="say incomplete">
+                    <span role="status">{text.incomplete}</span>
+                    <button type="button" title={text.completeHint} aria-label={text.completeHint} onClick={onComplete}>{text.complete}</button>
+                </p>
+            )}
         </div>
     );
 }

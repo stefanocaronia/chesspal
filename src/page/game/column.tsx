@@ -33,8 +33,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     legend?: ComponentChildren;
     /** Who the AI saw ahead after the moves, with the helps on in a game and in analysis (D-90): the bar shows it, and in analysis the chart. */
     standings?: readonly Standing[];
-    /** The game in analysis: who reviews it, their word on the whole game once written, and whether an AI is going over it now. */
-    analysis?: { by: string; summary?: string; reviewing?: true; };
+    /** The game in analysis: who reviews it, their word on the whole game once written, whether an AI is going over it now, or else what completes it. */
+    analysis?: { by: string; summary?: string; reviewing?: true; onComplete?: () => void; };
     shownPlies: number;
     onShow: (plies: number) => void;
     onStep: (step: Step) => void;
@@ -63,15 +63,22 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                         {/* The cards scroll under the wheel when the column is short: the moves and the steps stay in sight, by the board's lower edge (Stefano). */}
                         <div class="side-cards">
                             <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} bar={bar} text={text} />
-                            {analysis === undefined || standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={shownPlies} onShow={onShow} text={text} />}
-                            {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
-                            {helps}
+                            {/* Where the analysis stands, under the game's card, in sight above the fold (Zoe). */}
                             {analysis?.reviewing !== true ? null : (
                                 <p class="card review waiting" role="status">
                                     <span class="spinner" aria-hidden="true" />
                                     {text.reviewing(analysis.by)}
                                 </p>
                             )}
+                            {analysis?.onComplete === undefined ? null : (
+                                <div class="card review incomplete">
+                                    <p role="status">{text.incomplete}</p>
+                                    <button type="button" title={text.completeHint} aria-label={text.completeHint} onClick={analysis.onComplete}>{text.complete}</button>
+                                </div>
+                            )}
+                            {analysis === undefined || standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={shownPlies} onShow={onShow} text={text} />}
+                            {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
+                            {helps}
                         </div>
                         {/* The moves, then the saves and the analysis, over the buttons that step through them (Stefano). */}
                         <div class="side-foot">

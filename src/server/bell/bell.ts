@@ -6,6 +6,7 @@ import { get, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
 import { writeAtomically } from "../../games/index.ts";
 import { dataFolder, tableFolder } from "../../home/index.ts";
+import { analystAgent } from "../../host-files/index.ts";
 import { version } from "../../version.ts";
 
 /** What the chat hears from the doorbell: one line for whatever the player did, never what, only where to read it. */
@@ -234,7 +235,8 @@ export async function bellHeard(input: string, ports?: number[]): Promise<BellHe
         return { folder, rang: false, why: `${pages} at ports ${tried.join(", ")}${others.length > 0 ? `; ${others.join(", ")}` : ""}` };
     }
 
-    const said = await body(port, "/api/bell");
+    // The page lets the analyst go as the hook starts waiting, when none runs any more.
+    const said = await body(port, hook.analystGone === true ? "/api/bell?analyst=gone" : "/api/bell");
     return said === "ring" ? { folder, rang: true } : { folder, rang: false, why: said === undefined ? `the page at port ${port} did not answer` : `the page at port ${port} said "${said}"` };
 }
 
@@ -315,17 +317,30 @@ function chatFolder(hook: { cwd?: string; }): string
     return resolve(process.env.CLAUDE_PROJECT_DIR ?? hook.cwd ?? process.cwd());
 }
 
-function hookInput(input: string): { session?: string; cwd?: string; }
+function hookInput(input: string): { session?: string; cwd?: string; analystGone?: true; }
 {
     try {
-        const parsed = JSON.parse(input) as { session_id?: unknown; cwd?: unknown; };
+        const parsed = JSON.parse(input) as { session_id?: unknown; cwd?: unknown; background_tasks?: unknown; };
         return {
             ...(typeof parsed.session_id === "string" ? { session: parsed.session_id } : {}),
             ...(typeof parsed.cwd === "string" ? { cwd: parsed.cwd } : {}),
+            ...(analystGone(parsed.background_tasks) ? { analystGone: true } : {}),
         };
     } catch {
         return {};
     }
+}
+
+/**
+ * Whether Claude Code's Stop hook says no analyst runs in the background: after it ends, is stopped or fails, the chat takes a turn, and its Stop hook
+ * lists the tasks still running (D-109, Priya's test). A host that lists none says nothing.
+ */
+function analystGone(tasks: unknown): boolean
+{
+    return Array.isArray(tasks) && !tasks.some((task) => {
+        const { agent_type: agent, status } = (task ?? {}) as { agent_type?: unknown; status?: unknown; };
+        return agent === analystAgent && status === "running";
+    });
 }
 
 /**

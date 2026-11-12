@@ -2,7 +2,7 @@
 // it saw, and asks for the New game window. One chat at a time, of this version alone; a page a chat serves itself has none of these routes.
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { forgetTheAi, noteAiHost, noteAiModel } from "../../games/index.ts";
+import { forgetAnalyst, forgetTheAi, noteAiHost, noteAiModel } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
 import { type Attached, chatAttach, chatCopy } from "./chat.ts";
@@ -79,11 +79,16 @@ function attach(body: Record<string, unknown>, response: ServerResponse, served:
     tellWatchers(served.watchers);
 }
 
-/** The next chat may play in another host, with another model: the AI's card shows its own from its first move (Federico). */
+/**
+ * The next chat may play in another host, with another model: the AI's card shows its own from its first move (Federico). The analyst ended with its chat
+ * (D-109): the game it held is free for the next one.
+ */
 function forgetChat(served: Served): void
 {
     try {
-        forgetTheAi(gameFolder(served.context.home()));
+        const folder = gameFolder(served.context.home());
+        forgetTheAi(folder);
+        forgetAnalyst(folder);
     } catch {
         // A data folder that cannot be read keeps no notes to forget.
     }

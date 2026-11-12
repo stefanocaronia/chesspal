@@ -320,6 +320,27 @@
     color: var(--soft);
 }
 
+/* A review nobody is finishing: the note, and beside it the button that brings the game back to the AI (D-109); neutral, as no error (Zoe) */
+.review.incomplete,
+.say.incomplete {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0;
+    color: var(--soft);
+}
+
+.review.incomplete button,
+.say.incomplete button {
+    flex: none;
+}
+
+/* On the bubble's tint the button keeps the card's ground, to read as one */
+.say.incomplete button {
+    background: var(--card);
+}
+
 .review ul {
     margin: 0;
     padding-left: 18px;
@@ -497,7 +518,8 @@
     padding: 8px;
 }
 
-.analysis-actions button {
+.analysis-actions button,
+.incomplete button {
     flex: 1;
     display: inline-flex;
     align-items: center;
@@ -513,7 +535,8 @@
     cursor: pointer;
 }
 
-.analysis-actions button:hover {
+.analysis-actions button:hover,
+.incomplete button:hover {
     border-color: var(--accent);
 }
 

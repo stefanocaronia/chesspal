@@ -10,9 +10,10 @@ import { checkIcon } from "../dialogs/profiles.tsx";
 import type { Settings } from "../profile/settings.ts";
 import type { Text } from "../text.ts";
 
-/** The chat's window: closed once a chat opens or starts again, the page then saying where it stands. */
-export function ChatDialog({ open, table, settings, onChange, name, onClose, text }: {
+/** The chat's window: closed once a chat opens or starts again, the page then saying where it stands; `review` when it opened to have a game analysed. */
+export function ChatDialog({ open, review = false, table, settings, onChange, name, onClose, text }: {
     open: boolean;
+    review?: boolean;
     table: TableShown;
     settings: Settings;
     onChange: (settings: Settings) => void;
@@ -44,23 +45,24 @@ export function ChatDialog({ open, table, settings, onChange, name, onClose, tex
     };
 
     // While a chat opens or waits to start again, the rows wait too, and the note says why.
+    const chooseNote = review ? words.reviewChoose : words.choose;
     const note = installed.length === 0
         ? words.install(name)
         : busy
-        ? chatState(table, name, text) ?? words.choose
+        ? chatState(table, name, text) ?? chooseNote
         : byHand
         ? words.byHand(name)
         : table.chat
         ? words.restartHint
-        : words.choose;
+        : chooseNote;
     const offersChoices = installed.some((host) => host.models.length > 0 || host.efforts.length > 0);
     // The chat at the table started with other choices than the ones kept now: its row starts it again with these, else it only closes the window.
     const started = table.held ? table.started : undefined;
     const changed = (host: ChatHost): boolean => started !== undefined && (chosen(host, "model", settings) !== (started.model ?? "") || chosen(host, "effort", settings) !== (started.effort ?? ""));
     return (
-        <Dialog open={open} title={words.title} onClose={onClose} text={text}>
+        <Dialog open={open} title={review ? words.reviewTitle : words.title} onClose={onClose} text={text}>
             <p class="note">{note}</p>
-            <div class="chat-hosts" role="group" aria-label={words.title}>
+            <div class="chat-hosts" role="group" aria-label={review ? words.reviewTitle : words.title}>
                 {offersChoices
                     ? (
                         <div class="chat-head" aria-hidden="true">

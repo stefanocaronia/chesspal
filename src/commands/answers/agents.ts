@@ -115,15 +115,20 @@ export function goneOver(context: Context, game: string): boolean
 
 /**
  * The run of the analyst agent at work on a game: the one that took it last, unless its chat has started again since, not only summarized, and took the
- * agent with it.
+ * agent with it, or it has written nothing for half an hour, as one long dead (D-109): a quiet minute proves nothing, since an analyst may think long.
  */
 export function analystOf(context: Context, game: string): string | undefined
 {
-    const taken = gameInAnalysis(gameFolder(context.home()))?.analyst;
+    const analysis = gameInAnalysis(gameFolder(context.home()));
+    const taken = analysis?.analyst;
     const start = lastChatStart(context.folder);
-    const gone = taken !== undefined && start !== undefined && start.source !== "compact" && Date.parse(start.at) > Date.parse(taken.since);
-    return taken?.game === game && !gone ? taken.run : undefined;
+    const restarted = taken !== undefined && start !== undefined && start.source !== "compact" && Date.parse(start.at) > Date.parse(taken.since);
+    const quiet = analysis !== undefined && context.now().getTime() - Date.parse(analysis.at) > analystQuiet;
+    return taken?.game === game && !restarted && !quiet ? taken.run : undefined;
 }
+
+/** How long an analyst may write nothing before it counts as gone. */
+const analystQuiet = 30 * 60 * 1000;
 
 /** What stops an analyst agent on a game another analyst has taken: the chat hears of the review from that one (Priya). */
 export const anotherAnalyst = "Stop now: another analyst is reviewing this game. End with one line for the AI that started you: its review is on its way to the "

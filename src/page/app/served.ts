@@ -104,7 +104,7 @@ export interface PageData
     /** The talk before the first game (D-77), with no game. */
     readonly talk?: readonly TalkLine[];
     /** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review, and whether an AI is going over it now. */
-    readonly analysis?: { readonly name: string; readonly pgn: string; readonly book: number; readonly reviewing?: true; };
+    readonly analysis?: { readonly name: string; readonly pgn: string; readonly book: number; readonly reviewing?: true; readonly incomplete?: true; };
     readonly opponent?: string;
     /** The model and effort the AI played its last move with, as the host tied them to it (D-82). */
     readonly aiModel?: AiModel;
@@ -157,18 +157,25 @@ export interface ChatHost
  */
 export async function post(path: string, body: object, text: Text, name: string): Promise<Refused | undefined>
 {
+    const sent = await ask(path, body, text, name);
+    return "refused" in sent ? sent.refused : undefined;
+}
+
+/** Sends a request to the server as `post` does: its answer, or the reason it was refused. */
+export async function ask(path: string, body: object, text: Text, name: string): Promise<{ answer: Record<string, unknown>; } | { refused: Refused; }>
+{
     try {
         const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
         if (response.ok) {
-            return undefined;
+            return { answer: await response.json().catch(() => ({})) as Record<string, unknown> };
         }
 
         const refused = (await response.json()) as { error?: string; refusal?: string; most?: number; };
         const known = refused.refusal === undefined ? undefined : text.refused[refused.refusal as ServerRefusal] as ((most: number, name: string) => string) | undefined;
-        return { text: known?.(refused.most ?? 0, name) ?? refused.error ?? response.statusText, words: refused.refusal?.startsWith("words-") === true };
+        return { refused: { text: known?.(refused.most ?? 0, name) ?? refused.error ?? response.statusText, words: refused.refusal?.startsWith("words-") === true } };
     } catch (error) {
-        return { text: String(error), words: false };
+        return { refused: { text: String(error), words: false } };
     }
 }
 

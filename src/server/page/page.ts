@@ -5,7 +5,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { join } from "node:path";
 import { type Context, positionIn, samePosition, type SeenPosition } from "../../commands/index.ts";
 import { aiNameOf } from "../../core/index.ts";
-import { gameStamp, tableTalkStamp } from "../../games/index.ts";
+import { forgetAnalyst, gameStamp, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { Bell, bellProbe, pagePorts, type TableChat } from "../bell/index.ts";
@@ -244,10 +244,24 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         if (url.searchParams.has("probe")) {
             send(response, 200, json, JSON.stringify(bellProbe(served.folder, served.watchers.size > 0, tableChat(served))));
         } else {
+            if (url.searchParams.get("analyst") === "gone") {
+                forgetGoneAnalyst(served);
+            }
+
             served.bell.listen(request, response);
         }
     } else {
         sendFile(response, path);
+    }
+}
+
+/** The chat's hook says no analyst runs any more (D-109): the game it held is free, and its review, unless finished, incomplete. */
+function forgetGoneAnalyst(served: Served): void
+{
+    try {
+        forgetAnalyst(gameFolder(served.context.home()));
+    } catch {
+        // A data folder that cannot be written keeps the analyst until half an hour has gone by.
     }
 }
 
