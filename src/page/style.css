@@ -3,6 +3,7 @@
 @import "base.css";
 @import "layout/layout.css";
 @import "board/board.css";
+@import "avatars/torretta.css";
 @import "talk/talk.css";
 @import "talk/chat.css";
 @import "table/table.css";
