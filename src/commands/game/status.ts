@@ -196,8 +196,10 @@ function firstInChat(context: Context, chatStart: string | undefined): boolean
  */
 function analysisLine({ game, brought, redo, analyst, codex, review }: NonNullable<Status["analysis"]>): string
 {
+    // A chat that remembered the old review put its notes back with annotate_game, and its corrections stand over every review after (Priya).
     if (redo === true && analyst === "offer") {
-        return `The player asked on the board page for a new review of ${game}. Next, at once, even if an analyst was stopped before: ${analystLine(game, codex === true)}`;
+        return `The player asked on the board page for a new review of ${game}. Next, at once, even if an analyst was stopped before: ${analystLine(game, codex === true)} `
+            + "The new review replaces the old one: correct a note with annotate_game only when the player shows it wrong.";
     }
 
     if (brought === true && analyst !== "done") {

@@ -89,6 +89,8 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         expect(status).toContain(
             `\nThe player asked on the board page for a new review of ${game}. Next, at once, even if an analyst was stopped before: start the chesspal-analyst agent`,
         );
+        // The chat that remembers the old review leaves the new one to the analyst.
+        expect(status).toContain("from what it tells you. The new review replaces the old one: correct a note with annotate_game only when the player shows it wrong.");
         expect(status).not.toContain("don't start it for this review");
         expect(await run({ ...analyst, agentRun: "agent-second" }, "analyse_game", { game })).toMatch(/^You played Black/);
     });
