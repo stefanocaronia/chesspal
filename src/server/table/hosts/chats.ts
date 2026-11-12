@@ -1,8 +1,7 @@
 // The chats a table opens from its page (D-104): the hosts found on this computer, each with the choices the page offers, and a terminal in the table's
 // folder running `chesspal play <host>`, which starts the host there, and again when the table asks it.
 import type { Context } from "../../../commands/index.ts";
-import { tableFolder } from "../../../home/index.ts";
-import { samePath } from "../../bell/index.ts";
+import { samePath, tableFolder } from "../../../home/index.ts";
 import type { ChatHost, TableChats } from "../../page/index.ts";
 import { programPath } from "./find.ts";
 import { hostChoices, hostNames, isHostName } from "./hosts.ts";

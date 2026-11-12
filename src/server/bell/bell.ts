@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { get, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
 import { writeAtomically } from "../../games/index.ts";
-import { dataFolder, tableFolder } from "../../home/index.ts";
+import { dataFolder, samePath, tableFolder } from "../../home/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { version } from "../../version.ts";
 
@@ -368,12 +368,6 @@ function probeOf(said: string | undefined): BellProbe | undefined
     } catch {
         return undefined;
     }
-}
-
-/** Whether two paths name the same folder: without regard to case on Windows. */
-export function samePath(one: string, other: string): boolean
-{
-    return process.platform === "win32" ? resolve(one).toLowerCase() === resolve(other).toLowerCase() : resolve(one) === resolve(other);
 }
 
 /** The body a page of this computer answers with, once it ends; undefined when it does not answer, or not with 200. */

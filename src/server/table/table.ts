@@ -2,9 +2,9 @@
 // to; it closes by itself once no browser has had the page open, and no chat been attached, for a while.
 import { request } from "node:http";
 import type { Context } from "../../commands/index.ts";
-import { tableFolder } from "../../home/index.ts";
+import { samePath, tableFolder } from "../../home/index.ts";
 import { setUpHosts } from "../../host-files/index.ts";
-import { pageAt, pagePorts, samePath } from "../bell/index.ts";
+import { pageAt, pagePorts } from "../bell/index.ts";
 import { type Page, startPage, type TableChats } from "../page/index.ts";
 import type { TableUpdater } from "./update.ts";
 
