@@ -394,6 +394,8 @@
     overflow: hidden auto;
     scrollbar-width: none;
     font-size: 14px;
+    /* A row too long for a phone never makes the page wider */
+    contain: inline-size;
 }
 
 .moves ol {
@@ -436,6 +438,11 @@
     color: inherit;
     font: inherit;
     cursor: pointer;
+}
+
+/* A move never breaks, its piece always beside its square: a long one takes room from its neighbour in the row */
+.moves .ply {
+    white-space: nowrap;
 }
 
 /* The move under the pointer in a neutral grey, never the accent, so it never reads as the move shown (Stefano) */
@@ -549,6 +556,32 @@
 
     .moves li {
         break-inside: avoid;
+    }
+}
+
+/* On a phone the rows give the moves all the room they can, so that two columns hold a move with its badge on one line (Zoe) */
+@media (max-width: 479px) {
+    .moves ol {
+        column-gap: 8px;
+    }
+
+    .moves li {
+        grid-template-columns: 22px 1fr 1fr;
+        column-gap: 4px;
+        padding: 3px 4px;
+    }
+
+    .moves .ply {
+        gap: 3px;
+        padding: 1px 4px;
+        margin-left: -4px;
+    }
+}
+
+/* On the narrowest phones two columns would leave a move no room: one column */
+@media (max-width: 359px) {
+    .moves ol {
+        columns: 1;
     }
 }
 
