@@ -1,7 +1,7 @@
 // The player's rating on Chess.com (D-105): their statistics, with the date of the last game at each speed. Chess.com has no classical speed.
-import type { SiteReading } from "../profiles/index.ts";
+import type { SiteReading } from "../../profiles/index.ts";
+import { askSite, type Fetch } from "../request/index.ts";
 import { counted } from "./choice.ts";
-import { askSite, type Fetch } from "./request/index.ts";
 
 /** What Chess.com says of a name: undefined when it could not be reached. */
 export async function chesscomReading(account: string, fetch: Fetch, signal: AbortSignal): Promise<SiteReading | undefined>

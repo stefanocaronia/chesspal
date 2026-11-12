@@ -39,6 +39,14 @@ const commandsOrder = commandsSteps.flatMap((step, index) =>
     })
 );
 
+// The window's members whose names a page's own variables also take, the list of confusing-browser-globals.
+const windowNames = `
+addEventListener blur close closed confirm defaultStatus defaultstatus event external find focus frameElement frames history innerHeight innerWidth
+length location locationbar menubar moveBy moveTo name onblur onerror onfocus onload onresize onunload open opener opera outerHeight outerWidth
+pageXOffset pageYOffset parent print removeEventListener resizeBy resizeTo screen screenLeft screenTop screenX screenY scroll scrollbars scrollBy
+scrollTo scrollX scrollY self status statusbar stop toolbar top
+`.trim().split(/\s+/);
+
 // Only the layout rules dprint cannot apply: braces always, a blank line around block statements, at most one blank line.
 export default [
     { ignores: ["**/dist/", "node_modules/", "project/", "tmp/"] },
@@ -111,6 +119,11 @@ export default [
                 ],
             }],
         },
+    },
+    // The window's members that read as plain names: a vanished local such as `opener` or `name` still compiles as the window's. Reach them through `window.`.
+    {
+        files: ["src/page/**/*.ts", "src/page/**/*.tsx"],
+        rules: { "no-restricted-globals": ["error", ...windowNames.map((name) => ({ name, message: `\`${name}\` here is the window's: declare it, or write \`window.${name}\` if the window's is meant.` }))] },
     },
     // The games on disk sit below the commands, and print nothing: the MCP server speaks on stdout.
     {

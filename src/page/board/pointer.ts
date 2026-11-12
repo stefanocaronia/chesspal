@@ -150,11 +150,11 @@ export function useBoardPointer({ columns, ranks, pieces, player, selected, targ
         };
 
         const landed = drag.back ? setTimeout(() => setDrag(undefined), reducedMotion() ? 0 : 260) : undefined;
-        addEventListener("keydown", escape);
+        window.addEventListener("keydown", escape);
         document.documentElement.classList.add("dragging");
 
         return () => {
-            removeEventListener("keydown", escape);
+            window.removeEventListener("keydown", escape);
             document.documentElement.classList.remove("dragging");
             clearTimeout(landed);
         };

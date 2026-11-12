@@ -1,5 +1,5 @@
 // Which of a site's ratings counts (D-106): the rapid, and when it is missing or provisional the classical, then the blitz.
-import { type Speed, speeds } from "../profiles/index.ts";
+import { type Speed, speeds } from "../../profiles/index.ts";
 
 /** A site's rating at one speed, as it gives it: established once it is no longer provisional. */
 export interface Candidate

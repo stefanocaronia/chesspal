@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { request } from "node:http";
+import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +11,7 @@ import { type Context, withProfile } from "../src/commands/registry/context.ts";
 import { archivedGames, gameInAnalysis, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
-import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, waitForBell } from "../src/server/bell/bell.ts";
+import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, pageAt, waitForBell } from "../src/server/bell/bell.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { profilesShown } from "../src/server/page/profiles.ts";
 import { version } from "../src/version.ts";
@@ -1053,6 +1053,29 @@ describe("the doorbell of the chat", () => {
         seconds = 91;
         expect((await game()).pgn).toContain('[Result "0-1"]');
         expect(await waitForBell(JSON.stringify({ cwd: folder }), [Number(new URL(page.url).port)])).toBe(true);
+    });
+
+    it("hears a page that answered while the process asking was stalled, and gives up on a port that never answers", async () => {
+        const page = await open(playerFolder());
+        const asked = pageAt(Number(new URL(page.url).port));
+        // A stall longer than a probe waits, as on a busy computer: its timer fires before the answer waiting is read.
+        const until = Date.now() + 1200;
+
+        while (Date.now() < until) {
+            // Stalled.
+        }
+
+        expect(await asked).toMatchObject({ open: false });
+
+        const silent = createServer(() => undefined);
+        await new Promise<void>((done) => silent.listen(0, "127.0.0.1", done));
+
+        try {
+            expect(await pageAt((silent.address() as { port: number; }).port)).toBeUndefined();
+        } finally {
+            silent.closeAllConnections();
+            silent.close();
+        }
     });
 
     it("finds no page for a folder that has none", async () => {
