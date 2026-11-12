@@ -40,6 +40,23 @@ describe("the command line", () => {
         }
     });
 
+    it("lists the player's commands first in its help, then the others", async () => {
+        const { output, exitCode } = await runCommandLine(["--help"], context);
+        const forPlayer = output.indexOf("For the player:");
+        const forOthers = output.indexOf("For the AI, and for whoever develops Chesspal:");
+
+        expect(exitCode).toBe(0);
+        expect(forPlayer).toBeGreaterThan(0);
+        expect(forOthers).toBeGreaterThan(forPlayer);
+
+        for (const command of ["play", "init", "icon"]) {
+            const at = output.indexOf(`\n  ${command} `);
+            expect(at > forPlayer && at < forOthers, command).toBe(true);
+        }
+
+        expect(output.indexOf("\n  status ")).toBeGreaterThan(forOthers);
+    });
+
     it("explains a command with --help", async () => {
         const { output, exitCode } = await runCommandLine(["status", "--help"], context);
 

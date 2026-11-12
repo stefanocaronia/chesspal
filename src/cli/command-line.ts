@@ -18,7 +18,7 @@ const listenDescription = "Wait for the player's move on the board page and wake
 const chatDescription = "Note how the chat started: new, cleared, resumed or compacted. Claude Code and Codex run it when a chat starts, as init sets them up.";
 const tableDescription = "Serve the board page with no chat, until no browser has had it open for five minutes. `chesspal` alone starts it apart and opens the page.";
 const openDescription = "Open the board page as `chesspal` alone does, without asking about the icon: what the icon runs.";
-const iconDescription = "Put Chesspal's icon on the desktop and in the menu: it opens the board page as `chesspal` alone does, with no terminal.";
+const iconDescription = "Put Chesspal's icon on the desktop and in the menu: it opens the board page as `chesspal` alone does, with no terminal. `chesspal icon --remove` takes it away.";
 const playDescription = "Play at the table in Claude Code or Codex, in this terminal: what the page's buttons open, with the model and effort chosen there; New game on the page starts the chat again, clean.";
 // Those of them that take no options, by name.
 const plainCommands = new Map([["mcp", mcpDescription], ["chat", chatDescription], ["table", tableDescription], ["open", openDescription], ["icon", iconDescription]]);
@@ -204,22 +204,26 @@ function inputFields(command: AnyCommand): [string, z.ZodType][]
     return Object.entries(command.input.shape as Record<string, z.ZodType>);
 }
 
-/** The commands, each with the first sentence of its description. */
+/** The commands, each with the first sentence of its description: the player's first, then those of the AI and of whoever develops Chesspal. */
 function generalHelp(list: AnyCommand[]): string
 {
     const width = Math.max("listen".length, ...list.map((command) => command.name.length));
     const line = (name: string, description: string): string => `  ${name.padEnd(width)} ${firstSentence(description)}`;
+    const init = list.find((command) => command.name === "init");
     return [
         `chesspal ${version}`,
         "",
-        "Run `chesspal` alone to open the board page in your browser.",
+        "To play, type `chesspal` alone: the board opens in your browser, and from there you start the AI.",
         "",
-        "Commands:",
-        ...list.map((command) => line(command.name, command.description)),
+        "For the player:",
+        line("play", playDescription),
+        ...(init === undefined ? [] : [line(init.name, init.description)]),
+        line("icon", iconDescription),
+        "",
+        "For the AI, and for whoever develops Chesspal:",
+        ...list.filter((command) => command !== init).map((command) => line(command.name, command.description)),
         line("table", tableDescription),
         line("open", openDescription),
-        line("icon", iconDescription),
-        line("play", playDescription),
         line("mcp", mcpDescription),
         line("listen", listenDescription),
         line("chat", chatDescription),
