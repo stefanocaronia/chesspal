@@ -29,8 +29,8 @@ describe("the move shown in the page's address", () => {
         expect(anchorAction({ game: "2026-11-04-184025", plies: 31 }, games, undefined)).toBe("view");
         expect(anchorAction(other, games, undefined)).toBe("open");
         expect(anchorAction(other, games, other.game)).toBe("wait");
-        // A game going on keeps its place.
-        expect(anchorAction(other, { ...games, played: "2026-11-09-220000", going: true }, undefined)).toBe("drop");
+        // A game going on keeps its place, and the page says why the link is not followed.
+        expect(anchorAction(other, { ...games, played: "2026-11-09-220000", going: true }, undefined)).toBe("refuse");
         // The game just played, with the table set (D-77), opens in analysis on the player's yes alone (D-89); once another game shows, the link goes.
         expect(anchorAction(other, { ...games, shown: undefined, played: other.game }, undefined)).toBe("wait");
         expect(anchorAction(other, { ...games, played: other.game }, undefined)).toBe("drop");

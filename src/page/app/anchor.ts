@@ -42,18 +42,18 @@ export interface AnchoredGames
 }
 
 /**
- * What the page does with the place the address names: goes to its move on the game shown; drops it while a game goes on; waits while its game opens in
- * analysis, `asked` already; else opens its game in analysis, but the game just played, which opens on the player's yes alone (D-89): the link waits for
- * it while the table is set (D-77), and goes once another game shows (Zoe).
+ * What the page does with the place the address names: goes to its move on the game shown; refuses it while a game goes on; waits while its game opens
+ * in analysis, `asked` already; else opens its game in analysis, but the game just played, which opens on the player's yes alone (D-89): the link waits
+ * for it while the table is set (D-77), and goes once another game shows (Zoe).
  */
-export function anchorAction(wanted: Anchor, games: AnchoredGames, asked: string | undefined): "view" | "drop" | "wait" | "open"
+export function anchorAction(wanted: Anchor, games: AnchoredGames, asked: string | undefined): "view" | "refuse" | "drop" | "wait" | "open"
 {
     if (wanted.game === games.shown) {
         return "view";
     }
 
     if (games.going) {
-        return "drop";
+        return "refuse";
     }
 
     if (wanted.game === games.played) {
@@ -69,11 +69,20 @@ export function shownHash(games: AnchoredGames, viewing: number | undefined): st
     return games.shown === undefined ? "" : hashOf(viewing === undefined || games.going ? { game: games.shown } : { game: games.shown, plies: viewing });
 }
 
+/** Why the page did not open the game a link names: a game goes on, or the game is not in the profile. */
+export type LinkIgnored = "going" | "gone";
+
 /**
  * Keeps the move shown in the address, and goes to the place the address names as the page opens or as the player writes it (anchorAction); `open` opens a
- * game in analysis and says whether it did. A link never shows its move on another game.
+ * game in analysis and says whether it did, and `ignored` says why a link was not followed. A link never shows its move on another game.
  */
-export function useAnchor(games: AnchoredGames, viewing: number | undefined, view: (plies: number | undefined) => void, open: (game: string) => Promise<boolean>): void
+export function useAnchor(
+    games: AnchoredGames,
+    viewing: number | undefined,
+    view: (plies: number | undefined) => void,
+    open: (game: string) => Promise<boolean>,
+    ignored: (why: LinkIgnored) => void,
+): void
 {
     const { ready, shown, played, going } = games;
     const [wanted, setWanted] = useState(() => anchorOf(location.hash));
@@ -100,7 +109,11 @@ export function useAnchor(games: AnchoredGames, viewing: number | undefined, vie
             view(wanted.plies);
         }
 
-        if (action === "view" || action === "drop") {
+        if (action === "refuse") {
+            ignored("going");
+        }
+
+        if (action === "view" || action === "refuse" || action === "drop") {
             setWanted(undefined);
         }
 
@@ -113,6 +126,7 @@ export function useAnchor(games: AnchoredGames, viewing: number | undefined, vie
         void open(game).then((opened) => {
             // A place written since stays wanted (Federico).
             if (!opened && asked.current === game) {
+                ignored("gone");
                 setWanted(undefined);
             }
         });
