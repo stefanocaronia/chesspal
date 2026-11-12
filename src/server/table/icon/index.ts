@@ -1,6 +1,6 @@
 // Chesspal's icon on the desktop and in the system's menu (D-104): it opens the table as `chesspal` alone does, with no console, on Windows, macOS and Linux.
 // The command line asks once a machine whether to put it there.
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,6 +73,21 @@ export function noteIconMade(home: string, command: IconCommand, files: readonly
     const notes = iconNotes(home);
     const asked = notes.asked.includes(machine) ? notes.asked : [...notes.asked, machine];
     writeIconNotes(home, { asked, made: { ...notes.made, [machine]: { command: commandLine(command), files: [...files] } } });
+}
+
+/** Takes Chesspal's icon off the desktop and the menu of this machine, the files noted when it was made: those it removed. */
+export function removeIcons(home: string, machine = hostname()): string[]
+{
+    const notes = iconNotes(home);
+    const removed = (notes.made[machine]?.files ?? []).filter((file) => existsSync(file));
+
+    // On macOS the icon is an application, a folder.
+    for (const file of removed) {
+        rmSync(file, { recursive: true, force: true });
+    }
+
+    writeIconNotes(home, { ...notes, made: Object.fromEntries(Object.entries(notes.made).filter(([name]) => name !== machine)) });
+    return removed;
 }
 
 /**

@@ -3,7 +3,7 @@ import { runCommandLine } from "./command-line.ts";
 
 const args = process.argv.slice(2);
 
-// The table's own words (D-104): alone or open, its page; table, icon, play <host>. The host's: mcp, its server; listen, its doorbell; chat, how the chat
+// The table's own words (D-104): alone or open, its page; table, icon (--remove), play <host>. The host's: mcp, its server; listen, its doorbell; chat, how the chat
 // started. Everything else is a command.
 if (args.length === 0) {
     await openTableHere(true);
@@ -14,6 +14,9 @@ if (args.length === 0) {
     await serveTable();
 } else if (args.length === 1 && args[0] === "icon") {
     await putIconHere();
+} else if (args.length === 2 && args[0] === "icon" && args[1] === "--remove") {
+    const [{ defaultContext }, { iconsRemoved }] = await Promise.all([import("../commands/index.ts"), import("./icon.ts")]);
+    console.log(iconsRemoved(defaultContext()));
 } else if (args.length === 2 && args[0] === "play" && !args[1]!.startsWith("-")) {
     await playHere(args[1]!);
 } else if (args.length === 1 && args[0] === "mcp") {

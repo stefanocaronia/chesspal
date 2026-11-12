@@ -3,7 +3,7 @@
 import { createInterface } from "node:readline/promises";
 import { styleText } from "node:util";
 import { type Context, speaksItalian } from "../commands/index.ts";
-import { iconAsked, iconCommand, type IconPlaces, iconToRemake, makeIcons, noteIconAsked, noteIconMade } from "../server/table/index.ts";
+import { iconAsked, iconCommand, type IconPlaces, iconToRemake, makeIcons, noteIconAsked, noteIconMade, removeIcons } from "../server/table/index.ts";
 
 /** Where `chesspal` alone runs: its input and output, which ask only when both are a terminal, and its environment. The tests give their own. */
 export interface Terminal
@@ -64,6 +64,14 @@ export async function iconsMade(context: Context, places?: IconPlaces): Promise<
     }
 }
 
+/** Takes the icon off the desktop and the menu, before Chesspal is uninstalled: what to tell the player. */
+export function iconsRemoved(context: Context): string
+{
+    const words = wordsFor(context);
+    const removed = removeIcons(context.home());
+    return removed.length === 0 ? words.noneRemoved : `${words.removed}\n${styleText("dim", removed.map((file) => `  ${file}`).join("\n"))}`;
+}
+
 function processTerminal(): Terminal
 {
     return { input: process.stdin, output: process.stdout, env: process.env };
@@ -88,6 +96,8 @@ interface IconWords
     made: string;
     later: string;
     failed: (reason: string) => string;
+    removed: string;
+    noneRemoved: string;
 }
 
 // The words for the player (Zoe), with the menu as their system names it.
@@ -102,6 +112,8 @@ function wordsFor(context: Context): IconWords
             made: `Fatto: Chesspal è sul desktop e ${where}.`,
             later: "Va bene, niente icona. Se la vuoi più avanti, scrivi chesspal icon.",
             failed: (reason) => `Chesspal non è riuscito a mettere l'icona (${reason}). Riprova con chesspal icon.`,
+            removed: `Fatto: l'icona di Chesspal non è più sul desktop né ${where}.`,
+            noneRemoved: "Chesspal non ha trovato sue icone su questo computer.",
         };
     }
 
@@ -111,5 +123,7 @@ function wordsFor(context: Context): IconWords
         made: `Done: Chesspal is on your desktop and in ${where}.`,
         later: "All right, no icon. To add it later, type chesspal icon.",
         failed: (reason) => `Chesspal could not add its icon (${reason}). Try again with chesspal icon.`,
+        removed: `Done: Chesspal's icon is gone from your desktop and ${where}.`,
+        noneRemoved: "Chesspal found no icon of its own on this computer.",
     };
 }

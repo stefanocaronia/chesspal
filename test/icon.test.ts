@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
-import { offerIcon, type Terminal } from "../src/cli/icon.ts";
+import { iconsRemoved, offerIcon, type Terminal } from "../src/cli/icon.ts";
 import { windowPlace } from "../src/page/layout/window.ts";
 import { appBrowser, iconAsked, type IconCommand, iconCommand, iconToRemake, makeIcons, noteIconAsked, noteIconMade, openedAddress } from "../src/server/table/index.ts";
 import { testContext } from "./commands.ts";
@@ -75,6 +75,17 @@ describe("the icon", () => {
         expect(said).toContain("Done: Chesspal is on your desktop and in your applications menu.");
         expect(existsSync(join(places.desktop, "chesspal.desktop"))).toBe(true);
         expect(iconToRemake(home, iconCommand(home))).toBe(false);
+    });
+
+    it("takes its icon away before an uninstall, the files it made on this machine, and says when there is none", async () => {
+        const home = temporary();
+        const places = { desktop: folderIn(temporary(), "Desktop"), menu: join(temporary(), "applications") };
+        await offerIcon(testContext(home), fakeTerminal("").terminal, places);
+
+        expect(iconsRemoved(testContext(home))).toContain("Done: Chesspal's icon is gone from your desktop and your applications menu.");
+        expect(existsSync(join(places.desktop, "chesspal.desktop"))).toBe(false);
+        expect(existsSync(join(places.menu, "chesspal.desktop"))).toBe(false);
+        expect(iconsRemoved(testContext(home))).toBe("Chesspal found no icon of its own on this computer.");
     });
 
     it("never asks with no terminal, on a Linux with no desktop, or for a playtest's data folder", async () => {
