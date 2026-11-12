@@ -239,7 +239,7 @@ describe("site_games and analyse_game with a game of the sites (D-110)", () => {
         const analysis = await run(context, "analyse_game", { game: "chess.com/live/186466981288" });
 
         expect(analysis).toContain("White: AnnaK (the player); Black: Eve. 2026.10.20, time control 3+0. Result: 1-0 (checkmate), after 4 moves.");
-        expect(analysis).toContain("2.Bc4: spent 0:02, 2:57 left");
+        expect(analysis).toContain("2.♝c4: spent 0:02, 2:57 left");
     });
 
     it("refuses a link, a name gone wrong, a name no longer among the latest games, and says when the site could not be reached", async () => {
