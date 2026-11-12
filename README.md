@@ -6,21 +6,60 @@ Play chess against an AI on a real board, or learn with one.
 
 ## Get started
 
-You need [Node.js](https://nodejs.org) 22.13 or newer and an AI agent on your computer, [Claude Code](https://code.claude.com/docs/en/setup) or [Codex](https://developers.openai.com/codex), signed in with your own subscription: see [what you need](#what-you-need).
+Five steps, done once, in about 15 minutes. You need a paid Claude plan or a ChatGPT account. After these steps you open the board with a double click.
 
-Open a terminal, the window where you type commands, after installing Node.js: one opened before does not find `npm`. On Windows, open Command Prompt (press Start, type `cmd`, press Enter): PowerShell, on a new computer, refuses npm's commands with "running scripts is disabled on this system", until you type `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` there once and answer yes. On macOS, open Terminal. Then type:
+**1. Install Node.js.** Download it from [nodejs.org](https://nodejs.org): take the version marked **LTS**, the steady one (22.13 or newer). Install it like any program, keeping every choice as it is; on Windows, leave the box "Automatically install the necessary tools" unticked.
+
+**2. Open a terminal**, the window where you type commands. Open it after installing Node.js: one opened before does not find it.
+
+- **Windows:** press Start, type `cmd` and press Enter. This opens Command Prompt. Use it rather than PowerShell: on a new computer PowerShell refuses these commands with "running scripts is disabled on this system".
+- **macOS:** press ⌘ and Space, type `Terminal` and press Enter.
+
+In the steps below, copy each command, paste it in the terminal (Ctrl+V or right-click; on macOS ⌘V) and press Enter. Wait for the terminal to finish before the next one. Lines with "WARN" are normal: go on.
+
+**3. Install the AI and sign in.** Choose one of the two. You need your own subscription: Chesspal never uses an API key, which is paid by the call.
+
+- **Claude Code**, with a paid Claude plan (Pro or higher; the free plan does not include it):
+
+  ```bash
+  npm install -g @anthropic-ai/claude-code
+  claude
+  ```
+
+  `claude` asks a few questions first, such as the colours you prefer: press Enter to keep the first choice. Then it opens your browser: sign in with your Claude account and go back to the terminal.
+- **Codex**, with a ChatGPT account:
+
+  ```bash
+  npm install -g @openai/codex
+  codex
+  ```
+
+  Choose **Sign in with ChatGPT** and sign in in your browser.
+
+Once you are signed in, close that terminal window with its × and open a new one, as in step 2.
+
+**4. Install Chesspal and open it.**
 
 ```bash
 npm install -g chesspal
 chesspal
 ```
 
-- `npm install -g` installs the `chesspal` command for the whole computer, where your agent finds it.
-- `chesspal` opens the board page in your browser. The first time, it offers an icon on your desktop and in your menu of programs: with it, you open the board with a double click, with no terminal.
-- The first time, the board page asks who you are: fill it in and press **Start playing**.
-- Press **Claude Code** or **Codex**: the AI opens in a terminal of its own, at the table; keep it open while you play. The first time, it asks whether you trust the folder: choose **Yes** with the arrow keys and press Enter. With Codex, when it asks about Chesspal's two hooks, choose **Trust all and continue**; on Windows, it also offers to set up its sandbox: choose the first option, and answer yes when Windows asks for permission.
+The board page opens in your browser, and you can close this terminal. The first time, Chesspal offers an icon on your desktop and in your menu of programs: accept it, and from then on you open the board with a double click on it, with no terminal.
 
-Then press **New game**: you choose your colour, the clock and the AI's level, and play on the board. Talk with the AI on the board page or in its terminal.
+**5. Start the AI.** The first time, the board page asks who you are: fill it in and press **Start playing**. Then press **Claude Code** or **Codex**: the AI opens in a terminal of its own. Keep that window open while you play. The first time it asks some questions:
+
+- whether you trust the folder: choose **Yes** with the arrow keys and press Enter;
+- with Codex, about Chesspal's two hooks, the small programs that tell the AI when you move on the board: choose **Trust all and continue**;
+- with Codex on Windows, whether to set up its sandbox, a safe space where it works: choose the first option, and answer yes when Windows asks for permission.
+
+Now press **New game**: choose your colour, the clock and the AI's level, and play on the board. Talk with the AI on the board page or in its terminal.
+
+**If a command fails:**
+
+- "npm is not recognized" or "command not found": close the terminal and open a new one; if it still fails, install Node.js again.
+- On macOS, "EACCES" or "permission denied": npm cannot write where Node.js put it. Follow [npm's guide](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally), not `sudo`: with `sudo`, Chesspal and Claude Code cannot update themselves.
+- Anything else in red, or with "ERR!": copy the last lines and [tell us](#try-it-and-tell-us).
 
 ## What it does
 
@@ -36,11 +75,11 @@ Coming later: an AI coach that helps you grow, exercises chosen on your weak poi
 
 ## What you need
 
-- **Node.js 22.13** or newer: download the version marked LTS and install it like any program.
-- **An AI agent** with your own subscription: Claude Code, with a paid Claude plan, or Codex, with a ChatGPT account. Chesspal never uses an API key, which is paid by the call: sign your agent in with your account.
+- **Node.js 22.13** or newer.
+- **An AI agent** with your own subscription: [Claude Code](https://code.claude.com/docs/en/setup), with a paid Claude plan, or [Codex](https://developers.openai.com/codex), with a ChatGPT account.
 - **A web browser**, for the board page.
 
-Chesspal works with any agent that supports MCP tools and can work with the files on your computer: we develop it with Claude Code, and Codex is connected too.
+Chesspal works with any agent that can use Chesspal's tools (MCP) and the files on your computer: we develop it with Claude Code, and Codex is connected too.
 
 ## Good to know
 
