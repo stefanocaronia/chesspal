@@ -103,8 +103,8 @@ export interface PageData
     } | null;
     /** The talk before the first game (D-77), with no game. */
     readonly talk?: readonly TalkLine[];
-    /** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review. */
-    readonly analysis?: { readonly name: string; readonly pgn: string; readonly book: number; };
+    /** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review, and whether an AI is going over it now. */
+    readonly analysis?: { readonly name: string; readonly pgn: string; readonly book: number; readonly reviewing?: true; };
     readonly opponent?: string;
     /** The model and effort the AI played its last move with, as the host tied them to it (D-82). */
     readonly aiModel?: AiModel;

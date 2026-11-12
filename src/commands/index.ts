@@ -8,7 +8,7 @@ import { aiSay, playerSay } from "./talk/index.ts";
 
 // What the server and the command line use besides the list: the context, the reading of an input, and the operations the page shares with the tools.
 export { analyseGame, deleteReview } from "./analysis/index.ts";
-export { bookOpening, bookPlies, gameAt, gameToStudy, namedGame, playMove, PositionChanged, positionIn, samePosition, say, shownPosition } from "./answers/index.ts";
+export { analystOf, bookOpening, bookPlies, gameAt, gameToStudy, namedGame, playMove, PositionChanged, positionIn, samePosition, say, shownPosition } from "./answers/index.ts";
 export { aiMove, answerDraw, ChatNotClear, DrawRefused, endGame, newGame, offerDraw, startNewGame } from "./game/index.ts";
 export { chooseDrawnAvatar, deleteGame, editProfile, GameGoingOn, newProfile, ratingsAge, refreshRatings, useProfile } from "./profiles/index.ts";
 export { type AnyCommand, baseType, type Caller, type Command, commandLineFieldProblem, type Context, defaultContext, inputProblems, isBoolean, isList, type SeenPosition, speaksItalian, takesNumbers } from "./registry/index.ts";

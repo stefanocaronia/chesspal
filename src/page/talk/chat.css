@@ -5,15 +5,13 @@
     max-height: none;
 }
 
-/* A line apart from the AI's note, which another voice signed (Zoe) */
+/* Under the AI's note, with no line between them (Stefano) */
 .talk.studied > section > .chat {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
     margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid var(--line);
 }
 
 .chat > .compose {
@@ -49,9 +47,11 @@
 
     .flipped .talk.studied > section > .chat {
         margin: 0 0 12px;
-        padding: 0 0 10px;
-        border-top: 0;
-        border-bottom: 1px solid var(--line);
+    }
+
+    /* Turned round, the note's room goes under its bubbles, which would touch the AI's card or the note that no chat listens (Zoe) */
+    .flipped .talk.studied .ai-note {
+        margin: 0 0 12px;
     }
 }
 

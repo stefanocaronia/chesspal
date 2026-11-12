@@ -651,23 +651,23 @@
     overflow-wrap: anywhere;
 }
 
-/* Only the note's last bubble has a tail, pointing down at the Torretta beside the AI's name, the board turned round or not */
+/* Only the note's first bubble has a tail, pointing up at the Torretta beside the AI's name, the board turned round or not (Stefano) */
 .ai-note > .say::before,
 .ai-note > .say::after {
     content: none;
 }
 
-.ai-note > .say:has(+ .who)::after {
+.ai-note > .who + .say::before {
     content: "";
     position: absolute;
     left: 8px;
-    bottom: -9px;
+    top: -9px;
     border: 10px solid transparent;
-    border-bottom: 0;
-    border-top-color: var(--say);
+    border-top: 0;
+    border-bottom-color: var(--say);
 }
 
-.ai-note > .say + .who {
+.ai-note > .who + .say {
     margin-top: 4px;
 }
 
@@ -816,8 +816,8 @@
     margin: 0 0 var(--between);
 }
 
-.ai-block:has(> .asleep) .say::before,
-.ai-block:has(> .asleep) .say::after {
+.ai-block:has(> .asleep) .says .say::before,
+.ai-block:has(> .asleep) .says .say::after {
     content: none;
 }
 

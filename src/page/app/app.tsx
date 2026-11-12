@@ -397,6 +397,8 @@ export function App({ start }: { start: Settings; })
     );
     const legend = legendAt(false);
     const summary = studied === undefined ? undefined : gameReviewOf(live.record);
+    // An AI is going over the game only when the server says so: with no chat at it, nobody is (Stefano).
+    const reviewing = summary === undefined && studied?.reviewing === true && !offline;
     const closing = studied === undefined ? undefined : closingOf(live.record);
     // In analysis the AI's card says who played that game, as its PGN keeps it (D-82), not who plays now.
     const playedBy = studied === undefined ? undefined : aiModelIn(live.record);
@@ -658,7 +660,7 @@ export function App({ start }: { start: Settings; })
                                             {...(shownOpening === undefined ? {} : { opening: shownOpening })}
                                             {...(at === total && closing !== undefined ? { closing } : {})}
                                             {...(at === 0 && summary !== undefined ? { summary } : {})}
-                                            {...(summary === undefined ? { reviewing: true } : {})}
+                                            {...(reviewing ? { reviewing: true } : {})}
                                             name={analyst}
                                             by={annotator}
                                             mood={mood}
@@ -835,7 +837,7 @@ export function App({ start }: { start: Settings; })
                         )}
                         {...(helps === undefined && legendRows.length > 0 ? { legend } : {})}
                         {...(standings === undefined ? {} : { standings })}
-                        {...(studied === undefined ? {} : { analysis: summary === undefined ? { by: analyst } : { by: analyst, summary } })}
+                        {...(studied === undefined ? {} : { analysis: { by: analyst, ...(summary === undefined ? {} : { summary }), ...(reviewing ? { reviewing: true } : {}) } })}
                         shownPlies={at}
                         onShow={goTo}
                         onStep={step}

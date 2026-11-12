@@ -33,8 +33,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     legend?: ComponentChildren;
     /** Who the AI saw ahead after the moves, with the helps on in a game and in analysis (D-90): the bar shows it, and in analysis the chart. */
     standings?: readonly Standing[];
-    /** The game in analysis: who reviews it, and their word on the whole game, once written. */
-    analysis?: { by: string; summary?: string; };
+    /** The game in analysis: who reviews it, their word on the whole game once written, and whether an AI is going over it now. */
+    analysis?: { by: string; summary?: string; reviewing?: true; };
     shownPlies: number;
     onShow: (plies: number) => void;
     onStep: (step: Step) => void;
@@ -66,7 +66,7 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                             {analysis === undefined || standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={shownPlies} onShow={onShow} text={text} />}
                             {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
                             {helps}
-                            {analysis === undefined || analysis.summary !== undefined ? null : (
+                            {analysis?.reviewing !== true ? null : (
                                 <p class="card review waiting" role="status">
                                     <span class="spinner" aria-hidden="true" />
                                     {text.reviewing(analysis.by)}

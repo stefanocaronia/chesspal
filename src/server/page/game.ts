@@ -3,6 +3,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
     analyseGame,
+    analystOf,
     answerDraw,
     bookPlies,
     ChatNotClear,
@@ -463,8 +464,11 @@ function coachOn(folder: string, current: CurrentGame | undefined): CoachWords |
     return shown.judgments.length === 0 && shown.hint === undefined && shown.leads === undefined ? undefined : shown;
 }
 
-/** The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review; none without one, or when it cannot be read. */
-function analysisShown(served: Served): { name: string; pgn: string; book: number; } | undefined
+/**
+ * The game in analysis, once no game goes on (D-69): its name and its PGN with the AI's review, and whether an AI is going over it now; none without one,
+ * or when it cannot be read.
+ */
+function analysisShown(served: Served): { name: string; pgn: string; book: number; reviewing?: true; } | undefined
 {
     const analysis = gameInAnalysis(gameFolder(served.context.home()));
 
@@ -474,8 +478,13 @@ function analysisShown(served: Served): { name: string; pgn: string; book: numbe
 
     try {
         const { name, record } = namedGame(served.context, analysis.game);
+        // Without a review, an AI is at it only while the chat is in a turn, or hears the player while its analyst holds the game (D-89): one the chat has
+        // started again since is gone (Priya). On the table the chat's start is in the chat's own folder.
+        const { bell } = served;
+        const chat = { ...served.context, folder: served.attached?.chat.folder ?? served.folder };
+        const reviewing = !isReviewed(record) && (bell.inTurn || (bell.listening && analystOf(chat, analysis.game) !== undefined));
         // How far the book goes, which the page cannot tell without the book's moves: its card names the opening on those moves.
-        return { name, pgn: writePgn(record), book: bookPlies(record) };
+        return { name, pgn: writePgn(record), book: bookPlies(record), ...(reviewing ? { reviewing: true } : {}) };
     } catch {
         // A game gone from the archive is no longer shown.
         return undefined;

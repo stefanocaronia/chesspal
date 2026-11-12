@@ -81,8 +81,9 @@
         display: none;
     }
 
-    /* Beside a narrow board the offer and its answer take the room of the other commands, which come back once it is answered */
-    .top:has(.answer) .command:not(.answer) {
+    /* Beside a narrow board the offer and its answer take the room of the other commands and the flip, which come back once it is answered */
+    .top:has(.answer) .command:not(.answer),
+    .top:has(.answer) .flip-button {
         display: none;
     }
 }
@@ -112,6 +113,13 @@
 .top .icon-button {
     flex-shrink: 0;
     white-space: nowrap;
+}
+
+/* The board turned round: the flip stands pressed, its edge in the soft ink that reads on both themes (Zoe) */
+.top .flip-button[aria-pressed="true"] {
+    color: var(--ink);
+    border-color: var(--soft);
+    background: var(--card);
 }
 
 /* The player's picture, round and borderless, at the end of the header: it opens the menu of the players */
@@ -150,10 +158,6 @@
             margin-right: auto;
         }
     }
-}
-
-.top:has(.verdict.idle, .verdict.over) .command:has(.icon.flip) span {
-    display: none;
 }
 
 /* On a phone the player's card is under the board, below the fold: between games the header's new game stands out too, on the first screen */
@@ -466,8 +470,6 @@
     box-shadow: 0 0 0 2px var(--page);
 }
 
-.fold-tab button.unread::after {
-    top: -4px;
 /* On the Torretta's disc, clear of its battlement, ringed in the card's colour */
 .face.unread::after {
     top: -2px;
@@ -475,6 +477,8 @@
     box-shadow: 0 0 0 2px var(--card);
 }
 
+.fold-tab button.unread::after {
+    top: -4px;
     right: auto;
     left: -4px;
 }

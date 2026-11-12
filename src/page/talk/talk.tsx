@@ -32,7 +32,7 @@ export function AiWords({ words, newestFirst, voice }: { words: readonly string[
 }
 
 /**
- * The AI's word on the move shown of a game in analysis (D-69), in a bubble that points down at the Torretta beside the AI's name: the move, its badge by name,
+ * The AI's word on the move shown of a game in analysis (D-69), in a bubble under the Torretta beside the AI's name, pointing up at it: the move, its badge by name,
  * and its note when it wrote one; read out as the player steps through the game. The Torretta and the name stay when the move has no word.
  */
 export function AiNote({ ply, opening, closing, summary, reviewing, name, by, mood, voice, text }: {
@@ -67,9 +67,16 @@ export function AiNote({ ply, opening, closing, summary, reviewing, name, by, mo
         return hush;
     }, [spoken, voice]);
 
-    // The Torretta stays in sight through the whole analysis, under its bubbles, which show only where it wrote something.
+    // The Torretta stays in sight through the whole analysis, over its bubbles, which show only where it wrote something.
     return (
         <div class="ai-note" aria-live="polite">
+            <p class="who">
+                <Torretta size={36} mood={mood} />
+                <span class="signed">
+                    {name}
+                    {by === undefined ? null : <small>{signature(by.annotator, by.effort)}</small>}
+                </span>
+            </p>
             {ply === undefined || shown === undefined ? null : (
                 <p class={`say move-note ${shown.badge ?? ""}`}>
                     <span class="head">
@@ -105,13 +112,6 @@ export function AiNote({ ply, opening, closing, summary, reviewing, name, by, mo
                     </p>
                 )
                 : null}
-            <p class="who">
-                <Torretta size={36} mood={mood} />
-                <span class="signed">
-                    {name}
-                    {by === undefined ? null : <small>{signature(by.annotator, by.effort)}</small>}
-                </span>
-            </p>
         </div>
     );
 }

@@ -78,19 +78,17 @@ export function Header({ text, verdict, kind, who, actions, onNewGame, standOut 
                 </button>
             )}
             {onStudy === undefined ? null : (
-                <button class="command" type="button" title={text.study.title} onClick={onStudy}>
+                <button class="icon-button" type="button" title={text.study.title} aria-label={text.study.title} aria-haspopup="dialog" onClick={onStudy}>
                     <Icon class="study">
                         <circle cx="10.5" cy="10.5" r="5.5" />
                         <path d="M14.5 14.5L20 20" />
                     </Icon>
-                    <span>{text.study.title}</span>
                 </button>
             )}
-            <button class="command" type="button" title={text.flip} aria-pressed={flipped} onClick={onFlip}>
+            <button class="icon-button flip-button" type="button" title={text.flip} aria-label={text.flip} aria-pressed={flipped} onClick={onFlip}>
                 <Icon class="flip">
                     <path d="M7 4V17M7 17L4 14M7 17L10 14M17 20V7M17 7L14 10M17 7L20 10" />
                 </Icon>
-                <span>{text.flip}</span>
             </button>
             {update === undefined || onUpdate === undefined ? null : <UpdateMark version={update.version} installing={update.installing} onOpen={onUpdate} text={text} />}
             <button class="icon-button sound-button" type="button" title={text.sounds} aria-label={text.sounds} aria-pressed={sound} onClick={onSound}>
