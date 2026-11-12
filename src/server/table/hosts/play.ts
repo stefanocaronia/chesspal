@@ -3,9 +3,9 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { win32 } from "node:path";
-import type { Context } from "../../../commands/index.ts";
+import { type Context, speaksItalian } from "../../../commands/index.ts";
 import { tableFolder } from "../../../home/index.ts";
-import { setUpHosts } from "../../../host-files/index.ts";
+import { codexHooksPath, setUpHosts } from "../../../host-files/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
 import { programPath } from "./find.ts";
 import { choiceIn, hostArgs, type HostChoice, type HostName, isHostName, startMessage } from "./hosts.ts";
@@ -24,6 +24,8 @@ export interface HostLaunch
     readonly env: NodeJS.ProcessEnv;
     readonly shell: boolean;
     readonly choice: HostChoice;
+    /** Codex's hooks were there and Chesspal wrote them again: Codex runs them only once the player trusts them again. */
+    readonly hooksChanged?: true;
 }
 
 /**
@@ -154,28 +156,42 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
         throw new Error(`${hostTitle[host]} is not installed on this computer, or not on its PATH: install it (${installHint[host]}), then try again.`);
     }
 
-    setUpHosts(folder, context.platform);
+    const hooks = codexHooksPath(folder);
+    const hadHooks = host === "codex" && existsSync(hooks);
+    const hooksChanged = setUpHosts(folder, context.platform).includes(hooks) && hadHooks ? { hooksChanged: true as const } : {};
     const choice = choiceIn(profileSettings(home, activeProfile(home).id), host);
     const args = hostArgs(host, startMessage(languageIn(gameFolder(home), context.language)), choice);
     // An effort the player set for every chat would win over the one chosen on the page: spawn leaves out a variable that is undefined.
     const effort = host === "claude" && choice.effort !== undefined ? { CLAUDE_CODE_EFFORT_LEVEL: undefined } : {};
-    const childEnv = { ...env, ...Object.fromEntries(sessionMarks.map((name) => [name, undefined])), ...effort };
+    // The seat this play holds, by which its chat's server tells the table it is the chat held, and not another opened in the same folder.
+    const childEnv = { ...env, ...Object.fromEntries(sessionMarks.map((name) => [name, undefined])), ...effort, CHESSPAL_SEAT: String(process.pid) };
     const script = npmScript(host, found, context.platform, exists ?? existsSync);
 
     if (script !== undefined) {
-        return { program: process.execPath, args: [script, ...args], folder, env: childEnv, shell: false, choice };
+        return { program: process.execPath, args: [script, ...args], folder, env: childEnv, shell: false, choice, ...hooksChanged };
     }
 
-    return { program: found, args, folder, env: childEnv, shell: context.platform === "win32" && /\.(cmd|bat)$/i.test(found), choice };
+    return { program: found, args, folder, env: childEnv, shell: context.platform === "win32" && /\.(cmd|bat)$/i.test(found), choice, ...hooksChanged };
 }
 
 const hostTitle: Record<HostName, string> = { claude: "Claude Code", codex: "Codex" };
+
+const hooksChangedWords = {
+    english: "Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.",
+    italian: "Gli «hook» di Chesspal per Codex sono cambiati: quando Codex te lo chiede, scegli di nuovo Trust all.",
+};
 
 // Runs the host as runHost does, the seat noting the model and effort it is given; one not installed, or that could not start, fails saying so.
 async function started(context: Context, host: HostName, again: () => boolean): Promise<{ code: number; again: boolean; }>
 {
     const launch = hostLaunch(context, host);
     takeSeat(launch.folder, { pid: process.pid, host, ...launch.choice });
+
+    // After an update the player is asked about the hooks again: said here, above the host's question, as init says it.
+    if (launch.hooksChanged === true) {
+        process.stdout.write(`${speaksItalian(context.language) ? hooksChangedWords.italian : hooksChangedWords.english}\n`);
+    }
+
     return runHost(launch, again, context.platform).catch((error: unknown) => {
         throw new Error(`${hostTitle[host]} did not start: ${(error as Error).message}`);
     });

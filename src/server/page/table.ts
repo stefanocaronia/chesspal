@@ -33,11 +33,12 @@ export interface TableChats
     relaunch(folder: string, host?: string, updated?: boolean): boolean;
 }
 
-/** The chat `chesspal play` holds: the model and effort its host started with, none for the host's own. */
+/** The chat `chesspal play` holds: the model and effort its host started with, none for the host's own, and the seat, the play's process. */
 export interface HeldChat
 {
     readonly model?: string | undefined;
     readonly effort?: string | undefined;
+    readonly seat?: number;
 }
 
 /** A chat opening at the table: one the page asked for, the one started again for a new game, or with another model or host (D-107). */
@@ -135,7 +136,7 @@ export function relaunchChat(served: Served, how: "again" | "restart" = "again",
     // Another host may first ask whether it trusts the table's folder: the pages say so, as for a chat opened.
     const switching = how === "restart" && host !== undefined && host !== hostAtTable(served);
 
-    if (folder === undefined || served.table?.chats?.relaunch(folder, host) !== true) {
+    if (folder === undefined || heldChat(served) === undefined || served.table?.chats?.relaunch(folder, host) !== true) {
         return false;
     }
 
@@ -340,10 +341,12 @@ function hostAtTable(served: Served): string | undefined
 }
 
 // The chat at the table when `chesspal play` holds it, which the table can start again: the model and effort it started with.
+// The chat at the table when it is the one `chesspal play` holds: in its folder and started by it, not another opened there by hand.
 function heldChat(served: Served): HeldChat | undefined
 {
     const { attached } = served;
-    return attached === undefined ? undefined : served.table?.chats?.held(attached.chat.folder);
+    const held = attached === undefined ? undefined : served.table?.chats?.held(attached.chat.folder);
+    return held === undefined || held.seat !== attached?.chat.seat ? undefined : { model: held.model, effort: held.effort };
 }
 
 // The chat waits for the doorbell, out of a turn, and no analyst of it is at work: starting it again loses nothing.

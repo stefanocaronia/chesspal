@@ -8,6 +8,7 @@ import { tableFolder } from "../src/home/index.ts";
 import { settingsFrom } from "../src/page/profile/settings.ts";
 import { activeProfile, saveProfileSettings } from "../src/profiles/index.ts";
 import type { TableChats } from "../src/server/page/table.ts";
+import { playCommand } from "../src/server/table/hosts/chats.ts";
 import { hostArgs, startMessage } from "../src/server/table/hosts/hosts.ts";
 import { type HostLaunch, runHost } from "../src/server/table/hosts/play.ts";
 import { askAgain, askedAgain, leaveSeat, refreshSeat, seatTaken, seatTimes, takeSeat } from "../src/server/table/hosts/seat.ts";
@@ -61,6 +62,18 @@ describe("a chat the table opens", () => {
         expect(() => hostLaunch(context, "codex", env, () => false)).toThrow("Codex is not installed on this computer, or not on its PATH: install it (npm install -g @openai/codex), then try again.");
     });
 
+    it("says when it wrote Codex's hooks again over older ones, which Codex then asks the player to trust again", () => {
+        const context = homeContext("linux");
+        const env = { PATH: "/usr/bin" };
+        const found = (path: string): boolean => path === "/usr/bin/codex";
+        const hooks = join(tableFolder(context.home()), ".codex", "hooks.json");
+
+        expect(hostLaunch(context, "codex", env, found).hooksChanged).toBeUndefined();
+        writeFileSync(hooks, "{}\n");
+        expect(hostLaunch(context, "codex", env, found).hooksChanged).toBe(true);
+        expect(hostLaunch(context, "codex", env, found).hooksChanged).toBeUndefined();
+    });
+
     it("opens in Windows Terminal, else in the console Windows starts; in macOS's Terminal; on Linux in the terminals installed", () => {
         const command = ["C:\\Program Files\\nodejs\\node.exe", "cli.js", "play", "claude"];
         const windows = terminals("C:\\Users\\R&D\\table", command, "win32", { PATH: "C:\\apps", PATHEXT: ".EXE" }, (path) => path === "C:\\apps\\wt.exe");
@@ -92,10 +105,10 @@ describe("a chat the table opens", () => {
         expect(chats.relaunch(table)).toBe(false);
         takeSeat(table, { pid: process.pid, host: "claude" });
         expect(chats.held(bin)).toBeUndefined();
-        expect(chats.held(table)).toEqual({});
+        expect(chats.held(table)).toEqual({ seat: process.pid });
         // With the model and effort its host started with, which the page compares with the ones chosen since (D-107).
         takeSeat(table, { pid: process.pid, host: "claude", model: "opus", effort: "high" });
-        expect(chats.held(table)).toEqual({ model: "opus", effort: "high" });
+        expect(chats.held(table)).toEqual({ model: "opus", effort: "high", seat: process.pid });
         expect(chats.relaunch(bin)).toBe(false);
         expect(chats.relaunch(table)).toBe(true);
         expect(askedAgain(table, process.pid)).toEqual({});
@@ -105,6 +118,11 @@ describe("a chat the table opens", () => {
         // Asked after an update, from the Chesspal just installed (D-108).
         expect(chats.relaunch(table, undefined, true)).toBe(true);
         expect(askedAgain(table, process.pid)).toEqual({ updated: true });
+    });
+
+    it("names the table's own data folder to the chat it opens, which a terminal may start without the table's environment", () => {
+        expect(playCommand(["node", "cli.js"], "claude", {})).toEqual(["node", "cli.js", "play", "claude"]);
+        expect(playCommand(["node", "cli.js"], "codex", { CHESSPAL_HOME: "/runs/home" })).toEqual(["node", "cli.js", "play", "codex", "--home", "/runs/home"]);
     });
 
     it("keeps each host's choice in the page's settings, a word alone", () => {

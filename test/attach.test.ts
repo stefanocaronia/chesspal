@@ -480,6 +480,15 @@ describe("the chat's window at the table", () => {
         expect(await gameShown(other.table.url)).not.toHaveProperty("table.started");
         expect(await restartAt(other.table.url, "claude")).toMatchObject({ status: 409 });
         expect(byHand.relaunched).toEqual([]);
+
+        // Nor one opened by hand in the table's folder while chesspal play holds the seat for its own chat.
+        const beside = playChats(4242);
+        const third = await tableOn(undefined, beside.chats);
+        await attached({ ...chatOn(third.home), host: () => "claude-code" });
+
+        expect(await gameShown(third.table.url)).toMatchObject({ table: { chat: true, held: false } });
+        expect(await restartAt(third.table.url, "claude")).toMatchObject({ status: 409 });
+        expect(beside.relaunched).toEqual([]);
     });
 
     it("lets the page start a waiting request at once, cutting the chat's answer, or let it go; and shows the model the chat started with", async () => {
@@ -507,14 +516,18 @@ describe("the chat's window at the table", () => {
     });
 });
 
-/** The chats of a table where chesspal play holds the seat, unless not `held`: the folders whose chat it was asked to start again, and with which host. */
-function playChats(held = true): { chats: TableChats; relaunched: string[]; asked: (string | undefined)[]; }
+/**
+ * The chats of a table where chesspal play holds the seat, unless not `held`, or holds the seat numbered `held` for a chat of its own: the folders whose
+ * chat it was asked to start again, and with which host.
+ */
+function playChats(held: boolean | number = true): { chats: TableChats; relaunched: string[]; asked: (string | undefined)[]; }
 {
     const relaunched: string[] = [];
     const asked: (string | undefined)[] = [];
     const hosts = ["claude", "codex"].map((name) => ({ name, installed: true, models: [], efforts: [], command: `chesspal play ${name}` }));
     const relaunch = (folder: string, host?: string): boolean => relaunched.push(folder) > 0 && asked.push(host) > 0;
-    return { chats: { hosts: () => hosts, open: () => Promise.resolve(false), held: () => (held ? { model: "opus" } : undefined), relaunch }, relaunched, asked };
+    const seat = typeof held === "number" ? { seat: held } : {};
+    return { chats: { hosts: () => hosts, open: () => Promise.resolve(false), held: () => (held === false ? undefined : { model: "opus", ...seat }), relaunch }, relaunched, asked };
 }
 
 /** Asks the table to start its chat again with a host, as its page does, from the origin given, else the page's own: the answer's status and text. */

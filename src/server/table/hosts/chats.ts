@@ -27,14 +27,24 @@ export function terminalChats(context: Context, chesspal: readonly string[] = [p
 
             return found.hosts;
         },
-        open: async (host) => isHostName(host) && await openTerminal(tableFolder(context.home()), [...chesspal, "play", host], context.platform, env),
+        open: async (host) => isHostName(host) && await openTerminal(tableFolder(context.home()), playCommand(chesspal, host, env), context.platform, env),
         // Only a chat in the table's folder can be the one chesspal play holds.
         held: (folder) => {
             const seat = samePath(folder, tableFolder(context.home())) ? seatHeld(folder, context.now()) : undefined;
-            return seat === undefined ? undefined : { model: seat.model, effort: seat.effort };
+            return seat === undefined ? undefined : { model: seat.model, effort: seat.effort, seat: seat.pid };
         },
         relaunch: (folder, host, updated) => samePath(folder, tableFolder(context.home())) && askAgain(folder, context.now(), { ...(host === undefined ? {} : { host }), ...(updated === true ? { updated } : {}) }),
     };
+}
+
+/**
+ * What the terminal runs: `chesspal play <host>`, with the table's data folder when it has one of its own, as a playtest's: Terminal.app and Windows
+ * Terminal start the chat without the table's environment.
+ */
+export function playCommand(chesspal: readonly string[], host: string, env: NodeJS.ProcessEnv): string[]
+{
+    const home = env.CHESSPAL_HOME?.trim();
+    return [...chesspal, "play", host, ...(home ? ["--home", home] : [])];
 }
 
 // Looking on the PATH takes a few milliseconds, and the page asks at every change of the game.

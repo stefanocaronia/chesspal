@@ -165,7 +165,8 @@ const chatHook = { type: "command", command: "chesspal chat" };
 
 /**
  * Codex's settings, read once the player trusts the folder: the chesspal server with its tools approved, a table of Chesspal's rewritten but for the
- * environment the player gave it, as CHESSPAL_HOME in a playtest; the rest stays.
+ * environment the player gave it; CHESSPAL_HOME and CHESSPAL_SEAT always passed on to the server, which Codex otherwise starts without them, so that a
+ * playtest's data folder is the one the server reads, and the chat `chesspal play` holds knows it. The rest stays.
  */
 function codexConfigFile(folder: string, platform: string): FileChange | undefined
 {
@@ -174,8 +175,12 @@ function codexConfigFile(folder: string, platform: string): FileChange | undefin
     const { command, args } = chesspalServer(platform);
     // The table runs up to the next one, or to the end; a header with a comment after it is the same table.
     const ours = /^\s*\[mcp_servers\.chesspal\]\s*(#.*)?\r?\n[\s\S]*?(?=^\s*\[|(?![\s\S]))/m;
-    const environment = (ours.exec(before)?.[0].match(/^\s*env(?:_vars)?\s*=.*$/gm) ?? []).map((line) => `${line.trim()}\n`).join("");
-    const table = `[mcp_servers.chesspal]\ncommand = ${JSON.stringify(command)}\nargs = [${args.map((arg) => JSON.stringify(arg)).join(", ")}]\ndefault_tools_approval_mode = "approve"\n${environment}`;
+    const given = ours.exec(before)?.[0].match(/^\s*env(?:_vars)?\s*=.*$/gm) ?? [];
+    const environment = given.filter((line) => !/^\s*env_vars\s*=/.test(line)).map((line) => `${line.trim()}\n`).join("");
+    const passed = given.filter((line) => /^\s*env_vars\s*=/.test(line)).flatMap((line) => [...line.matchAll(/["']([^"']+)["']/g)].map((name) => name[1] ?? ""));
+    const names = [...new Set(["CHESSPAL_HOME", "CHESSPAL_SEAT", ...passed])].map((name) => JSON.stringify(name)).join(", ");
+    const table = `[mcp_servers.chesspal]\ncommand = ${JSON.stringify(command)}\nargs = [${args.map((arg) => JSON.stringify(arg)).join(", ")}]\n`
+        + `default_tools_approval_mode = "approve"\nenv_vars = [${names}]\n${environment}`;
     const rest = before.replace(ours, "").trim();
     const text = rest === "" ? table : `${rest}\n\n${table}`;
     return text === before ? undefined : { path, text };

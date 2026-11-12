@@ -51,7 +51,7 @@ describe("chesspal init", () => {
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${startInstructions()}\n<!-- chesspal: end -->\n`);
         expect(text(chess, "CLAUDE.md")).toBe("@AGENTS.md\n");
         expect(json(chess, ".claude/settings.json")).toEqual({ enabledMcpjsonServers: ["chesspal"], permissions: { allow: ["mcp__chesspal"] }, hooks: { Stop: [{ hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] } });
-        expect(text(chess, ".codex/config.toml")).toBe('[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\n');
+        expect(text(chess, ".codex/config.toml")).toBe('[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\nenv_vars = ["CHESSPAL_HOME", "CHESSPAL_SEAT"]\n');
         expect(json(chess, ".codex/hooks.json")).toEqual({ hooks: { Stop: [{ hooks: [codexBellHook] }], SessionStart: [{ hooks: [codexChatHook] }] } });
         expect(startInstructions()).toContain("even to a greeting, call `instructions` and `status`");
         expect(text(chess, ".claude/agents/chesspal-ponder-quick.md")).toMatch(
@@ -97,7 +97,10 @@ describe("chesspal init", () => {
         const ownStop = { hooks: [{ type: "command", command: "say done" }] };
         writeFileSync(join(folder, ".claude", "settings.json"), "﻿" + JSON.stringify({ model: "opus", permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [ownStop] } }));
         writeFileSync(join(folder, ".codex", "hooks.json"), JSON.stringify({ hooks: { Stop: [ownStop] } }));
-        writeFileSync(join(folder, ".codex", "config.toml"), 'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\nenv = { CHESSPAL_HOME = "D:/runs" }\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n');
+        writeFileSync(
+            join(folder, ".codex", "config.toml"),
+            'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\nenv = { CHESSPAL_HOME = "D:/runs" }\nenv_vars = ["HOME", "CHESSPAL_HOME"]\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n',
+        );
         // Codex runs hooks that changed only once the player trusts them again.
         expect((await runCommandLine(["init"], testContext(folder))).output).toContain(
             "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 14 files.",
@@ -114,7 +117,7 @@ describe("chesspal init", () => {
             hooks: { Stop: [ownStop, { hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] },
         });
         expect(text(folder, ".codex/config.toml")).toBe(
-            'model = "gpt-5"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n\n[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\nenv = { CHESSPAL_HOME = "D:/runs" }\n',
+            'model = "gpt-5"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n\n[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\nenv_vars = ["CHESSPAL_HOME", "CHESSPAL_SEAT", "HOME"]\nenv = { CHESSPAL_HOME = "D:/runs" }\n',
         );
         expect(json(folder, ".codex/hooks.json")).toEqual({ hooks: { Stop: [ownStop, { hooks: [codexBellHook] }], SessionStart: [{ hooks: [codexChatHook] }] } });
         expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/^♜ Chesspal is ready in .*: nothing to change\n/);

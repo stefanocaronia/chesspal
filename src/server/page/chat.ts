@@ -67,13 +67,17 @@ export function asTheChatSees(context: Context, chat: ChatSeen): Context
     return { ...context, host: () => chat.host(), positionSeen: chat.positionSeen };
 }
 
-/** What a chat says of itself as it attaches to the table (D-104): its version, its session, its folder, its host, and whether its folder needs init again. */
+/**
+ * What a chat says of itself as it attaches to the table (D-104): its version, its session, its folder, its host, whether its folder needs init again,
+ * and the seat of the `chesspal play` that started it, if one did.
+ */
 export const chatAttach = z.object({
     version: z.string(),
     session: z.string().nullable(),
     folder: z.string(),
     host: z.string().optional(),
     outdated: z.boolean(),
+    seat: z.int().optional(),
 });
 export type ChatAttach = z.infer<typeof chatAttach>;
 

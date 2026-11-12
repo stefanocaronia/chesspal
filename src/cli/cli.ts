@@ -17,7 +17,12 @@ if (args.length === 0) {
 } else if (args.length === 2 && args[0] === "icon" && args[1] === "--remove") {
     const [{ defaultContext }, { iconsRemoved }] = await Promise.all([import("../commands/index.ts"), import("./icon.ts")]);
     console.log(iconsRemoved(defaultContext()));
-} else if (args.length === 2 && args[0] === "play" && !args[1]!.startsWith("-")) {
+} else if (args[0] === "play" && (args.length === 2 || (args.length === 4 && args[2] === "--home")) && !args[1]!.startsWith("-")) {
+    // The data folder of a table started with CHESSPAL_HOME, which a terminal the table opens may not pass on (Terminal.app): the chat and its server read it.
+    if (args[3] !== undefined) {
+        process.env.CHESSPAL_HOME = args[3];
+    }
+
     await playHere(args[1]!);
 } else if (args.length === 1 && args[0] === "mcp") {
     // The server and its SDK load only here: every other command starts faster without them.

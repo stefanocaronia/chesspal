@@ -243,15 +243,17 @@ function answerOf(status: number | undefined, text: string): Answer
     return status === 200 ? jsonOf(text) : undefined;
 }
 
-/** What the chat says of itself as it attaches:its version, session and folder, its host, and whether its folder needs init again. */
+/** What the chat says of itself as it attaches: its version, session and folder, its host, whether its folder needs init again, and the seat of its play. */
 function attachment(context: Context): Record<string, unknown>
 {
+    const seat = Number(process.env.CHESSPAL_SEAT);
     return {
         version,
         session: process.env.CLAUDE_CODE_SESSION_ID ?? null,
         folder: context.folder,
         host: context.host?.(),
         outdated: outdatedHostFiles(context.folder, context.platform).length > 0,
+        ...(Number.isInteger(seat) && seat > 0 ? { seat } : {}),
     };
 }
 
