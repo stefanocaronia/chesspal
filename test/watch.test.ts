@@ -84,6 +84,18 @@ describe("the page's watch on the server's game", () => {
         await settle();
         expect(page.said.problem).toEqual([undefined]);
         expect(page.reads).toBe(2);
+        // Nor tries it again, nor shows the page offline over the game read since.
+        await vi.advanceTimersByTimeAsync(readTryWait * (readTries + 1));
+        expect(page.reads).toBe(2);
+        expect(page.said.offline).not.toContain(true);
+    });
+
+    it("leaves the browser to connect again on its own while it says it is connecting", async () => {
+        const page = watched([{ version: "1" }]);
+        page.stream().state = connecting;
+        page.stream().failed();
+        await vi.advanceTimersByTimeAsync(reconnectWait * 2);
+        expect(page.streams).toHaveLength(1);
     });
 
     it("connects again a little later when the browser gives the events up for good", async () => {

@@ -10,8 +10,14 @@ let refused = 0;
 
 if (gate !== undefined) {
     writeFileSync(join(gate, name), "");
+    const giveUp = Date.now() + 20_000;
 
     while (readdirSync(gate).length < Number(writers)) {
+        if (Date.now() > giveUp) {
+            process.stderr.write(`The writer ${name} waited 20 s at the gate for the others, which never came.\n`);
+            process.exit(2);
+        }
+
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
     }
 }

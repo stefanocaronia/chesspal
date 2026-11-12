@@ -1,8 +1,8 @@
 // Chesspal's icon on the desktop and in the system's menu (D-104): it opens the table as `chesspal` alone does, with no console, on Windows, macOS and Linux.
 // The command line asks once a machine whether to put it there.
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { hostname } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeAtomically } from "../../../games/index.ts";
 import { tableFolder } from "../../../home/index.ts";
@@ -79,7 +79,8 @@ export function noteIconMade(home: string, command: IconCommand, files: readonly
 export function removeIcons(home: string, machine = hostname()): string[]
 {
     const notes = iconNotes(home);
-    const removed = (notes.made[machine]?.files ?? []).filter((file) => existsSync(file));
+    // Only Chesspal's own files, by their names, and links too, whose target the player may have thrown away already.
+    const removed = (notes.made[machine]?.files ?? []).filter((file) => iconName.test(basename(file)) && lstatSync(file, { throwIfNoEntry: false }) !== undefined);
 
     // On macOS the icon is an application, a folder.
     for (const file of removed) {
@@ -128,6 +129,9 @@ function writeIconNotes(home: string, notes: IconNotes): void
     mkdirSync(tableFolder(home), { recursive: true });
     writeAtomically(notesFile(home), `${JSON.stringify(notes, null, 2)}\n`);
 }
+
+// The names of the files an icon is made of, on Windows, Linux and macOS: removing touches no other, whatever the notes say.
+const iconName = /^chesspal\.(lnk|desktop|app)$/i;
 
 // The notes kept; none when the file is missing or cannot be read, which only asks again.
 function iconNotes(home: string): IconNotes

@@ -227,10 +227,11 @@ function reviewProgress(context: Context, game: string): string | undefined
         const { record } = namedGame(context, game);
         const worded = gameReviewOf(record) !== undefined;
         const estimated = record.moves.filter(({ comment }) => leadOf(comment) !== undefined).length;
-        // A game resigned or lost on time needs who is ahead after its last move too.
-        const needed = new Game(record).outcome.over ? record.moves.length - 1 : record.moves.length;
+        // A game resigned or lost on time needs who is ahead after its last move too; the game is played over only when that is the one estimate missing.
+        const all = record.moves.length;
+        const done = estimated >= all || (estimated === all - 1 && new Game(record).outcome.over);
 
-        if (worded && estimated >= needed) {
+        if (worded && done) {
             return "its review is done";
         }
 

@@ -80,7 +80,7 @@ export function notePondering(folder: string, key: string, pondering: boolean, n
 export function ponderingUntil(folder: string, key: string): Date | undefined
 {
     const kept = read(folder);
-    return kept?.key === key && kept.pondering !== undefined ? new Date(new Date(kept.pondering).getTime() + ponderSignFor) : undefined;
+    return kept?.key === key && typeof kept.pondering === "string" ? new Date(new Date(kept.pondering).getTime() + ponderSignFor) : undefined;
 }
 
 /** Whether the AI thinks on the player's time in a position now, as noted. */
@@ -102,8 +102,8 @@ const thoughtsFile = z.object({
     key: z.string(),
     thoughts: z.array(z.object({ reply: z.string(), move: z.string(), why: z.string() })),
     since: z.iso.datetime().optional(),
-    // The time of the AI's last look or thought while it ponders.
-    pondering: z.iso.datetime().optional(),
+    // The time of the AI's last look or thought while it ponders; true, from an older Chesspal, is a sign without its time, taken as gone.
+    pondering: z.union([z.iso.datetime(), z.boolean()]).optional(),
 });
 
 type ThoughtsFile = z.infer<typeof thoughtsFile>;
