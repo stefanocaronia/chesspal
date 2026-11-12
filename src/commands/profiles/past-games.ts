@@ -5,27 +5,40 @@ import { gameFolder } from "../../profiles/index.ts";
 import { openingName } from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
 
-type Past = { games: string[]; } | { pgn: string; };
+type Past = { games: string[]; searched: true | undefined; } | { pgn: string; };
 
 /** The AI's memory of the games played (D-57): how the latest went, one line each, or one game whole from the archive. */
 export const pastGames = defineCommand({
     name: "past_games",
     description: "Lists the games played with this player, the latest first: when, your colour, the result, the opening, how long, and its name in the "
-        + "archive. With game, that game's PGN with your comments and plans; to comment a game with the player, analyse_game. new_game already gives the "
-        + "last three. Example: past_games {}.",
-    input: z.object({ game: z.string().optional().describe("a game's name, as the list writes it: its PGN") }),
+        + "archive. With search, only the games whose line holds every word of it. With game, that game's PGN with your comments and plans; to comment a "
+        + 'game with the player, analyse_game. new_game already gives the last three. Example: past_games {search: "Sicilian lost"}.',
+    input: z.object({
+        search: z.string().optional().describe("words the game's line must all hold: a date, a colour, won, lost, drew, unfinished, an opening"),
+        game: z.string().optional().describe("a game's name, as the list writes it: its PGN"),
+    }),
     readOnly: true,
     idempotent: true,
-    run: ({ game }, context): Past => {
+    run: ({ search, game }, context): Past => {
         const folder = gameFolder(context.home());
-        return game === undefined ? { games: pastGameLines(folder, listed) } : { pgn: writePgn(archivedGame(folder, game)) };
+        return game === undefined ? { games: pastGameLines(folder, listed, search), searched: search?.trim() ? true : undefined } : { pgn: writePgn(archivedGame(folder, game)) };
     },
-    format: (past) => ("pgn" in past ? past.pgn : past.games.length === 0 ? "No game played yet." : past.games.join("\n")),
+    format: (past) => {
+        if ("pgn" in past) {
+            return past.pgn;
+        }
+
+        return past.games.length > 0 ? past.games.join("\n") : past.searched ? "No game played holds all those words." : "No game played yet.";
+    },
 });
 
-/** The latest games of the archive, one line each as the AI reads them: none when there is no archive. A game closed before any move is no game played. */
-export function pastGameLines(folder: string, count: number): string[]
+/**
+ * The latest games of the archive, one line each as the AI reads them, those holding every word searched: none when there is no archive. A game closed
+ * before any move is no game played.
+ */
+export function pastGameLines(folder: string, count: number, search = ""): string[]
 {
+    const words = search.toLowerCase().split(/\s+/).filter((word) => word !== "");
     const lines: string[] = [];
 
     for (const name of archivedGames(folder)) {
@@ -35,9 +48,10 @@ export function pastGameLines(folder: string, count: number): string[]
 
         try {
             const record = archivedGame(folder, name);
+            const line = record.moves.length > 0 ? pastGameLine(name, record) : undefined;
 
-            if (record.moves.length > 0) {
-                lines.push(pastGameLine(name, record));
+            if (line !== undefined && words.every((word) => line.toLowerCase().includes(word))) {
+                lines.push(line);
             }
         } catch {
             // A game the archive cannot read stays out of the memory.
