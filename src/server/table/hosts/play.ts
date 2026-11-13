@@ -5,9 +5,9 @@ import { existsSync } from "node:fs";
 import { win32 } from "node:path";
 import { type Context, speaksItalian } from "../../../commands/index.ts";
 import { tableFolder } from "../../../home/index.ts";
-import { codexHooksPath, setUpHosts } from "../../../host-files/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
 import { programPath } from "./find.ts";
+import { setUpTable, takeHooksChanged } from "./hooks.ts";
 import { choiceIn, hostArgs, type HostChoice, type HostName, isHostName, startMessage } from "./hosts.ts";
 import { askedAgain, leaveSeat, refreshSeat, seatTimes, takeSeat } from "./seat.ts";
 import { cmdQuoted } from "./terminal.ts";
@@ -156,9 +156,9 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
         throw new Error(`${hostTitle[host]} is not installed on this computer, or not on its PATH: install it (${installHint[host]}), then try again.`);
     }
 
-    const hooks = codexHooksPath(folder);
-    const hadHooks = host === "codex" && existsSync(hooks);
-    const hooksChanged = setUpHosts(folder, context.platform).includes(hooks) && hadHooks ? { hooksChanged: true as const } : {};
+    setUpTable(folder, context.platform);
+    // Codex's hooks written again, by this play or by the table before it: the note is for Codex's chat, and waits for it.
+    const hooksChanged = host === "codex" && takeHooksChanged(folder) ? { hooksChanged: true as const } : {};
     const choice = choiceIn(profileSettings(home, activeProfile(home).id), host);
     const args = hostArgs(host, startMessage(languageIn(gameFolder(home), context.language)), choice);
     // An effort the player set for every chat would win over the one chosen on the page: spawn leaves out a variable that is undefined.

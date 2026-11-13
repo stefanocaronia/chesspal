@@ -481,6 +481,8 @@ export type ServerRefusal =
     | "profile-game"
     | "game-going"
     | "pgn-unreadable"
+    | "game-missing"
+    | "game-not-archived"
     | "update-game"
     | "update-chat";
 
@@ -746,6 +748,8 @@ const english: Text = {
         "profile-game": () => english.profile.whilePlaying,
         "game-going": () => "A game is going on: finish it before you bring another to analyse.",
         "pgn-unreadable": () => "Chesspal cannot read this PGN: check you copied the whole game, its tags and its moves.",
+        "game-missing": () => "This game is no longer there: pick another.",
+        "game-not-archived": () => "The game just over is not saved yet: try again in a moment.",
         "update-game": () => english.update.whilePlaying,
         "update-chat": (most, name) => `${name} is answering: update once it has done.`,
     },
@@ -1183,6 +1187,8 @@ const italian: Text = {
         "profile-game": () => italian.profile.whilePlaying,
         "game-going": () => "C'è una partita in corso: finiscila prima di portarne un'altra da analizzare.",
         "pgn-unreadable": () => "Chesspal non riesce a leggere questo PGN: controlla di aver copiato la partita intera, intestazioni e mosse.",
+        "game-missing": () => "Questa partita non c'è più: scegline un'altra.",
+        "game-not-archived": () => "La partita appena finita non è ancora salvata: riprova fra un momento.",
         "update-game": () => italian.update.whilePlaying,
         "update-chat": (most, name) => `${name} sta rispondendo: aggiorna quando ha finito.`,
     },

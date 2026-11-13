@@ -10,6 +10,7 @@ import { activeProfile, saveProfileSettings } from "../src/profiles/index.ts";
 import type { TableChats } from "../src/server/page/table.ts";
 import { playCommand } from "../src/server/table/hosts/chats.ts";
 import { hostArgs, startMessage } from "../src/server/table/hosts/hosts.ts";
+import { setUpTable } from "../src/server/table/hosts/index.ts";
 import { type HostLaunch, runHost } from "../src/server/table/hosts/play.ts";
 import { askAgain, askedAgain, leaveSeat, refreshSeat, seatTaken, seatTimes, takeSeat } from "../src/server/table/hosts/seat.ts";
 import { terminals } from "../src/server/table/hosts/terminal.ts";
@@ -20,6 +21,8 @@ import { sent } from "./http.ts";
 import { onFreePorts } from "./ports.ts";
 
 const folders: string[] = [];
+// The note the table leaves for chesspal play when it wrote Codex's hooks again.
+const hooksNote = "codex-hooks-changed.json";
 const tables: Table[] = [];
 
 afterEach(async () => {
@@ -72,6 +75,41 @@ describe("a chat the table opens", () => {
         writeFileSync(hooks, "{}\n");
         expect(hostLaunch(context, "codex", env, found).hooksChanged).toBe(true);
         expect(hostLaunch(context, "codex", env, found).hooksChanged).toBeUndefined();
+        expect(existsSync(join(tableFolder(context.home()), hooksNote))).toBe(false);
+    });
+
+    it("says once that Codex's hooks changed when the table wrote them again before chesspal play started, and nothing when none changed", async () => {
+        const context = homeContext("linux");
+        const folder = tableFolder(context.home());
+        const env = { PATH: "/usr/bin" };
+        const found = (path: string): boolean => path === "/usr/bin/codex";
+
+        // A first table writes Codex's hooks where there were none: no note, nothing said.
+        const table = await onFreePorts(() => startTable(context, { idle: 60_000, every: 1_000 }, fakeChats().chats));
+        tables.push(table!);
+        expect(existsSync(join(folder, hooksNote))).toBe(false);
+        expect(hostLaunch(context, "codex", env, found).hooksChanged).toBeUndefined();
+        await table!.close();
+
+        // Older hooks the table writes again: the next play says it, once, and takes the note; Claude Code's play leaves it to Codex's.
+        writeFileSync(join(folder, ".codex", "hooks.json"), "{}\n");
+        const again = await onFreePorts(() => startTable(context, { idle: 60_000, every: 1_000 }, fakeChats().chats));
+        tables.push(again!);
+        expect(existsSync(join(folder, hooksNote))).toBe(true);
+        hostLaunch(context, "claude", env, (path) => path === "/usr/bin/claude");
+        expect(hostLaunch(context, "codex", env, found).hooksChanged).toBe(true);
+        expect(existsSync(join(folder, hooksNote))).toBe(false);
+        expect(hostLaunch(context, "codex", env, found).hooksChanged).toBeUndefined();
+    });
+
+    it("takes a note it cannot read as no note", () => {
+        const context = homeContext("linux");
+        const folder = tableFolder(context.home());
+        setUpTable(folder, "linux");
+        writeFileSync(join(folder, hooksNote), "{ not json");
+
+        expect(hostLaunch(context, "codex", { PATH: "/usr/bin" }, (path) => path === "/usr/bin/codex").hooksChanged).toBeUndefined();
+        expect(existsSync(join(folder, hooksNote))).toBe(false);
     });
 
     it("opens in Windows Terminal, else in the console Windows starts; in macOS's Terminal; on Linux in the terminals installed", () => {

@@ -11,6 +11,7 @@ export {
     archiveGame,
     archiveName,
     deleteGame,
+    GameMissing,
     gameStemOf,
     isGameName,
     isOverOnTable,

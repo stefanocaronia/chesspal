@@ -121,6 +121,11 @@ export function archivedGame(folder: string, name: string): GameRecord
     return gameNamed(folder, "games", name);
 }
 
+/** The refusal of a game asked by a name no game has, apart from a game that is there and cannot be read. */
+export class GameMissing extends Error
+{
+}
+
 /** The names of the games kept to study in a profile's folder, the latest kept first: study/2026-11-04-153012.pgn. */
 export function keptGames(root: string): string[]
 {
@@ -277,7 +282,7 @@ function gameNamed(folder: string, shelf: Shelf, name: string): GameRecord
     const { what, list } = shelves[shelf];
 
     if (!namePattern.test(file)) {
-        throw new Error(`${name} is no game ${what}: give a name as ${list} writes it, such as ${shelf}/2026-11-02-153012.pgn.`);
+        throw new GameMissing(`${name} is no game ${what}: give a name as ${list} writes it, such as ${shelf}/2026-11-02-153012.pgn.`);
     }
 
     let text: string;
@@ -285,7 +290,7 @@ function gameNamed(folder: string, shelf: Shelf, name: string): GameRecord
     try {
         text = readFileSync(join(folder, shelf, file), "utf8");
     } catch {
-        throw new Error(`There is no ${name} among the games ${what}: give a name as ${list} writes it.`);
+        throw new GameMissing(`There is no ${name} among the games ${what}: give a name as ${list} writes it.`);
     }
 
     const [record] = readPgn(text);
