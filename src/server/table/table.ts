@@ -100,21 +100,48 @@ export async function tableAt(folder: string): Promise<TableFound | undefined>
 }
 
 /** Asks the table at a port to quit; it answers before it goes, and a table that cannot be reached, or does not answer within a second or so, is let be. */
-export function askToQuit(port: number): Promise<void>
+export async function askToQuit(port: number): Promise<void>
+{
+    await askTable(port, "/api/table/quit");
+}
+
+/**
+ * Asks the table at a port for an opening of its window: its number, which the window carries, null while another opening has not reached the table
+ * yet, so that no second window opens; undefined when the table did not answer.
+ */
+export async function askToOpen(port: number): Promise<number | null | undefined>
+{
+    const answer = await askTable(port, "/api/table/open");
+    const opening = (answer as { opening?: unknown; } | undefined)?.opening;
+    return typeof opening === "number" || opening === null ? opening : undefined;
+}
+
+// A POST of JSON to a route of the table: its answer read as JSON, undefined when it could not be reached or read in time.
+function askTable(port: number, path: string): Promise<unknown>
 {
     return new Promise((done) => {
-        const asked = request({ host: "127.0.0.1", port, path: "/api/table/quit", method: "POST", headers: { "Content-Type": "application/json" }, agent: false }, (response) => {
-            response.resume();
-            response.on("end", () => done());
+        const asked = request({ host: "127.0.0.1", port, path, method: "POST", headers: { "Content-Type": "application/json" }, agent: false }, (response) => {
+            let body = "";
+            response.setEncoding("utf8");
+            response.on("data", (chunk: string) => {
+                body += chunk;
+            });
+            response.on("end", () => {
+                try {
+                    done(JSON.parse(body));
+                } catch {
+                    done(undefined);
+                }
+            });
         });
-        asked.setTimeout(quitWait, () => asked.destroy());
-        asked.on("error", () => done());
+        asked.setTimeout(tableWait, () => asked.destroy());
+        asked.on("error", () => done(undefined));
         asked.end("{}");
     });
 }
 
 // A table answers at once: one stuck must not hold the chat's first tool, nor `chesspal`.
-const quitWait = 1_500;
+const tableWait = 1_500;
 
 /** Whether a table of the same folder answers on a lower port than this one's: the other won, and this one goes. */
 async function lostTo(url: string, folder: string): Promise<boolean>

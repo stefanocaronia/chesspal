@@ -9,6 +9,7 @@ import { gameFolder } from "../../profiles/index.ts";
 import { tellWatchers } from "./events.ts";
 import { bodyOf, isJson, jsonOf, type Refused, runRoute, sendJson } from "./http.ts";
 import type { Served } from "./page.ts";
+import { giveOpening } from "./windows.ts";
 
 /** A host the table offers a chat in: whether it is installed, the models and efforts the player may choose, and the command to open one by hand. */
 export interface ChatHost
@@ -97,6 +98,9 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
         // Another Chesspal version asks the table to quit, to start its own in its place.
         sendJson(response, 200, { quitting: true });
         served.table.quit();
+    } else if (path === "/api/table/open") {
+        // chesspal asks to open the table's window: the newest one stays, the others close.
+        sendJson(response, 200, giveOpening(served));
     } else if (path === "/api/table/chat") {
         runRoute(response, () => openChat(request, response, served));
     } else if (path === "/api/table/restart") {
@@ -107,7 +111,7 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
         runRoute(response, () => updateChesspal(request, response, served));
     } else {
         sendJson(response, 404, {
-            error: `${path} is no route of the table's: it answers POST /api/table/chat, /api/table/restart, /api/table/waiting, /api/table/update and /api/table/quit.`,
+            error: `${path} is no route of the table's: it answers POST /api/table/open, /api/table/chat, /api/table/restart, /api/table/waiting, /api/table/update and /api/table/quit.`,
         });
     }
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { AiModel, Clock, Side } from "../../core/index.ts";
 import type { Thinking } from "../avatars/thought.tsx";
 import type { CoachShown, TalkLine } from "../game/plies.ts";
+import { closesForNewer, eventsAddress } from "../layout/window.ts";
 import type { ProfileShown } from "../profile/profile.ts";
 import type { ServerRefusal, Text } from "../text.ts";
 import { watchServed } from "./watch.ts";
@@ -35,9 +36,9 @@ export function useServed(onNewGame: () => void): ServedPage
         const watch = watchServed<PageData & { error?: string; }>({
             read: () => fetch("/api/game").then((response) => response.json() as Promise<PageData & { error?: string; }>),
             connect: (handlers) => {
-                const events = new EventSource("/api/events");
+                const events = new EventSource(eventsAddress());
                 events.onopen = handlers.open;
-                events.onmessage = (event: MessageEvent<string>) => handlers.message(event.data);
+                events.onmessage = (event: MessageEvent<string>) => closesForNewer(event.data) || handlers.message(event.data);
                 events.onerror = handlers.error;
                 return events;
             },

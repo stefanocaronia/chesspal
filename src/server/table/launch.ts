@@ -7,22 +7,22 @@ import { type Context, speaksItalian } from "../../commands/index.ts";
 import { tableFolder } from "../../home/index.ts";
 import { version } from "../../version.ts";
 import { openInBrowser } from "./browser.ts";
-import { askToQuit, tableAt } from "./table.ts";
+import { askToOpen, askToQuit, tableAt } from "./table.ts";
 
 /** What opening the table does outside this process: start the table apart, open the browser, wait. The tests give their own. */
 export interface TableLauncher
 {
     /** Starts `chesspal table` apart from this process, which it outlives, in the data folder. */
     start(home: string): void;
-    /** Opens the page in the browser: whether it could. */
-    open(url: string): Promise<boolean>;
+    /** Opens the page in the browser, its window marked with its opening when the table gave one: whether it could. */
+    open(url: string, opening?: number): Promise<boolean>;
     wait(milliseconds: number): Promise<void>;
 }
 
 /**
  * Opens the table's page in the browser, the table started first when none answers, or when the one that does is of another version, which is asked to
- * quit; a table of this version another `chesspal` started meanwhile is as good. What to tell the player, in their language; a table that does not start
- * within ten seconds throws.
+ * quit; a table of this version another `chesspal` started meanwhile is as good. The window opened last stays, the table's older ones close, and none opens
+ * while another is opening (D-104). What to tell the player, in their language; a table that does not start within ten seconds throws.
  */
 export async function openTable(context: Context, launcher: TableLauncher = processLauncher(context.platform)): Promise<string>
 {
@@ -37,7 +37,7 @@ export async function openTable(context: Context, launcher: TableLauncher = proc
         const table = await tableAt(folder);
 
         if (table?.version === version) {
-            return styleText(["bold", "green"], `♜ ${(await launcher.open(table.url)) ? words.opened(table.url) : words.notOpened(table.url)}`);
+            return styleText(["bold", "green"], `♜ ${(await openWindow(table.url, table.port, launcher)) ? words.opened(table.url) : words.notOpened(table.url)}`);
         }
 
         if (table !== undefined && !asked.has(table.port)) {
@@ -79,9 +79,16 @@ export function processLauncher(platform: string, command: string[] = [...proces
             // Its own process group, with no console and nothing of this one's: the terminal can close, the table stays.
             spawn(process.execPath, [...command, "table"], { cwd: home, detached: true, stdio: "ignore", windowsHide: true }).unref();
         },
-        open: (url) => openInBrowser(url, platform),
+        open: (url, opening) => openInBrowser(url, platform, opening),
         wait: (milliseconds) => new Promise((done) => setTimeout(done, milliseconds)),
     };
+}
+
+// The table's window, opened unless another opening has not reached the table yet, as two clicks on the icon ask: then the one opening is as good.
+async function openWindow(url: string, port: number, launcher: TableLauncher): Promise<boolean>
+{
+    const opening = await askToOpen(port);
+    return opening === null || await launcher.open(url, opening);
 }
 
 // A table answers within ten seconds of its start, an older one quitting first, looked for every tenth of a second.

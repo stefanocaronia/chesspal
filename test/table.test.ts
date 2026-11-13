@@ -85,12 +85,49 @@ describe("the table", () => {
 describe("chesspal alone", () => {
     it("starts the table when none answers and opens its page; the next time it opens the page of the table that is there", async () => {
         const context = homeContext();
-        const { launcher, opened, starts } = inProcess(context);
+        const { launcher, opened, openings, starts } = inProcess(context);
 
         expect(await openTable(context, launcher)).toContain(opened[0]);
+        const first = await tableWindow(opened[0]!, openings[0]);
         expect(await openTable(context, launcher)).toContain(opened[1]);
         expect(starts()).toBe(1);
         expect(opened[0]).toBe(opened[1]);
+        first.close();
+    });
+
+    it("keeps one window of the table: the newest opened stays, the older hear of it, and an opening while another has not reached the table opens none", async () => {
+        let clock = Date.parse("2026-11-13T10:00:00Z");
+        const context = { ...homeContext(), now: () => new Date(clock) };
+        const { launcher, opened, openings } = inProcess(context);
+
+        await openTable(context, launcher);
+        // Two clicks on the icon while the first window is opening: no second window.
+        await Promise.all([openTable(context, launcher), openTable(context, launcher)]);
+        expect(openings).toHaveLength(1);
+
+        const first = await tableWindow(opened[0]!, openings[0]);
+        clock += 1;
+        await Promise.all([openTable(context, launcher), openTable(context, launcher)]);
+        expect(openings).toHaveLength(2);
+        expect(openings[1]).toBeGreaterThan(openings[0]!);
+
+        const second = await tableWindow(opened[1]!, openings[1]);
+        expect(await first.heard(`window ${openings[1]}`)).toBe(true);
+
+        // An opening whose window never came lets the next one open after a while.
+        await openTable(context, launcher);
+        await openTable(context, launcher);
+        expect(openings).toHaveLength(3);
+        clock += 10_000;
+        await openTable(context, launcher);
+        expect(openings).toHaveLength(4);
+
+        // A window that connects again after a newer one hears it is older.
+        first.close();
+        const again = await tableWindow(opened[0]!, openings[0]);
+        expect(await again.heard(`window ${openings[1]}`)).toBe(true);
+        again.close();
+        second.close();
     });
 
     it("asks a table of another version to quit, and starts its own in its place", async () => {
@@ -182,20 +219,56 @@ function freshTable(times = patient): Promise<{ context: Context; table: Table; 
     });
 }
 
-/** A launcher that starts the table in this process, and opens no browser: the addresses it was asked to open, and how many tables it started. */
-function inProcess(context: Context): { launcher: TableLauncher; opened: string[]; starts: () => number; }
+/**
+ * A launcher that starts the table in this process, and opens no browser: the addresses it was asked to open with their openings, and how many tables it
+ * started.
+ */
+function inProcess(context: Context): { launcher: TableLauncher; opened: string[]; openings: (number | undefined)[]; starts: () => number; }
 {
     const opened: string[] = [];
+    const openings: (number | undefined)[] = [];
     let starts = 0;
     const launcher: TableLauncher = {
         start: () => {
             starts++;
             void started(context);
         },
-        open: (url) => Promise.resolve(opened.push(url) > 0),
+        open: (url, opening) => {
+            openings.push(opening);
+            return Promise.resolve(opened.push(url) > 0);
+        },
         wait: (milliseconds) => new Promise((done) => setTimeout(done, milliseconds)),
     };
-    return { launcher, opened, starts: () => starts };
+    return { launcher, opened, openings, starts: () => starts };
+}
+
+/** A window the table opened, listening to its events with its opening: whether it hears an event within a second, and closing it. */
+function tableWindow(url: string, opening: number | undefined): Promise<{ heard: (data: string) => Promise<boolean>; close: () => void; }>
+{
+    return new Promise((done) => {
+        const said: string[] = [];
+        const events = get(new URL(`/api/events?window=${opening}`, url), (response) => {
+            response.setEncoding("utf8");
+            response.on("data", (chunk: string) => said.push(chunk));
+            done({
+                heard: async (data) => {
+                    for (let waited = 0; waited < 1000; waited += 20) {
+                        if (
+                            said.join("").includes(`data: ${data}
+`)
+                        ) {
+                            return true;
+                        }
+
+                        await new Promise((later) => setTimeout(later, 20));
+                    }
+
+                    return false;
+                },
+                close: () => events.destroy(),
+            });
+        });
+    });
 }
 
 function portOf(url: string): number

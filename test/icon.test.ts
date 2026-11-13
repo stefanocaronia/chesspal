@@ -3,10 +3,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import { iconsRemoved, offerIcon, type Terminal } from "../src/cli/icon.ts";
-import { windowPlace } from "../src/page/layout/window.ts";
+import { closesForNewer, eventsAddress, fitOpenedWindow, windowPlace } from "../src/page/layout/window.ts";
 import { appBrowser, type BrowserSystem, iconAsked, type IconCommand, iconCommand, iconToRemake, makeIcons, noteIconAsked, noteIconMade, openedAddress } from "../src/server/table/index.ts";
 import { testContext } from "./commands.ts";
 
@@ -14,6 +14,7 @@ const folders: string[] = [];
 
 afterEach(() => {
     folders.splice(0).forEach((folder) => rmSync(folder, { recursive: true, force: true }));
+    vi.unstubAllGlobals();
 });
 
 describe("the table's window", () => {
@@ -71,8 +72,33 @@ describe("the table's window", () => {
 
     it("opens marked, so that the page sizes it the first time: 1600×900 centred, or the screen's room when it has less", () => {
         expect(openedAddress("http://localhost:5876/")).toBe("http://localhost:5876/?opened=");
+        expect(openedAddress("http://localhost:5876/", 1763028000000)).toBe("http://localhost:5876/?opened=1763028000000");
         expect(windowPlace(1920, 1040)).toEqual({ width: 1600, height: 900, left: 160, top: 70 });
         expect(windowPlace(1366, 728)).toEqual({ width: 1366, height: 728, left: 0, top: 0 });
+    });
+});
+
+describe("the window the table opened", () => {
+    it("keeps its opening through its reloads, says it to the events, and closes once the table has opened a newer one", () => {
+        const page = browserWindow("http://127.0.0.1:5876/?opened=1763028000000");
+
+        fitOpenedWindow();
+        expect(page.address()).toBe("/");
+        expect(eventsAddress()).toBe("/api/events?window=1763028000000");
+        expect(closesForNewer("changed")).toBe(false);
+        expect(closesForNewer("window 1763028000000")).toBe(true);
+        expect(page.closed()).toBe(false);
+        expect(closesForNewer("window 1763028000500")).toBe(true);
+        expect(page.closed()).toBe(true);
+    });
+
+    it("never closes when the player opened it by hand", () => {
+        const page = browserWindow("http://127.0.0.1:5876/");
+
+        fitOpenedWindow();
+        expect(eventsAddress()).toBe("/api/events");
+        expect(closesForNewer("window 1763028000500")).toBe(true);
+        expect(page.closed()).toBe(false);
     });
 });
 
@@ -238,4 +264,27 @@ function folderIn(parent: string, name: string): string
     const folder = join(parent, name);
     mkdirSync(folder);
     return folder;
+}
+
+/** A browser's window at an address, as the page's start sees it: its address after the start, and whether it was closed. */
+function browserWindow(href: string): { address: () => string; closed: () => boolean; }
+{
+    let address = href;
+    let closed = false;
+    const kept = new Map<string, string>();
+    vi.stubGlobal("window", {
+        location: {
+            get href()
+            {
+                return address;
+            },
+        },
+        history: { state: null, replaceState: (_: unknown, __: string, to: string) => void (address = to) },
+        screen: { availWidth: 1920, availHeight: 1040 },
+        sessionStorage: { getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => void kept.set(key, value) },
+        resizeTo: () => undefined,
+        moveTo: () => undefined,
+        close: () => void (closed = true),
+    });
+    return { address: () => address, closed: () => closed };
 }

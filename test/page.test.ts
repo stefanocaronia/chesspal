@@ -36,7 +36,7 @@ afterEach(async () => {
 });
 
 describe("the page's server", () => {
-    it("serves the page with its import map, on 127.0.0.1", async () => {
+    it("serves the page with its import map, on 127.0.0.1, not to be translated by the browser", async () => {
         const page = await open(playerFolder());
         const { status, body, headers } = await get(page, "/");
 
@@ -44,6 +44,8 @@ describe("the page's server", () => {
         expect(status).toBe(200);
         expect(body).toContain('<script type="importmap">');
         expect(body).toContain('"chess.js":"/vendor/chess.js"');
+        expect(body).toContain('<html lang="en" translate="no">');
+        expect(body).toContain('<meta name="google" content="notranslate">');
         expect(headers["content-security-policy"]).toMatch(/script-src 'self' 'sha256-/);
     });
 
