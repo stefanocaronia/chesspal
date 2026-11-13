@@ -160,3 +160,16 @@ function judged({ review }: Ply): boolean
 {
     return review?.note !== undefined || (review?.badge !== undefined && review.badge !== "book");
 }
+
+/** The moves of a game the analyst has said who is ahead after, of all its moves. */
+export interface ReviewCount
+{
+    readonly done: number;
+    readonly total: number;
+}
+
+/** How far a review has got, as status tells the AI: the moves the analyst has said who is ahead after, of all the game's. */
+export function reviewCount(plies: readonly Ply[]): ReviewCount
+{
+    return { done: plies.filter((ply) => ply.lead !== undefined).length, total: plies.length };
+}

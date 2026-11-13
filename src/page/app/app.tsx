@@ -43,7 +43,7 @@ import { GameColumn } from "../game/column.tsx";
 import { howEnded, useDeclined, useJustEnded, useSawEnd } from "../game/ending.ts";
 import { Steps } from "../game/move-list.tsx";
 import { useOpeningBook } from "../game/opening-book.ts";
-import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
+import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, reviewCount, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
 import { GuideDialog } from "../guide/guide.tsx";
 import { BareButton, HelpsCard, HintLine, MapButton } from "../helps/helps.tsx";
 import { helpsOf } from "../helps/view.ts";
@@ -455,6 +455,8 @@ export function App({ start }: { start: Settings; })
     // With nobody at it, a review not finished says so, and the player brings the game back to the AI (D-109).
     const completeIt = summary === undefined && studied?.incomplete === true && !offline ? () => void studyGame({ game: studied.name }) : undefined;
     const closing = studied === undefined ? undefined : closingOf(live.record);
+    // How far the review has got, counted as status counts it for the AI: who is ahead after how many of the game's moves.
+    const count = reviewing || completeIt !== undefined ? reviewCount(plies) : undefined;
     // In analysis the AI's card says who played that game, as its PGN keeps it (D-82), not who plays now.
     const playedBy = studied === undefined ? undefined : aiModelIn(live.record);
     const talk = game?.talk ?? served.talk ?? [];
@@ -730,6 +732,7 @@ export function App({ start }: { start: Settings; })
                                             {...(at === total && closing !== undefined ? { closing } : {})}
                                             {...(at === 0 && summary !== undefined ? { summary } : {})}
                                             {...(reviewing ? { reviewing: true } : {})}
+                                            {...(count === undefined ? {} : { count })}
                                             {...(completeIt === undefined ? {} : { onComplete: completeIt })}
                                             name={analyst}
                                             by={annotator}
@@ -917,6 +920,7 @@ export function App({ start }: { start: Settings; })
                                 by: analyst,
                                 ...(summary === undefined ? {} : { summary }),
                                 ...(reviewing ? { reviewing: true } : {}),
+                                ...(count === undefined ? {} : { count }),
                                 ...(completeIt === undefined ? {} : { onComplete: completeIt }),
                             },
                         })}

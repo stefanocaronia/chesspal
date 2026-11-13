@@ -319,24 +319,104 @@
     line-height: 1.45;
 }
 
+/* The line that says the AI reviews, and under it how far it has got */
 .review.waiting,
 .say.reviewing {
-    display: flex;
-    align-items: center;
+    display: grid;
     gap: 8px;
     margin: 0;
     color: var(--soft);
 }
 
-/* A review nobody is finishing: the note, and beside it the button that brings the game back to the AI (D-109); neutral, as no error (Zoe) */
+/* A review nobody is finishing: the note, and beside it the button that brings the game back to the AI (D-109); neutral, as no error (Zoe). Under them,
+   how far it got */
 .review.incomplete,
 .say.incomplete {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    color: var(--soft);
+}
+
+.review.incomplete > p,
+.say.incomplete > p {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin: 0;
-    color: var(--soft);
+}
+
+/* How far a review has got: a thin bar in the accent and the count, 12/33. Before the first move a short run goes back and forth; full, while the word on
+   the whole game is written, it breathes; stopped unfinished, it stands still in the soft ink */
+.review-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.review-progress .track {
+    flex: 1;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.review-progress .fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+    transition: width 300ms ease-out;
+}
+
+.review-progress .count {
+    flex: none;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.review-progress.waiting .fill {
+    width: 30%;
+    animation: review-run 1400ms ease-in-out infinite alternate;
+}
+
+.review-progress.writing .fill {
+    animation: review-breath 1600ms ease-in-out infinite;
+}
+
+.review-progress.stopped .track {
+    background: color-mix(in srgb, var(--soft) 20%, transparent);
+}
+
+.review-progress.stopped .fill {
+    background: var(--soft);
+}
+
+@keyframes review-run {
+    to {
+        translate: 233%;
+    }
+}
+
+@keyframes review-breath {
+    50% {
+        opacity: 0.45;
+    }
+}
+
+/* Still: before the first move a faint full bar, the count then grows without sliding */
+@media (prefers-reduced-motion: reduce) {
+    .review-progress .fill {
+        transition: none;
+        animation: none;
+    }
+
+    .review-progress.waiting .fill {
+        width: 100%;
+        opacity: 0.35;
+    }
 }
 
 .review.incomplete button,

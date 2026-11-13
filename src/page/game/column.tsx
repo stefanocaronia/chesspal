@@ -10,8 +10,9 @@ import type { Step } from "./browse.ts";
 import { FoldButton, useCardFold } from "./card-fold.tsx";
 import type { HowEnded } from "./ending.ts";
 import { MoveList, Steps } from "./move-list.tsx";
-import type { Ply } from "./plies.ts";
+import type { Ply, ReviewCount } from "./plies.ts";
 import { ResultTile } from "./result-tile.tsx";
+import { ReviewProgress } from "./review-progress.tsx";
 
 /**
  * The column, which the player folds with its tab; under the board, where three columns would leave the board small, always open. A game in analysis
@@ -36,7 +37,7 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     /** Who the AI saw ahead after the moves, with the helps on in a game and in analysis (D-90): the bar shows it, and in analysis the chart. */
     standings?: readonly Standing[];
     /** The game in analysis: who reviews it, their word on the whole game once written, whether an AI is going over it now, or else what completes it. */
-    analysis?: { by: string; summary?: string; reviewing?: true; onComplete?: () => void; };
+    analysis?: { by: string; summary?: string; reviewing?: true; count?: ReviewCount; onComplete?: () => void; };
     shownPlies: number;
     onShow: (plies: number) => void;
     onStep: (step: Step) => void;
@@ -67,15 +68,18 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                             <GameCard plies={plies} result={result} how={how} lit={lit} started={started} move={move} toMove={toMove} bar={bar} text={text} />
                             {/* Where the analysis stands, under the game's card, in sight above the fold (Zoe). */}
                             {analysis?.reviewing !== true ? null : (
-                                <p class="card review waiting" role="status">
-                                    <span class="spinner" aria-hidden="true" />
-                                    {text.reviewing(analysis.by)}
-                                </p>
+                                <div class="card review waiting">
+                                    <p role="status">{text.reviewing(analysis.by)}</p>
+                                    {analysis.count === undefined ? null : <ReviewProgress count={analysis.count} label={text.reviewing(analysis.by)} />}
+                                </div>
                             )}
                             {analysis?.onComplete === undefined ? null : (
                                 <div class="card review incomplete">
-                                    <p role="status">{text.incomplete}</p>
-                                    <button type="button" title={text.completeHint} aria-label={text.completeHint} onClick={analysis.onComplete}>{text.complete}</button>
+                                    <p>
+                                        <span role="status">{text.incomplete}</span>
+                                        <button type="button" title={text.completeHint} aria-label={text.completeHint} onClick={analysis.onComplete}>{text.complete}</button>
+                                    </p>
+                                    {analysis.count === undefined || analysis.count.done === 0 ? null : <ReviewProgress count={analysis.count} label={text.incomplete} stopped />}
                                 </div>
                             )}
                             {analysis === undefined || standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={shownPlies} onShow={onShow} text={text} />}
