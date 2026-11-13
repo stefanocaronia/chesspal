@@ -120,7 +120,7 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
     .spinner {
-        animation-duration: 3s;
+        animation-duration: 3000ms;
     }
 }
 

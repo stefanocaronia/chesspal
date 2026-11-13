@@ -40,13 +40,17 @@ export function timed(operations: number, work: () => unknown): number
     return (performance.now() - started) / operations;
 }
 
-/** A game of random legal moves, made on chess.js so that the core sees its positions for the first time; from the first seed that lasts long enough. */
-export function randomGame(firstSeed: number, length: number): string[]
+/**
+ * A game of random legal moves, made on chess.js so that the core sees its positions for the first time, after the moves it starts with; from the first seed
+ * that lasts long enough.
+ */
+export function randomGame(firstSeed: number, length: number, start: readonly string[] = []): string[]
 {
     for (let attempt = firstSeed;; attempt++) {
         const random = randomFrom(attempt);
         const chess = new Chess();
-        const moves: string[] = [];
+        const moves = [...start];
+        moves.forEach((move) => chess.move(move));
 
         while (moves.length < length && !chess.isGameOver()) {
             const legal = chess.moves();

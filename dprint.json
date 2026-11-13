@@ -18,7 +18,14 @@
     "getAccessor.bracePosition": "nextLine",
     "setAccessor.bracePosition": "nextLine"
   },
-  "includes": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "eslint.config.js", "vitest.config.ts"],
+  "malva": {
+    "indentWidth": 4,
+    "printWidth": 240,
+    "quotes": "alwaysDouble",
+    "hexCase": "lower",
+    "blockSelectorLinebreak": "always"
+  },
+  "includes": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "eslint.config.js", "vitest.config.ts", "src/**/*.css"],
   "excludes": ["**/node_modules", "dist"],
-  "plugins": ["https://plugins.dprint.dev/typescript-0.96.1.wasm"]
+  "plugins": ["https://plugins.dprint.dev/typescript-0.96.1.wasm", "https://plugins.dprint.dev/g-plane/malva-v0.16.0.wasm"]
 }

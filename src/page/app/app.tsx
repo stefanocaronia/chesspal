@@ -15,6 +15,7 @@ import {
     moodAt,
     movesOnly,
     openingOf,
+    outOfBookMove,
     type PieceLetter,
     type Promotion,
     readPgn,
@@ -197,8 +198,10 @@ export function App({ start }: { start: Settings; })
     const analyst = annotator === undefined ? name : aiNameOf(annotator.annotator, annotator.annotator) ?? text.ai;
     const material = useMemo(() => materialOf(live.position.fen), [live]);
     const pieces = useMemo(() => piecesOf(live.position.fen), [live]);
+    // How many of the game's first plies a line of the book reaches, as the server counts them (D-68).
+    const bookPlies = studied !== undefined ? studied.book : game?.book ?? 0;
     // While the game goes on, the book's first moves carry its badge, when the player wants it, as the AI's review gives it after (D-69).
-    const inBook = studied === undefined && settings.book ? game?.book ?? 0 : 0;
+    const inBook = studied === undefined && settings.book ? bookPlies : 0;
     // The judgments of the player's moves, and the AI's drawings, show during a game only with the helps on, always once it is over (D-78); during it the
     // coach's come from its own file, never in the PGN the opponent may read (D-88).
     const judged = !going || settings.helps;
@@ -280,6 +283,8 @@ export function App({ start }: { start: Settings; })
     // In analysis, the opening the move shown has reached, while the book knows the moves (D-69).
     const bookAt = studied === undefined || book === undefined || at === 0 || at > studied.book ? undefined : { tags: live.record.tags, moves: live.record.moves.slice(0, at) };
     const shownOpening = useMemo(() => bookAt === undefined || book === undefined ? undefined : openingOf(bookAt, book), [live, book, bookAt === undefined ? 0 : at]);
+    // Whether the move shown is still the book's, whatever the badges show: the card says the move the game left it at, once it is past it.
+    const leftBook = outOfBookMove(at, bookPlies);
     // A jump of more than one move shows the position at once: only a step slides its pieces.
     const shownBefore = useRef(at);
     const jumped = Math.abs(shownBefore.current - at) > 1;
@@ -870,6 +875,7 @@ export function App({ start }: { start: Settings; })
                         move={live.position.moveNumber}
                         toMove={live.position.turn}
                         opening={opening}
+                        {...(leftBook === undefined ? {} : { outOfBook: leftBook })}
                         helps={helps === undefined ? undefined : (
                             <HelpsCard
                                 helps={helps}

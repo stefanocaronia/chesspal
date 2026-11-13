@@ -622,7 +622,9 @@ h3 + .switch {
 
 /* A game without a result: its star on a coin of the card's colour, readable where the four squares meet */
 .analyses .tile.open {
-    background: radial-gradient(circle, var(--card) 0 11px, transparent 11.5px), conic-gradient(var(--dark-square) 0 25%, var(--light-square) 0 50%, var(--dark-square) 0 75%, var(--light-square) 0);
+    background:
+        radial-gradient(circle, var(--card) 0 11px, transparent 11.5px),
+        conic-gradient(var(--dark-square) 0 25%, var(--light-square) 0 50%, var(--dark-square) 0 75%, var(--light-square) 0);
     color: var(--soft);
     font-size: 18px;
     font-weight: 700;

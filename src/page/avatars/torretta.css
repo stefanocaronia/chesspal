@@ -9,7 +9,7 @@
 
 .torretta .light {
     fill: var(--torretta-light);
-    transition: fill 0.2s;
+    transition: fill 200ms;
 }
 
 .torretta.mood-worried .light {
@@ -17,7 +17,7 @@
 }
 
 .torretta.mood-thoughtful .light {
-    animation: ponder 2.4s ease-in-out infinite;
+    animation: ponder 2400ms ease-in-out infinite;
 }
 
 .torretta.mood-sad .light {
@@ -33,7 +33,7 @@
 .torretta .expression.changed {
     transform-box: fill-box;
     transform-origin: center;
-    animation: face-in 0.16s ease-out;
+    animation: face-in 160ms ease-out;
 }
 
 @keyframes face-in {
@@ -80,7 +80,7 @@
 .torretta .eyes {
     transform-box: fill-box;
     transform-origin: center;
-    animation: blink 6s infinite;
+    animation: blink 6000ms infinite;
 }
 
 @keyframes blink {
