@@ -1,7 +1,7 @@
 // The finished games, as PGN in games/ (D-9, D-41), with the AI's plans for the analyst (D-21); and the games played elsewhere, kept to study in study/ (D-68).
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { type GameRecord, movesOnly, pgnDate, readPgn, unsigned, withAiHost, withAiModel, writePgn } from "../core/index.ts";
+import { type GameRecord, movesOnly, pgnDate, readPgn, readPgnTags, unsigned, withAiHost, withAiModel, writePgn } from "../core/index.ts";
 import { aiHostOf, aiModelOf } from "./ai-model.ts";
 import { coachWords, withCoach } from "./coach.ts";
 import { type CurrentGame, endOf, loadGame } from "./current-game.ts";
@@ -42,10 +42,10 @@ export function startOfNewGame(folder: string, now: Date, before?: CurrentGame):
 }
 
 /**
- * Writes the game to the archive, with the plans, how it ended and the AI's model and host last noted (D-82, D-97), and gives its name; the same game again rewrites the
- * same file. A game closed before any move is not kept, as Lichess aborts it: none.
+ * Writes the game to the archive, with the plans, how it ended, the AI's model and host last noted (D-82, D-97) and the opening's tags, and gives its name;
+ * the same game again rewrites the same file. A game closed before any move is not kept, as Lichess aborts it: none.
  */
-export function archiveGame(folder: string, current: CurrentGame): string | undefined
+export function archiveGame(folder: string, current: CurrentGame, opening: OpeningTags): string | undefined
 {
     if (current.game.record.moves.length === 0) {
         return undefined;
@@ -56,7 +56,7 @@ export function archiveGame(folder: string, current: CurrentGame): string | unde
 
     try {
         makeFolder(dirname(path));
-        writeAtomically(path, writePgn(withAiHost(withAiModel(endedRecord(folder, current), aiModelOf(folder)), aiHostOf(folder))));
+        writeAtomically(path, writePgn(withListTags(withAiHost(withAiModel(endedRecord(folder, current), aiModelOf(folder)), aiHostOf(folder)), opening)));
     } catch (error) {
         throw new Error(`Chesspal could not archive the game: ${(error as Error).message}`, { cause: error });
     }
@@ -68,10 +68,10 @@ export function archiveGame(folder: string, current: CurrentGame): string | unde
  * Archives a game that has ended: its name in the archive, none for a game closed before any move, or, when that fails, a warning, since the game is saved in
  * game.json all the same.
  */
-export function archiveEnded(folder: string, current: CurrentGame): { archive?: string; warning?: string; }
+export function archiveEnded(folder: string, current: CurrentGame, opening: OpeningTags): { archive?: string; warning?: string; }
 {
     try {
-        const archive = archiveGame(folder, current);
+        const archive = archiveGame(folder, current, opening);
         return archive === undefined ? {} : { archive };
     } catch (error) {
         return { warning: `${(error as Error).message} The game is saved in game.json: it goes to the archive when a new game starts.` };
@@ -82,12 +82,12 @@ export function archiveEnded(folder: string, current: CurrentGame): { archive?: 
  * Writes the coach's judgments into a game over already in the archive, beside what the analyst may have written there since (Federico);
  * archives the game when it is not there.
  */
-export function archiveCoached(folder: string, current: CurrentGame): { archive?: string; warning?: string; }
+export function archiveCoached(folder: string, current: CurrentGame, opening: OpeningTags): { archive?: string; warning?: string; }
 {
     const name = archivedName(folder, current);
 
     if (name === undefined) {
-        return archiveEnded(folder, current);
+        return archiveEnded(folder, current, opening);
     }
 
     try {
@@ -109,6 +109,16 @@ export function archivedName(folder: string, current: CurrentGame): string | und
     return existsSync(join(folder, name)) ? name : undefined;
 }
 
+/**
+ * The opening a game reached, in its ECO and Opening tags, as the commands name it: none from another position or outside the book. With the PlyCount the
+ * archive adds, a game is listed from its tags alone.
+ */
+export interface OpeningTags
+{
+    readonly ECO?: string;
+    readonly Opening?: string;
+}
+
 /** The names of the games in the archive, the latest first: games/2026-11-02-153012.pgn. */
 export function archivedGames(folder: string): string[]
 {
@@ -119,6 +129,12 @@ export function archivedGames(folder: string): string[]
 export function archivedGame(folder: string, name: string): GameRecord
 {
     return gameNamed(folder, "games", name);
+}
+
+/** The tags of a game of the archive by its name, as listed, read without its moves; refused as archivedGame refuses. */
+export function archivedTags(folder: string, name: string): Readonly<Record<string, string>>
+{
+    return readPgnTags(gameText(folder, "games", name));
 }
 
 /** The refusal of a game asked by a name no game has, apart from a game that is there and cannot be read. */
@@ -277,6 +293,17 @@ function gameNames(folder: string, shelf: Shelf): string[]
 
 function gameNamed(folder: string, shelf: Shelf, name: string): GameRecord
 {
+    const [record] = readPgn(gameText(folder, shelf, name));
+
+    if (record === undefined) {
+        throw new Error(`${name} holds no game Chesspal can read.`);
+    }
+
+    return record;
+}
+
+function gameText(folder: string, shelf: Shelf, name: string): string
+{
     // The name as listed, or without its folder or its .pgn.
     const file = `${(name.startsWith(`${shelf}/`) ? name.slice(shelf.length + 1) : name).trim().replace(/\.pgn$/, "")}.pgn`;
     const { what, list } = shelves[shelf];
@@ -285,21 +312,11 @@ function gameNamed(folder: string, shelf: Shelf, name: string): GameRecord
         throw new GameMissing(`${name} is no game ${what}: give a name as ${list} writes it, such as ${shelf}/2026-11-02-153012.pgn.`);
     }
 
-    let text: string;
-
     try {
-        text = readFileSync(join(folder, shelf, file), "utf8");
+        return readFileSync(join(folder, shelf, file), "utf8");
     } catch {
         throw new GameMissing(`There is no ${name} among the games ${what}: give a name as ${list} writes it.`);
     }
-
-    const [record] = readPgn(text);
-
-    if (record === undefined) {
-        throw new Error(`${name} holds no game Chesspal can read.`);
-    }
-
-    return record;
 }
 
 /** Whether two records are the same game: the same tags and the same moves, whatever their comments say. */
@@ -321,6 +338,13 @@ function endedRecord(folder: string, current: CurrentGame): GameRecord
 {
     const { record, outcome } = current.game;
     return withTermination(withCoach(record, coachWords(folder, current)), outcome);
+}
+
+/** The record with the tags past_games lists it from: the opening's, the commands' alone whatever the game brought, and how many plies it has. */
+function withListTags(record: GameRecord, opening: OpeningTags): GameRecord
+{
+    const tags = Object.fromEntries(Object.entries(record.tags).filter(([name]) => name !== "ECO" && name !== "Opening" && name !== "PlyCount"));
+    return { ...record, tags: { ...tags, ...opening, PlyCount: String(record.moves.length) } };
 }
 
 function withTermination(record: GameRecord, outcome: CurrentGame["game"]["outcome"]): GameRecord

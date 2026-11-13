@@ -2,7 +2,7 @@ import { z } from "zod";
 import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../../core/index.ts";
 import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../../games/index.ts";
 import { gameFolder, gameFolders } from "../../profiles/index.ts";
-import { coachRuns, gameAt, type GameSummary, nextStep, positionLines, refuseUnseenPosition, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "../answers/index.ts";
+import { coachRuns, gameAt, type GameSummary, nextStep, openingTags, positionLines, refuseUnseenPosition, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "../answers/index.ts";
 import { pastGameLines, playerLine } from "../profiles/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
 import { levelText, levelToPlay } from "./levels.ts";
@@ -239,7 +239,7 @@ const hostsNotingChats = new Set(["claude-code", "codex-mcp-client"]);
 function archiveBefore(folder: string, before: CurrentGame): string | undefined
 {
     try {
-        return archiveGame(folder, before);
+        return archiveGame(folder, before, openingTags(before.game.record));
     } catch (error) {
         throw new Error(`${(error as Error).message} Nothing changed.`, { cause: error });
     }

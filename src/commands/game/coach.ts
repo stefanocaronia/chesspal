@@ -18,6 +18,7 @@ import {
     materialText,
     noteInput,
     openingLine,
+    openingTags,
     riskLine,
     speechLine,
     speechOf,
@@ -406,7 +407,7 @@ function keep(folder: string, current: CurrentGame, place: Place, { ahead, badge
 
     if (over) {
         // The game went to the archive with the move that ended it: the judgment goes there too.
-        archiveCoached(folder, current);
+        archiveCoached(folder, current, openingTags(current.game.record));
         return { kept: place, then: "over", saved, hintLeft };
     }
 

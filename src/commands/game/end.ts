@@ -2,7 +2,7 @@ import { z } from "zod";
 import { canMate, endWithMood, Game, moods, type Side, timeLeft } from "../../core/index.ts";
 import { archiveEnded, bothSidesMoved, type CurrentGame, drawOfferOf, saveGame } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { colourName, gameGoingOn, type GameSummary, nextStep, positionLines, refuseUnseenPosition, summaryOf, withAnalyst } from "../answers/index.ts";
+import { colourName, gameGoingOn, type GameSummary, nextStep, openingTags, positionLines, refuseUnseenPosition, summaryOf, withAnalyst } from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
 
 interface Ended
@@ -46,7 +46,7 @@ export const endGame = defineCommand({
             ? { ...current, game }
             : { ...current, game, clock: { ...current.clock, left: timeLeft(current.clock, current.game.position.turn, now), since: now.toISOString() } };
         saveGame(folder, ended);
-        const { archive, warning } = archiveEnded(folder, ended);
+        const { archive, warning } = archiveEnded(folder, ended, openingTags(ended.game.record));
         const summary = withAnalyst(summaryOf(ended, now, archive), context);
         return warning === undefined ? { game: summary } : { game: summary, warning };
     },

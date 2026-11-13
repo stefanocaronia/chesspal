@@ -1,13 +1,14 @@
 // The commands' bench (D-34): a move as the MCP server plays it, game.json written, and the command line in a new process, against their budgets.
 // Run it with: npm run bench, which builds dist/ first. It exits with 1 when a median is over its budget.
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { commands } from "../../src/commands/index.ts";
 import type { Context } from "../../src/commands/registry/context.ts";
 import { Game, writePgn } from "../../src/core/index.ts";
+import { archivedGames } from "../../src/games/index.ts";
 import { setUpHosts } from "../../src/host-files/index.ts";
 import { gameFolder } from "../../src/profiles/index.ts";
 import { attachTable, startTable } from "../../src/server/table/index.ts";
@@ -30,6 +31,12 @@ const chatFolder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
 const table = await startTable({ ...testContext(folder), now: () => new Date() });
 const chat: Context = { ...testContext(chatFolder), home: context.home, told: new Set() };
 const atTable = table === undefined ? undefined : await attachTable(chat, () => undefined);
+// The archives past_games reads, of a keen player and a very keen one, and that one again as an older Chesspal wrote it, without the tags past_games lists
+// from: the games of the first date are the oldest, at the end of the archive.
+const played = playedGames();
+const archives = new Map([100, 1_000].map((size) => [size, archiveOf(size, played)]));
+const oldArchive = archiveOf(1_000, played.map((text) => text.replace(/^\[(?:ECO|Opening|PlyCount) .*\]\n/gm, "")));
+const firstDate = "2025-01-01";
 
 try {
     await report([
@@ -39,6 +46,17 @@ try {
         { name: "status in a game", budget: 0.5, run: () => timed(1, () => call(context, "status")) },
         { name: "status after another process changed a game of 120 plies", budget: 25, run: readAgain },
         { name: "analyse_game on a game of 120 plies over, its positions new", budget: 250, run: analyseLong },
+        // Each game read from its tags: opening its file is most of it, some 50 µs.
+        ...[...archives].flatMap(([size, archive]) => {
+            const games = `${size.toLocaleString("en")} games`;
+            return [
+                { name: `past_games, the latest 20 of ${games}`, budget: 4, run: () => pastGames(archive) },
+                { name: `past_games searching words of many games, ${games}`, budget: 4, run: () => pastGames(archive, "won") },
+                { name: `past_games searching words of a few old games, all ${games} read`, budget: size * 0.08, run: () => pastGames(archive, firstDate) },
+            ];
+        }),
+        // The old archive's path: each game read whole, its moves played and its opening looked up, some 4 ms.
+        { name: "past_games, the latest 20 of 1,000 games an older Chesspal archived without the tags, each read whole", budget: 250, run: () => pastGames(oldArchive) },
         { name: "chesspal status from the command line, a new process", budget: 500, run: () => timed(1, () => spawnSync(process.execPath, [cli, "status"], { cwd: folder, env: { ...process.env, CHESSPAL_HOME: folder } })) },
     ]);
 } finally {
@@ -47,6 +65,7 @@ try {
     rmSync(folder, { recursive: true, force: true });
     rmSync(chatFolder, { recursive: true, force: true });
     rmSync(studyFolder, { recursive: true, force: true });
+    [...archives.values(), oldArchive].forEach((archive) => rmSync(archive.folder, { recursive: true, force: true }));
 }
 
 /** The time of one move of a new random game of 40 plies, the player's and the AI's in turn, each saved. */
@@ -106,6 +125,75 @@ async function analyseLong(): Promise<number>
     const started = performance.now();
     await callAwaited(study, "analyse_game", { game: "games/2026-11-02-153012.pgn" });
     return performance.now() - started;
+}
+
+/** The time of past_games on an archive, with the words searched. */
+function pastGames(archive: Context, search?: string): number
+{
+    return timed(1, () => call(archive, "past_games", search === undefined ? {} : { search }));
+}
+
+/**
+ * A data folder whose archive holds that many games, one every eight hours from the first date: the games played, with the AI's plans and comments, copied in
+ * turn under the names of the others.
+ */
+function archiveOf(size: number, texts: string[]): Context
+{
+    const archive = { ...testContext(mkdtempSync(join(tmpdir(), "chesspal-bench-"))), told: new Set<string>() };
+    const games = join(gameFolder(archive.home()), "games");
+    mkdirSync(games, { recursive: true });
+
+    for (let index = 0; index < size; index++) {
+        const start = new Date(2025, 0, 1, 9 + index * 8);
+        const name = `${start.getFullYear()}-${twoDigits(start.getMonth() + 1)}-${twoDigits(start.getDate())}-${twoDigits(start.getHours())}0000.pgn`;
+        writeFileSync(join(games, name), texts[index % texts.length]!);
+    }
+
+    return archive;
+}
+
+/** The PGN of a dozen games played through the commands, from the openings players choose most, for all the archives. */
+function playedGames(): string[]
+{
+    const openings = [
+        ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "a6"],
+        ["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7"],
+        ["d4", "d5", "c4", "e6", "Nc3", "Nf6", "Bg5", "Be7"],
+        ["e4", "e6", "d4", "d5", "Nc3", "Bb4"],
+        ["e4", "c6", "d4", "d5", "Nc3", "dxe4", "Nxe4", "Bf5"],
+        ["d4", "Nf6", "c4", "g6", "Nc3", "Bg7", "e4", "d6", "Nf3", "O-O"],
+        ["c4", "e5", "Nc3", "Nf6"],
+        ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "c3", "Nf6"],
+        ["d4", "d5", "c4", "c6", "Nf3", "Nf6", "Nc3", "dxc4"],
+        ["e4", "d5", "exd5", "Qxd5", "Nc3", "Qa5"],
+        ["Nf3", "d5", "g3", "Nf6", "Bg2", "c6"],
+        ["e4", "c5", "Nc3", "Nc6", "g3", "g6"],
+    ];
+    let day = 1;
+    const player = { ...testContext(mkdtempSync(join(tmpdir(), "chesspal-bench-"))), now: () => new Date(2026, 9, day, 18), told: new Set<string>() };
+    const folder = gameFolder(player.home());
+
+    openings.forEach((opening, index) => {
+        const ai = index % 2 === 0 ? "black" : "white";
+        day = 1 + index;
+        call(player, "new_game", { ai_colour: ai, replace: true });
+
+        randomGame(3_000 + index * 10, 60 + (index % 4) * 10, opening).forEach((move, ply) => {
+            const aiMoves = (ply % 2 === 0) === (ai === "white");
+            call(player, aiMoves ? "ai_move" : "player_move", aiMoves ? { move, plan: "Keep the knight on its outpost and push the queenside pawns.", comment: "Your knight looks lonely there." } : { move });
+        });
+
+        call(player, "end_game", { result: index % 3 === 0 ? "ai_resigns" : "player_resigns" });
+    });
+
+    const games = archivedGames(folder).map((name) => readFileSync(join(folder, name), "utf8"));
+    rmSync(player.folder, { recursive: true, force: true });
+    return games;
+}
+
+function twoDigits(number: number): string
+{
+    return String(number).padStart(2, "0");
 }
 
 /** A command as the MCP server runs it: its input checked, its result as text. */

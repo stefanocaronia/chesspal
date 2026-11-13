@@ -29,7 +29,7 @@ export async function report(cases: BenchCase[], runs = 25): Promise<void>
         console.log(`| ${name} | ${format(median)} | ${format(budget)}${median > budget ? " ✗ over" : ""} |`);
     }
 
-    process.exitCode = over ? 1 : 0;
+    process.exitCode = over ? 1 : process.exitCode;
 }
 
 /** The time of one of the operations a piece of work does, in milliseconds. */
@@ -40,13 +40,17 @@ export function timed(operations: number, work: () => unknown): number
     return (performance.now() - started) / operations;
 }
 
-/** A game of random legal moves, made on chess.js so that the core sees its positions for the first time; from the first seed that lasts long enough. */
-export function randomGame(firstSeed: number, length: number): string[]
+/**
+ * A game of random legal moves, after an opening when one is given, made on chess.js so that the core sees its positions for the first time; from the
+ * first seed that lasts long enough.
+ */
+export function randomGame(firstSeed: number, length: number, opening: string[] = []): string[]
 {
     for (let attempt = firstSeed;; attempt++) {
         const random = randomFrom(attempt);
         const chess = new Chess();
-        const moves: string[] = [];
+        const moves = [...opening];
+        moves.forEach((move) => chess.move(move));
 
         while (moves.length < length && !chess.isGameOver()) {
             const legal = chess.moves();

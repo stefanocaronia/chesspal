@@ -21,6 +21,24 @@ export function readPgn(text: string): GameRecord[]
     return new PgnReader(text).read();
 }
 
+/** The tags of a PGN text's first game, read without its moves: none checked, none played. */
+export function readPgnTags(text: string): Readonly<Record<string, string>>
+{
+    const tags: Record<string, string> = {};
+
+    for (const line of text.split("\n")) {
+        const tag = tagPattern.exec(line);
+
+        if (tag !== null) {
+            tags[tag[1]!] = tag[2]!.replace(/\\(.)/g, "$1");
+        } else if (line.trim() !== "" || Object.keys(tags).length > 0) {
+            break;
+        }
+    }
+
+    return tags;
+}
+
 /** The day of a date, in its own time zone, as PGN's Date tag writes it: 2026.11.02. */
 export function pgnDate(date: Date): string
 {
@@ -31,6 +49,9 @@ export function pgnDate(date: Date): string
 // The seven tags of every PGN, in their order, with the value for an unknown one.
 const sevenTags = [["Event", "?"], ["Site", "?"], ["Date", "????.??.??"], ["Round", "?"], ["White", "?"], ["Black", "?"], ["Result", "*"]] as const;
 const sevenTagNames = new Set<string>(sevenTags.map(([name]) => name));
+
+// A line holding a tag alone, as writePgn writes it.
+const tagPattern = /^\s*\[\s*(\w+)\s*"((?:[^"\\]|\\.)*)"\s*\]\s*$/;
 
 // The judgments written after a move, NAGs $1 to $6.
 const glyphs = ["!", "?", "!!", "??", "!?", "?!"];
