@@ -13,6 +13,7 @@ const folders: string[] = [];
 // The doorbell of the moves on the page (D-47), as init writes it into Claude Code's settings.
 const bellHook = { type: "command", command: "chesspal listen", asyncRewake: true, timeout: 86_400 };
 const chatHook = { type: "command", command: "chesspal chat" };
+const promptHook = { type: "command", command: "chesspal prompt", timeout: 10 };
 // The doorbell as init writes it into Codex's hooks.
 const codexBellHook = {
     type: "command",
@@ -50,7 +51,11 @@ describe("chesspal init", () => {
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${startInstructions()}\n<!-- chesspal: end -->\n`);
         expect(text(chess, "CLAUDE.md")).toBe("@AGENTS.md\n");
-        expect(json(chess, ".claude/settings.json")).toEqual({ enabledMcpjsonServers: ["chesspal"], permissions: { allow: ["mcp__chesspal"] }, hooks: { Stop: [{ hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] } });
+        expect(json(chess, ".claude/settings.json")).toEqual({
+            enabledMcpjsonServers: ["chesspal"],
+            permissions: { allow: ["mcp__chesspal"] },
+            hooks: { Stop: [{ hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }], UserPromptSubmit: [{ hooks: [promptHook] }] },
+        });
         expect(text(chess, ".codex/config.toml")).toBe('[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\nenv_vars = ["CHESSPAL_HOME", "CHESSPAL_SEAT"]\n');
         expect(json(chess, ".codex/hooks.json")).toEqual({ hooks: { Stop: [{ hooks: [codexBellHook] }], SessionStart: [{ hooks: [codexChatHook] }] } });
         expect(startInstructions()).toContain("even to a greeting, call `instructions` and `status`");
@@ -114,7 +119,7 @@ describe("chesspal init", () => {
             model: "opus",
             enabledMcpjsonServers: ["chesspal"],
             permissions: { allow: ["Bash(ls)", "mcp__chesspal"] },
-            hooks: { Stop: [ownStop, { hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }] },
+            hooks: { Stop: [ownStop, { hooks: [bellHook] }], SessionStart: [{ hooks: [chatHook] }], UserPromptSubmit: [{ hooks: [promptHook] }] },
         });
         expect(text(folder, ".codex/config.toml")).toBe(
             'model = "gpt-5"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n\n[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\nenv_vars = ["CHESSPAL_HOME", "CHESSPAL_SEAT", "HOME"]\nenv = { CHESSPAL_HOME = "D:/runs" }\n',

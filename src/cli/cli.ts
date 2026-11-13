@@ -1,10 +1,8 @@
 #!/usr/bin/env node
-import { runCommandLine } from "./command-line.ts";
-
 const args = process.argv.slice(2);
 
 // The table's own words (D-104): alone or open, its page; table, icon (--remove), play <host>. The host's: mcp, its server; listen, its doorbell; chat, how the chat
-// started. Everything else is a command.
+// started; prompt, the move the player wrote alone. Everything else is a command. Each loads only what it needs: prompt runs on every message of the chat.
 if (args.length === 0) {
     await openTableHere(true);
 } else if (args.length === 1 && args[0] === "open") {
@@ -34,7 +32,11 @@ if (args.length === 0) {
 } else if (args.length === 1 && args[0] === "chat") {
     const { recordChatStart } = await import("./chat-hook.ts");
     await recordChatStart();
+} else if (args.length === 1 && args[0] === "prompt") {
+    const { answerPrompt } = await import("./prompt-hook.ts");
+    await answerPrompt();
 } else {
+    const { runCommandLine } = await import("./command-line.ts");
     const { output, exitCode } = await runCommandLine(args);
 
     if (exitCode === 0) {

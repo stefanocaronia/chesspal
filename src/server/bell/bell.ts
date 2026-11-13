@@ -376,7 +376,7 @@ async function forgetGonePages(home: string, folder: string, kept: number, wait:
  * The data folder the chat's server is given in its folder's settings, as CHESSPAL_HOME in a playtest: the hook runs in the host's environment, not the
  * server's (Federico). Claude Code's .mcp.json first, then Codex's config.
  */
-function serverHome(folder: string): string | undefined
+export function serverHome(folder: string): string | undefined
 {
     const chosen = [claudeHome(folder), codexHome(folder)].find((one) => one !== undefined && one.trim() !== "");
     return chosen === undefined ? undefined : resolve(chosen.trim());
@@ -422,8 +422,8 @@ export function noteSilence(folder: string, why: string, now = new Date()): void
     }
 }
 
-/** The chat's folder, where its server started: Claude Code names it, and the hook's cwd follows the cd's of the chat. */
-function chatFolder(hook: { cwd?: string; }): string
+/** The chat's folder, where its server started, as a hook finds it: Claude Code names it, and the hook's cwd follows the cd's of the chat. */
+export function chatFolder(hook: { cwd?: string; }): string
 {
     return resolve(process.env.CLAUDE_PROJECT_DIR ?? hook.cwd ?? process.cwd());
 }

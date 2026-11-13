@@ -11,11 +11,12 @@ export interface CommandLineResult
     exitCode: number;
 }
 
-// The commands that exist only on the command line: cli.ts starts the table, opens its page, puts its icon, starts the server, the doorbell or the chat's
-// note, when one comes alone.
+// The commands that exist only on the command line: cli.ts starts the table, opens its page, puts its icon, starts the server, the doorbell, the chat's
+// note or the move written alone, when one comes alone.
 const mcpDescription = "Start the MCP server for an AI host. Through it the host uses these commands as tools; the host starts it, with no options.";
 const listenDescription = "Wait for the player's move on the board page and wake the chat. Claude Code starts it at the end of each turn, and Codex with --codex, as init sets them up.";
 const chatDescription = "Note how the chat started: new, cleared, resumed or compacted. Claude Code and Codex run it when a chat starts, as init sets them up.";
+const promptDescription = "Play the move the player wrote alone in the chat, before the AI reads it, and tell the AI the position. Claude Code runs it on each message, as init sets it up.";
 const tableDescription = "Serve the board page with no chat, until no browser has had it open for five minutes. `chesspal` alone starts it apart and opens the page.";
 const openDescription = "Open the board page as `chesspal` alone does, without asking about the icon: what the icon runs.";
 const iconDescription = "Put Chesspal's icon on the desktop and in the menu: it opens the board page as `chesspal` alone does, with no terminal. `chesspal icon --remove` takes it away.";
@@ -24,7 +25,7 @@ const playDescription = "Start the AI in this terminal, in Claude Code or Codex,
 const initForPlayer = "Set up a folder of your own to play in, from Claude Code, Codex or the Claude desktop app.";
 const iconRemoveForPlayer = "Take Chesspal's icon away, before you uninstall it.";
 // Those of them that take no options, by name.
-const plainCommands = new Map([["mcp", mcpDescription], ["chat", chatDescription], ["table", tableDescription], ["open", openDescription], ["icon", iconDescription]]);
+const plainCommands = new Map([["mcp", mcpDescription], ["chat", chatDescription], ["prompt", promptDescription], ["table", tableDescription], ["open", openDescription], ["icon", iconDescription]]);
 
 /** The `chesspal` command line: finds the command, validates its input, runs it and renders the result. */
 export async function runCommandLine(argv: string[], context: Context = defaultContext(), list: AnyCommand[] = commands): Promise<CommandLineResult>
@@ -231,6 +232,7 @@ function generalHelp(list: AnyCommand[]): string
         line("mcp", mcpDescription),
         line("listen", listenDescription),
         line("chat", chatDescription),
+        line("prompt", promptDescription),
         "",
         "Run `chesspal <command> --help` for its options.",
     ].join("\n");

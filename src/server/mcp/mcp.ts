@@ -4,9 +4,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, homeForOneCall, inputProblems, isBoolean, PositionChanged } from "../../commands/index.ts";
+import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, homeForOneCall, inputProblems, isBoolean, PositionChanged, positionIn, samePosition } from "../../commands/index.ts";
 import { aiNameOf } from "../../core/index.ts";
-import { endOf, loadGame, noteAiHost, noteAiModel, rerunIfChanged } from "../../games/index.ts";
+import { endOf, forgetPositionShown, lastChatStart, loadGame, noteAiHost, noteAiModel, positionShownNote, rerunIfChanged } from "../../games/index.ts";
 import { agentTools, hasAgent, startInstructions } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
@@ -259,6 +259,7 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
 
     try {
         if (chat) {
+            takePositionShown(context, home);
             await context.calls?.();
         }
 
@@ -277,6 +278,53 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
             chatHasRead(context, command.showsGame === true && !refused, home);
         }
     }
+}
+
+/**
+ * The position the prompt hook showed the chat with the move the player wrote alone (D-71), taken before the chat's tool runs as if a tool had shown it,
+ * while the game is still there: the AI moves on it without a status, and the player's words the hook gave count as given, which the page hears. A note
+ * on another position goes; one of another chat's stays for it.
+ */
+function takePositionShown(context: Context, home: () => string): void
+{
+    const shown = positionShownNote(context.folder);
+
+    if (shown === undefined) {
+        return;
+    }
+
+    let current: boolean;
+
+    try {
+        current = samePosition(shown, positionIn(gameFolder(home())));
+    } catch {
+        // A game that cannot be read is the tool's to report.
+        return;
+    }
+
+    if (current && !chatSession(shown.session, context.folder)) {
+        return;
+    }
+
+    forgetPositionShown(context.folder);
+
+    if (!current) {
+        return;
+    }
+
+    shown.given.forEach((key) => context.given.add(key));
+    // The position is new to the chat, a move later than any it saw: the page hears of it, and of the words read with it.
+    chatHasRead(context, true, home);
+}
+
+/**
+ * Whether the hooks' session is this server's chat: Claude Code starts the server with its session, and gives the hooks a new one after /clear, which the
+ * chat's start notes; a chat started or resumed since in the folder is another Claude Code, with a server of its own.
+ */
+function chatSession(session: string, folder: string, own = process.env.CLAUDE_CODE_SESSION_ID): boolean
+{
+    const start = lastChatStart(folder);
+    return session === own || (start?.session === session && start.source !== "startup" && start.source !== "resume");
 }
 
 /**

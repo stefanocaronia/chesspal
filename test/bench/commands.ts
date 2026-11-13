@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { commands, homeForOneCall } from "../../src/commands/index.ts";
 import type { Context } from "../../src/commands/registry/context.ts";
 import { Game, writePgn } from "../../src/core/index.ts";
-import { archivedGames } from "../../src/games/index.ts";
+import { archivedGames, forgetPositionShown, positionShownNote } from "../../src/games/index.ts";
 import { setUpHosts } from "../../src/host-files/index.ts";
 import { gameFolder } from "../../src/profiles/index.ts";
 import { analysesOf } from "../../src/server/page/analyses.ts";
@@ -65,6 +65,10 @@ try {
         // The page's list of games: each read whole, its moves not played, for its review.
         ...[...archives].map(([size, archive]) => ({ name: `the page's list of games, ${size.toLocaleString("en")} games`, budget: size * 0.17, run: () => timed(1, () => analysesOf(archive.home())) })),
         { name: "chesspal status from the command line, a new process", budget: 500, run: () => timed(1, () => spawnSync(process.execPath, [cli, "status"], { cwd: folder, env: { ...process.env, CHESSPAL_HOME: folder } })) },
+        // Claude Code runs the prompt hook on every message: one that is no move leaves as soon as Node has started.
+        { name: "chesspal prompt on a message that is no move, a new process", budget: 150, run: () => timed(1, () => prompted("Is it my move?")) },
+        { name: "chesspal prompt on a move, played and answered, a new process", budget: 500, run: promptedMove },
+        { name: "the chat's server looks for the prompt hook's note before a tool, none there", budget: 0.1, run: lookForNote },
     ]);
 } finally {
     await atTable?.close();
@@ -136,6 +140,38 @@ async function movesAtTheTable(): Promise<number>
     }
 
     return time / moves.length;
+}
+
+/** The prompt hook in a process of its own, as Claude Code runs it in the player's folder, with the message given: what it wrote. */
+function prompted(prompt: string): string
+{
+    const input = JSON.stringify({ session_id: "bench", cwd: folder, hook_event_name: "UserPromptSubmit", prompt });
+    return spawnSync(process.execPath, [cli, "prompt"], { cwd: folder, input, encoding: "utf8", env: { ...process.env, CHESSPAL_HOME: folder, CLAUDE_PROJECT_DIR: folder } }).stdout;
+}
+
+/** The time of the prompt hook on the player's first move of a new game: read, played, saved, noted and answered. */
+function promptedMove(): number
+{
+    call(context, "new_game", { ai_colour: "black", replace: true });
+    let said = "";
+    const time = timed(1, () => said = prompted("e4"));
+    forgetPositionShown(folder);
+
+    if (!said.includes("Chesspal has already played")) {
+        throw new Error(`The prompt hook did not play the move: it wrote "${said}".`);
+    }
+
+    return time;
+}
+
+/** The time the chat's server spends on the prompt hook's note before each tool, when there is none: one read that fails. */
+function lookForNote(): number
+{
+    return timed(1_000, () => {
+        for (let index = 0; index < 1_000; index++) {
+            positionShownNote(folder);
+        }
+    });
 }
 
 /** The time of a status when game.json was written by someone else: read, parsed and replayed. */

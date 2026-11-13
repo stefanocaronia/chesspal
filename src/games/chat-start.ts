@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { writeAtomically } from "./files.ts";
 
 /**
- * How a chat started, as the host's SessionStart hook says it: new, cleared, resumed or compacted; when, as an ISO date; its session, for the logs; and the
- * file where the host writes the chat, where Claude Code tells which model made each tool call (D-81).
+ * How a chat started, as the host's SessionStart hook says it: new, cleared, resumed or compacted; when, as an ISO date; its session, as the hooks have it;
+ * and the file where the host writes the chat, where Claude Code tells which model made each tool call (D-81).
  */
 export interface ChatStart
 {
@@ -31,7 +31,12 @@ export function lastChatStart(folder: string): ChatStart | undefined
             return undefined;
         }
 
-        return { source: start.source, at: start.at, ...(typeof start.transcript === "string" ? { transcript: start.transcript } : {}) };
+        return {
+            source: start.source,
+            at: start.at,
+            ...(typeof start.session === "string" ? { session: start.session } : {}),
+            ...(typeof start.transcript === "string" ? { transcript: start.transcript } : {}),
+        };
     } catch {
         return undefined;
     }

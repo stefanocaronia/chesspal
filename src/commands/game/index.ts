@@ -7,7 +7,7 @@ export { endGame } from "./end.ts";
 export { exportGame } from "./export.ts";
 export { look } from "./look.ts";
 export { ChatNotClear, newGame, startNewGame } from "./new.ts";
-export { playerMove } from "./player-move.ts";
+export { type MoveSentAlone, playerMove, playMoveSentAlone } from "./player-move.ts";
 export { ponder } from "./ponder.ts";
 export { position } from "./position.ts";
 export { status } from "./status.ts";

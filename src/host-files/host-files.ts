@@ -134,8 +134,8 @@ function claudeFile(folder: string): FileChange | undefined
 }
 
 /**
- * Claude Code's settings: the chesspal server of .mcp.json approved and its tools allowed, so that the first chat asks for neither, and the doorbell of the
- * moves on the page (D-47), and the note of how each chat starts (D-57); the player's own stay.
+ * Claude Code's settings: the chesspal server of .mcp.json approved and its tools allowed, so that the first chat asks for neither, the doorbell of the
+ * moves on the page (D-47), the note of how each chat starts (D-57), and the move the player writes alone in the chat (D-36); the player's own stay.
  */
 function claudeSettingsFile(folder: string): FileChange | undefined
 {
@@ -147,7 +147,7 @@ function claudeSettingsFile(folder: string): FileChange | undefined
         ...settings,
         enabledMcpjsonServers: withItem(settings.enabledMcpjsonServers, "chesspal"),
         permissions: { ...permissions, allow: withItem(permissions.allow, "mcp__chesspal") },
-        hooks: withHook(withHook(hooks, "Stop", bellHook), "SessionStart", chatHook),
+        hooks: withHook(withHook(withHook(hooks, "Stop", bellHook), "SessionStart", chatHook), "UserPromptSubmit", promptHook),
     });
 }
 
@@ -171,6 +171,9 @@ const bellHook = { type: "command", command: "chesspal listen", asyncRewake: tru
 
 // Claude Code's SessionStart hook (D-57): it notes how each chat starts, so that a new game waits for a clean one.
 const chatHook = { type: "command", command: "chesspal chat" };
+
+// Claude Code's UserPromptSubmit hook (D-36): a message that is one move and nothing else is played before the AI reads it, which then only replies.
+const promptHook = { type: "command", command: "chesspal prompt", timeout: 10 };
 
 /**
  * Codex's settings, read once the player trusts the folder: the chesspal server with its tools approved, a table of Chesspal's rewritten but for the

@@ -76,6 +76,10 @@ function initialised(): { command: string; args: string[]; }
     check("chesspal init writes the chesspal server in .mcp.json", server !== undefined);
     const start = readFileSync(join(installed, "node_modules", "chesspal", "instructions", "start.md"), "utf8").trim();
     check("chesspal init writes the lines that start a chat in AGENTS.md", readFileSync(join(player, "AGENTS.md"), "utf8").includes(start));
+    check("chesspal init sets Claude Code's hook for a move written alone in the chat", readFileSync(join(player, ".claude", "settings.json"), "utf8").includes('"chesspal prompt"'));
+    const input = JSON.stringify({ session_id: "smoke", cwd: player, hook_event_name: "UserPromptSubmit", prompt: "Hello, shall we play?" });
+    const prompted = spawnSync("chesspal prompt", { cwd: player, env: environment, shell: true, encoding: "utf8", input });
+    check("chesspal prompt lets a message that is no move go to the AI, saying nothing", prompted.status === 0 && prompted.stdout === "" && prompted.stderr === "");
     return server!;
 }
 
