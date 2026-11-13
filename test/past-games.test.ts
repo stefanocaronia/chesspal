@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -6,6 +6,7 @@ import { endGame } from "../src/commands/game/end.ts";
 import { newGame } from "../src/commands/game/new.ts";
 import { pastGames } from "../src/commands/profiles/past-games.ts";
 import type { Context } from "../src/commands/registry/context.ts";
+import { archivedGame, GameMissing } from "../src/games/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
 
@@ -72,6 +73,30 @@ describe("the archive's tags (ECO, Opening, PlyCount)", () => {
         expect((await listings(context))[0]).toContain("games/2026-11-02-153012.pgn");
         writeFileSync(sicilian, text.replace("1. e4 c5", "1. e5 c5").replace(/^\[PlyCount .*\]\n/m, ""));
         expect((await listings(context))[0]).not.toContain("games/2026-11-02-153012.pgn");
+    });
+});
+
+describe("a game of the archive asked by its name", () => {
+    it("is missing only when its file is not there: one that cannot be read now is there, and is asked again", () => {
+        const folder = mkdtempSync(join(tmpdir(), "chesspal-"));
+        folders.push(folder);
+        // A folder where the game's file should be: the read fails, as for a file another process holds, but not because it is not there.
+        mkdirSync(join(folder, "games", "2026-11-02-153012.pgn"), { recursive: true });
+
+        expect(() => archivedGame(folder, "games/2026-11-02-170000.pgn")).toThrow(GameMissing);
+        expect(() => archivedGame(folder, "../game.json")).toThrow(GameMissing);
+
+        let refusal: unknown;
+
+        try {
+            archivedGame(folder, "games/2026-11-02-153012.pgn");
+        } catch (error) {
+            refusal = error;
+        }
+
+        expect(refusal).toBeInstanceOf(Error);
+        expect(refusal).not.toBeInstanceOf(GameMissing);
+        expect((refusal as Error).message).toMatch(/^games\/2026-11-02-153012\.pgn could not be read \(\w+\): try again in a moment\.$/);
     });
 });
 

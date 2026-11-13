@@ -25,7 +25,13 @@ export function setUpTable(folder: string, platform: string): void
 export function takeHooksNews(folder: string): HooksNews | undefined
 {
     const news = readNote(folder);
-    rmSync(join(folder, hooksNoteFile), { force: true });
+
+    try {
+        rmSync(join(folder, hooksNoteFile), { force: true });
+    } catch {
+        // A note that cannot go now (the table rewrites it) is said again at the next play, which is harmless.
+    }
+
     return news;
 }
 

@@ -10,7 +10,7 @@ Where things are in the repository, what each module depends on, and where new c
 | [instructions/](../instructions/) | The instructions for the AI: the opponent's, which the MCP server gives, the lines that start a chat, and the analyst's, coach's and ponderer's, which `chesspal init` installs in a player's folder |
 | [data/openings/](../data/openings/) | Lichess's openings (CC0), which the build turns into an index by position |
 | [scripts/](../scripts/) | The build's scripts: [build-openings.ts](../scripts/build-openings.ts) |
-| [test/](../test/) | The tests, one file a module or command; [bench/](../test/bench/), the commands timed against their budgets; [smoke/](../test/smoke/), the package installed and run as a player would; [demo/](../test/demo/), the board page served to look at it (`npm run page`, `npm run endings`); [concurrent/](../test/concurrent/), the writers of two processes at once |
+| [test/](../test/) | The tests, one file a module or command; [setup.ts](../test/setup.ts), each vitest worker's own ports; [bench/](../test/bench/), the commands timed against their budgets; [smoke/](../test/smoke/), the package installed and run as a player would; [demo/](../test/demo/), the board page served to look at it (`npm run page`, `npm run endings`); [concurrent/](../test/concurrent/), the writers of two processes at once |
 | [docs/](.) | This page and the README's screenshot |
 
 The build (`npm run build`) compiles `src/` into `dist/`, the page apart with its own `tsconfig.json`, copies the page's other files (styles, pictures, sounds) as they are, and writes the openings' index.

@@ -15,6 +15,7 @@ export {
     deleteGame,
     GameMissing,
     gameStemOf,
+    hasListTags,
     isGameName,
     isOverOnTable,
     keepToStudy,

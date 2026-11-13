@@ -149,6 +149,15 @@ export function archivedTags(folder: string, name: string): Readonly<Record<stri
     return readPgnTags(gameText(folder, "games", name));
 }
 
+/**
+ * Whether the archive wrote a game's list tags, its PlyCount with its ECO and Opening, or none for a game that has no opening: a numeric PlyCount says so.
+ * A game an older Chesspal archived has none, and is read whole.
+ */
+export function hasListTags(tags: Readonly<Record<string, string>>): boolean
+{
+    return /^\d+$/.test(tags.PlyCount ?? "");
+}
+
 /** The refusal of a game asked by a name no game has, apart from a game that is there and cannot be read. */
 export class GameMissing extends Error
 {
@@ -326,8 +335,15 @@ function gameText(folder: string, shelf: Shelf, name: string): string
 
     try {
         return readFileSync(join(folder, shelf, file), "utf8");
-    } catch {
-        throw new GameMissing(`There is no ${name} among the games ${what}: give a name as ${list} writes it.`);
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+
+        // Only a file that is not there is a missing game: one busy or locked by another process is there, and may be read in a moment.
+        if (code === "ENOENT") {
+            throw new GameMissing(`There is no ${name} among the games ${what}: give a name as ${list} writes it.`);
+        }
+
+        throw new Error(`${name} could not be read (${code ?? (error as Error).message}): try again in a moment.`, { cause: error });
     }
 }
 

@@ -171,13 +171,14 @@ export function pagePorts(folder: string): number[]
 
 /**
  * Notes in the data folder the port a chat's page took off its folder's usual ports, one file per page, for the hook to find it there; then forgets, off
- * the caller's clock, the notes of its folder whose page no longer answers there. It throws when the note cannot be written.
+ * the caller's clock, the notes of its folder whose page is gone: nobody listens at the port, or another folder's page does. A page that answers late
+ * is busy, not gone, and keeps its note. It throws when the note cannot be written.
  */
-export function notePagePort(home: string, folder: string, port: number): Promise<void>
+export function notePagePort(home: string, folder: string, port: number, wait = probeWait): Promise<void>
 {
     mkdirSync(join(home, notesFolder), { recursive: true });
     writeAtomically(noteOf(home, port), JSON.stringify({ folder: resolve(folder) }));
-    return forgetGonePages(home, folder, port);
+    return forgetGonePages(home, folder, port, wait);
 }
 
 /** Forgets the note of a page that closes, unless another folder's page took its port since; a note that cannot go is left for the next page to clear. */
@@ -337,15 +338,19 @@ function notedFolder(home: string, port: number): string | undefined
     }
 }
 
-/** Forgets the notes of a folder's pages that no longer answer at their port, but the one at `kept`: a page closed without forgetting its own. */
-async function forgetGonePages(home: string, folder: string, kept: number): Promise<void>
+/**
+ * Forgets the notes of a folder's pages that are gone, but the one at `kept`: a page closed without forgetting its own, when nobody listens at its port or
+ * another folder's page took it. A page that does not answer in time, or not as a page, may only be busy, and its note stays.
+ */
+async function forgetGonePages(home: string, folder: string, kept: number, wait: number): Promise<void>
 {
     const others = notedPagePorts(home, folder).filter((port) => port !== kept);
 
     await Promise.all(others.map(async (port) => {
-        const said = await pageAt(port);
+        const { refused, text } = await answerAt(port, "/api/bell?probe", wait);
+        const said = probeOf(text);
 
-        if (said === undefined || !samePath(said.folder, folder)) {
+        if (refused || (said !== undefined && !samePath(said.folder, folder))) {
             forgetPagePort(home, folder, port);
         }
     }));
@@ -461,7 +466,19 @@ function probeOf(said: string | undefined): BellProbe | undefined
 }
 
 /** The body a page of this computer answers with, once it ends; undefined when it does not answer, or not with 200. */
-function body(port: number, path: string, wait?: number): Promise<string | undefined>
+async function body(port: number, path: string, wait?: number): Promise<string | undefined>
+{
+    return (await answerAt(port, path, wait)).text;
+}
+
+/** What a port of this computer answers: the body of a 200, none for any other answer or none in time; `refused` when nobody listens there at all. */
+interface Answer
+{
+    refused: boolean;
+    text?: string;
+}
+
+function answerAt(port: number, path: string, wait?: number): Promise<Answer>
 {
     return new Promise((done) => {
         // A connection of its own: Node's shared one ends a request idle for five seconds, and the doorbell waits for hours.
@@ -471,15 +488,15 @@ function body(port: number, path: string, wait?: number): Promise<string | undef
             response.on("data", (chunk: string) => {
                 text += chunk;
             });
-            response.on("end", () => done(response.statusCode === 200 ? text : undefined));
-            response.on("error", () => done(undefined));
+            response.on("end", () => done(response.statusCode === 200 ? { refused: false, text } : { refused: false }));
+            response.on("error", () => done({ refused: false }));
         });
 
         if (wait !== undefined) {
             giveUpAfterTurns(request, wait);
         }
 
-        request.on("error", () => done(undefined));
+        request.on("error", (error: NodeJS.ErrnoException) => done({ refused: error.code === "ECONNREFUSED" }));
     });
 }
 

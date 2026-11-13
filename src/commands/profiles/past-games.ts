@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { writePgn } from "../../core/index.ts";
-import { archivedGame, archivedGames, archivedTags, archivedWhen } from "../../games/index.ts";
+import { archivedGame, archivedGames, archivedTags, archivedWhen, hasListTags } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { openingName } from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
@@ -69,10 +69,9 @@ const listed = 20;
 function pastGameLine(folder: string, name: string): string | undefined
 {
     const tags = archivedTags(folder, name);
-    const { ECO: eco, Opening: opening, PlyCount: plies = "" } = tags;
+    const { ECO: eco, Opening: opening, PlyCount: plies } = tags;
 
-    // The archive that writes the plies writes the opening too, or none for a game that has none: from another position, or outside the book.
-    if (/^\d+$/.test(plies)) {
+    if (hasListTags(tags)) {
         return lineOf(name, tags, Number(plies), eco === undefined || opening === undefined ? undefined : `${eco} ${opening}`);
     }
 

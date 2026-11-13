@@ -351,7 +351,7 @@ export function withSanLetters(text: string): string
 /** The moves a text writes with a piece's letter of another language, each with its SAN: Cxe5 as Nxe5. */
 export function foreignMovesIn(text: string): { written: string; san: string; }[]
 {
-    return [...text.matchAll(/(?<![\p{L}\d])[CSAFLTD][a-h]?[1-8]?x?[a-h][1-8][+#]?(?![\p{L}\d])/gu)]
+    return [...text.matchAll(foreignMove)]
         .map(([written]) => ({ written, san: `${foreignPieces[written[0]!]![1]}${written.slice(1)}` }));
 }
 
@@ -365,6 +365,9 @@ const foreignPieces: Readonly<Record<string, readonly [string, string]>> = {
     T: ["rook", "R"],
     D: ["queen", "Q"],
 };
+
+// A move written with one of those letters, standing alone in a text.
+const foreignMove = new RegExp(`(?<![\\p{L}\\d])[${Object.keys(foreignPieces).join("")}][a-h]?[1-8]?x?[a-h][1-8][+#]?(?![\\p{L}\\d])`, "gu");
 
 // The legal moves of the positions seen last, by their key: about 4 KB each.
 const legalByPosition = new Map<string, readonly Move[]>();

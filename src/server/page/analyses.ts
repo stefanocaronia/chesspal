@@ -3,7 +3,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { bookOpening, deleteGame, deleteReview, siteGames, SiteGamesRefused } from "../../commands/index.ts";
 import { type AiModel, aiModelIn, annotatorOf, type GameRecord, isReviewed, leadOf, reviewOf } from "../../core/index.ts";
-import { archivedGame, archivedGames, archivedGameUnplayed, gameInAnalysis, gameStemOf, keptGame, keptGames } from "../../games/index.ts";
+import { archivedGame, archivedGames, archivedGameUnplayed, gameInAnalysis, gameStemOf, hasListTags, keptGame, keptGames } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { bodyOf, isJson, jsonOf, runRoute, sendJson, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
@@ -100,7 +100,7 @@ interface Listed
 function archivedListed(folder: string, name: string): Listed
 {
     const unplayed = archivedGameUnplayed(folder, name);
-    return /^\d+$/.test(unplayed.tags.PlyCount ?? "") ? { record: unplayed, opening: unplayed.tags.Opening } : withBookOpening(archivedGame(folder, name));
+    return hasListTags(unplayed.tags) ? { record: unplayed, opening: unplayed.tags.Opening } : withBookOpening(archivedGame(folder, name));
 }
 
 function withBookOpening(record: GameRecord): Listed

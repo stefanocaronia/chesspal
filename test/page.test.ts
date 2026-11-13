@@ -11,7 +11,7 @@ import { type Context, withProfile } from "../src/commands/registry/context.ts";
 import { archivedGames, gameInAnalysis, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
-import { Bell, bellHeard, bellLine, codexBellAnswer, notedPagePorts, noteSilence, pageAt, pagePorts, waitForBell } from "../src/server/bell/bell.ts";
+import { Bell, bellHeard, bellLine, codexBellAnswer, notedPagePorts, notePagePort, noteSilence, pageAt, pagePorts, waitForBell } from "../src/server/bell/bell.ts";
 import { analysesOf } from "../src/server/page/analyses.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { profilesShown } from "../src/server/page/profiles.ts";
@@ -1214,6 +1214,36 @@ describe("the doorbell of the chat", () => {
             expect(existsSync(join(folder, "pages", `${port}.json`))).toBe(false);
         } finally {
             await taken.close();
+        }
+    });
+
+    it("keeps the note of a page that answers late, busy, and forgets those where nobody listens or another folder's page answers", async () => {
+        const home = playerFolder();
+        const folder = playerFolder();
+        const wait = 100;
+        const late = createServer((_request, response) => {
+            setTimeout(() => response.end(JSON.stringify({ session: null, folder, open: true })), wait * 5);
+        });
+        const another = createServer((_request, response) => response.end(JSON.stringify({ session: null, folder: playerFolder(), open: true })));
+        const [latePort, anotherPort] = await Promise.all([late, another].map(async (server) => {
+            await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+            return (server.address() as { port: number; }).port;
+        }));
+        const [gone, own] = [await portGone(), await portGone()];
+        mkdirSync(join(home, "pages"));
+
+        for (const port of [latePort!, anotherPort!, gone]) {
+            writeFileSync(join(home, "pages", `${port}.json`), JSON.stringify({ folder }));
+        }
+
+        try {
+            await notePagePort(home, folder, own, wait);
+            expect(notedPagePorts(home, folder).sort()).toEqual([latePort!, own].sort());
+        } finally {
+            for (const server of [late, another]) {
+                server.closeAllConnections();
+                server.close();
+            }
         }
     });
 
