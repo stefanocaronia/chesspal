@@ -888,6 +888,50 @@ describe("the doorbell of the chat", () => {
         expect([bell.listening, told]).toEqual([true, 4]);
     });
 
+    it("ends the chat's turn at the player's act in a host that runs no hook, but for words while it may think on its move, until a hook waits", () => {
+        let told = 0;
+        const bell = new Bell(() => true, () => told++);
+
+        bell.chatCalls();
+        bell.ring(true);
+        expect([bell.listening, told]).toEqual([true, 1]);
+        bell.ring();
+        expect([bell.listening, bell.inTurn, told]).toEqual([false, false, 2]);
+        bell.ring();
+        expect(told).toBe(2);
+        expect(bell.chatCalls()).toBe(true);
+
+        // A hook that comes hears what the player did meanwhile; from then on only the hooks end a turn, until the chat leaves.
+        expect(hookAt(bell).heard).toBe("ring");
+        bell.ring();
+        expect(bell.listening).toBe(true);
+        bell.chatLeft();
+        bell.chatCalls();
+        bell.ring();
+        expect(bell.listening).toBe(false);
+    });
+
+    it("holds the AI's clock from the player's move on the page in a host that runs no hook, and starts it when the chat calls a tool", async () => {
+        const folder = playerFolder();
+        const base = testContext(folder);
+        const start = base.now().getTime();
+        let seconds = 0;
+        const context = { ...base, now: () => new Date(start + seconds * 1000) };
+        const page = await open(folder, undefined, context);
+        const served = async (): Promise<{ listening: boolean; game: { clock: { since: string; left: { black: number; }; }; }; }> => JSON.parse((await get(page, "/api/game")).body);
+
+        expect(await post(page, "/api/new", { ai_colour: "black", clock: "5+0" })).toMatchObject({ status: 200 });
+        page.chatCalls();
+        await run(folder, "status", {}, context);
+        seconds = 5;
+        expect(await post(page, "/api/move", { move: "e4" })).toMatchObject({ status: 200 });
+        expect((await served()).listening).toBe(false);
+
+        seconds = 65;
+        page.chatCalls();
+        expect((await served()).game.clock).toMatchObject({ since: new Date(start + 65_000).toISOString(), left: { black: 300_000 } });
+    });
+
     it("knows whether the doorbell woke the chat in the turn it is in, and tells when it wakes it or the turn ends", () => {
         let told = 0;
         const bell = new Bell(() => true, () => told++);

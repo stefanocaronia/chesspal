@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { moods } from "../../core/index.ts";
 import { archivedName, talkLimits } from "../../games/index.ts";
+import { hasDoorbell } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { analystLine, coachOnEnd, coachOnEndLine, type GameSummary, give, newGameStep, nextStep, refuseOtherGame, reviewedLine, say, summaryOf, waitingWords, withAnalyst, wordLines, type Written } from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
@@ -42,17 +43,17 @@ export const aiSay = defineCommand({
         // The chat woken by the player's ending move on the page may have gone to its words without the coach (Priya).
         return { game: withAnalyst(summaryOf(current, context.now(), archivedName(folder, current)), context, current), words, ...(coachOnEnd(context, folder, current) ? { coach: true as const } : {}) };
     },
-    format: ({ game, words, coach }) =>
+    format: ({ game, words, coach }, context) =>
         [
             "Said on the board page, where the player reads it: don't write it again in the chat.",
             ...wordLines(words),
             ...(coach === true ? [coachOnEndLine] : []),
-            afterWords(game, words),
+            afterWords(game, words, hasDoorbell(context?.host?.())),
         ].join("\n"),
 });
 
 /** The next step once the AI has spoken: the end of a game over has been told already, and the player's draw offer answered in words. */
-function afterWords(game: GameSummary | undefined, words: readonly Written[]): string
+function afterWords(game: GameSummary | undefined, words: readonly Written[], doorbell: boolean): string
 {
     if (words.length === 0 && game?.end !== undefined) {
         // The offer to go over the game, made in the AI's words, waits for the player's yes (D-89).
@@ -69,5 +70,5 @@ function afterWords(game: GameSummary | undefined, words: readonly Written[]): s
         return "Next: accept the draw with end_game draw_agreed, or wait for the player's move.";
     }
 
-    return nextStep(game, words);
+    return nextStep(game, words, false, doorbell);
 }

@@ -201,7 +201,8 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
     // The first words of a move wake the chat, and between games the first since the AI spoke; the AI finds the rest at its next call (D-54, D-74). In
     // analysis every line does: a chat that answered in its own window would not hear the next (Priya).
     if (shown !== undefined || wakesTheChat(current)) {
-        served.bell.ring();
+        // Words may come while the chat thinks on the AI's move, which they do not end.
+        served.bell.ring("game" in current && endOf(current.game) === undefined && current.game.position.turn === current.ai);
     }
 
     send(response, 200, json, JSON.stringify({ said: true }));

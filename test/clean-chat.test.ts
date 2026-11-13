@@ -95,6 +95,10 @@ describe("a new game chosen on the board page", () => {
         expect(newGame.format(await newGame.run({ replace: false }, ask(true)))).toMatch(/The New game window is open on the board page/);
         expect(asked).toBe(1);
         expect(newGame.format(await newGame.run({ replace: false }, ask(false)))).toMatch(/give the player its address, http:\/\/127\.0\.0\.1:5876/);
+        // A host that runs no doorbell hears of the game from the player.
+        const goose = (open: boolean): Context => ({ ...ask(open), host: () => "goose" });
+        expect(newGame.format(await newGame.run({ replace: false }, goose(true)), goose(true))).toMatch(/Don't ask in the chat\. End your turn, and call status when they tell you the game started\.$/);
+        expect(newGame.format(await newGame.run({ replace: false }, goose(false)), goose(false))).toMatch(/New game button\. End your turn, and call status when they tell you the game started\.$/);
         expect(() => newGame.run({ replace: false }, context)).toThrow(/There is no board page here: ask the player/);
         expect(() => newGame.run({ replace: false, clock: "5+0" }, context)).toThrow(/ai_colour: say the colour you play/);
     });

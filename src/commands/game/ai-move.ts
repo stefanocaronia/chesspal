@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { boardText, drawingsText, moods, moodTag } from "../../core/index.ts";
 import { commentWithPlan, talkLimits } from "../../games/index.ts";
-import { coachAgent, ponderAgentFor } from "../../host-files/index.ts";
+import { coachAgent, hasDoorbell, ponderAgentFor } from "../../host-files/index.ts";
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
 import { agentRuns, agentsLine, arrowsInput, closingLines, coachRuns, drawingsOf, give, moveLines, type MovePlayed, playMove, refuseUnseenPosition, shownMove, squaresInput, waitingWords, withAnalyst } from "../answers/index.ts";
 import { type Context, defineCommand, sentence } from "../registry/index.ts";
@@ -43,12 +43,12 @@ export const aiMove = defineCommand({
         // The player's words are read before the move, which would count as the answer to them; a move refused leaves them for the next call.
         const waiting = waitingWords(context);
         const words = [commentWithPlan(comment, plan), drawingsText(drawings), mood === undefined ? "" : moodTag(mood)].filter((part) => part !== "").join(" ");
-        const played = playMove(folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: words, offerDraw });
+        const played = playMove(folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: words, offerDraw, doorbell: hasDoorbell(context.host?.()) });
         const agents = agentsAfter(context, folder, played);
         const board = context.pageOpen?.() === true ? {} : { board: true as const };
         return { ...played, game: withAnalyst(played.game, context), words: give(context, waiting), ...(agents.length === 0 ? {} : { agents }), ...board };
     },
-    format: (result) => {
+    format: (result, context) => {
         // The mood the AI has just given is not told back: player_move and status tell it while it lasts (Priya).
         const game = { ...result.game };
         delete game.mood;
@@ -58,7 +58,7 @@ export const aiMove = defineCommand({
             ...moveLines({ ...result, game }),
             ...(result.board === true ? ["No board page is open: copy this board into your message.", boardText(result.game.fen)] : []),
             ...(result.agents === undefined ? [] : [agentsLine(result.agents)]),
-            ...closingLines(result.game, result.words),
+            ...closingLines(result.game, result.words, false, hasDoorbell(context?.host?.())),
         ].join("\n");
     },
 });

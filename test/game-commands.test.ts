@@ -87,6 +87,30 @@ describe("a game in chat", () => {
         expect(gameFile(context).pgn).toContain("\n\n1. e4 *");
     });
 
+    it("tells the AI of a host whose hooks do not ring it, as Claude Code's and Codex's do, that the player tells it of what they do on the board page", async () => {
+        const folder = playerFolder();
+        const told = "when they tell you they moved on the board page, call status; when they write it here, call player_move with it.";
+
+        const said = async (host: string, name: string, input: Record<string, unknown> = {}): Promise<string> => {
+            // With the page open, a game with a clock waits for the player to start it.
+            const context = { ...folder, host: () => host, pageOpen: () => true };
+            const { input: schema, run: runCommand, format } = command(name);
+            return format(await runCommand(schema.parse(input), context), context);
+        };
+
+        const lastLine = async (host: string, name: string, input: Record<string, unknown> = {}): Promise<string | undefined> => (await said(host, name, input)).split("\n").at(-1);
+
+        expect(await lastLine("goose", "new_game", { ai_colour: "black" })).toBe(`Next: wait for the player's move: ${told}`);
+        await expect(said("goose", "ai_move", { move: "e5", plan: "p" })).rejects.toThrow(`It is the player's move (White): ${told} Nothing changed.`);
+        expect(await lastLine("claude-code", "status")).toBe("Next: wait for the player's move, then call player_move with it.");
+        expect(await lastLine("codex-mcp-client", "status")).toBe("Next: wait for the player's move, then call player_move with it.");
+
+        await said("goose", "new_game", { ai_colour: "white", clock: "5+0", replace: true });
+        expect(await lastLine("goose", "status")).toBe("Next: don't move yet: the player starts the game with Start on the board page. End your turn, and call status when they tell you they did.");
+        await expect(said("goose", "ai_move", { move: "e4", plan: "p" })).rejects.toThrow("don't move yet, call status when they tell you they did. Nothing changed.");
+        await expect(said("claude-code", "ai_move", { move: "e4", plan: "p" })).rejects.toThrow("don't move yet, the doorbell wakes you then. Nothing changed.");
+    });
+
     it("takes the AI's plan in one sentence, and a comment only when it has one, without brackets", async () => {
         const { input } = command("ai_move");
 
@@ -119,7 +143,8 @@ describe("a game in chat", () => {
             "The player has the helps off: play without arrows and squares, with the comment in 300 characters at most. Nothing changed.",
         );
         await expect(run(context, "ai_move", { move: "e5", plan: "p", arrows: ["Ge4e4"] })).rejects.toThrow("an arrow goes from a square to another");
-        await run(context, "ai_move", { move: "e5", plan: "p" });
+        // An empty list draws nothing, as one left out: some hosts send every parameter.
+        await run(context, "ai_move", { move: "e5", plan: "p", arrows: [], squares: [] });
 
         helps(true);
         await run(context, "player_move", { move: "Nf3" });

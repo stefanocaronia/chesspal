@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { loadGame } from "../../games/index.ts";
+import { hasDoorbell } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { closingLines, coachOnEnd, coachOnEndLine, coachRuns, lastMoveText, moveLines, type MovePlayed, newWords, playMove, positionIn, refuseUnseenPosition, shownMove, withAnalyst } from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
@@ -34,13 +35,13 @@ export const playerMove = defineCommand({
         const coach = ended !== undefined && coachOnEnd(context, folder, ended);
         return { ...played, game: withAnalyst(played.game, context), words: newWords(context), ...(invite === undefined ? {} : { invite }), ...(coach ? { coach } : {}) };
     },
-    format: (result) =>
+    format: (result, context) =>
         [
             `Player: ${result.game.lastMove === undefined ? shownMove(result.move) : lastMoveText(result.game.lastMove)}.`,
             ...moveLines(result),
             ...(result.invite === undefined ? [] : [inviteLine(result.invite)]),
             ...(result.coach === true ? [coachOnEndLine] : []),
-            ...closingLines(result.game, result.words),
+            ...closingLines(result.game, result.words, false, hasDoorbell(context?.host?.())),
         ].join("\n"),
 });
 
