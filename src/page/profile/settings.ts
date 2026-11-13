@@ -34,7 +34,9 @@ export interface Settings
     /** Whether the AI's words are read aloud, by the browser's local voices. */
     readonly voice: boolean;
     readonly language: "auto" | "it" | "en";
-    /** The model and effort of the chats the table opens, by host: empty keeps the host's own (D-104); `chesspal play` reads them. */
+    /** The host the button of the chat's window last opened or started a chat in: the one chosen when no chat is at the table. */
+    readonly chatHost: string;
+    /** The model and effort of the chats the table opens, by host: empty, or one the host no longer offers, is its middle one (D-104); `chesspal play` reads them. */
     readonly claudeModel: string;
     readonly claudeEffort: string;
     readonly codexModel: string;
@@ -68,6 +70,7 @@ export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | 
         voice: typeof stored.voice === "boolean" ? stored.voice : false,
         language: oneOf(stored.language, ["auto", "it", "en"], "auto"),
         // Checked against what the host offers when the chat opens, which this page does not know.
+        chatHost: word(stored.chatHost),
         claudeModel: word(stored.claudeModel),
         claudeEffort: word(stored.claudeEffort),
         codexModel: word(stored.codexModel),

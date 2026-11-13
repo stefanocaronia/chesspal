@@ -139,6 +139,9 @@ export interface ChatHost
     readonly installed: boolean;
     readonly models: readonly string[];
     readonly efforts: readonly string[];
+    /** The middle model and effort, which a chat starts with until the player chooses others. */
+    readonly model: string;
+    readonly effort: string;
     readonly command: string;
 }
 

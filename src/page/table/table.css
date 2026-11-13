@@ -73,18 +73,6 @@
     content: "";
 }
 
-/* The button that only closes: the frame of a card and not the accent, so that the one that acts stands out when a choice changes it */
-.profile-form .start.quiet {
-    border: 1px solid var(--line);
-    background: none;
-    color: var(--ink);
-    font-weight: 400;
-}
-
-.profile-form .start.quiet:hover {
-    border-color: var(--soft);
-}
-
 .chat-window .problem.chat-state {
     margin-top: -4px;
 }
