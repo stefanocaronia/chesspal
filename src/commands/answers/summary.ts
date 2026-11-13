@@ -141,7 +141,7 @@ export function gameGoingOn(folder: string, now: Date): CurrentGame
     const end = endOf(current.game);
 
     if (end !== undefined) {
-        throw new Error(`The game is over (${endText(end)}): new_game starts another. Nothing changed.`);
+        throw new Error(`The game is over (${endText(end, current.ai)}): new_game starts another. Nothing changed.`);
     }
 
     return current;
@@ -153,10 +153,24 @@ export function unplayed(summary: GameSummary): boolean
     return summary.lastMoves === "";
 }
 
-/** How a game ended, in words: its result, and how it came when known. */
-export function endText({ result, termination }: { result: string; termination?: string; }): string
+/**
+ * How a game ended, in words: its result, and how it came when known, each colour named with who played it, the AI as `aiName`:
+ * "0-1, White (the player) resigns", "1-0, White (you) checkmates Black (the player)".
+ */
+export function endText({ result, termination }: { result: string; termination?: string; }, ai: Side, aiName = "you"): string
 {
-    return termination === undefined ? result : `${result}, ${termination}`;
+    if (termination === undefined) {
+        return result;
+    }
+
+    const named = (colour: string) => `${colour} (${colour.toLowerCase() === ai ? aiName : "the player"})`;
+
+    if (termination === "checkmate" && result !== "1/2-1/2") {
+        const winner = result === "1-0" ? "White" : "Black";
+        return `${result}, ${named(winner)} checkmates ${named(winner === "White" ? "Black" : "White")}`;
+    }
+
+    return `${result}, ${termination.replace(/\b(White|Black)\b/g, named)}`;
 }
 
 /** The last plies of a record, numbered as a player writes them, from the move number and side of its FEN. */

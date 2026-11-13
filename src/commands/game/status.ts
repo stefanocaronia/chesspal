@@ -254,7 +254,7 @@ function reviewProgress(context: Context, game: string): string | undefined
  */
 function gameLines(game: GameSummary | undefined, words: readonly Written[], brought: boolean, pageClosed: boolean, coach: boolean, doorbell: boolean): string[]
 {
-    const closing = [...(coach ? [coachOnEndLine] : []), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed, doorbell))];
+    const closing = [...(coach && game !== undefined ? [coachOnEndLine(game)] : []), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed, doorbell))];
 
     if (game === undefined) {
         return ["No game.", ...closing];

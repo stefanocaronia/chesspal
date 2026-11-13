@@ -40,7 +40,7 @@ export const playerMove = defineCommand({
             `Player: ${result.game.lastMove === undefined ? shownMove(result.move) : lastMoveText(result.game.lastMove)}.`,
             ...moveLines(result),
             ...(result.invite === undefined ? [] : [inviteLine(result.invite)]),
-            ...(result.coach === true ? [coachOnEndLine] : []),
+            ...(result.coach === true ? [coachOnEndLine(result.game)] : []),
             ...closingLines(result.game, result.words, false, hasDoorbell(context?.host?.())),
         ].join("\n"),
 });

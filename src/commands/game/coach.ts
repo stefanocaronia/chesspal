@@ -11,6 +11,7 @@ import {
     colourName,
     compactView,
     drawingsOf,
+    endText,
     knownMoves,
     lastMoves,
     leadFrom,
@@ -234,7 +235,7 @@ function startOf(current: CurrentGame, folder: string, context: Context): string
     const head = over === undefined
         ? `Game "${place.game}", position ${plies}: the player (${colourName(player)}) to move, move ${game.position.moveNumber}; the opponent plays ${colourName(ai)} at the `
             + `${levelOf(record)} level.`
-        : `Game "${place.game}", position ${plies}: the game is over, ${over.result}${over.termination === undefined ? "" : `, ${over.termination}`}, with ${ender} move.`;
+        : `Game "${place.game}", position ${plies}: the game is over, ${endText(over, ai, "the opponent")}, with ${ender} move.`;
     const speech = speechOf(folder, context.language);
     const clock = clockSummaryOf(current, context.now());
     const keepLine = over === undefined

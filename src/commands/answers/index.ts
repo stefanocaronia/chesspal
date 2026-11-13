@@ -11,5 +11,5 @@ export { playMove, PositionChanged, positionIn, refuseOtherGame, refuseUnseenPos
 export { give, newWords, say, unansweredWords, waitingWords, type Written } from "./say.ts";
 export { type Speech, speechLine, speechOf } from "./speech.ts";
 export { gameShown, gameToStudy, knownTag, moveIndex, moveNumbers, namedGame, noGameGoingOn, positionAfter, positionLine, shownPosition, type Studied, studyInput } from "./study.ts";
-export { gameGoingOn, type GameSummary, lastMoves, type MovePlayed, summaryOf, withThought } from "./summary.ts";
+export { endText, gameGoingOn, type GameSummary, lastMoves, type MovePlayed, summaryOf, withThought } from "./summary.ts";
 export { balanceText, boardView, colourName, compactView, fullView, materialText, riskLine, tacticsText } from "./view.ts";

@@ -225,7 +225,7 @@ function whereLine(game: GameSummary): string
     if (game.end !== undefined) {
         // Saved where the player's games are: the AI says so, never the file, which past_games names when it is needed.
         const archived = game.end.archive === undefined ? "" : " Saved with the player's games.";
-        return `Game over: ${endText(game.end)}.${archived}`;
+        return `Game over: ${endText(game.end, game.ai)}.${archived}`;
     }
 
     return `${game.turn === game.ai ? "You" : "Player"} (${colourName(game.turn)}) to move, move ${game.moveNumber}.`;

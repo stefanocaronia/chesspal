@@ -83,7 +83,7 @@ describe("the board page's address for a player who has not opened it", () => {
         await said(newGame, { ai_colour: "black", from: "rnbqkbnr/ppppp2p/5p2/6p1/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3", replace: true }, context);
         open = false;
         const mate = await said(playerMove, { move: "Qh5#" }, context);
-        expect(mate).toContain("Game over: 1-0, checkmate.");
+        expect(mate).toContain("Game over: 1-0, White (the player) checkmates Black (you).");
         expect(mate).not.toContain("invite the player");
     });
 

@@ -47,7 +47,7 @@ export const aiSay = defineCommand({
         [
             "Said on the board page, where the player reads it: don't write it again in the chat.",
             ...wordLines(words),
-            ...(coach === true ? [coachOnEndLine] : []),
+            ...(coach === true && game !== undefined ? [coachOnEndLine(game)] : []),
             afterWords(game, words, hasDoorbell(context?.host?.())),
         ].join("\n"),
 });

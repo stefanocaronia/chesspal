@@ -263,9 +263,9 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "g4" });
 
         expect(await run(context, "ai_move", { move: "Qh4#", plan: "Mate.", comment: "c" })).toMatch(
-            /^Played 2\.\.\.♛h4#\.\nGame over: 0-1, checkmate\.\nChesspal could not archive the game: .*games could not be made \(.+\): check that it is a folder, and can be written\. The game is saved in game\.json: it goes to the archive when a new game starts\.\nNo board page is open: copy this board into your message\.\n[\s\S]*\nNext: /,
+            /^Played 2\.\.\.♛h4#\.\nGame over: 0-1, Black \(you\) checkmates White \(the player\)\.\nChesspal could not archive the game: .*games could not be made \(.+\): check that it is a folder, and can be written\. The game is saved in game\.json: it goes to the archive when a new game starts\.\nNo board page is open: copy this board into your message\.\n[\s\S]*\nNext: /,
         );
-        expect(await run(context, "status")).toContain("Game over: 0-1, checkmate.\nNext: ");
+        expect(await run(context, "status")).toContain("Game over: 0-1, Black (you) checkmates White (the player).\nNext: ");
         await expect(run(context, "new_game", { ai_colour: "white" })).rejects.toThrow(/^Chesspal could not archive the game: .* Nothing changed\.$/);
         expect(gameFile(context).pgn).toContain("2. g4 Qh4#");
 
@@ -394,7 +394,7 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "g4" });
 
         expect(await run(context, "ai_move", { move: "Qh4+", plan: "Mate.", comment: "The fool's mate.", offer_draw: true })).toBe(
-            `Played 2...♛h4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, checkmate. Saved with the player's games.\n`
+            `Played 2...♛h4#.\nNote: Written as Qh4+, but Qh4 is checkmate.\nGame over: 0-1, Black (you) checkmates White (the player). Saved with the player's games.\n`
                 + "No board page is open: copy this board into your message.\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n8 ♜ ♞ ♝ ⊙ ♚ ♝ ♞ ♜ 8\n7 ♟︎ ♟︎ ♟︎ ♟︎ ⊙ ♟︎ ♟︎ ♟︎ 7\n6 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ 6\n5 ⊙ ⊙ ⊙ ⊙ ♟︎ ⊙ ⊙ ⊙ 5\n"
                 + "4 ⊙ ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ♛ 4\n3 ⊙ ⊙ ⊙ ⊙ ⊙ ♙ ⊙ ⊙ 3\n2 ♙ ♙ ♙ ♙ ♙ ⊙ ⊙ ♙ 2\n1 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 1\n  ⓐ ⓑ ⓒ ⓓ ⓔ ⓕ ⓖ ⓗ\n"
                 + "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one "
@@ -405,8 +405,8 @@ describe("a game in chat", () => {
         // A mate leaves no draw offer, even one made with it (D-65).
         expect(readArchive(context)).not.toContain("(=)");
         expect(gameFile(context).drawOffer).toBeUndefined();
-        await expect(run(context, "player_move", { move: "a3" })).rejects.toThrow("The game is over (0-1, checkmate): new_game starts another. Nothing changed.");
-        expect(await run(context, "status")).toContain(`Moves: 1.f3 e5 2.g4 ♛h4#\nGame over: 0-1, checkmate. Saved with the player's games.`);
+        await expect(run(context, "player_move", { move: "a3" })).rejects.toThrow("The game is over (0-1, Black (you) checkmates White (the player)): new_game starts another. Nothing changed.");
+        expect(await run(context, "status")).toContain(`Moves: 1.f3 e5 2.g4 ♛h4#\nGame over: 0-1, Black (you) checkmates White (the player). Saved with the player's games.`);
         expect(await run(context, "new_game", { ai_colour: "white" })).toContain("New game: you play White");
     });
 
@@ -420,10 +420,10 @@ describe("a game in chat", () => {
         };
 
         expect(await ended("player_resigns")).toBe(
-            `Game over: 0-1, White resigns. Saved with the player's games.\nNext: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one `
+            `Game over: 0-1, White (the player) resigns. Saved with the player's games.\nNext: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or to go over this one `
                 + "(analyse_game). For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.",
         );
-        expect(await ended("ai_resigns")).toContain("Game over: 1-0, Black resigns.");
+        expect(await ended("ai_resigns")).toContain("Game over: 1-0, Black (you) resigns.");
         await expect(ended("draw_agreed")).rejects.toThrow("No draw offer stands: the player offers one with their move (player_move with offer_draw), you with yours");
         expect(await ended("draw_agreed", true)).toContain("Game over: 1/2-1/2, draw agreed.");
 
@@ -434,7 +434,7 @@ describe("a game in chat", () => {
         await run(context, "end_game", { result: "ai_resigns" });
 
         expect(readArchive(context)).toContain('[Result "1-0"]\n[AILevel "strong"]\n[Termination "Black resigns"]');
-        await expect(run(context, "end_game", { result: "draw_agreed" })).rejects.toThrow("The game is over (1-0, Black resigns)");
+        await expect(run(context, "end_game", { result: "draw_agreed" })).rejects.toThrow("The game is over (1-0, Black (you) resigns)");
     });
 
     it("keeps no game closed before any move, nor offers to go over it, and leaves out of the memory one kept before", async () => {
@@ -442,7 +442,7 @@ describe("a game in chat", () => {
         await run(context, "new_game", { ai_colour: "black" });
 
         expect(await run(context, "end_game", { result: "player_resigns" })).toBe(
-            "Game over: 0-1, White resigns.\nNext: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in "
+            "Game over: 0-1, White (the player) resigns.\nNext: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in "
                 + "words, another game. For another, call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.",
         );
         expect(existsSync(join(gameFolder(context.home()), archive))).toBe(false);
@@ -464,7 +464,7 @@ describe("a game in chat", () => {
         await run(context, "player_move", { move: "Rh2" });
         await run(context, "ai_move", { move: "Kd5", plan: "Hold on." });
 
-        expect(await run(context, "end_game", { result: "player_resigns" })).toContain("Game over: 1/2-1/2, White resigns and Black cannot mate.");
+        expect(await run(context, "end_game", { result: "player_resigns" })).toContain("Game over: 1/2-1/2, White (the player) resigns and Black (you) cannot mate.");
         expect(readArchive(context)).toMatch(/\[Result "1\/2-1\/2"\][^]*\[Termination "White resigns and Black cannot mate"\]/);
     });
 

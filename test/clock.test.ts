@@ -71,20 +71,20 @@ describe("a game with a clock (D-13)", () => {
         const game = clockGame("1+0");
         await run(game.at(65), "player_move", { move: "e4" });
         expect(gameFile(game.context).clock).toMatchObject({ white: 5_000 });
-        await expect(run(game.at(200), "ai_move", { move: "e5", plan: "Late." })).rejects.toThrow(/Black lost on time/);
+        await expect(run(game.at(200), "ai_move", { move: "e5", plan: "Late." })).rejects.toThrow(/Black \(you\) lost on time/);
     });
 
     it("ends the game when the side to move runs out of time, at the first command that reads it, and archives it", async () => {
         const game = clockGame("1+0");
         await run(game.at(5), "player_move", { move: "e4" });
-        expect(await run(game.at(70), "status")).toMatch(/Game over: 1-0, Black lost on time\. Saved with the player's games\./);
-        await expect(run(game.at(71), "ai_move", { move: "e5", plan: "Too late." })).rejects.toThrow(/The game is over \(1-0, Black lost on time\)/);
+        expect(await run(game.at(70), "status")).toMatch(/Game over: 1-0, Black \(you\) lost on time\. Saved with the player's games\./);
+        await expect(run(game.at(71), "ai_move", { move: "e5", plan: "Too late." })).rejects.toThrow(/The game is over \(1-0, Black \(you\) lost on time\)/);
         expect(readdirSync(join(gameFolder(game.context.home()), "games"))).toHaveLength(1);
     });
 
     it("is a draw on time when the other side could not mate", async () => {
         const game = clockGame("1+0", "8/8/8/4k3/r7/8/8/4K3 b - - 0 1", "white");
-        expect(await run(game.at(61), "status")).toMatch(/Game over: 1\/2-1\/2, Black ran out of time and White cannot mate/);
+        expect(await run(game.at(61), "status")).toMatch(/Game over: 1\/2-1\/2, Black \(the player\) ran out of time and White \(you\) cannot mate\./);
     });
 
     it("keeps a clock of a fraction of a minute readable from disk, in another process", async () => {

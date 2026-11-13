@@ -263,7 +263,7 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         // Once it has started, the chat is told no more, and a second coach the chat started on it stops (Priya).
         expect(await run(context, "status")).not.toContain(coachLine);
         expect(await run(context, "coach")).toBe("Stop now: another coach works on this position. End with one word.");
-        expect(start).toMatch(/^Game "\w+", position 4: the game is over, 0-1, checkmate, with the player's move\.\n/);
+        expect(start).toMatch(/^Game "\w+", position 4: the game is over, 0-1, Black \(the player\) checkmates White \(the opponent\), with the player's move\.\n/);
         expect(start).toContain("\nTheir move to judge: 2...Qh4#. The position they played it in:\n");
         expect(start).not.toMatch(/After their move|The opponent answered/);
         expect(await run(context, "coach", { ...at, badge: "best", note: "Mate." })).toBe("Kept for the game's record: your judgment; the game is over. Stop now: end with one word.");
@@ -286,6 +286,22 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
         await run(page, "coach");
         expect(await run(page, "status")).not.toContain(coachLine);
         expect(await run(page, "ai_say", { text: "Another?" })).not.toContain(coachLine);
+    });
+
+    it("tells the chat, after the opponent's move that ends the game, that the coach judges the player's last move before it", async () => {
+        const context = { ...playerFolder(), host: () => "claude-code" };
+        setUpHosts(context.folder, "linux");
+        helps(context, true);
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "f3" });
+        await run(context, "ai_move", { move: "e5", plan: "p" });
+        await run(context, "player_move", { move: "g4" });
+        await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
+        const judged = "whatever the player asks: it judges the player's last move, the one before the end, apart from the analyst;";
+
+        expect(await run(context, "status")).toContain(judged);
+        expect(await run(context, "ai_say", { text: "Mate.", mood: "happy" })).toContain(judged);
+        expect(await run(context, "status")).not.toContain("the move that ended the game");
     });
 
     it("holds a note while a move it names is legal on the player's turn, not only until their next move (Anatolij)", async () => {
