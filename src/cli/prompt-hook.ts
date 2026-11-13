@@ -74,8 +74,9 @@ export interface HookInput
     cwd?: string;
 }
 
-// One move and nothing else, as player_move takes it: SAN with K, Q, R, B and N, small or as figurines, or as squares, or castling; a check or mate sign.
-const moveShape = /^(?:[KQRBNkqrbn♔-♟]?[a-h]?[1-8]?[-x:×–—−]?[a-h][1-8](?:=?[QRBNqrbn])?|[0Oo]-[0Oo](?:-[0Oo])?)[+#]?$/u;
+// One move and nothing else, as player_move takes it: SAN with K, Q, R, B and N, small or as figurines, or with the letters of other languages that name
+// one piece (Cf3, Tf1, Dd1, e8=D), or as squares, or castling; a check or mate sign.
+const moveShape = /^(?:[KQRBNkqrbnCSAFLTDt♔-♟]?[a-h]?[1-8]?[-x:×–—−]?[a-h][1-8](?:=?[QRBNqrbnCSAFLTD])?|[0Oo]-[0Oo](?:-[0Oo])?)[+#]?$/u;
 
 /**
  * Tells the chat's page that the prompt starts its turn: the doorbell lets the hook of the turn before go, and a new game asked on the page waits for

@@ -53,7 +53,7 @@ export function randomGame(firstSeed: number, length: number, start: readonly st
         moves.forEach((move) => chess.move(move));
 
         while (moves.length < length && !chess.isGameOver()) {
-            const legal = chess.moves();
+            const legal = playable(chess.moves());
             const move = legal[Math.floor(random() * legal.length)] ?? "";
             chess.move(move);
             moves.push(move);
@@ -63,6 +63,13 @@ export function randomGame(firstSeed: number, length: number, start: readonly st
             return moves;
         }
     }
+}
+
+/** The moves player_move plays as written: none written R and a square the king could go to too, which it refuses for the player to say which piece. */
+function playable(legal: string[]): string[]
+{
+    const kingTo = new Set(legal.filter((move) => move.startsWith("K")).map((move) => /[a-h][1-8]/.exec(move)?.[0]));
+    return legal.filter((move) => !kingTo.has(/^Rx?([a-h][1-8])/.exec(move)?.[1]));
 }
 
 /** The moves of a game as squares: e2e4, e7e8q. */
