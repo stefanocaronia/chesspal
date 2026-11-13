@@ -1,24 +1,27 @@
-// The book of the openings the build indexed (D-16), read once at the first lookup; the book's moves, only for a game at the master level (D-60).
+// The book of the openings the build indexed (D-16), read once at the first lookup: where a game is in it (D-68) at every level, its moves for the master (D-60).
 import { readFileSync } from "node:fs";
-import { bookMoves, Game, type GameRecord, inOpenings, type Opening, type OpeningBook, type OpeningIndex, openingOf, outOfBookMove } from "../../core/index.ts";
+import { bookMoves, type BookPlace, bookPlaceOf, Game, type GameRecord, type Opening, type OpeningBook, type OpeningIndex, outOfBookMove, positionKeysOf } from "../../core/index.ts";
 
 // The index of the named openings and the book of their moves, each read at its first lookup; null where the build made none.
 let index: OpeningIndex | null | undefined;
 let book: OpeningBook | null | undefined;
 // Each record is looked up once: the live game keeps its record until a move changes it.
-const lines = new WeakMap<GameRecord, string | null>();
+const places = new WeakMap<GameRecord, BookPlace | null>();
 
-/** The game's opening as the AI reads it: ECO and name, and the move it left the book at; none outside the book, or where the build made no index. */
-export function openingLine(record: GameRecord): string | undefined
+/**
+ * The game's opening as the AI reads it: ECO and name, and the move it left the book at (D-68); none outside the book, or where the build made no index.
+ * A live game gives the positions it went through; a record alone is replayed.
+ */
+export function openingLine(game: Game | GameRecord): string | undefined
 {
-    let line = lines.get(record);
+    const place = bookPlace(game);
 
-    if (line === undefined) {
-        line = lineOf(record) ?? null;
-        lines.set(record, line);
+    if (place?.opening === undefined) {
+        return undefined;
     }
 
-    return line ?? undefined;
+    const left = outOfBookMove(recordOf(game).moves.length, place.plies);
+    return `${place.opening.eco} ${place.opening.name}${left === undefined ? "" : ` (out of book since move ${left})`}`;
 }
 
 /** The moves the book knows from a position (D-15), for the AI at the master level; none out of the book, or where the build made no book. */
@@ -28,33 +31,10 @@ export function knownMoves(fen: string): readonly string[]
     return moves === undefined ? [] : bookMoves(fen, moves);
 }
 
-/** How many plies from the start the book knows, to the last before the game left it (D-69); none from another position. */
-export function bookPlies(record: GameRecord): number
+/** How many plies from the start the book knows, to the last before the game left it (D-68, D-69); none from another position. */
+export function bookPlies(game: Game | GameRecord): number
 {
-    if (record.tags.FEN !== undefined) {
-        return 0;
-    }
-
-    const game = new Game({ tags: record.tags, moves: [] });
-    let plies = 0;
-
-    for (const { san } of record.moves) {
-        if (!game.playRecorded(san).played || !bookReaches(game.position.fen)) {
-            break;
-        }
-
-        plies++;
-    }
-
-    return plies;
-}
-
-/** Whether a line of Lichess's openings reaches a position, by any order of moves (D-68); never where the build made no book. */
-export function bookReaches(fen: string): boolean
-{
-    const named = openingIndex();
-    const moves = openingBook();
-    return named !== undefined && moves !== undefined && inOpenings(fen, named, moves);
+    return bookPlace(game)?.plies ?? 0;
 }
 
 /** The opening a game reached, ECO and name, without where it left the book: for the games in the archive. */
@@ -67,19 +47,31 @@ export function openingName(record: GameRecord): string | undefined
 /** The last named opening a game reached, and at which ply; none outside the book, or where the build made no index. */
 export function bookOpening(record: GameRecord): Opening | undefined
 {
-    const named = openingIndex();
-    return named === undefined ? undefined : openingOf(record, named);
+    return bookPlace(record)?.opening;
 }
 
-function lineOf(record: GameRecord): string | undefined
+/**
+ * Where a game stands in the book, its opening and its plies the book knows, once per record: from the positions a live game went through, or a record
+ * replayed; none from another position, or where the build made no index.
+ */
+export function bookPlace(game: Game | GameRecord): BookPlace | undefined
 {
-    const opening = bookOpening(record);
+    const record = recordOf(game);
+    let place = places.get(record);
 
-    if (opening === undefined) {
-        return undefined;
+    if (place === undefined) {
+        const named = openingIndex();
+        const keys = game instanceof Game ? game.positionKeys : positionKeysOf(record);
+        place = named === undefined ? null : bookPlaceOf(keys, named, openingBook()) ?? null;
+        places.set(record, place);
     }
 
-    return `${opening.eco} ${opening.name}${opening.inBook ? "" : ` (out of book since move ${outOfBookMove(opening)})`}`;
+    return place ?? undefined;
+}
+
+function recordOf(game: Game | GameRecord): GameRecord
+{
+    return game instanceof Game ? game.record : game;
 }
 
 function openingBook(): OpeningBook | undefined
@@ -88,7 +80,7 @@ function openingBook(): OpeningBook | undefined
         try {
             book = JSON.parse(readFileSync(new URL("../../../dist/core/book.json", import.meta.url), "utf8")) as OpeningBook;
         } catch {
-            // Not built yet: the master goes without the book.
+            // Not built yet: no game is in the book, and the master goes without its moves.
             book = null;
         }
     }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type Badge, badges, Game, type GameRecord, leadText, levelOf, materialOf, type Move, type Side, withSanLetters } from "../../core/index.ts";
+import { type Badge, badges, Game, leadText, levelOf, materialOf, type Move, type Side, withSanLetters } from "../../core/index.ts";
 import { archiveCoached, coachWaitingSince, coachWords, type CurrentGame, endOf, keepHint, keepJudgment, keepLead, loadGame, startCoach } from "../../games/index.ts";
 import { agentHosts, coachAgent } from "../../host-files/index.ts";
 import { activeProfile, gameFolder, helpsIn } from "../../profiles/index.ts";
@@ -245,7 +245,7 @@ function startOf(current: CurrentGame, folder: string, context: Context): string
         head,
         speech === undefined ? "The player speaks English." : speechLine(speech),
         ...playerLines(context),
-        ...movesLines(record),
+        ...movesLines(game),
         ...(clock === undefined ? [] : [clockLine(clock, ai)]),
         ...(judged === undefined ? [] : judgedLines(current, judged, player)),
         ...(over === undefined ? nowLines(current, folder, player) : []),
@@ -254,9 +254,10 @@ function startOf(current: CurrentGame, folder: string, context: Context): string
 }
 
 /** The game's moves as the coach reads them, with the position a game set up began in, the last ones of a long game, and its opening by the book (Anatolij). */
-function movesLines(record: GameRecord): string[]
+function movesLines(game: Game): string[]
 {
-    const opening = openingLine(record);
+    const { record } = game;
+    const opening = openingLine(game);
     return [
         ...(record.tags.FEN === undefined ? [] : [`The game began from a set position: ${record.tags.FEN}`]),
         `${record.moves.length > pliesShown ? `Moves (the last ${pliesShown} plies)` : "Moves"}: ${lastMoves(record, pliesShown)}`,

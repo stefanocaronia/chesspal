@@ -83,7 +83,7 @@ export function summaryOf(current: CurrentGame, now: Date, archive?: string): Ga
         summary.lastMove = { move: lastMoves(record, 1), from: lastMove.from, to: lastMove.to };
     }
 
-    const opening = openingLine(record);
+    const opening = openingLine(game);
     const clock = clockSummaryOf(current, now);
     const drawOffer = drawOfferOf(current);
 

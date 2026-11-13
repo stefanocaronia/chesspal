@@ -24,6 +24,8 @@ const longFile = JSON.stringify({ format: 1, ai: "black", started: new Date().to
 const studyFolder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
 const cli = fileURLToPath(new URL("../../dist/cli/cli.js", import.meta.url));
 let seed = 2_000;
+// A Najdorf whose 14 first plies a line of the book reaches, then random moves: the opening's name and the book's plies looked up to the book's depth.
+const najdorf = ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "a6", "Be3", "e5", "Nb3", "Be6"];
 
 // A chat attached to the table of its data folder (D-104), in a folder of its own: the table in this process, as near as another is.
 const chatFolder = mkdtempSync(join(tmpdir(), "chesspal-bench-"));
@@ -37,6 +39,8 @@ try {
         { name: "a move through player_move or ai_move, game.json written", budget: 3.5, run: movesOfANewGame },
         { name: "a move with the chat at the table, which hears the call before it (D-104)", budget: 5, run: movesAtTheTable },
         { name: "status in a game", budget: 0.5, run: () => timed(1, () => call(context, "status")) },
+        { name: "a move in a game still in theory after 14 plies, game.json written", budget: 3.5, run: movesInTheory },
+        { name: "status after another process changed a game of 40 plies still in theory after 14", budget: 20, run: readTheoryAgain },
         { name: "status after another process changed a game of 120 plies", budget: 25, run: readAgain },
         { name: "analyse_game on a game of 120 plies over, its positions new", budget: 250, run: analyseLong },
         { name: "chesspal status from the command line, a new process", budget: 500, run: () => timed(1, () => spawnSync(process.execPath, [cli, "status"], { cwd: folder, env: { ...process.env, CHESSPAL_HOME: folder } })) },
@@ -61,6 +65,29 @@ function movesOfANewGame(): number
     });
 
     return time / moves.length;
+}
+
+/** The time of one move of a new game of 40 plies past the book's 14 plies of a Najdorf, the player's and the AI's in turn, each saved. */
+function movesInTheory(): number
+{
+    const moves = randomGame(seed++, 40, najdorf);
+    call(context, "new_game", { ai_colour: "black", replace: true });
+    let time = 0;
+
+    moves.forEach((move, index) => {
+        const took = timed(1, () => (index % 2 === 0 ? call(context, "player_move", { move }) : call(context, "ai_move", { move, plan: "A plan.", comment: "A comment." })));
+        time += index < najdorf.length ? 0 : took;
+    });
+
+    return time / (moves.length - najdorf.length);
+}
+
+/** The time of a status when game.json of a game still in theory after 14 plies was written by someone else: read, parsed, replayed and looked up. */
+function readTheoryAgain(): number
+{
+    const game = new Game({ tags: {}, moves: randomGame(seed++, 40, najdorf).map((san) => ({ san })) });
+    writeFileSync(join(gameFolder(context.home()), "game.json"), JSON.stringify({ format: 1, ai: "black", started: new Date().toISOString(), pgn: writePgn(game.record) }));
+    return timed(1, () => call(context, "status"));
 }
 
 /**

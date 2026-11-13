@@ -2,6 +2,7 @@
 import { Chess, type Move as ChessMove, type Square, validateFen } from "chess.js";
 import { type Facts, factsOf } from "./facts.ts";
 import { type Illegal, whyIllegal } from "./illegal.ts";
+import { positionKey } from "./openings.ts";
 import { type Chances, type Possibilities, possibilitiesOf, threatsOf } from "./possibilities.ts";
 import { type Profile, profileOf } from "./profile.ts";
 import { type Annotation, cleanComment, type GameRecord, type RecordedMove, recordedMove } from "./record.ts";
@@ -60,6 +61,8 @@ export class Game
     private last: Move | undefined;
     // The key of every position the game has stood in, the first included, and how each side castled: for the profile's repetitions and castling.
     private readonly keys: string[];
+    // The same positions keyed as the openings' book keys them, its FEN without the move counters.
+    private readonly positions: string[];
     private readonly castled: Partial<Record<Side, "O-O" | "O-O-O">> = {};
     private keptPosition: Position | undefined;
     private keptOutcome: Outcome | undefined;
@@ -71,6 +74,7 @@ export class Game
         this.chess = startingBoard(record.tags.FEN);
         // The first key without an en passant square no pawn can use, which the FEN may give: the position then repeats as the rules count it.
         this.keys = [new Chess(this.chess.fen()).hash()];
+        this.positions = [positionKey(this.chess.fen())];
         this.tags = { ...record.tags };
         this.comment = cleanComment(record.comment ?? "") || undefined;
 
@@ -112,6 +116,12 @@ export class Game
     {
         this.keptRecord ??= this.snapshot();
         return this.keptRecord;
+    }
+
+    /** The key of every position the game has stood in, its start first, as the openings' book keys them (D-68): no replay to look the book up. */
+    get positionKeys(): readonly string[]
+    {
+        return this.positions;
     }
 
     /** The last move played, with its squares; none before the first. */
@@ -215,12 +225,10 @@ export class Game
             return move;
         }
 
-        if (exact === undefined) {
-            this.chess.move({ from: move.from, to: move.to, promotion: move.promotion });
-        }
-
+        const after = exact === undefined ? this.chess.move({ from: move.from, to: move.to, promotion: move.promotion }).after : exact.after;
         this.last = move;
         this.keys.push(this.chess.hash());
+        this.positions.push(positionKey(after));
 
         if (move.san.startsWith("O-O")) {
             this.castled[mover] = move.san.startsWith("O-O-O") ? "O-O-O" : "O-O";

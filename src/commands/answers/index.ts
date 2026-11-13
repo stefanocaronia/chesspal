@@ -5,7 +5,7 @@ export { clockLine, clockSummaryOf, gameAt } from "./clock.ts";
 export { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
 export { aheadWords, leadFrom, leadInput } from "./lead-input.ts";
 export { closingLines, headLines, lastMoveText, moveLines, newGameStep, nextStep, positionLines, shownMove, shownMoves, sidesLine, wordLines } from "./lines.ts";
-export { bookOpening, bookPlies, bookReaches, knownMoves, openingLine, openingName } from "./opening-book.ts";
+export { bookOpening, bookPlace, bookPlies, knownMoves, openingLine, openingName } from "./opening-book.ts";
 export { playMove, PositionChanged, positionIn, refuseOtherGame, refuseUnseenPosition, samePosition } from "./play-move.ts";
 export { give, newWords, say, unansweredWords, waitingWords, type Written } from "./say.ts";
 export { type Speech, speechLine, speechOf } from "./speech.ts";

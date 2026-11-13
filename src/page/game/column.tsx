@@ -1,7 +1,7 @@
 // The game's column on the right of the board (D-53): the game's card with who is ahead (D-90), the chart of the game in analysis, its opening (D-16), the
 // helps (D-78), the moves, the saves and the buttons that step through them.
 import type { ComponentChildren } from "preact";
-import { type Opening, outOfBookMove, type Side } from "../../core/index.ts";
+import { type Opening, type Side } from "../../core/index.ts";
 import { LeadBar, LeadChart } from "../lead/lead.tsx";
 import { type Standing, standingAt } from "../lead/view.ts";
 import { Piece } from "../pieces/pieces.tsx";
@@ -17,7 +17,7 @@ import { ResultTile } from "./result-tile.tsx";
  * The column, which the player folds with its tab; under the board, where three columns would leave the board small, always open. A game in analysis
  * (D-69) says above the moves that the AI is going over it, until its word on the whole game comes, which the talk shows.
  */
-export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, helps, legend, standings, analysis, shownPlies, onShow, onStep, onDownload, onSaveMoves, onAnalyse, text }: {
+export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, outOfBook, helps, legend, standings, analysis, shownPlies, onShow, onStep, onDownload, onSaveMoves, onAnalyse, text }: {
     plies: readonly Ply[];
     result?: string;
     how?: HowEnded;
@@ -27,6 +27,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     move: number;
     toMove: Side;
     opening?: Opening;
+    /** The move the game left the opening book at (D-68), by the move shown; none while the book reaches it. */
+    outOfBook?: number;
     /** The helps' card, under the opening, while the helps are on (D-78). */
     helps?: ComponentChildren;
     /** The legend of the marks on the board in the moves' title, when no helps' card holds it (D-99). */
@@ -77,7 +79,7 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                                 </div>
                             )}
                             {analysis === undefined || standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={shownPlies} onShow={onShow} text={text} />}
-                            {opening === undefined ? null : <OpeningCard opening={opening} text={text} />}
+                            {opening === undefined ? null : <OpeningCard opening={opening} {...(outOfBook === undefined ? {} : { outOfBook })} text={text} />}
                             {helps}
                         </div>
                         {/* The moves, then the saves and the analysis, over the buttons that step through them (Stefano). */}
@@ -203,19 +205,20 @@ function GameCard({ plies, result, how, lit, started, move, toMove, bar, text }:
  * The opening by Lichess's book: a book, crossed out once the game left it, and the family, which fold the card to them (Stefano); the variation under them,
  * and the move the game left the book at.
  */
-function OpeningCard({ opening, text }: { opening: Opening; text: Text; })
+function OpeningCard({ opening, outOfBook, text }: { opening: Opening; outOfBook?: number; text: Text; })
 {
     const [foldedHere, toggleFold] = useCardFold("opening");
-    const book = opening.inBook ? text.inBook : `${text.outOfBook} ${outOfBookMove(opening)}`;
+    const inBook = outOfBook === undefined;
+    const book = inBook ? text.inBook : `${text.outOfBook} ${outOfBook}`;
     // The family alone has nothing under it to fold: no button, no chevron (Stefano).
-    const foldable = opening.variation !== undefined || !opening.inBook;
+    const foldable = opening.variation !== undefined || !inBook;
     const folded = foldable && foldedHere;
     const title = (
         <>
-            <span class={`book${opening.inBook ? "" : " out"}`} title={book} role="img" aria-label={book}>
+            <span class={`book${inBook ? "" : " out"}`} title={book} role="img" aria-label={book}>
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 6.5C10 5 7 4.5 4 5V18C7 17.5 10 18 12 19.5C14 18 17 17.5 20 18V5C17 4.5 14 5 12 6.5ZM12 6.5V19.5" />
-                    {opening.inBook ? null : <path d="M3.5 3.5L20.5 20.5" />}
+                    {inBook ? null : <path d="M3.5 3.5L20.5 20.5" />}
                 </svg>
             </span>
             <b>{opening.family}</b>
@@ -228,7 +231,7 @@ function OpeningCard({ opening, text }: { opening: Opening; text: Text; })
                 {foldable ? <FoldButton folded={folded} onFold={toggleFold} text={text}>{title}</FoldButton> : title}
             </h3>
             {folded || opening.variation === undefined ? null : <p class="variation">{opening.variation}</p>}
-            {folded || opening.inBook ? null : <p class="out">{text.outOfBook} {outOfBookMove(opening)}</p>}
+            {folded || inBook ? null : <p class="out">{text.outOfBook} {outOfBook}</p>}
         </section>
     );
 }

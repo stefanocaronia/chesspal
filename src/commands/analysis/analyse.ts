@@ -36,7 +36,8 @@ import {
     anotherAnalyst,
     balanceText,
     bookOpening,
-    bookReaches,
+    bookPlace,
+    bookPlies,
     colourName,
     gameToStudy,
     knownTag,
@@ -173,7 +174,7 @@ export const analyseGame = defineCommand({
         const analysis = analysisOf(studied, activeProfile(context.home()));
 
         if (studied.name !== undefined) {
-            markBook(context, { record: studied.record, name: studied.name }, analysis.moves);
+            markBook(context, { record: studied.record, name: studied.name });
             startAnalysis(gameFolder(context.home()), studied.name, context.now());
         }
 
@@ -301,9 +302,9 @@ async function siteGamePgn(context: Context, name: string): Promise<string>
  * The opening book's moves marked as such in the game kept (D-69): a fact, not a judgment, so Chesspal puts the badge itself on each move from the start to the
  * last one the book knows, where the AI gave none; a game from another position has none.
  */
-function markBook(context: Context, { record, name }: Required<Studied>, moves: readonly MoveFacts[]): void
+function markBook(context: Context, { record, name }: Required<Studied>): void
 {
-    const inBook = bookPliesOfFacts(record, moves);
+    const inBook = bookPlies(record);
     const unmarked = record.moves.slice(0, inBook).some((move) => reviewOf(move.comment)?.badge === undefined);
 
     if (!unmarked) {
@@ -316,13 +317,6 @@ function markBook(context: Context, { record, name }: Required<Studied>, moves: 
     });
 
     rewriteGame(gameFolder(context.home()), name, { ...record, moves: marked });
-}
-
-/** How many plies from the start the opening book knows, as opening-book's bookPlies counts them, read from the facts already found: none from another position. */
-function bookPliesOfFacts(record: GameRecord, moves: readonly MoveFacts[]): number
-{
-    const firstOut = moves.findIndex((move) => move.outOfBook);
-    return record.tags.FEN !== undefined ? 0 : firstOut >= 0 ? firstOut : moves.length;
 }
 
 function analysisOf({ record, name }: Studied, profile: PlayerProfile): Analysis
@@ -348,7 +342,7 @@ function analysisOf({ record, name }: Studied, profile: PlayerProfile): Analysis
         termination: ended?.termination,
         opening: opening === undefined ? undefined : `${opening.eco} ${opening.name}`,
         inBook: opening !== undefined && !moves.some((move) => move.outOfBook) ? true : undefined,
-        bookTo: opening === undefined ? undefined : moves[bookPliesOfFacts(record, moves) - 1]?.move,
+        bookTo: opening === undefined ? undefined : moves[bookPlies(record) - 1]?.move,
         review: [gameReviewOf(record), closingOf(record)].filter((word) => word !== undefined).join(" ") || undefined,
         name,
         start: tags.FEN === undefined ? undefined : { fen: tags.FEN, ...start },
@@ -364,7 +358,8 @@ function movesOf(record: GameRecord, ai: Side | undefined): Replay
     const increment = timeControlOfTag(record.tags.TimeControl ?? "")?.increment;
     // The time each side had left after its last move: the first move of each side spends no time it can tell, as the sites start their clocks apart.
     const left: Partial<Record<Side, number>> = {};
-    let inBook = record.tags.FEN === undefined && bookReaches(game.position.fen);
+    // The first move no line of the book reaches is out of book (D-68); a game from another position has no book.
+    const leftBook = bookPlace(record)?.plies;
     let before = game.facts;
     let balance = materialOf(game.position.fen).balance;
     const start = { atRisk: riskLine(before), oneLegal: oneLegalMove(before), mates: matesOf(before), tactics: tacticsText(before, game.possibilities, true) };
@@ -379,8 +374,6 @@ function movesOf(record: GameRecord, ai: Side | undefined): Replay
             throw new Error(`The game's move ${numbers[ply]}${san} cannot be played: ${played.message} Fix the game's PGN.`);
         }
 
-        const outOfBook = inBook && !bookReaches(game.position.fen);
-        inBook &&= !outOfBook;
         const facts = game.facts;
         const over = game.outcome.over;
         const now = materialOf(game.position.fen).balance;
@@ -397,7 +390,7 @@ function movesOf(record: GameRecord, ai: Side | undefined): Replay
             oneLegal: over ? undefined : oneLegalMove(facts),
             mates: over ? undefined : matesOf(facts),
             tactics: over ? undefined : tacticsText(facts, game.possibilities, true),
-            outOfBook: outOfBook ? true : undefined,
+            outOfBook: ply === leftBook ? true : undefined,
             drawOffer: comment?.includes("(=)") === true ? true : undefined,
             said: side === ai ? saidIn(comment) : undefined,
             review: reviewOf(comment),

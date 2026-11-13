@@ -406,7 +406,7 @@ function sendGame(response: ServerResponse, served: Served): void
         name: archiveName(current),
         talk,
         // How many of its first moves are the book's: the page marks them while the game goes on, as the AI's review does after.
-        book: bookPlies(current.game.record),
+        book: bookPlies(current.game),
         ...(current.clock === undefined ? {} : { clock: current.clock }),
         ...(offer === undefined ? {} : { drawOffer: offer }),
         ...(coach === undefined ? {} : { coach }),
