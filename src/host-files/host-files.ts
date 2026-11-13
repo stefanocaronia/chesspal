@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { makeFolder, writeAtomically } from "../games/index.ts";
-import { agentFiles, instructionsFile } from "./agents.ts";
+import { agentFiles, agentHosts, instructionsFile } from "./agents.ts";
 
 /**
  * Sets up the player's folder for Claude Code and Codex (D-31): .mcp.json with the chesspal server, AGENTS.md with the lines that start a chat between
@@ -39,6 +39,15 @@ export function outdatedHostFiles(folder: string, platform: string): string[]
 export function codexHooksPath(folder: string): string
 {
     return join(folder, ".codex", "hooks.json");
+}
+
+/**
+ * Whether the host runs the doorbell's hook init writes, Claude Code and Codex by the names they give the server, so the player's act on the page wakes
+ * the chat; the command line, which names no host, is taken as one. Elsewhere the player tells the chat in its window.
+ */
+export function hasDoorbell(host: string | undefined): boolean
+{
+    return host === undefined || agentHosts.includes(host);
 }
 
 /** The instructions of the AI opponent, read from the package wherever it is installed: the MCP server's `instructions` tool gives them (D-102). */

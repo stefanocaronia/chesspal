@@ -93,9 +93,9 @@ export function moveLines({ note, game, warning }: MovePlayed): string[]
 }
 
 /** The last lines of a tool's answer: the player's words from the board page, then the next step, which stays the last line. */
-export function closingLines(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false): string[]
+export function closingLines(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false, doorbell = true): string[]
 {
-    return [...wordLines(words), nextStep(game, words, pageClosed)];
+    return [...wordLines(words), nextStep(game, words, pageClosed, doorbell)];
 }
 
 /**
@@ -109,9 +109,9 @@ export function wordLines(words: readonly Written[]): string[]
 
 /**
  * What the AI does next: the one line every host reads, even where the server's instructions are not shown. Words of the player's ask for an answer. With the
- * board page open in no browser, a new game starts there, never in the chat.
+ * board page open in no browser, a new game starts there, never in the chat. In a host with no `doorbell`, the player tells the chat what they did on the page.
  */
-export function nextStep(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false): string
+export function nextStep(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false, doorbell = true): string
 {
     const step = pageClosed ? closedPageGameStep : newGameStep;
 
@@ -145,7 +145,9 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
     }
 
     if (game.turn === game.ai && game.clock?.waiting === true) {
-        return "Next: don't move yet: the player starts the game with Start on the board page, and the doorbell wakes you then. End your turn.";
+        return doorbell
+            ? "Next: don't move yet: the player starts the game with Start on the board page, and the doorbell wakes you then. End your turn."
+            : "Next: don't move yet: the player starts the game with Start on the board page. End your turn, and call status when they tell you they did.";
     }
 
     if (game.turn === game.ai) {
@@ -158,8 +160,15 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
         return "Next: accept the draw with end_game draw_agreed, or answer with ai_say and wait for the player's move.";
     }
 
-    return words.length === 0 ? "Next: wait for the player's move, then call player_move with it." : "Next: answer the player with ai_say, then wait for their move.";
+    if (words.length > 0) {
+        return "Next: answer the player with ai_say, then wait for their move.";
+    }
+
+    return doorbell ? "Next: wait for the player's move, then call player_move with it." : `Next: wait for the player's move: ${toldMove}`;
 }
+
+/** What the AI does with the player's move in a host with no doorbell: one played on the board page they tell it of, one written in the chat it plays. */
+export const toldMove = "when they tell you they moved on the board page, call status; when they write it here, call player_move with it.";
 
 /** How a new game starts: the player chooses it in the board page's window, which new_game without choices opens (D-85). */
 export const newGameStep = "call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.";

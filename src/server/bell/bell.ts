@@ -24,6 +24,8 @@ export class Bell
     private busy = false;
     // The doorbell woke the chat in this turn: the player acted on the page, and the chat goes to see it.
     private woken = false;
+    // A hook has waited for the bell since the chat came: its host runs Chesspal's hooks, and only they tell where a turn ends.
+    private hooked = false;
     private readonly news: () => boolean;
     private readonly changed: () => void;
 
@@ -64,11 +66,20 @@ export class Bell
         return asleep;
     }
 
-    /** The player acted on the page: the hook waiting hears it now, or the next one as soon as it comes. */
-    ring(): void
+    /**
+     * The player acted on the page: the hook waiting hears it now, or the next one as soon as it comes. In a host that runs no hook nothing tells the end of
+     * a turn: an act the chat waits for finds it out of its turn, and nobody hears the player, unless the chat `mayBeAtWork` on the AI's move meanwhile.
+     */
+    ring(mayBeAtWork = false): void
     {
         if (this.listener === undefined) {
             this.pending = true;
+
+            if (!this.hooked && !mayBeAtWork && this.busy) {
+                this.busy = false;
+                this.changed();
+            }
+
             return;
         }
 
@@ -83,6 +94,7 @@ export class Bell
     listen(request: IncomingMessage, response: ServerResponse): void
     {
         response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+        this.hooked = true;
         const missed = this.pending;
         this.pending = false;
 
@@ -111,6 +123,7 @@ export class Bell
     /** The chat left the table (D-104): its process ended, and nobody is in a turn or waits for the bell; a ring no hook heard is no longer news for anyone. */
     chatLeft(): void
     {
+        this.hooked = false;
         this.busy = false;
         this.woken = false;
         this.pending = false;

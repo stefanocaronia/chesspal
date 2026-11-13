@@ -2,6 +2,7 @@
 import { clockAfterMove, clockTag } from "../../core/index.ts";
 import { archiveEnded, type CurrentGame, endOf, loadGame, saveGame, talkLine } from "../../games/index.ts";
 import type { Context, SeenPosition } from "../registry/index.ts";
+import { toldMove } from "./lines.ts";
 import { openingTags } from "./opening-tags.ts";
 import { gameGoingOn, type MovePlayed, summaryOf, withThought } from "./summary.ts";
 import { colourName } from "./view.ts";
@@ -19,23 +20,33 @@ export interface WithMove
     allowance?: number;
     /** A coach judges the player's moves with the helps on (D-88): the AI reads it after the player's move. */
     coached?: boolean;
+    /** The chat's host runs the doorbell: the AI refused a move hears the page will wake it, else that the player tells it. */
+    doorbell?: boolean;
 }
 
 /**
  * Plays a move for one side `now` and saves the game, with the time it took and the clock after it in its comment ([%clk]). A refused move, or words refused
  * with it, change nothing: it throws the message `refused` writes from the core's.
  */
-export function playMove(folder: string, now: Date, mover: Mover, text: string, refused: (message: string, legal: readonly string[]) => string, { comment, said, offerDraw = false, allowance = 0, coached = false }: WithMove = {}): MovePlayed
+export function playMove(
+    folder: string,
+    now: Date,
+    mover: Mover,
+    text: string,
+    refused: (message: string, legal: readonly string[]) => string,
+    { comment, said, offerDraw = false, allowance = 0, coached = false, doorbell = true }: WithMove = {},
+): MovePlayed
 {
     // A flag falls only past the allowance.
-    const before = gameToMove(folder, mover, new Date(now.getTime() - allowance));
+    const before = gameToMove(folder, mover, new Date(now.getTime() - allowance), doorbell);
     const { game } = before;
     const position = game.position;
     // The words are checked before the move, which changes the live game; they count as said after it.
     const line = said === undefined ? undefined : talkLine(before, mover, said.text, said.at, game.record.moves.length + 1);
 
     if (mover === "ai" && before.clock?.waiting === true) {
-        throw new Error("The clocks wait for the player to start the game with Start on the board page: don't move yet, the doorbell wakes you then. Nothing changed.");
+        const then = doorbell ? "the doorbell wakes you then" : "call status when they tell you they did";
+        throw new Error(`The clocks wait for the player to start the game with Start on the board page: don't move yet, ${then}. Nothing changed.`);
     }
 
     if (offerDraw && game.record.moves.length === 0) {
@@ -125,7 +136,7 @@ export function samePosition(one: SeenPosition, other: SeenPosition): boolean
     return one.started === other.started && one.plies === other.plies;
 }
 
-function gameToMove(folder: string, mover: Mover, now: Date): CurrentGame
+function gameToMove(folder: string, mover: Mover, now: Date, doorbell: boolean): CurrentGame
 {
     const current = gameGoingOn(folder, now);
     const { turn } = current.game.position;
@@ -136,7 +147,7 @@ function gameToMove(folder: string, mover: Mover, now: Date): CurrentGame
     }
 
     if (mover === "ai" && !aiToMove) {
-        throw new Error(`It is the player's move (${colourName(turn)}): wait for it, then call player_move. Nothing changed.`);
+        throw new Error(`It is the player's move (${colourName(turn)}): ${doorbell ? "wait for it, then call player_move." : toldMove} Nothing changed.`);
     }
 
     return current;

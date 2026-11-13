@@ -19,13 +19,13 @@ const drawing = z.string().overwrite((text) => text.replace(/[\s-]+/g, ""));
 export const arrowsInput = z.array(
     drawing.regex(/^[GRYB][a-h][1-8][a-h][1-8]$/, "an arrow is a colour's letter and two squares: Gf6e4; a single square goes in squares")
         .refine((arrow) => arrow.slice(1, 3) !== arrow.slice(3, 5), "an arrow goes from a square to another: a single square goes in squares"),
-).max(drawLimit).optional()
+).max(drawLimit).optional().overwrite(noneIfEmpty)
     .describe(
         "arrows on the board, as PGN's %cal writes them: Rf2e1. G green: the better move or the good idea; R red: a threat or the mistake; Y yellow: another way; B blue: a plan.",
     );
 
 /** The squares the AI marks, as their input reads them. */
-export const squaresInput = z.array(drawing.regex(/^[GRYB][a-h][1-8]$/, "a square is a colour's letter and the square: Rf2")).max(drawLimit).optional()
+export const squaresInput = z.array(drawing.regex(/^[GRYB][a-h][1-8]$/, "a square is a colour's letter and the square: Rf2")).max(drawLimit).optional().overwrite(noneIfEmpty)
     .describe("squares to mark, as PGN's %csl writes them: Rf2; colours as for arrows");
 
 /** The arrows and squares drawn, those that read; none of either left out. */
@@ -34,4 +34,10 @@ export function drawingsOf(arrows: readonly string[] = [], squares: readonly str
     const drawnArrows = arrows.map(arrowOf).filter((arrow) => arrow !== undefined);
     const drawnSquares = squares.map(squareOf).filter((square) => square !== undefined);
     return { ...(drawnArrows.length === 0 ? {} : { arrows: drawnArrows }), ...(drawnSquares.length === 0 ? {} : { squares: drawnSquares }) };
+}
+
+// An empty list draws nothing, as one left out: a host may send every parameter of the schema (Priya).
+function noneIfEmpty(list: string[] | undefined): string[] | undefined
+{
+    return list?.length === 0 ? undefined : list;
 }

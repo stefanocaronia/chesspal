@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Game, gameReviewOf, leadOf, reviewOf } from "../../core/index.ts";
 import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "../../games/index.ts";
-import { isCodex, outdatedHostFiles } from "../../host-files/index.ts";
+import { hasDoorbell, isCodex, outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
 import {
@@ -147,7 +147,7 @@ export const status = defineCommand({
 
         return status;
     },
-    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words = [], analysis, fromBefore, coach, outdated, unread }) =>
+    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words = [], analysis, fromBefore, coach, outdated, unread }, context) =>
         [
             `Chesspal ${version}. Folder: ${folder}`,
             ...(unread === true ? [unreadLine] : []),
@@ -156,7 +156,7 @@ export const status = defineCommand({
             ...(player === undefined ? [] : [player]),
             ...(speech === undefined ? [] : [speechLine(speech)]),
             ...(fromBefore === true ? [fromBeforeLine] : []),
-            ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true, pageClosed === true, coach === true)),
+            ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true, pageClosed === true, coach === true, hasDoorbell(context?.host?.()))),
             ...(analysis === undefined ? [] : [analysisLine(analysis)]),
         ].join("\n"),
 });
@@ -252,9 +252,9 @@ function reviewProgress(context: Context, game: string): string | undefined
  * The game's lines; a game the player brought to analyse takes the place of the next step. The coach to start goes just before the next step, where
  * the AI acts on it (Priya).
  */
-function gameLines(game: GameSummary | undefined, words: readonly Written[], brought: boolean, pageClosed: boolean, coach: boolean): string[]
+function gameLines(game: GameSummary | undefined, words: readonly Written[], brought: boolean, pageClosed: boolean, coach: boolean, doorbell: boolean): string[]
 {
-    const closing = [...(coach ? [coachOnEndLine] : []), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed))];
+    const closing = [...(coach ? [coachOnEndLine] : []), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed, doorbell))];
 
     if (game === undefined) {
         return ["No game.", ...closing];

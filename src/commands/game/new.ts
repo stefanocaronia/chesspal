@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../../core/index.ts";
 import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../../games/index.ts";
+import { hasDoorbell } from "../../host-files/index.ts";
 import { gameFolder, gameFolders } from "../../profiles/index.ts";
 import { coachRuns, gameAt, type GameSummary, nextStep, openingTags, positionLines, refuseUnseenPosition, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "../answers/index.ts";
 import { pastGameLines, playerLine } from "../profiles/index.ts";
@@ -68,7 +69,7 @@ export const newGame = defineCommand({
 
         return startNewGame(input, context, "chat");
     },
-    format: (result) => "window" in result ? askedLine(result) : startedLines(result),
+    format: (result, context) => "window" in result ? askedLine(result, hasDoorbell(context?.host?.())) : startedLines(result, hasDoorbell(context?.host?.())),
 });
 
 /**
@@ -135,7 +136,7 @@ export function startNewGame({ ai_colour: colour, from, clock, level: chosen, re
 }
 
 /** The new game's lines for the AI. */
-function startedLines({ game, archived, past, player, speech, closedPage: closed }: NewGame): string
+function startedLines({ game, archived, past, player, speech, closedPage: closed }: NewGame, doorbell: boolean): string
 {
     return [
         `New game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`,
@@ -145,7 +146,7 @@ function startedLines({ game, archived, past, player, speech, closedPage: closed
         ...(past.length === 0 ? [] : ["Last games with this player (past_games gives more, and their moves):", ...past]),
         ...positionLines(game),
         ...(closed === undefined ? [] : [pageLine(closed, true)]),
-        nextStep(game),
+        nextStep(game, [], false, doorbell),
     ].join("\n");
 }
 
@@ -188,12 +189,19 @@ function justBegun(context: Context): boolean
     return current !== undefined && endOf(current.game) === undefined && current.game.record.moves.length === 0;
 }
 
-function askedLine({ window, page }: Asked): string
+function askedLine({ window, page }: Asked, doorbell: boolean): string
 {
-    return window === "opened"
+    // A host with no doorbell hears of the game from the player, in its window.
+    const told = "End your turn, and call status when they tell you the game started.";
+
+    if (window !== "opened") {
+        return `Nobody has the board page open: give the player its address, ${page}, and tell them to start the game there with its New game button. ${doorbell ? "End your turn." : told}`;
+    }
+
+    return doorbell
         ? "The New game window is open on the board page: the player chooses the game there. Don't ask in the chat; end your turn, the doorbell wakes you when "
             + "the game starts."
-        : `Nobody has the board page open: give the player its address, ${page}, and tell them to start the game there with its New game button. End your turn.`;
+        : `The New game window is open on the board page: the player chooses the game there. Don't ask in the chat. ${told}`;
 }
 
 /** The refusal of a new game in a chat that still holds the game before (D-57): the board page says it in the player's language. */
