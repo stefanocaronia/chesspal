@@ -54,7 +54,7 @@ import { tellWatchers } from "./events.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
-import { chatToRelaunch, relaunchChat, tableShown } from "./table.ts";
+import { chatToRelaunch, chatToWaitFor, relaunchChat, tableShown } from "./table.ts";
 import { updateShown } from "./update.ts";
 
 /** Answers the page's requests about the game: true when the request was one. */
@@ -197,13 +197,14 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
 /**
  * A new game from the page, with the sides, the level and the clock the player chose: the sides and the level they leave out are as in the game
  * before, and no clock means a game without one. One going on goes to the archive unfinished, and the doorbell tells the chat, unless the table starts
- * it again.
+ * it again. A chat the table holds that must be clear for it, and is at work, has the game wait with the choices kept until it has ended its answer (D-107).
  */
 async function newGameFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
     const asked = 'Send the new game as JSON: {"ai_colour": "black", "level": "club", "clock": "10+5"}, each one optional; no clock for a game without one.';
     const body = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;
     let relaunching = false;
+    let chosen: NewGameChoices | undefined;
 
     if (body === undefined) {
         send(response, isJson(request) ? 400 : 415, json, JSON.stringify({ error: asked }));
@@ -222,9 +223,16 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
         // The game starts from the page, open: its clocks wait for the player's Start there. A chat the table starts again is clean: no /clear is asked.
         relaunching = chatToRelaunch(served);
         const sight = relaunching ? served.context : asTheChatSees(served.context, served.chat);
+        chosen = input.data;
         rerunIfChanged(() => startNewGame(input.data, { ...sight, pageOpen: () => true }, "page"));
     } catch (error) {
-        send(response, 409, json, JSON.stringify(refusalFrom(error)));
+        if (error instanceof ChatNotClear && chosen !== undefined && chatToWaitFor(served)) {
+            waitForChat(served, chosen);
+            send(response, 200, json, JSON.stringify({ waiting: true }));
+        } else {
+            send(response, 409, json, JSON.stringify(refusalFrom(error)));
+        }
+
         return;
     }
 
@@ -234,6 +242,35 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
     }
 
     send(response, 200, json, JSON.stringify({ started: true }));
+}
+
+/** The player's choices for a new game. */
+type NewGameChoices = Parameters<typeof startNewGame>[0];
+
+/**
+ * The new game waits, with the player's choices, for the chat at the table to end its answer; then it starts and the chat starts again, clean, for it, or
+ * one gone meanwhile hears the doorbell when another comes. A game that cannot start then leaves everything as it was.
+ */
+function waitForChat(served: Served, chosen: NewGameChoices): void
+{
+    const start = (): boolean => {
+        try {
+            rerunIfChanged(() => startNewGame(chosen, { ...served.context, pageOpen: () => true }, "page"));
+        } catch {
+            return false;
+        }
+
+        const relaunching = relaunchChat(served);
+
+        if (!relaunching) {
+            served.bell.ring();
+        }
+
+        return relaunching;
+    };
+
+    served.chatWait = { for: "new-game", start };
+    tellWatchers(served.watchers);
 }
 
 /** The player's draw from the page (D-65): an offer on their turn, which rings the doorbell, or their answer to the AI's, which rings it when accepted. */

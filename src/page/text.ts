@@ -169,10 +169,15 @@ export interface Text
         again(name: string): string;
         readonly restart: string;
         waiting(name: string): string;
+        /** A new game that waits for the chat to end its answer, to start it again clean for the game. */
+        newGameWaiting(name: string): string;
         /** The marks on a start again: the ↻ of the row whose choices changed, and those of the one that waits, to start it at once or let it go. */
         readonly restartChanged: string;
         readonly restartNow: string;
         readonly cancel: string;
+        /** The marks on a new game that waits: to start it at once, or let it go. */
+        readonly newGameNow: string;
+        readonly newGameCancel: string;
         readonly failed: string;
         readonly notRestarted: string;
         readonly typeIt: string;
@@ -721,9 +726,12 @@ const english: Text = {
         again: (name) => `${name} starts again with a clean chat for the new game…`,
         restart: "The chat starts again, clean…",
         waiting: (name) => `${name} starts again once it has ended its answer…`,
+        newGameWaiting: (name) => `The new game starts once ${name} has ended its answer…`,
         restartChanged: "Starts again, clean, with the new choices",
         restartNow: "Start again now: it cuts the answer it is giving",
         cancel: "Do not start again",
+        newGameNow: "Start the new game now: it cuts the answer it is giving",
+        newGameCancel: "Do not start the new game",
         failed: "The terminal did not open: type the command below in a terminal.",
         notRestarted: "The chat did not start again: close its window, then open another from here.",
         typeIt: "Or type in a terminal:",
@@ -1160,9 +1168,12 @@ const italian: Text = {
         again: (name) => `${name} riparte con una chat pulita per la nuova partita…`,
         restart: "La chat riparte pulita…",
         waiting: (name) => `${name} riparte appena ha finito di rispondere…`,
+        newGameWaiting: (name) => `La nuova partita comincia appena ${name} ha finito di rispondere…`,
         restartChanged: "Riparte pulita con le nuove scelte",
         restartNow: "Riparti adesso: interrompe la risposta in corso",
         cancel: "Non ripartire",
+        newGameNow: "Comincia adesso la nuova partita: interrompe la risposta in corso",
+        newGameCancel: "Non cominciare la nuova partita",
         failed: "Il terminale non si è aperto: scrivi il comando qui sotto in un terminale.",
         notRestarted: "La chat non è ripartita: chiudi la sua finestra, poi aprine un'altra da qui.",
         typeIt: "Oppure scrivi in un terminale:",
