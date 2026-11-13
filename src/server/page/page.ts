@@ -8,7 +8,7 @@ import { aiNameOf } from "../../core/index.ts";
 import { forgetAnalyst, gameStamp, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { Bell, bellProbe, pagePorts, type TableChat } from "../bell/index.ts";
+import { Bell, bellProbe, forgetPagePort, notePagePort, pagePorts, type TableChat } from "../bell/index.ts";
 import { analysesOf, answerAnalyses, sendSiteGames } from "./analyses.ts";
 import { answerChat } from "./attach.ts";
 import { type Attached, attachedSeen, type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";
@@ -33,6 +33,8 @@ export interface Page
     chatCalls(): void | Promise<void>;
     /** A tool of the chat's has ended: the table gets a copy of what the chat saw; the chat's own page reads it from the chat. */
     toolEnded(): void;
+    /** Whether the doorbell finds the page: on its folder's usual ports, at the port it noted in the data folder, or at the table. */
+    readonly findable: boolean;
     /** Whether a browser has the page open now: one listens to the game's changes. */
     open(): boolean;
     /** Whether the page is in use: open in a browser, or, on the table, with a chat attached. */
@@ -69,8 +71,8 @@ export interface TableUpdate
 }
 
 /**
- * Serves the page of the context's folder on 127.0.0.1, on a port of its own when free, else on any free one, where the doorbell cannot find it; the
- * table's on its own ports alone, which keep two tables apart. The page reads the chat from the context in the chat's process, and on the table from
+ * Serves the page of the context's folder on 127.0.0.1, on a port of its own when free, else on any free one, which it notes in the data folder for the
+ * doorbell to find it there; the table's on its own ports alone, which keep two tables apart. The page reads the chat from the context in the chat's process, and on the table from
  * what the chat attached to it tells it (D-104); it names the opponent as the chat's host does. The doorbell knows what the chat has read.
  */
 export async function startPage(context: Context, options: PageOptions = {}): Promise<Page>
@@ -102,16 +104,33 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
         if (await listened(server, port)) {
             server.unref();
             served.port = portOf(server);
+            // Noted before the game is watched: the notes' folder, made in the data folder, is no news for the pages.
+            const offPorts = table === undefined && !pagePorts(folder).includes(served.port);
+            const noted = offPorts ? notePort(served) : undefined;
             const stopWatchingGame = watchGame(served);
             const stopAskingNpm = watchForUpdates(served);
+
+            // A chat's process ends without closing its page: the note goes with it.
+            const forgetPort = (): void => {
+                if (noted !== undefined) {
+                    forgetPagePort(noted, folder, served.port);
+                }
+            };
+
+            if (noted !== undefined) {
+                process.once("exit", forgetPort);
+            }
 
             const stopWatching = (): void => {
                 stopWatchingGame();
                 stopAskingNpm();
+                forgetPort();
+                process.off("exit", forgetPort);
             };
 
             return {
                 url: `http://127.0.0.1:${served.port}/`,
+                findable: !offPorts || noted !== undefined,
                 heard: () => tellWatchers(watchers),
                 chatCalls: () => chatCalls(served),
                 toolEnded: () => undefined,
@@ -373,6 +392,18 @@ function fromHere(request: IncomingMessage, port: number, api: boolean): boolean
     const site = request.headers["sec-fetch-site"];
     return hosts.includes(request.headers.host ?? "") && (origin === undefined || hosts.some((host) => origin === `http://${host}`))
         && (!api || site === undefined || site === "same-origin" || site === "none");
+}
+
+/** Notes the port of a page off its folder's usual ports in the data folder: the data folder it noted it in, or none when it could not. */
+function notePort(served: Served): string | undefined
+{
+    try {
+        const home = served.context.home();
+        void notePagePort(home, served.folder, served.port);
+        return home;
+    } catch {
+        return undefined;
+    }
 }
 
 function listened(server: Server, port: number): Promise<boolean>

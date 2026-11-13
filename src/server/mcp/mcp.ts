@@ -10,7 +10,6 @@ import { endOf, loadGame, noteAiHost, noteAiModel, rerunIfChanged } from "../../
 import { agentTools, hasAgent, startInstructions } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
-import { pagePorts } from "../bell/index.ts";
 import { chatHasRead, type Page, startPage } from "../page/index.ts";
 import { attachTable, tableToJoin } from "../table/index.ts";
 import { allowedCaller, callerOf, type CallingAgent, callingAgent, fromCodexAgent } from "./caller.ts";
@@ -130,8 +129,8 @@ async function pageOf(context: Context, opponent: () => string | undefined, agai
         context.pageOpen = page.open;
         context.askNewGame = page.askNewGame;
 
-        if (table === undefined && !pagePorts(context.folder).includes(Number(new URL(page.url).port))) {
-            process.stderr.write(`The board page is at ${page.url}, off its usual ports: the doorbell cannot find it, so moves on the page do not wake the chat.\n`);
+        if (!page.findable) {
+            process.stderr.write(`The board page is at ${page.url}, off its usual ports, and its port could not be noted in the data folder: the doorbell cannot find it, so moves on the page do not wake the chat.\n`);
         }
 
         return page;

@@ -1,7 +1,7 @@
 // The doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes for Claude Code and Codex, waits at the page of its chat and, when
 // the player moves or writes there, tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { type ClientRequest, get, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
 import { writeAtomically } from "../../games/index.ts";
@@ -166,7 +166,50 @@ export async function pageAt(port: number): Promise<BellProbe | undefined>
 export function pagePorts(folder: string): number[]
 {
     const offset = createHash("sha256").update(resolve(folder).toLowerCase()).digest()[0]! % 10;
-    return [5870, 6870, 7870].map((base) => base + offset);
+    return [5870, 6870, 7870].map((base) => base + portShift() + offset);
+}
+
+/**
+ * Notes in the data folder the port a chat's page took off its folder's usual ports, one file per page, for the hook to find it there; then forgets, off
+ * the caller's clock, the notes of its folder whose page no longer answers there. It throws when the note cannot be written.
+ */
+export function notePagePort(home: string, folder: string, port: number): Promise<void>
+{
+    mkdirSync(join(home, notesFolder), { recursive: true });
+    writeAtomically(noteOf(home, port), JSON.stringify({ folder: resolve(folder) }));
+    return forgetGonePages(home, folder, port);
+}
+
+/** Forgets the note of a page that closes, unless another folder's page took its port since; a note that cannot go is left for the next page to clear. */
+export function forgetPagePort(home: string, folder: string, port: number): void
+{
+    const noted = notedFolder(home, port);
+
+    if (noted !== undefined && samePath(noted, folder)) {
+        try {
+            rmSync(noteOf(home, port), { force: true });
+        } catch {
+            // The next page of the folder clears it.
+        }
+    }
+}
+
+/** The ports noted for a folder's page in the data folder: none when it has no notes or cannot be read. A note may be stale: the probe tells. */
+export function notedPagePorts(home: string, folder: string): number[]
+{
+    let names: string[];
+
+    try {
+        names = readdirSync(join(home, notesFolder));
+    } catch {
+        return [];
+    }
+
+    return names.flatMap((name) => {
+        const port = Number(/^(\d+)\.json$/.exec(name)?.[1]);
+        const noted = Number.isInteger(port) ? notedFolder(home, port) : undefined;
+        return noted !== undefined && samePath(noted, folder) ? [port] : [];
+    });
 }
 
 /** What Codex's Stop hook answers to wake the chat: its turn goes on with the doorbell's line. */
@@ -221,8 +264,10 @@ export async function bellHeard(input: string, ports?: number[]): Promise<BellHe
 {
     const hook = hookInput(input);
     const folder = chatFolder(hook);
-    const tried = ports ?? pagePorts(folder);
-    const [probes, table] = await Promise.all([Promise.all(tried.map(async (port) => ({ port, said: await pageAt(port) }))), ports === undefined ? tableOf(folder, hook.session) : undefined]);
+    // The data folder holds the table's ports and those a page of the folder noted, off its usual ones.
+    const home = ports === undefined ? homeOf(folder) : undefined;
+    const tried = ports ?? [...new Set([...pagePorts(folder), ...(home === undefined ? [] : notedPagePorts(home, folder))])];
+    const [probes, table] = await Promise.all([Promise.all(tried.map(async (port) => ({ port, said: await pageAt(port) }))), home === undefined ? undefined : tableOf(home, folder, hook.session)]);
     const pages = probes.flatMap(({ port, said }) => (said !== undefined && samePath(said.folder, folder) ? [{ port, said }] : []));
     // A chat opened in the table's own folder finds the table among the pages of its folder already.
     const ours = table === undefined || pages.some(({ port }) => port === table.port) ? pages : [...pages, table];
@@ -244,21 +289,66 @@ export async function bellHeard(input: string, ports?: number[]): Promise<BellHe
 const probeWait = 1000;
 
 /**
- * The table, when the chat attached to it is the hook's: of its folder, or of its session; none when the data folder cannot be found, or no table has
- * this chat. Finding the data folder costs some tens of milliseconds on Windows, off the AI's clock: the hook waits after the turn.
+ * CHESSPAL_PORT_SHIFT, for the tests: a multiple of ten under a thousand moves every range of ports by it, so that runs side by side never share one.
+ * Any other value moves nothing.
  */
-async function tableOf(folder: string, session: string | undefined): Promise<{ port: number; said: BellProbe; } | undefined>
+function portShift(): number
 {
-    let ports: number[];
+    const shift = Number(process.env.CHESSPAL_PORT_SHIFT ?? 0);
+    return Number.isInteger(shift) && shift >= 0 && shift < 1000 && shift % 10 === 0 ? shift : 0;
+}
 
+/**
+ * The data folder of the chat's server, as the hook finds it; none when it cannot be found. Finding it costs some tens of milliseconds on Windows, off the
+ * AI's clock: the hook waits after the turn.
+ */
+function homeOf(folder: string): string | undefined
+{
     try {
-        ports = pagePorts(tableFolder(serverHome(folder) ?? dataFolder()));
+        return serverHome(folder) ?? dataFolder();
     } catch {
         return undefined;
     }
+}
 
-    const probes = await Promise.all(ports.map(async (port) => ({ port, said: await pageAt(port) })));
+/** The table of the data folder, when the chat attached to it is the hook's: of its folder, or of its session; none when no table has this chat. */
+async function tableOf(home: string, folder: string, session: string | undefined): Promise<{ port: number; said: BellProbe; } | undefined>
+{
+    const probes = await Promise.all(pagePorts(tableFolder(home)).map(async (port) => ({ port, said: await pageAt(port) })));
     return probes.find((one): one is { port: number; said: BellProbe; } => one.said?.table === true && ((one.said.chat !== undefined && samePath(one.said.chat, folder)) || (session !== undefined && one.said.session === session)));
+}
+
+// Where the pages off their folder's usual ports note them, in the data folder: `<port>.json`, with the page's folder.
+const notesFolder = "pages";
+
+function noteOf(home: string, port: number): string
+{
+    return join(home, notesFolder, `${port}.json`);
+}
+
+/** The folder whose page noted a port; none when no note reads well. */
+function notedFolder(home: string, port: number): string | undefined
+{
+    try {
+        const { folder } = JSON.parse(readFileSync(noteOf(home, port), "utf8")) as { folder?: unknown; };
+        return typeof folder === "string" ? folder : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** Forgets the notes of a folder's pages that no longer answer at their port, but the one at `kept`: a page closed without forgetting its own. */
+async function forgetGonePages(home: string, folder: string, kept: number): Promise<void>
+{
+    const others = notedPagePorts(home, folder).filter((port) => port !== kept);
+
+    await Promise.all(others.map(async (port) => {
+        const said = await pageAt(port);
+
+        if (said === undefined || !samePath(said.folder, folder)) {
+            forgetPagePort(home, folder, port);
+        }
+    }));
 }
 
 /**

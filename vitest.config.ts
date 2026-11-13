@@ -8,8 +8,9 @@ import { defineConfig } from "vitest/config";
 const source = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
 
 // Only the tests in test/: project/ is another repo, and Claude Code's worktrees hold other copies of this one. No test reaches the player's own data
-// folder (D-71): one that forgets its own, and the processes they start, get a temporary one, new at every run.
+// folder (D-71): one that forgets its own, and the processes they start, get a temporary one, new at every run. Each worker serves its pages on ports of
+// its own (test/setup.ts).
 export default defineConfig({
     resolve: { alias: [{ find: /^chesspal$/, replacement: source("./src/index.ts") }] },
-    test: { include: ["test/**/*.test.ts"], env: { CHESSPAL_HOME: mkdtempSync(join(tmpdir(), "chesspal-tests-")) } },
+    test: { include: ["test/**/*.test.ts"], setupFiles: ["test/setup.ts"], env: { CHESSPAL_HOME: mkdtempSync(join(tmpdir(), "chesspal-tests-")) } },
 });

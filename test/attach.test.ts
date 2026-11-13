@@ -1,6 +1,6 @@
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { createServer, get, type Server } from "node:http";
 import type { Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -13,7 +13,7 @@ import { aiNameOf } from "../src/core/index.ts";
 import { gameInAnalysis, loadGame, noteAiModel, saveTableTalk, startAnalysis, type TableTalk, talkLine } from "../src/games/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
-import { bellHeard, pageAt, pagePorts } from "../src/server/bell/bell.ts";
+import { bellHeard, notedPagePorts, pageAt, pagePorts } from "../src/server/bell/bell.ts";
 import { type Page, startPage } from "../src/server/page/page.ts";
 import type { TableChats } from "../src/server/page/table.ts";
 import { attachTable, startTable, type Table } from "../src/server/table/index.ts";
@@ -327,6 +327,27 @@ describe("a chat at the table", () => {
     }, 30_000);
 });
 
+describe("a chat's own page off its usual ports", () => {
+    it("notes its port in the data folder, and forgets it as the host goes", async () => {
+        const home = temporary();
+        const folder = temporary();
+        const taken = await Promise.all(pagePorts(folder).map(holdPort));
+        const server = mcpServer(folder, home);
+
+        try {
+            const port = Number(/http:\/\/127\.0\.0\.1:(\d+)\//.exec(await server.call("status"))?.[1]);
+
+            expect(pagePorts(folder)).not.toContain(port);
+            expect(notedPagePorts(home, realpathSync(folder))).toEqual([port]);
+            await server.close();
+            expect(existsSync(join(home, "pages", `${port}.json`))).toBe(false);
+        } finally {
+            await server.close();
+            taken.forEach((one) => one.close());
+        }
+    }, 20_000);
+});
+
 describe("a new game at the table", () => {
     it("starts again the chat chesspal play holds once it waits for the bell, having seen a game; one in a turn hears the bell instead", async () => {
         const { chats, relaunched } = playChats();
@@ -614,6 +635,16 @@ function mcpServer(folder: string, home: string): { call: (name: string) => Prom
             await exited;
         },
     };
+}
+
+/** A server that is no page on a port, unless another holds it already. */
+function holdPort(port: number): Promise<Server>
+{
+    return new Promise((done) => {
+        const server = createServer((request, response) => response.writeHead(404).end());
+        server.once("error", () => done(server));
+        server.listen(port, "127.0.0.1", () => done(server));
+    });
 }
 
 function homeContext(home: string): Context

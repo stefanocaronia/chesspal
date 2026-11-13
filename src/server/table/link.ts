@@ -66,6 +66,7 @@ function tablePage(link: TableLink, url: string): Page
         heard: () => link.copy(true),
         chatCalls: () => link.calls(),
         toolEnded: () => link.copy(false),
+        findable: true,
         open: () => link.open,
         inUse: () => true,
         askNewGame: () => link.askNewGame(),

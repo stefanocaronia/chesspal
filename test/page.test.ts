@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createServer, request } from "node:http";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, request, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +11,7 @@ import { type Context, withProfile } from "../src/commands/registry/context.ts";
 import { archivedGames, gameInAnalysis, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
-import { Bell, bellHeard, bellLine, codexBellAnswer, noteSilence, pageAt, waitForBell } from "../src/server/bell/bell.ts";
+import { Bell, bellHeard, bellLine, codexBellAnswer, notedPagePorts, noteSilence, pageAt, pagePorts, waitForBell } from "../src/server/bell/bell.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { profilesShown } from "../src/server/page/profiles.ts";
 import { version } from "../src/version.ts";
@@ -1127,6 +1127,103 @@ describe("the doorbell of the chat", () => {
         browser.close();
     });
 
+    it("finds the chat's page at the port it noted in the data folder when its usual ones are taken, and forgets the note as the page closes", async () => {
+        const folder = playerFolder();
+        vi.stubEnv("CHESSPAL_HOME", folder);
+        const taken = await takeUsualPorts(folder);
+
+        try {
+            const page = await open(folder);
+            const port = Number(new URL(page.url).port);
+
+            expect(pagePorts(folder)).not.toContain(port);
+            expect(page.findable).toBe(true);
+            expect(notedPagePorts(folder, folder)).toEqual([port]);
+
+            await run(folder, "new_game", { ai_colour: "black" });
+            const waiting = bellHeard(JSON.stringify({ cwd: folder }));
+            await untilListening(page);
+            await post(page, "/api/move", { move: "e4" });
+
+            expect(await waiting).toEqual({ folder: resolve(folder), rang: true });
+
+            await page.close();
+            expect(existsSync(join(folder, "pages", `${port}.json`))).toBe(false);
+        } finally {
+            await taken.close();
+        }
+    });
+
+    it("ignores a note of a page gone, and the next page of its folder clears it, as one whose port another folder's page took", async () => {
+        const folder = playerFolder();
+        vi.stubEnv("CHESSPAL_HOME", folder);
+        const another = Number(new URL((await open(playerFolder())).url).port);
+        mkdirSync(join(folder, "pages"));
+        writeFileSync(join(folder, "pages", `${await portGone()}.json`), JSON.stringify({ folder }));
+        writeFileSync(join(folder, "pages", `${another}.json`), JSON.stringify({ folder }));
+        const taken = await takeUsualPorts(folder);
+
+        try {
+            const page = await open(folder);
+            const port = Number(new URL(page.url).port);
+
+            for (let tries = 0; notedPagePorts(folder, folder).length > 1; tries++) {
+                expect(tries).toBeLessThan(300);
+                await new Promise((done) => setTimeout(done, 10));
+            }
+
+            expect(notedPagePorts(folder, folder)).toEqual([port]);
+
+            // A page that ended without forgetting its note, as a chat closed at once.
+            writeFileSync(join(folder, "pages", `${await portGone()}.json`), JSON.stringify({ folder }));
+            await run(folder, "new_game", { ai_colour: "black" });
+            const waiting = bellHeard(JSON.stringify({ cwd: folder }));
+            await untilListening(page);
+            await post(page, "/api/move", { move: "e4" });
+
+            expect(await waiting).toEqual({ folder: resolve(folder), rang: true });
+        } finally {
+            await taken.close();
+        }
+    });
+
+    it("says the doorbell cannot find a page off its usual ports whose port it could not note", async () => {
+        const folder = playerFolder();
+        const taken = await takeUsualPorts(folder);
+
+        try {
+            const page = await open(folder, undefined, {
+                ...testContext(folder),
+                home: () => {
+                    throw new Error("No data folder.");
+                },
+            });
+
+            expect(page.findable).toBe(false);
+            expect(existsSync(join(folder, "pages"))).toBe(false);
+        } finally {
+            await taken.close();
+        }
+    });
+
+    it("moves a folder's ports by CHESSPAL_PORT_SHIFT, a multiple of ten under a thousand, which keeps runs side by side apart, and by nothing else", () => {
+        const folder = playerFolder();
+        vi.stubEnv("CHESSPAL_PORT_SHIFT", "0");
+        const usual = pagePorts(folder);
+        const offset = usual[0]! - 5870;
+
+        expect(usual).toEqual([5870 + offset, 6870 + offset, 7870 + offset]);
+        expect(offset).toBeLessThan(10);
+
+        vi.stubEnv("CHESSPAL_PORT_SHIFT", "990");
+        expect(pagePorts(folder)).toEqual(usual.map((port) => port + 990));
+
+        for (const shift of ["1000", "15", "-10", "ten"]) {
+            vi.stubEnv("CHESSPAL_PORT_SHIFT", shift);
+            expect(pagePorts(folder)).toEqual(usual);
+        }
+    });
+
     it("logs the hooks that heard no bell in the chat's folder, keeping the last hundred", () => {
         const folder = playerFolder();
 
@@ -1146,6 +1243,40 @@ async function open(folder: string, opponent?: () => string | undefined, context
     const page = await startPage(context, opponent === undefined ? {} : { opponent });
     opened.push(page);
     return page;
+}
+
+/** Holds a folder's usual ports with servers that are no page, as other programs may: its page then starts elsewhere. Those already taken stay so. */
+async function takeUsualPorts(folder: string): Promise<{ close: () => Promise<void>; }>
+{
+    const servers: Server[] = await Promise.all(
+        pagePorts(folder).map((port) =>
+            new Promise<Server>((done) => {
+                const server = createServer((request, response) => response.writeHead(404).end());
+                server.once("error", () => done(server));
+                server.listen(port, "127.0.0.1", () => done(server));
+            })
+        ),
+    );
+    return { close: () => Promise.all(servers.map((server) => new Promise<void>((done) => server.close(() => done())))).then(() => undefined) };
+}
+
+/** A port no page answers at any more. */
+async function portGone(): Promise<number>
+{
+    const server = createServer();
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    const { port } = server.address() as { port: number; };
+    await new Promise<void>((done) => server.close(() => done()));
+    return port;
+}
+
+/** Waits until the page knows a hook listens at its doorbell. */
+async function untilListening(page: Page): Promise<void>
+{
+    for (let tries = 0; JSON.parse((await get(page, "/api/game")).body).listening !== true; tries++) {
+        expect(tries).toBeLessThan(300);
+        await new Promise((done) => setTimeout(done, 10));
+    }
 }
 
 function playerFolder(): string
