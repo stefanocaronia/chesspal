@@ -18,7 +18,13 @@ export function writePgn(record: GameRecord): string
 /** The games of a PGN text, with their tags, moves, NAGs (! and ? too) and comments; variations are skipped. Every move is checked: an error names its line. */
 export function readPgn(text: string): GameRecord[]
 {
-    return new PgnReader(text).read();
+    return new PgnReader(text, true).read();
+}
+
+/** The games of a PGN text as readPgn gives them, but with their moves as written, neither checked nor played: for what the tags and comments say, quickly. */
+export function readPgnUnplayed(text: string): GameRecord[]
+{
+    return new PgnReader(text, false).read();
 }
 
 /** The tags of a PGN text's first game, read without its moves: none checked, none played. */
@@ -73,18 +79,22 @@ interface DraftMove
 class PgnReader
 {
     private readonly text: string;
+    // Whether the moves are played, so checked and written as Chesspal writes them, or taken as written.
+    private readonly plays: boolean;
     private readonly records: GameRecord[] = [];
     private tags: [string, string][] = [];
     private comments: string[] = [];
     private moves: DraftMove[] = [];
     private game: Game | undefined;
+    private begun = false;
     private result: string | undefined;
     private depth = 0;
     private at = 0;
 
-    constructor(text: string)
+    constructor(text: string, plays: boolean)
     {
         this.text = text;
+        this.plays = plays;
     }
 
     read(): GameRecord[]
@@ -146,7 +156,7 @@ class PgnReader
     private tag(name: string, value: string): void
     {
         // A tag after the moves starts the next game, when the last one had no result.
-        if (this.game !== undefined) {
+        if (this.begun) {
             this.finish();
         }
 
@@ -163,7 +173,9 @@ class PgnReader
         const [, san = "", glyph = ""] = /^(.*?)([!?]*)$/.exec(token) ?? [];
         const game = this.started();
 
-        if (san !== "") {
+        if (san !== "" && game === undefined) {
+            this.moves.push({ san, nags: [], comments: [] });
+        } else if (san !== "" && game !== undefined) {
             const played = game.playRecorded(san);
 
             if (!played.played) {
@@ -195,10 +207,12 @@ class PgnReader
         this.moves.at(-1)?.nags.push(nag);
     }
 
-    /** The game the moves are played on, made from the tags at the first move. */
-    private started(): Game
+    /** The game the moves are played on, made from the tags at the first move; none when they are taken as written. */
+    private started(): Game | undefined
     {
-        if (this.game === undefined) {
+        this.begun = true;
+
+        if (this.game === undefined && this.plays) {
             try {
                 this.game = new Game({ tags: Object.fromEntries(this.tags), moves: [] });
             } catch (error) {
@@ -228,6 +242,7 @@ class PgnReader
         this.comments = [];
         this.moves = [];
         this.game = undefined;
+        this.begun = false;
         this.result = undefined;
     }
 

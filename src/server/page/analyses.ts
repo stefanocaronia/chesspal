@@ -3,7 +3,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { bookOpening, deleteGame, deleteReview, siteGames, SiteGamesRefused } from "../../commands/index.ts";
 import { type AiModel, aiModelIn, annotatorOf, type GameRecord, isReviewed, leadOf, reviewOf } from "../../core/index.ts";
-import { archivedGame, archivedGames, gameInAnalysis, gameStemOf, keptGame, keptGames } from "../../games/index.ts";
+import { archivedGame, archivedGames, archivedGameUnplayed, gameInAnalysis, gameStemOf, keptGame, keptGames } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { bodyOf, isJson, jsonOf, runRoute, sendJson, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
@@ -36,7 +36,7 @@ export function analysesOf(home: string): AnalysisItem[]
     const stamp = (name: string): string => gameStemOf(name) ?? "";
     const names = [...keptGames(folder), ...archivedGames(folder)].sort((one, other) => stamp(other).localeCompare(stamp(one)));
     const taken = gameInAnalysis(folder)?.analyst?.game;
-    return names.flatMap((name) => itemOf(name, () => name.startsWith("study/") ? keptGame(folder, name) : archivedGame(folder, name), taken === name));
+    return names.flatMap((name) => itemOf(name, () => name.startsWith("study/") ? withBookOpening(keptGame(folder, name)) : archivedListed(folder, name), taken === name));
 }
 
 /** Answers the page's deletions, of a game or of its review alone, done as the command line does them: true when the request was one. */
@@ -86,12 +86,35 @@ export function sendSiteGames(response: ServerResponse, served: Served): void
 
 const deletions: Readonly<Record<string, typeof deleteGame | typeof deleteReview>> = { "/api/delete-game": deleteGame, "/api/delete-review": deleteReview };
 
-function itemOf(name: string, read: () => GameRecord, taken: boolean): AnalysisItem[]
+// A game as the list reads it: its record, and the name of the opening it reached.
+interface Listed
+{
+    readonly record: GameRecord;
+    readonly opening: string | undefined;
+}
+
+/**
+ * A game of the archive for the list: its moves taken as written, not played, when the archive wrote its PlyCount, with its opening's tags, none for a game
+ * that has none; a game an older Chesspal archived is read whole, its opening looked up.
+ */
+function archivedListed(folder: string, name: string): Listed
+{
+    const unplayed = archivedGameUnplayed(folder, name);
+    return /^\d+$/.test(unplayed.tags.PlyCount ?? "") ? { record: unplayed, opening: unplayed.tags.Opening } : withBookOpening(archivedGame(folder, name));
+}
+
+function withBookOpening(record: GameRecord): Listed
+{
+    return { record, opening: bookOpening(record)?.name };
+}
+
+function itemOf(name: string, read: () => Listed, taken: boolean): AnalysisItem[]
 {
     let record: GameRecord;
+    let opening: string | undefined;
 
     try {
-        record = read();
+        ({ record, opening } = read());
     } catch {
         // A game that cannot be read stays out of the list.
         return [];
@@ -104,7 +127,6 @@ function itemOf(name: string, read: () => GameRecord, taken: boolean): AnalysisI
 
     const { tags } = record;
     const date = tags.Date === undefined || tags.Date.includes("?") ? undefined : tags.Date;
-    const opening = bookOpening(record)?.name;
     const aiModel = aiModelIn(record);
     const site = tags.Site === undefined || /^[?\-\s]*$/.test(tags.Site) ? undefined : tags.Site;
     const signed = annotatorOf(record);
