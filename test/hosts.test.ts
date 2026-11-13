@@ -32,9 +32,10 @@ afterEach(async () => {
 });
 
 describe("a chat the table opens", () => {
-    it("starts Claude Code with the start message first, then the model and effort it offers; others are left out", () => {
+    it("starts Claude Code with the start message first, then the model and effort it offers; its middle ones for others, or none chosen", () => {
         expect(hostArgs("claude", "Giochiamo!", { model: "opus", effort: "high" })).toEqual(["Giochiamo!", "--model", "opus", "--effort", "high"]);
-        expect(hostArgs("claude", "Let's play!", { model: "gpt-6-luna", effort: "ultra" })).toEqual(["Let's play!"]);
+        expect(hostArgs("claude", "Let's play!", { model: "gpt-6-luna", effort: "ultra" })).toEqual(["Let's play!", "--model", "sonnet", "--effort", "medium"]);
+        expect(hostArgs("claude", "Let's play!")).toEqual(["Let's play!", "--model", "sonnet", "--effort", "medium"]);
         expect(startMessage("it-IT")).toBe("Giochiamo!");
         expect(startMessage(undefined)).toBe("Let's play!");
         expect(startMessage("it-IT", true)).toBe("Analizziamo la partita!");
@@ -43,7 +44,7 @@ describe("a chat the table opens", () => {
 
     it("starts Codex with no update screen, its model and the effort in its config, the message last", () => {
         expect(hostArgs("codex", "Let's play!", { model: "gpt-6-luna", effort: "low" })).toEqual(["-c", "check_for_update_on_startup=false", "-m", "gpt-6-luna", "-c", "model_reasoning_effort=low", "Let's play!"]);
-        expect(hostArgs("codex", "Let's play!")).toEqual(["-c", "check_for_update_on_startup=false", "Let's play!"]);
+        expect(hostArgs("codex", "Let's play!")).toEqual(["-c", "check_for_update_on_startup=false", "-m", "gpt-6.1-terra", "-c", "model_reasoning_effort=medium", "Let's play!"]);
     });
 
     it("plays with the model and effort the profile in use chose on the page, in the table's folder, set up as init does", () => {
