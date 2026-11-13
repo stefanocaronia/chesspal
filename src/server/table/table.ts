@@ -3,8 +3,8 @@
 import { request } from "node:http";
 import type { Context } from "../../commands/index.ts";
 import { samePath, tableFolder } from "../../home/index.ts";
-import { pageAt, pagePorts } from "../bell/index.ts";
 import { type Page, startPage, type TableChats } from "../page/index.ts";
+import { pageAt, pagePorts } from "../ports/index.ts";
 import { setUpTable } from "./hosts/index.ts";
 import type { TableUpdater } from "./update.ts";
 

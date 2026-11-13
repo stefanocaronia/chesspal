@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { realPath, samePath } from "../src/home/index.ts";
-import { pagePorts } from "../src/server/bell/bell.ts";
+import { pagePorts } from "../src/server/ports/ports.ts";
 
 const root = mkdtempSync(join(tmpdir(), "chesspal-same-path-"));
 const folder = join(root, "player");

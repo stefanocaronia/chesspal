@@ -1,6 +1,6 @@
 // The commands' bench (D-34): a move as the MCP server plays it, game.json written, and the command line in a new process, against their budgets.
 // Run it with: npm run bench, which builds dist/ first. It exits with 1 when a median is over its budget.
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -65,8 +65,10 @@ try {
         // The page's list of games: each read whole, its moves not played, for its review.
         ...[...archives].map(([size, archive]) => ({ name: `the page's list of games, ${size.toLocaleString("en")} games`, budget: size * 0.17, run: () => timed(1, () => analysesOf(archive.home())) })),
         { name: "chesspal status from the command line, a new process", budget: 500, run: () => timed(1, () => spawnSync(process.execPath, [cli, "status"], { cwd: folder, env: { ...process.env, CHESSPAL_HOME: folder } })) },
-        // Claude Code runs the prompt hook on every message: one that is no move leaves as soon as Node has started.
-        { name: "chesspal prompt on a message that is no move, a new process", budget: 150, run: () => timed(1, () => prompted("Is it my move?")) },
+        // Claude Code runs the prompt hook on every message: one that is no move looks for the chat's page, tells it, and leaves. The table answers from
+        // this process, which waits for the hook without stopping.
+        { name: "chesspal prompt on a message that is no move, no page of the chat's, a new process", budget: 150, run: async () => (await prompted("Is it my move?")).time },
+        { name: "chesspal prompt on a message that is no move, the chat at the table told, a new process", budget: 150, run: async () => (await prompted("Is it my move?", chatFolder)).time },
         { name: "chesspal prompt on a move, played and answered, a new process", budget: 500, run: promptedMove },
         { name: "the chat's server looks for the prompt hook's note before a tool, none there", budget: 0.1, run: lookForNote },
     ]);
@@ -142,19 +144,24 @@ async function movesAtTheTable(): Promise<number>
     return time / moves.length;
 }
 
-/** The prompt hook in a process of its own, as Claude Code runs it in the player's folder, with the message given: what it wrote. */
-function prompted(prompt: string): string
+/** The prompt hook in a process of its own, as Claude Code runs it in the chat's folder, with the message given: what it wrote, and in how many ms. */
+async function prompted(prompt: string, chatIn = folder): Promise<{ said: string; time: number; }>
 {
-    const input = JSON.stringify({ session_id: "bench", cwd: folder, hook_event_name: "UserPromptSubmit", prompt });
-    return spawnSync(process.execPath, [cli, "prompt"], { cwd: folder, input, encoding: "utf8", env: { ...process.env, CHESSPAL_HOME: folder, CLAUDE_PROJECT_DIR: folder } }).stdout;
+    const input = JSON.stringify({ session_id: "bench", cwd: chatIn, hook_event_name: "UserPromptSubmit", prompt });
+    const started = performance.now();
+    const hook = spawn(process.execPath, [cli, "prompt"], { cwd: chatIn, env: { ...process.env, CHESSPAL_HOME: folder, CLAUDE_PROJECT_DIR: chatIn } });
+    let said = "";
+    hook.stdout.on("data", (chunk: Buffer) => (said += String(chunk)));
+    hook.stdin.end(input);
+    await new Promise((done) => hook.on("close", done));
+    return { said, time: performance.now() - started };
 }
 
 /** The time of the prompt hook on the player's first move of a new game: read, played, saved, noted and answered. */
-function promptedMove(): number
+async function promptedMove(): Promise<number>
 {
     call(context, "new_game", { ai_colour: "black", replace: true });
-    let said = "";
-    const time = timed(1, () => said = prompted("e4"));
+    const { said, time } = await prompted("e4");
     forgetPositionShown(folder);
 
     if (!said.includes("Chesspal has already played")) {

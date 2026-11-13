@@ -321,6 +321,74 @@ describe("the doorbell after a move the hook played", () => {
     });
 });
 
+describe("the board page when a message starts the chat's turn", () => {
+    it("lets the hook of the turn before go without a ring: words written on the page meanwhile ring at the turn's end", async () => {
+        const base = gameWith("black");
+        vi.stubEnv("CLAUDE_PROJECT_DIR", base.folder);
+        vi.stubEnv("CLAUDE_CODE_SESSION_ID", "chat-1");
+        const page = await startPage(base);
+        pages.push(page);
+        const hook = JSON.stringify({ session_id: "chat-1", cwd: base.folder });
+        const before = waitForBell(hook);
+        await vi.waitFor(async () => expect(await shown(page)).toMatchObject({ listening: true }));
+
+        await sendPrompt(base, "What do you make of the Sicilian?");
+        expect(await before).toBe(false);
+        await ask(page, "POST", "/api/message", { text: "And the Dragon?" });
+        expect(await shown(page)).toMatchObject({ listening: true });
+
+        expect(await waitForBell(hook)).toBe(true);
+    });
+
+    it("has the bell for a new game asked on the page wait for the turn's end", async () => {
+        const base = gameWith("black");
+        vi.stubEnv("CLAUDE_PROJECT_DIR", base.folder);
+        vi.stubEnv("CLAUDE_CODE_SESSION_ID", "chat-1");
+        const page = await startPage(base);
+        pages.push(page);
+        const hook = JSON.stringify({ session_id: "chat-1", cwd: base.folder });
+        const before = waitForBell(hook);
+        await vi.waitFor(async () => expect(await shown(page)).toMatchObject({ listening: true }));
+
+        await sendPrompt(base, "e4 or d4?");
+        expect(await before).toBe(false);
+        expect(JSON.parse(await ask(page, "POST", "/api/new", { ai_colour: "white" }))).toMatchObject({ started: true });
+
+        expect(await waitForBell(hook)).toBe(true);
+    });
+
+    it("is not told of a slash command, which may start no turn, and so no Stop hook to end it: the hook waits on", async () => {
+        const base = gameWith("black");
+        vi.stubEnv("CLAUDE_PROJECT_DIR", base.folder);
+        vi.stubEnv("CLAUDE_CODE_SESSION_ID", "chat-1");
+        const page = await startPage(base);
+        pages.push(page);
+        const before = waitForBell(JSON.stringify({ session_id: "chat-1", cwd: base.folder }));
+        await vi.waitFor(async () => expect(await shown(page)).toMatchObject({ listening: true }));
+
+        await sendPrompt(base, "/clear");
+        await ask(page, "POST", "/api/message", { text: "Still there?" });
+        expect(await before).toBe(true);
+    });
+
+    it("moves no clock: the AI's, held while nobody heard the player, starts at the chat's first tool", async () => {
+        const base = gameWith("white", "5+0");
+        vi.stubEnv("CLAUDE_PROJECT_DIR", base.folder);
+        vi.stubEnv("CLAUDE_CODE_SESSION_ID", "chat-1");
+        let seconds = 0;
+        const page = await startPage({ ...base, now: () => new Date(start.getTime() + seconds * 1000) });
+        pages.push(page);
+
+        seconds = 30;
+        await sendPrompt(base, "Your move.");
+        expect(await shown(page)).toMatchObject({ listening: false, game: { clock: { since: start.toISOString() } } });
+
+        seconds = 40;
+        await page.chatCalls();
+        expect(gameFile(base).clock).toMatchObject({ since: new Date(start.getTime() + 40_000).toISOString() });
+    });
+});
+
 describe("Claude Code's settings", () => {
     it("get the prompt hook once, beside the player's own", () => {
         const folder = temporary();
@@ -343,6 +411,25 @@ function prompt(context: Context, text: string, session = "chat-1"): Promise<str
         JSON.stringify({ session_id: session, transcript_path: "chat.jsonl", cwd: context.folder, permission_mode: "default", hook_event_name: "UserPromptSubmit", prompt: text }),
         async () => ({ ...context, host: () => "claude-code", given: new Set<string>(), heard: undefined }),
     );
+}
+
+/** The prompt hook as Claude Code runs it, on a message of the chat in its folder that is no move: it writes nothing. */
+async function sendPrompt(context: Context, text: string): Promise<void>
+{
+    const written = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    try {
+        await answerPrompt(Readable.from([JSON.stringify({ session_id: "chat-1", cwd: context.folder, hook_event_name: "UserPromptSubmit", prompt: text })]));
+        expect(written).not.toHaveBeenCalled();
+    } finally {
+        written.mockRestore();
+    }
+}
+
+/** What the page shows of the game and the chat. */
+async function shown(page: Page): Promise<{ listening: boolean; game: { clock?: { since: string; }; }; }>
+{
+    return JSON.parse(await ask(page, "GET", "/api/game")) as never;
 }
 
 /** A game in a folder of its own, the AI with the colour given, with the clocks running from the start when it has a time control. */
