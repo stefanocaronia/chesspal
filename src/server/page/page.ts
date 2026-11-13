@@ -17,7 +17,7 @@ import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls, thinkingChanged } from "./game.ts";
 import { json, send } from "./http.ts";
 import { answerProfiles, readRatingsOf } from "./profiles.ts";
-import { answerTable, type Opening, restartWhenAtRest, type TableChats, updateWhenAtRest } from "./table.ts";
+import { answerTable, type ChatWait, type Opening, startWhenAtRest, type TableChats, updateWhenAtRest } from "./table.ts";
 import { watchForUpdates } from "./update.ts";
 import { type TableWindows, windowConnected } from "./windows.ts";
 
@@ -87,9 +87,9 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
         context: pageContext(context),
         chat,
         opponent: options.opponent ?? (() => aiNameOf(chat.host())),
-        // A start again asked while the chat was at work comes once it has ended its answer (D-107), as an update installed meanwhile (D-108).
+        // A start again or a new game asked while the chat was at work comes once it has ended its answer (D-107), as an update installed meanwhile (D-108).
         bell: new Bell(() => hasNews(context, chat), () => {
-            restartWhenAtRest(served);
+            startWhenAtRest(served);
             updateWhenAtRest(served);
             tellWatchers(watchers);
         }),
@@ -176,8 +176,8 @@ export interface Served
     attached?: Attached;
     /** When the table last opened a chat from the page, which has not attached yet: no second one meanwhile. */
     chatOpened?: { readonly at: number; readonly how: Opening; } | undefined;
-    /** The host the page asked the chat to start again with while it was at work (D-107). */
-    restartWanted?: { readonly host: string; } | undefined;
+    /** What the page asked while the chat was at work, waiting for it to end its answer: a start again with another host, or a new game (D-107). */
+    chatWait?: ChatWait | undefined;
     /** The newer Chesspal npm has (D-108); the table installing it, installed and waiting to be at rest, or starting again from it. */
     newer?: string;
     updating?: "installing" | "installed" | "restarting" | undefined;

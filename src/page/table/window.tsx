@@ -29,7 +29,7 @@ export function ChatDialog({ open, review = false, table, settings, onChange, na
     const installed = table.hosts.filter((host) => host.installed && host.name in choiceKeys);
     // A chat opened by hand is the player's: Chesspal cannot start it again. Its rows stay readable, as the ones waiting.
     const byHand = table.chat && !table.held;
-    const busy = sending || table.opening !== undefined || table.waiting === true;
+    const busy = sending || table.opening !== undefined || table.waiting !== undefined;
 
     const choose = async (host: string): Promise<void> => {
         setSending(true);
@@ -127,22 +127,25 @@ export function AiNameButton({ name, table, onOpen, text }: { name: string; tabl
 }
 
 /**
- * The note on the chat at the table where the asleep note stands: one opening or starting again; one waiting to, with a ↻ that starts it at once and a ×
- * that lets the request go; in a game with no chat at the table, a line that opens the chat's window. None otherwise.
+ * The note on the chat at the table where the asleep note stands: one opening or starting again; one waiting to, or a new game waiting for it, with a ↻
+ * that starts it at once and a × that lets the request go; in a game with no chat at the table, a line that opens the chat's window. None otherwise.
  */
 export function tableNote({ table, name, inGame, onOpen, text }: { table: TableShown; name: string; inGame: boolean; onOpen: () => void; text: Text; }): VNode | null
 {
     const words = text.table;
     const state = chatState(table, name, text);
 
-    if (table.waiting === true) {
+    if (table.waiting !== undefined) {
+        const newGame = table.waiting === "new-game";
+        const now = newGame ? words.newGameNow : words.restartNow;
+        const cancel = newGame ? words.newGameCancel : words.cancel;
         return (
             <p class="asleep table-note" role="status">
                 <span>{state}</span>
-                <button class="icon-button" type="button" title={words.restartNow} aria-label={words.restartNow} onClick={() => void endWaiting(true)}>
+                <button class="icon-button" type="button" title={now} aria-label={now} onClick={() => void endWaiting(true)}>
                     {restartIcon}
                 </button>
-                <button class="icon-button" type="button" title={words.cancel} aria-label={words.cancel} onClick={() => void endWaiting(false)}>
+                <button class="icon-button" type="button" title={cancel} aria-label={cancel} onClick={() => void endWaiting(false)}>
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M6 6L18 18M18 6L6 18" />
                     </svg>
@@ -169,13 +172,13 @@ export function tableNote({ table, name, inGame, onOpen, text }: { table: TableS
     return null;
 }
 
-/** What the page says of the chat at the table: one opening, starting again, or waiting to; nothing else. */
+/** What the page says of the chat at the table: one opening, starting again, or waiting to, for a new game too; nothing else. */
 export function chatState(table: TableShown, name: string, text: Text): string | undefined
 {
     const words = text.table;
 
-    if (table.waiting === true) {
-        return words.waiting(name);
+    if (table.waiting !== undefined) {
+        return table.waiting === "new-game" ? words.newGameWaiting(name) : words.waiting(name);
     }
 
     return table.opening === "chat" ? words.opening : table.opening === "again" ? words.again(name) : table.opening === "restart" ? words.restart : undefined;
@@ -241,7 +244,7 @@ function openChat(host: string): Promise<boolean>
     return asked("/api/table/chat", { host }, (answer) => answer.opened === true);
 }
 
-/** Asks the table to start at once the chat that waits to start again, cutting its answer, or to let the request go. */
+/** Asks the table to start at once the chat or the new game that waits, cutting the chat's answer, or to let the request go. */
 function endWaiting(now: boolean): Promise<boolean>
 {
     return asked("/api/table/waiting", { now }, () => true);

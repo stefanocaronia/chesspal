@@ -10,7 +10,7 @@ import { newGame, startNewGame } from "../src/commands/game/new.ts";
 import { status } from "../src/commands/game/status.ts";
 import type { Context } from "../src/commands/index.ts";
 import { aiNameOf } from "../src/core/index.ts";
-import { gameInAnalysis, loadGame, noteAiModel, saveTableTalk, startAnalysis, type TableTalk, talkLine } from "../src/games/index.ts";
+import { gameInAnalysis, loadGame, noteAiModel, saveChatStart, saveTableTalk, startAnalysis, type TableTalk, talkLine } from "../src/games/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { bellHeard, notedPagePorts, pageAt, pagePorts } from "../src/server/bell/bell.ts";
@@ -437,6 +437,94 @@ describe("a new game at the table", () => {
     });
 });
 
+describe("a new game at the table that wants a clean chat", () => {
+    it("waits for the chat chesspal play holds to end its answer, then starts with the choices kept, and the chat starts again", async () => {
+        const { chats, relaunched } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const played = await longGameInTurn(home, chat, page, table.url);
+
+            expect(await newGameWith(table.url)).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+            expect(relaunched).toEqual([]);
+            expect(loadGame(gameFolder(home))?.started).toBe(played);
+            expect(await gameShown(table.url)).toMatchObject({ table: { waiting: "new-game" } });
+
+            // Its turn ends, and its hook waits for the bell: the game starts as the player chose it, and the chat again, clean.
+            const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(() => Promise.resolve(relaunched.length > 0));
+            expect(relaunched).toEqual([chat.folder]);
+            expectChosenGame(home, played);
+
+            await page.close();
+            expect(await hook).toMatchObject({ rang: false });
+            const shown = await gameShown(table.url);
+            expect(shown).toMatchObject({ table: { chat: false, opening: "again" } });
+            expect(shown.table).not.toHaveProperty("waiting");
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
+    it("lets the page start the waiting game at once, cutting the chat's answer, or let it go; a new game replaces a start again that waits", async () => {
+        const { chats, relaunched, asked } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const played = await longGameInTurn(home, chat, page, table.url);
+            expect(await restartAt(table.url, "codex")).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+            expect(await newGameWith(table.url)).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+            expect(await gameShown(table.url)).toMatchObject({ table: { waiting: "new-game" } });
+
+            // Let go: the game before stays, and the chat as it is.
+            expect(await waitingAt(table.url, false)).toEqual({ status: 200, text: JSON.stringify({ waiting: false }) });
+            expect(await gameShown(table.url)).not.toHaveProperty("table.waiting");
+            expect(loadGame(gameFolder(home))?.started).toBe(played);
+            expect(relaunched).toEqual([]);
+
+            // At once, in the chat's turn: as after an Esc, which never ends it.
+            expect(await newGameWith(table.url)).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+            expect(await waitingAt(table.url, true)).toEqual({ status: 200, text: JSON.stringify({ restarting: true }) });
+            expect(relaunched).toEqual([chat.folder]);
+            expect(asked).toEqual([undefined]);
+            expectChosenGame(home, played);
+            expect(await gameShown(table.url)).not.toHaveProperty("table.waiting");
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
+    it("asks a chat opened by hand for /clear, as before", async () => {
+        const { chats, relaunched } = playChats(false);
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const played = await longGameInTurn(home, chat, page, table.url);
+            const answer = await newGameWith(table.url);
+
+            expect(answer.status).toBe(409);
+            expect(JSON.parse(answer.text)).toMatchObject({ refusal: "clear-chat" });
+            expect(loadGame(gameFolder(home))?.started).toBe(played);
+            expect(await gameShown(table.url)).not.toHaveProperty("table.waiting");
+            expect(relaunched).toEqual([]);
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+});
+
 describe("the chat's window at the table", () => {
     it("starts the chat chesspal play holds again with the host the page names: at once when it is at rest, else once its turn ends (D-107)", async () => {
         const { chats, relaunched, asked } = playChats();
@@ -455,7 +543,7 @@ describe("the chat's window at the table", () => {
             await page.chatCalls();
             expect(await restartAt(table.url, "codex")).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
             expect(relaunched).toEqual([]);
-            expect(await gameShown(table.url)).toMatchObject({ table: { waiting: true } });
+            expect(await gameShown(table.url)).toMatchObject({ table: { waiting: "restart" } });
 
             // Its turn ends, and its hook waits for the bell: the chat starts again with Codex.
             const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
@@ -562,6 +650,41 @@ async function restartAt(url: string, host: string, origin = new URL(url).origin
 async function waitingAt(url: string, now: unknown, origin = new URL(url).origin): Promise<{ status: number; text: string; }>
 {
     return sent(new URL("/api/table/waiting", url), { method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify({ now }) });
+}
+
+/**
+ * A game of twenty plies, long enough to want a clean chat before the next (D-57), played in the chat at the table since it last started: the chat, in its
+ * turn, has seen it. When it started.
+ */
+async function longGameInTurn(home: string, chat: Context, page: Page, url: string): Promise<string>
+{
+    const moves = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7";
+    saveChatStart(tableFolder(home), { source: "startup", at: "2026-01-01T00:00:00.000Z" });
+    startNewGame(newGame.input.parse({ ai_colour: "white", from: moves, replace: true }), { ...homeContext(home), pageOpen: () => true }, "page");
+    const { started } = loadGame(gameFolder(home))!;
+    chat.positionFirstSeen = { started: "2026-11-01T10:00:00.000Z", plies: 0 };
+    chat.positionSeen = { started, plies: 20 };
+    await page.chatCalls();
+    page.toolEnded();
+    await until(async () => (await gameShown(url)).thinking === "move");
+    return started;
+}
+
+/** The game the player chose in the New game window of the table's page, in place of the one played before. */
+function expectChosenGame(home: string, before: string): void
+{
+    const current = loadGame(gameFolder(home))!;
+    expect(current.started).not.toBe(before);
+    expect(current.ai).toBe("black");
+    expect(current.game.record.moves).toEqual([]);
+    expect(current.game.record.tags.AILevel).toBe("strong");
+    expect(current.clock).toBeDefined();
+}
+
+/** The New game window's choices sent from the table's page: the AI with black, strong, with a clock; the answer's status and text. */
+async function newGameWith(url: string): Promise<{ status: number; text: string; }>
+{
+    return sent(new URL("/api/new", url), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai_colour: "black", level: "strong", clock: "5+3" }) });
 }
 
 /** A new game asked from the table's page, as its window sends it: the answer's status. */

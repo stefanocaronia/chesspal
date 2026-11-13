@@ -109,7 +109,7 @@ export interface PageData
 /**
  * The table's chat, as its page shows it (D-104, D-107): whether one is at the table, its host, and whether chesspal play holds it, which the page can then
  * start again, with the model and effort it started with; one opening is one the page asked for, the one started again for a new game, or with another
- * model or host, which may wait for its answer.
+ * model or host; a start again or a new game may wait for its answer.
  */
 export interface TableShown
 {
@@ -119,7 +119,7 @@ export interface TableShown
     readonly started?: { readonly model?: string; readonly effort?: string; };
     readonly hosts: readonly ChatHost[];
     readonly opening?: "chat" | "again" | "restart";
-    readonly waiting?: true;
+    readonly waiting?: "restart" | "new-game";
 }
 
 /** A host the table opens a chat in: whether it is installed, the models and efforts offered, and the command to type in a terminal instead. */

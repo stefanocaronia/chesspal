@@ -1,6 +1,6 @@
 // What only the table's page answers (D-104): another Chesspal version asks it to quit, and the page opens a chat with no chat at the table, through the
-// hosts the table offers, starts it again for a new game, and with another model or host once it has done, or at once if the player says so (D-107); it
-// installs a newer Chesspal between games (D-108). A page a chat serves itself has none of these routes.
+// hosts the table offers, starts it again for a new game, and with another model or host or for a new game once it has done, or at once if the player
+// says so (D-107); it installs a newer Chesspal between games (D-108). A page a chat serves itself has none of these routes.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
 import { gameAt, samePosition } from "../../commands/index.ts";
@@ -45,6 +45,12 @@ export interface HeldChat
 /** A chat opening at the table: one the page asked for, the one started again for a new game, or with another model or host (D-107). */
 export type Opening = "chat" | "again" | "restart";
 
+/**
+ * What waits for the chat at the table to end its answer (D-107): a start again with another host, or a new game that wants a clean chat, which starts
+ * it again; the later request replaces the earlier. `start` starts the new game with the choices kept: whether the chat starts again for it.
+ */
+export type ChatWait = { readonly for: "restart"; readonly host: string; } | { readonly for: "new-game"; readonly start: () => boolean; };
+
 /** What the table's page shows of its chat (D-104, D-107). */
 export interface TableShown
 {
@@ -56,8 +62,8 @@ export interface TableShown
     readonly started?: HeldChat;
     readonly hosts: readonly ChatHost[];
     readonly opening?: Opening;
-    /** A start again asked while the chat was at work, waiting for it to end its answer, or to be started at once or let go from the page. */
-    readonly waiting?: true;
+    /** A start again or a new game asked while the chat was at work, waiting for it to end its answer, or to be started at once or let go from the page. */
+    readonly waiting?: ChatWait["for"];
 }
 
 /** What the table's page shows of its chat: whether one is at the table, with which host, the hosts it can open one in, and one opening. */
@@ -80,7 +86,7 @@ export function tableShown(served: Served): { table?: TableShown; }
             ...(held === undefined ? {} : { started: held }),
             hosts: table.chats?.hosts() ?? [],
             ...(now === undefined ? {} : { opening: now }),
-            ...(served.restartWanted === undefined ? {} : { waiting: true }),
+            ...(served.chatWait === undefined ? {} : { waiting: served.chatWait.for }),
         },
     };
 }
@@ -148,20 +154,32 @@ export function relaunchChat(served: Served, how: "again" | "restart" = "again",
     return true;
 }
 
-/** Starts the chat again as the page asked while it was at work, now that it has ended its answer; a chat gone meanwhile takes the request with it. */
-export function restartWhenAtRest(served: Served): void
+/**
+ * Whether a new game that wants a clean chat waits for the chat at the table to end its answer, then starts it again (D-57, D-107): `chesspal play` holds
+ * it, it is at work, and no analyst of it is; with an analyst at work the player is asked for /clear, as with a chat opened by hand.
+ */
+export function chatToWaitFor(served: Served): boolean
 {
-    const wanted = served.restartWanted;
+    return heldChat(served) !== undefined && !chatAtRest(served) && !analystAtWork(served);
+}
 
-    if (wanted === undefined) {
+/**
+ * Does what the page asked while the chat was at work, now that it has ended its answer. A chat gone meanwhile takes a start again with it; a new game
+ * starts without it, and loses nothing: the next chat at the table is a clean one.
+ */
+export function startWhenAtRest(served: Served): void
+{
+    const wanted = served.chatWait;
+    const gone = heldChat(served) === undefined;
+
+    if (wanted === undefined || (!gone && !chatAtRest(served))) {
         return;
     }
 
-    if (heldChat(served) === undefined) {
-        served.restartWanted = undefined;
-    } else if (chatAtRest(served)) {
-        served.restartWanted = undefined;
-        relaunchChat(served, "restart", wanted.host);
+    served.chatWait = undefined;
+
+    if (!gone || wanted.for === "new-game") {
+        startWaited(served, wanted);
     }
 }
 
@@ -212,33 +230,39 @@ async function restartChat(request: IncomingMessage, response: ServerResponse, s
     } else if (chatAtRest(served)) {
         sendJson(response, 200, { restarting: relaunchChat(served, "restart", offered.name) });
     } else {
-        served.restartWanted = { host: offered.name };
+        served.chatWait = { for: "restart", host: offered.name };
         tellWatchers(served.watchers);
         sendJson(response, 200, { waiting: true });
     }
 }
 
 /**
- * Ends a start again the page asked while the chat was at work (D-107): `now` starts it at once, cutting the answer it gives, as after an Esc, when it would
- * never end; else the request is let go. Asked by the table's own page alone.
+ * Ends a start again or a new game the page asked while the chat was at work (D-107): `now` starts it at once, cutting the answer the chat gives, as after
+ * an Esc, when it would never end; else the request is let go, and nothing changes. Asked by the table's own page alone.
  */
 async function endWaiting(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
     const now = jsonOf(await bodyOf(request))?.now;
-    const wanted = served.restartWanted;
+    const wanted = served.chatWait;
 
     if (!fromTablePage(request, served)) {
-        sendJson(response, 403, { error: "Only the table's own page ends a start again that waits." });
+        sendJson(response, 403, { error: "Only the table's own page ends what waits for the chat." });
     } else if (typeof now !== "boolean") {
-        sendJson(response, 400, { error: "Say now: true to start the chat again at once, cutting its answer, or now: false to let the request go." });
+        sendJson(response, 400, { error: "Say now: true to start the chat again or the new game at once, cutting its answer, or now: false to let the request go." });
     } else if (wanted === undefined) {
-        sendJson(response, 409, { error: "No start again waits: ask for one from the chat's window." });
+        sendJson(response, 409, { error: "Nothing waits for the chat: ask for a start again from the chat's window, or for a new game." });
     } else {
-        served.restartWanted = undefined;
-        const restarting = now && heldChat(served) !== undefined && relaunchChat(served, "restart", wanted.host);
+        served.chatWait = undefined;
+        const restarting = now && startWaited(served, wanted);
         tellWatchers(served.watchers);
         sendJson(response, 200, now ? { restarting } : { waiting: false });
     }
+}
+
+// What waited for the chat to end its answer, done now: the chat starts again with the host asked, or the new game starts with it starting again clean.
+function startWaited(served: Served, wanted: ChatWait): boolean
+{
+    return wanted.for === "new-game" ? wanted.start() : relaunchChat(served, "restart", wanted.host);
 }
 
 /**
@@ -357,7 +381,12 @@ function heldChat(served: Served): HeldChat | undefined
 function chatAtRest(served: Served): boolean
 {
     const { bell } = served;
-    return bell.listening && !bell.inTurn && gameInAnalysis(gameFolder(served.context.home()))?.analyst === undefined;
+    return bell.listening && !bell.inTurn && !analystAtWork(served);
+}
+
+function analystAtWork(served: Served): boolean
+{
+    return gameInAnalysis(gameFolder(served.context.home()))?.analyst !== undefined;
 }
 
 // The pages show a chat opening from now until it attaches; one that has not by then lets them open another. The opening noted.
