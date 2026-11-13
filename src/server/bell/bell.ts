@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:f
 import { type ClientRequest, get, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
 import { writeAtomically } from "../../games/index.ts";
-import { dataFolder, samePath, tableFolder } from "../../home/index.ts";
+import { dataFolder, realPath, samePath, tableFolder } from "../../home/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { version } from "../../version.ts";
 
@@ -162,10 +162,13 @@ export async function pageAt(port: number): Promise<BellProbe | undefined>
     return probeOf(await body(port, "/api/bell?probe", probeWait));
 }
 
-/** The ports a folder's page tries first: one in each of a few ranges, by its path, since Windows may reserve a range. The hook looks for it there. */
+/**
+ * The ports a folder's page tries first: one in each of a few ranges, by its real path, since Windows may reserve a range and the hook may name the folder
+ * through a link. The hook looks for it there.
+ */
 export function pagePorts(folder: string): number[]
 {
-    const offset = createHash("sha256").update(resolve(folder).toLowerCase()).digest()[0]! % 10;
+    const offset = createHash("sha256").update(realPath(folder).toLowerCase()).digest()[0]! % 10;
     return [5870, 6870, 7870].map((base) => base + portShift() + offset);
 }
 

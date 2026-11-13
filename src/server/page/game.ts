@@ -82,6 +82,19 @@ export function chatCalls(served: Served): void
     }
 }
 
+/**
+ * Whether the AI's sign on the page is not the one the pages were last given: the ponder agent's every thought rewrites thoughts.json, and only the sign
+ * that comes or goes is news for them. True when the game cannot be read: they read it again.
+ */
+export function thinkingChanged(served: Served): boolean
+{
+    try {
+        return thinkingShown(served, loadGame(gameFolder(served.context.home()))).thinking !== thinkingSent.get(served);
+    } catch {
+        return true;
+    }
+}
+
 /** The AI's clock, held while nobody heard the player, starts now: the time it was held is not the AI's. */
 function giveHeldTime(served: Served, folder: string): void
 {
@@ -414,6 +427,8 @@ function sendGame(response: ServerResponse, served: Served): void
     };
     const analysis = current === undefined || endOf(current.game) !== undefined ? analysisShown(served) : undefined;
     const aiModel = aiModelOf(folder);
+    const thinking = thinkingShown(served, current);
+    thinkingSent.set(served, thinking.thinking);
     const body = {
         // The page loaded from another version loads again, its files and all (Federico).
         version,
@@ -423,7 +438,7 @@ function sendGame(response: ServerResponse, served: Served): void
         opponent: served.opponent(),
         ...(aiModel === undefined ? {} : { aiModel }),
         listening: served.bell.listening,
-        ...thinkingShown(served, current),
+        ...thinking,
         ...(served.outdated ? { outdated: true } : {}),
         ...updateShown(served),
         ...tableShown(served),
@@ -460,6 +475,9 @@ function thinkingShown(served: Served, current: CurrentGame | undefined): { thin
     signGoesIn(served, left);
     return { thinking: "ponder" };
 }
+
+// The AI's sign the pages were last given, one a table.
+const thinkingSent = new WeakMap<Served, "move" | "ponder" | undefined>();
 
 // The pages hear when the sign of an agent that stopped pondering without a word goes, which no file tells: one timer a table, the latest.
 const signTimers = new WeakMap<Served, NodeJS.Timeout>();

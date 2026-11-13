@@ -8,7 +8,7 @@ import { PositionChanged } from "../src/commands/answers/play-move.ts";
 import { status } from "../src/commands/game/status.ts";
 import { commands } from "../src/commands/index.ts";
 import { type Context, withProfile } from "../src/commands/registry/context.ts";
-import { archivedGames, gameInAnalysis, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
+import { archivedGames, gameInAnalysis, keepThought, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, notedPagePorts, notePagePort, noteSilence, pageAt, pagePorts, waitForBell } from "../src/server/bell/bell.ts";
@@ -932,6 +932,35 @@ describe("the doorbell of the chat", () => {
         notePondering(games, `${started}#1`, true, context.now());
         notePondering(games, `${started}#1`, false, context.now());
         expect(await thinking()).toBeUndefined();
+    });
+
+    it("tells the pages of the ponder agent only when its sign comes or goes, not at each thought it keeps", async () => {
+        const folder = playerFolder();
+        const context = testContext(folder);
+        const page = await open(folder, undefined, context);
+        const games = gameFolder(context.home());
+        const events = listenTo(page);
+        const thinking = async (): Promise<unknown> => JSON.parse((await get(page, "/api/game")).body).thinking;
+
+        await events.next();
+        await run(folder, "new_game", { ai_colour: "black" }, context);
+        expect(await events.next()).toBe("data: changed");
+        const key = `${JSON.parse((await get(page, "/api/game")).body).game.started as string}#0`;
+
+        notePondering(games, key, true, context.now());
+        expect(await events.next()).toBe("data: changed");
+        expect(await thinking()).toBe("ponder");
+        notePondering(games, key, false, context.now());
+        expect(await events.next()).toBe("data: changed");
+        expect(await thinking()).toBeUndefined();
+        notePondering(games, key, true, context.now());
+        expect(await events.next()).toBe("data: changed");
+        expect(await thinking()).toBe("ponder");
+
+        // A thought rewrites the file, and the sign stays: the pages hear nothing.
+        keepThought(games, key, { reply: "e4", move: "e5", why: "Symmetry." }, context.now());
+        expect(await Promise.race([events.next(), new Promise((done) => setTimeout(() => done("nothing"), 300))])).toBe("nothing");
+        events.close();
     });
 
     it("shows the AI on its move as soon as the doorbell wakes the chat for the player's act on the page, before it reads the position", async () => {

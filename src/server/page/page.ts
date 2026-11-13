@@ -2,7 +2,7 @@
 // kept up to date as the game changes; the doorbell wakes the chat when the player acts there.
 import { type FSWatcher, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { type Context, positionIn, samePosition, type SeenPosition } from "../../commands/index.ts";
 import { aiNameOf } from "../../core/index.ts";
 import { forgetAnalyst, gameStamp, tableTalkStamp } from "../../games/index.ts";
@@ -14,7 +14,7 @@ import { answerChat } from "./attach.ts";
 import { type Attached, attachedSeen, type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";
 import { askNewGame, keepPosted, tellWatchers } from "./events.ts";
 import { sendFile, sendHtml } from "./files.ts";
-import { answerGame, chatCalls } from "./game.ts";
+import { answerGame, chatCalls, thinkingChanged } from "./game.ts";
 import { json, send } from "./http.ts";
 import { answerProfiles, readRatingsOf } from "./profiles.ts";
 import { answerTable, type Opening, restartWhenAtRest, type TableChats, updateWhenAtRest } from "./table.ts";
@@ -98,14 +98,16 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
         ...(table === undefined ? {} : { table }),
     };
     const server = createServer((request, response) => answer(request, response, served));
-    const ports = table === undefined ? [...pagePorts(folder), 0] : pagePorts(folder);
+    // The folder's real path is read once: it costs a call to the disk for each part of the path.
+    const usual = pagePorts(folder);
+    const ports = table === undefined ? [...usual, 0] : usual;
 
     for (const port of ports) {
         if (await listened(server, port)) {
             server.unref();
             served.port = portOf(server);
             // Noted before the game is watched: the notes' folder, made in the data folder, is no news for the pages.
-            const offPorts = table === undefined && !pagePorts(folder).includes(served.port);
+            const offPorts = table === undefined && !usual.includes(served.port);
             const noted = offPorts ? notePort(served) : undefined;
             const stopWatchingGame = watchGame(served);
             const stopAskingNpm = watchForUpdates(served);
@@ -329,19 +331,38 @@ function watchGame(served: Served): () => void
 {
     let waiting: NodeJS.Timeout | undefined;
     let watching: FSWatcher[] = [];
+    let game: string | undefined;
 
     const watchAll = (): void => {
         watching.forEach((watcher) => watcher.close());
-        watching = watchedFolders(served).flatMap((folder) => watchFolder(folder, heard));
+        const folders = watchedFolders(served);
+        game = folders.length === 0 ? undefined : basename(folders.at(-1)!);
+        watching = folders.flatMap((folder) => watchFolder(folder, heard));
     };
 
-    // A save writes a new file and renames it: the events of one save come together, and the pages hear of it once.
-    const heard = (name: string | null): void => {
-        if ((name === null || watched.test(name)) && waiting === undefined) {
+    // A save writes a new file and renames it: the events of one save come together, and the pages hear of it once. Of the ponder agent's thoughts,
+    // only its sign coming or going.
+    let news = false;
+
+    // On Windows the profiles' folder hears every write in the game's folder, as a change of it: the game folder's own watcher hears what it was.
+    const heard = (name: string | null, event: string): void => {
+        if (name !== null && (!watched.test(name) || (event === "change" && name === game))) {
+            return;
+        }
+
+        news ||= name !== "thoughts.json";
+
+        if (waiting === undefined) {
             waiting = setTimeout(() => {
                 waiting = undefined;
+                const tell = news || thinkingChanged(served);
+                news = false;
                 watchAll();
-                tellWatchers(served.watchers);
+
+                if (tell) {
+                    tellWatchers(served.watchers);
+                }
+
                 // A game that has ended lets an update installed meanwhile start the table again (D-108).
                 updateWhenAtRest(served);
             }, 30);
@@ -356,7 +377,7 @@ function watchGame(served: Served): () => void
     };
 }
 
-// None while the data folder cannot be made: each tool call tells the chat why, and the page reads the game as it loads.
+// None while the data folder cannot be made: each tool call tells the chat why, and the page reads the game as it loads. The game's folder last.
 function watchedFolders(served: Served): string[]
 {
     try {
@@ -368,10 +389,10 @@ function watchedFolders(served: Served): string[]
 }
 
 // A folder watched, without its subfolders; none when it cannot be, or is not there yet: the pages see its files only as they load them.
-function watchFolder(folder: string, heard: (name: string | null) => void): FSWatcher[]
+function watchFolder(folder: string, heard: (name: string | null, event: string) => void): FSWatcher[]
 {
     try {
-        const watcher = watch(folder, (event, name) => heard(name));
+        const watcher = watch(folder, (event, name) => heard(name, event));
         watcher.on("error", () => watcher.close());
         watcher.unref();
         return [watcher];

@@ -330,8 +330,8 @@ describe("a chat at the table", () => {
 describe("a chat's own page off its usual ports", () => {
     it("notes its port in the data folder, and forgets it as the host goes", async () => {
         const home = temporary();
-        // The folder as the server names it, its real path: on macOS the temporary folder is a link, and the ports are the path's.
-        const folder = realpathSync(temporary());
+        // As written: on macOS the temporary folder is a link, and the server, which names it by its real path, counts the same ports.
+        const folder = temporary();
         const taken = await Promise.all(pagePorts(folder).map(holdPort));
         const server = mcpServer(folder, home);
 
