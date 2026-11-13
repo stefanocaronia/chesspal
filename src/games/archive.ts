@@ -1,7 +1,7 @@
 // The finished games, as PGN in games/ (D-9, D-41), with the AI's plans for the analyst (D-21); and the games played elsewhere, kept to study in study/ (D-68).
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { type GameRecord, movesOnly, pgnDate, readPgn, readPgnTags, unsigned, withAiHost, withAiModel, writePgn } from "../core/index.ts";
+import { type GameRecord, movesOnly, pgnDate, readPgn, readPgnTags, readPgnUnplayed, unsigned, withAiHost, withAiModel, writePgn } from "../core/index.ts";
 import { aiHostOf, aiModelOf } from "./ai-model.ts";
 import { coachWords, withCoach } from "./coach.ts";
 import { type CurrentGame, endOf, loadGame } from "./current-game.ts";
@@ -129,6 +129,18 @@ export function archivedGames(folder: string): string[]
 export function archivedGame(folder: string, name: string): GameRecord
 {
     return gameNamed(folder, "games", name);
+}
+
+/** A game of the archive by its name, as listed, with its moves as written, neither checked nor played: for its tags and comments, quickly. */
+export function archivedGameUnplayed(folder: string, name: string): GameRecord
+{
+    const [record] = readPgnUnplayed(gameText(folder, "games", name));
+
+    if (record === undefined) {
+        throw new Error(`${name} holds no game Chesspal can read.`);
+    }
+
+    return record;
 }
 
 /** The tags of a game of the archive by its name, as listed, read without its moves; refused as archivedGame refuses. */

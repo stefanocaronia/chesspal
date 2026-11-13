@@ -15,7 +15,7 @@ export type { Material } from "./material.ts";
 export { endWithMood, type Mood, moodAt, type MoodNow, moodOf, moods, moodTag, withoutMoods } from "./moods.ts";
 export { bookMoves, bookPlaceOf, indexBook, indexOpenings, openingOf, outOfBookMove, positionKeysOf } from "./openings.ts";
 export type { BookPlace, Opening, OpeningBook, OpeningIndex } from "./openings.ts";
-export { pgnDate, readPgn, readPgnTags, writePgn } from "./pgn.ts";
+export { pgnDate, readPgn, readPgnTags, readPgnUnplayed, writePgn } from "./pgn.ts";
 export type { Capture, Chances, DoubleAttack, Possibilities, StalemateTrap } from "./possibilities.ts";
 export type { BishopFacts, CentreSquare, KingFacts, Outpost, PawnFacts, PawnSquare, Phase, Profile, SideProfile } from "./profile.ts";
 export { movesOnly } from "./record.ts";

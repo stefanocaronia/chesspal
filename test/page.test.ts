@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, request, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -12,6 +12,7 @@ import { archivedGames, gameInAnalysis, noteAiModel, notePondering, saveChatStar
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, notedPagePorts, noteSilence, pageAt, pagePorts, waitForBell } from "../src/server/bell/bell.ts";
+import { analysesOf } from "../src/server/page/analyses.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { profilesShown } from "../src/server/page/profiles.ts";
 import { version } from "../src/version.ts";
@@ -342,6 +343,42 @@ describe("the page's server", () => {
         const shown = await open(other);
         await run(other, "analyse_game", { pgn: '[FEN "8/8/4k3/8/8/4K3/8/7R w - - 0 1"]\n[SetUp "1"]\n\n*' });
         expect(JSON.parse((await get(shown, "/api/analyses")).body)).toMatchObject([{ moves: 0, reviewed: false }]);
+    });
+
+    it("lists the games of the archive from their tags as it does reading them whole, a game to study read whole", async () => {
+        const folder = playerFolder();
+        const home = testContext(folder).home();
+        const games = join(gameFolder(home), "games");
+
+        for (const from of ["1. e4 c5 2. Nf3 d6 *", '[SetUp "1"]\n[FEN "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"]\n\n1. e3 Kd7 *', "1. d4 d5 2. c4 *"]) {
+            await run(folder, "new_game", { ai_colour: "black", from, replace: true });
+            await run(folder, "end_game", { result: "player_resigns" });
+        }
+
+        // One left unfinished, one reviewed, one with a review begun, and a game brought to study, which carries no tags of the archive.
+        await run(folder, "new_game", { ai_colour: "white", from: "1. e4 e5 2. Nf3 *", replace: true });
+        await run(folder, "new_game", { ai_colour: "black", replace: true });
+        await run(folder, "player_move", { move: "e4" });
+        await run(folder, "end_game", { result: "player_resigns" });
+        const [, unfinished, , , sicilian] = archivedGames(gameFolder(home));
+        await run(folder, "annotate_game", { game: sicilian, summary: "Corta." });
+        await run(folder, "annotate_game", { game: unfinished, notes: [{ move: "2.", badge: "inaccuracy" }] });
+        await run(folder, "analyse_game", { pgn: '[White "Ann"]\n[Black "Bob"]\n[PlyCount "9"]\n[Opening "Not the book\'s"]\n\n1. e4 e5 *' });
+        const withTags = analysesOf(home);
+        expect(withTags).toHaveLength(6);
+        expect(withTags).toEqual(expect.arrayContaining([
+            expect.objectContaining({ name: sicilian, reviewed: true, opening: "Sicilian Defense: Modern Variations" }),
+            expect.objectContaining({ name: unfinished, begun: true }),
+            expect.objectContaining({ white: "Ann", moves: 1, opening: expect.not.stringContaining("Not the book") }),
+        ]));
+
+        for (const name of readdirSync(games)) {
+            const text = readFileSync(join(games, name), "utf8");
+            expect(text).toContain("[PlyCount ");
+            writeFileSync(join(games, name), text.replace(/^\[(?:ECO|Opening|PlyCount) .*\]\n/gm, ""));
+        }
+
+        expect(analysesOf(home)).toEqual(withTags);
     });
 
     it("lists the games played, reviewed or not, and opens the one just over for the chat to go over", async () => {

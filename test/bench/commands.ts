@@ -11,6 +11,7 @@ import { Game, writePgn } from "../../src/core/index.ts";
 import { archivedGames } from "../../src/games/index.ts";
 import { setUpHosts } from "../../src/host-files/index.ts";
 import { gameFolder } from "../../src/profiles/index.ts";
+import { analysesOf } from "../../src/server/page/analyses.ts";
 import { attachTable, startTable } from "../../src/server/table/index.ts";
 import { testContext } from "../commands.ts";
 import { randomGame, report, timed } from "./bench.ts";
@@ -61,6 +62,8 @@ try {
         }),
         // The old archive's path: each game read whole, its moves played and its opening looked up, some 4 ms.
         { name: "past_games, the latest 20 of 1,000 games an older Chesspal archived without the tags, each read whole", budget: 250, run: () => pastGames(oldArchive) },
+        // The page's list of games: each read whole, its moves not played, for its review.
+        ...[...archives].map(([size, archive]) => ({ name: `the page's list of games, ${size.toLocaleString("en")} games`, budget: size * 0.17, run: () => timed(1, () => analysesOf(archive.home())) })),
         { name: "chesspal status from the command line, a new process", budget: 500, run: () => timed(1, () => spawnSync(process.execPath, [cli, "status"], { cwd: folder, env: { ...process.env, CHESSPAL_HOME: folder } })) },
     ]);
 } finally {

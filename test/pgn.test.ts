@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Game, type GameRecord, readPgn, writePgn } from "../src/core/index.ts";
+import { Game, type GameRecord, readPgn, readPgnTags, readPgnUnplayed, writePgn } from "../src/core/index.ts";
 
 // Morphy against Duke Karl and Count Isouard, Paris 1858.
 const opera = "e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3 Qe7 Nc3 c6 Bg5 b5 Nxb5 cxb5 Bxb5+ Nbd7 O-O-O Rd8 Rxd7 Rxd7 Rd1 Qe6 Bxd7+ Nxd7 Qb8+ Nxb8 Rd8#"
@@ -109,5 +109,24 @@ describe("reading PGN", () => {
         expect(() => readPgn("1. e4!!! e5")).toThrow('Line 1: "!!!" is not a judgment');
         expect(() => readPgn("1. e4 ] e5")).toThrow('Line 1: "]" is not PGN: remove it.');
         expect(() => readPgn('[FEN "nonsense"]\n\n1. e4')).toThrow(/^Line 3: The FEN tag is not a valid position/);
+    });
+});
+
+describe("reading PGN without playing the moves", () => {
+    it("gives what readPgn gives for a PGN Chesspal writes, its tags alone too", () => {
+        const game = new Game({ tags: { Event: "Paris", Site: "?", Date: "1858.??.??", Round: "?", White: "Morphy", Black: "Allies", Opening: 'Philidor "Defence"' }, comment: "An opera.", moves: [] });
+
+        for (const san of opera) {
+            game.play(san);
+        }
+
+        game.annotate(18, { nags: [2], comment: "It opens the queenside to White's pieces." });
+        const text = `${writePgn(game.record)}\n${writePgn(game.record)}`;
+        expect(readPgnUnplayed(text)).toEqual(readPgn(text));
+        expect(readPgnTags(text)).toEqual(game.record.tags);
+    });
+
+    it("takes the moves as written, illegal or not, and a FEN it cannot read", () => {
+        expect(readPgnUnplayed('[FEN "nonsense"]\n\n1. e5 {A} Ke2 *')).toEqual([{ tags: { FEN: "nonsense", Result: "*" }, moves: [{ san: "e5", comment: "A" }, { san: "Ke2" }] }]);
     });
 });

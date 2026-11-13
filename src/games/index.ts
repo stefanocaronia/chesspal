@@ -5,6 +5,7 @@ export {
     archiveCoached,
     archivedGame,
     archivedGames,
+    archivedGameUnplayed,
     archivedName,
     archivedTags,
     archivedWhen,
