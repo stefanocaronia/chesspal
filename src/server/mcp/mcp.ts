@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, inputProblems, isBoolean, PositionChanged } from "../../commands/index.ts";
+import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, homeForOneCall, inputProblems, isBoolean, PositionChanged } from "../../commands/index.ts";
 import { aiNameOf } from "../../core/index.ts";
 import { endOf, loadGame, noteAiHost, noteAiModel, rerunIfChanged } from "../../games/index.ts";
 import { agentTools, hasAgent, startInstructions } from "../../host-files/index.ts";
@@ -254,6 +254,7 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
     const calling = await sharingCaller(command, meta, context);
     const agent = calling !== undefined && "agent" in calling ? calling.agent : undefined;
     const chat = command.byAgents === undefined && agent === undefined;
+    const home = homeForOneCall(context);
     let refused = false;
 
     try {
@@ -264,7 +265,7 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
         const run = calling !== undefined && "run" in calling ? calling.run : undefined;
         const who = agent !== undefined ? { agent, ...(run === undefined ? {} : { agentRun: run }) } : calling !== undefined ? { chat: true as const } : {};
         // A game another process changed under the call is read again, and the call made once more.
-        const result: unknown = await rerunIfChanged(() => command.run(checkedInput(command, input), { ...context, caller, ...who }));
+        const result: unknown = await rerunIfChanged(() => command.run(checkedInput(command, input), { ...context, home, caller, ...who }));
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {
         refused = error instanceof PositionChanged;
@@ -273,7 +274,7 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
         // What the tool read or wrote, the chat has seen: the doorbell rings it only for what changes after, and it may move on the game a tool showed it,
         // unless that tool was refused for a position it had not seen. An agent's call is not the chat's.
         if (chat) {
-            chatHasRead(context, command.showsGame === true && !refused);
+            chatHasRead(context, command.showsGame === true && !refused, home);
         }
     }
 }

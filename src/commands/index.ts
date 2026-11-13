@@ -11,7 +11,22 @@ export { analyseGame, deleteReview, siteGames, SiteGamesRefused } from "./analys
 export { analystOf, bookOpening, bookPlies, gameAt, gameToStudy, namedGame, playMove, PositionChanged, positionIn, samePosition, say, shownPosition } from "./answers/index.ts";
 export { aiMove, answerDraw, ChatNotClear, DrawRefused, endGame, newGame, offerDraw, startNewGame } from "./game/index.ts";
 export { chooseDrawnAvatar, deleteGame, editProfile, GameGoingOn, newProfile, ratingsAge, refreshRatings, useProfile } from "./profiles/index.ts";
-export { type AnyCommand, baseType, type Caller, type Command, commandLineFieldProblem, type Context, defaultContext, inputProblems, isBoolean, isList, type SeenPosition, speaksItalian, takesNumbers } from "./registry/index.ts";
+export {
+    type AnyCommand,
+    baseType,
+    type Caller,
+    type Command,
+    commandLineFieldProblem,
+    type Context,
+    defaultContext,
+    homeForOneCall,
+    inputProblems,
+    isBoolean,
+    isList,
+    type SeenPosition,
+    speaksItalian,
+    takesNumbers,
+} from "./registry/index.ts";
 
 /** Every command of Chesspal, in the order the command line lists them and the MCP server offers them. */
 export const commands: AnyCommand[] = [

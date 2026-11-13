@@ -188,6 +188,28 @@ describe("the MCP server", () => {
         });
     });
 
+    it("looks for the data folder once a call, and again at the next: a profile folder deleted between two calls is made again", async () => {
+        const context = testContext(mkdtempSync(join(tmpdir(), "chesspal-")));
+        const home = context.home;
+        let asked = 0;
+
+        context.home = () => {
+            asked += 1;
+            return home();
+        };
+
+        const server = await connect(undefined, context);
+
+        await server.callTool({ name: "status", arguments: {} });
+        rmSync(join(context.folder, "profiles"), { recursive: true });
+        const answer = await server.callTool({ name: "status", arguments: {} });
+        rmSync(context.folder, { recursive: true, force: true });
+
+        expect(asked).toBe(2);
+        expect(answer.isError).not.toBe(true);
+        expect((answer.content as { text: string; }[])[0]?.text).toContain(profileFolder(context.folder, "player"));
+    });
+
     it("refuses a wrong input in words an AI can act on, with the parameters the tool takes", async () => {
         expect(await call("status", { colour: "white" })).toEqual({
             text: "status has no parameter colour. Nothing changed: call it again with no parameters.",

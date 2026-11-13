@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { commands } from "../../src/commands/index.ts";
+import { commands, homeForOneCall } from "../../src/commands/index.ts";
 import type { Context } from "../../src/commands/registry/context.ts";
 import { Game, writePgn } from "../../src/core/index.ts";
 import { setUpHosts } from "../../src/host-files/index.ts";
@@ -117,7 +117,7 @@ function call(at: Context, name: string, input: Record<string, unknown> = {}): s
         throw new Error(`There is no command ${name}.`);
     }
 
-    return command.format(command.run(command.input.parse(input), at));
+    return command.format(command.run(command.input.parse(input), { ...at, home: homeForOneCall(at) }));
 }
 
 /** A command that answers later, as analyse_game, which may ask the sites: its result as text once it has it. */
@@ -129,5 +129,5 @@ async function callAwaited(at: Context, name: string, input: Record<string, unkn
         throw new Error(`There is no command ${name}.`);
     }
 
-    return command.format(await command.run(command.input.parse(input), at));
+    return command.format(await command.run(command.input.parse(input), { ...at, home: homeForOneCall(at) }));
 }

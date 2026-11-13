@@ -101,6 +101,13 @@ export function defaultContext(): Context
     };
 }
 
+/** The data folder for one tool call: looked for, its profile made when missing, at its first use in the call alone; the next call looks again. */
+export function homeForOneCall(context: Context): () => string
+{
+    let found: string | undefined;
+    return () => (found ??= context.home());
+}
+
 /** Whether the player's language is Italian: the command line speaks Italian to them then, English otherwise (D-32). */
 export function speaksItalian(language: string | undefined): boolean
 {

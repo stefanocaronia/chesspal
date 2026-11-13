@@ -182,17 +182,17 @@ export interface Served
 
 /**
  * The chat has read the game as it is now, at the end of a tool's call: the doorbell wakes it only for what changes it after; and, when the tool `showed` it
- * the game, it moves on that position and no other until a tool shows it another (D-71). A game that cannot be read shows none.
+ * the game, it moves on that position and no other until a tool shows it another (D-71). A game that cannot be read shows none. The data folder is the call's.
  */
-export function chatHasRead(context: Context, showed: boolean): void
+export function chatHasRead(context: Context, showed: boolean, home = context.home): void
 {
-    context.seen = gameSeen(context);
+    context.seen = gameSeen(home);
 
     if (showed) {
         const before = context.positionSeen;
 
         try {
-            context.positionSeen = positionIn(gameFolder(context.home()));
+            context.positionSeen = positionIn(gameFolder(home()));
         } catch {
             context.positionSeen = null;
         }
@@ -303,15 +303,15 @@ function tableChat(served: Served): TableChat | undefined
  */
 function hasNews(context: Context, chat: ChatSeen): boolean
 {
-    return gameSeen(context) !== chat.seen;
+    return gameSeen(context.home) !== chat.seen;
 }
 
 // The game the chat sees: the profile's folder, and the stamps of its game.json and of the talk with no game, where the player's words go in analysis
 // before any game was played here (Priya); none while the data folder cannot be made.
-function gameSeen(context: Context): string
+function gameSeen(home: () => string): string
 {
     try {
-        const folder = gameFolder(context.home());
+        const folder = gameFolder(home());
         return `${folder}
 ${gameStamp(folder) ?? ""}
 ${tableTalkStamp(folder) ?? ""}`;
