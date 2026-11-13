@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { gameStamp, loadGame, rerunIfChanged } from "../../games/index.ts";
+import type { Move } from "../../core/index.ts";
+import { endOf, gameStamp, loadGame, rerunIfChanged } from "../../games/index.ts";
 import { hasDoorbell } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { closingLines, coachOnEnd, coachOnEndLine, coachRuns, lastMoveText, moveLines, type MovePlayed, newWords, playMove, positionIn, refuseUnseenPosition, shownMove, withAnalyst } from "../answers/index.ts";
@@ -44,13 +45,11 @@ export interface MoveSentAlone
 
 /**
  * Plays the move the player sent alone in the chat, before the AI reads it (D-36): at the moment they sent it, so with no allowance, and answered as
- * player_move answers, with the player's words on the board page the AI has not answered. Refused as player_move refuses it, and when an R may be read as
- * the king's, as in Italian, French and Spanish: the AI asks the player then.
+ * player_move answers, with the player's words on the board page the AI has not answered. Refused as player_move refuses it: the AI reads the prompt then.
  */
 export function playMoveSentAlone(move: string, context: Context): MoveSentAlone
 {
     const folder = gameFolder(context.home());
-    refuseKingAsRook(move, folder);
     const before = new Set(context.given);
     const played = rerunIfChanged(() => playersMove({ move }, context, 0));
     const stamp = gameStamp(folder);
@@ -84,6 +83,8 @@ function playersMove({ move, offer_draw: offerDraw = false }: { move: string; of
         refuseUnseenPosition(context, folder);
     }
 
+    refuseKingAsRook(move, folder);
+
     const started = context.positionSeen === null ? positionIn(folder).started : context.positionSeen?.started;
     const played = playMove(folder, context.now(), "player", move, (message) => `${message} Ask the player again. Nothing changed.`, { allowance, offerDraw, coached: coachRuns(context) });
     // A game over by this move has no more moves to play there: the next game's window gives the address (Federico, round of D-85).
@@ -93,13 +94,34 @@ function playersMove({ move, offer_draw: offerDraw = false }: { move: string; of
     return { ...played, game: withAnalyst(played.game, context), words: newWords(context), ...(invite === undefined ? {} : { invite }), ...(coach ? { coach } : {}) };
 }
 
-/** Refuses a rook's move written with an R when the king could go there too: R is the king in Italian, French and Spanish, and only the player knows. */
+/**
+ * Refuses a move written R and a square when the player's king could go there as well as a rook: R is the king in Italian, French and Spanish, and only
+ * the player's words tell which. A rook's move that names its file or rank, or given as squares, is never the king's.
+ */
 function refuseKingAsRook(move: string, folder: string): void
 {
-    const target = /^[Rr]\S*([a-h][1-8])[+#]?$/.exec(move.trim())?.[1];
+    const written = move.trim().replace(/^\d+\s*(?:\.[\s.]*|…\s*)/, "").replace(/\s+/g, "");
+    const target = /^[Rr][x:]?([a-h][1-8])[+#]*[!?]*$/.exec(written)?.[1];
     const current = target === undefined ? undefined : loadGame(folder);
 
-    if (current?.game.legalMoves().some((legal) => legal.san.startsWith("K") && legal.to === target) === true) {
-        throw new Error(`${move} may be the rook's move or the king's, whose letter is R in Italian, French and Spanish: ask the player which. Nothing changed.`);
+    // Another side to move, or a game over, is refused by the move itself.
+    if (current === undefined || current.game.position.turn === current.ai || endOf(current.game) !== undefined) {
+        return;
     }
+
+    const there = current.game.legalMoves().filter((legal) => legal.to === target);
+    const rooks = there.filter((legal) => legal.san.startsWith("R")).map(squaresOf);
+    const king = there.find((legal) => legal.san.startsWith("K"));
+
+    if (rooks.length > 0 && king !== undefined) {
+        throw new Error(
+            `${written} may be the rook's move, ${rooks.join(" or ")}, or the king's, ${squaresOf(king)}: R is the king in Italian, French and Spanish. `
+                + "Unless the player's words name the piece, ask them which; then give it as squares. Nothing changed.",
+        );
+    }
+}
+
+function squaresOf(move: Move): string
+{
+    return `${move.from}${move.to}`;
 }
