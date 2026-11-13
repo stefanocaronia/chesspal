@@ -81,6 +81,8 @@ export function App({ start }: { start: Settings; })
     const [setting, setSetting] = useState(false);
     const text = useMemo(() => textFor(languagesOf(settings)), [settings.language]);
     const sound = settings.sound;
+    // The sounds off hush the voice too: it is one of them.
+    const voiced = settings.voice && sound;
     useEffect(() => void (document.documentElement.lang = text.language), [text]);
 
     const apply = (next: Settings): void => {
@@ -737,7 +739,7 @@ export function App({ start }: { start: Settings; })
                                             name={analyst}
                                             by={annotator}
                                             mood={mood}
-                                            {...(settings.voice ? { voice: text } : {})}
+                                            {...(voiced ? { voice: text } : {})}
                                             text={text}
                                         />
                                     </section>
@@ -783,7 +785,7 @@ export function App({ start }: { start: Settings; })
                                         <AiWords
                                             words={aiWords(plies, ai, talk)}
                                             newestFirst={!flipped}
-                                            {...(settings.voice ? { voice: text } : {})}
+                                            {...(voiced ? { voice: text } : {})}
                                         />
                                     </section>
                                     <section class="you-block" aria-label={profile.name}>
