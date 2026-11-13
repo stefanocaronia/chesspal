@@ -155,6 +155,13 @@ export function analystOf(context: Context, game: string): string | undefined
     return taken?.game === game && !restarted && !quiet ? taken.run : undefined;
 }
 
+/** When the analyst that holds a game counts as gone if it writes nothing before: none while no analyst holds one. */
+export function analystQuietAt(context: Context): Date | undefined
+{
+    const analysis = gameInAnalysis(gameFolder(context.home()));
+    return analysis?.analyst === undefined ? undefined : new Date(Date.parse(analysis.at) + analystQuiet);
+}
+
 /** How long an analyst may write nothing before it counts as gone. */
 const analystQuiet = 30 * 60 * 1000;
 

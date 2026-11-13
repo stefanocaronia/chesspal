@@ -594,6 +594,34 @@ describe("a new game at the table that wants a clean chat", () => {
         }
     });
 
+    it("starts once the analyst at work has written nothing for half an hour, which no file tells", async () => {
+        const { chats, relaunched } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const played = await longGameInTurn(home, chat, page, table.url);
+            expect(await newGameWith(table.url)).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+
+            // Its analyst last wrote almost half an hour ago, and never writes again: a host that lists no task in its hook never says it has gone.
+            const quietSince = new Date(Date.now() - 30 * 60_000 + 500);
+            startAnalysis(gameFolder(home), "games/2026-11-01-100000.pgn", quietSince, { analyst: { game: "games/2026-11-01-100000.pgn", run: "a-run", since: quietSince.toISOString() } });
+            // Its turn ends meanwhile, and nothing more happens at the table: the game starts as the analyst counts as gone.
+            const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(() => Promise.resolve(relaunched.length > 0));
+            expect(relaunched).toEqual([chat.folder]);
+            expectChosenGame(home, played);
+
+            await page.close();
+            expect(await hook).toMatchObject({ rang: false });
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
     it("asks a chat opened by hand for /clear, as before", async () => {
         const { chats, relaunched } = playChats(false);
         const { home, table } = await tableOn(undefined, chats);

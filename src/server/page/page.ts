@@ -3,7 +3,7 @@
 import { type FSWatcher, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { basename, join } from "node:path";
-import { type Context, positionIn, samePosition, type SeenPosition } from "../../commands/index.ts";
+import { analystQuietAt, type Context, positionIn, samePosition, type SeenPosition } from "../../commands/index.ts";
 import { aiNameOf } from "../../core/index.ts";
 import { forgetAnalyst, gameStamp, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
@@ -336,14 +336,27 @@ ${tableTalkStamp(folder) ?? ""}`;
 function watchGame(served: Served): () => void
 {
     let waiting: NodeJS.Timeout | undefined;
+    let quiet: NodeJS.Timeout | undefined;
     let watching: FSWatcher[] = [];
     let game: string | undefined;
+
+    // An analyst that writes nothing for half an hour counts as gone, which no file tells: the pages, and what waits for the chat at rest, hear it then.
+    const analystGoesQuiet = (): void => {
+        clearTimeout(quiet);
+        const left = analystQuietIn(served);
+        quiet = left === undefined ? undefined : setTimeout(() => {
+            tellWatchers(served.watchers);
+            startWhenAtRest(served);
+            updateWhenAtRest(served);
+        }, left + 100).unref();
+    };
 
     const watchAll = (): void => {
         watching.forEach((watcher) => watcher.close());
         const folders = watchedFolders(served);
         game = folders.length === 0 ? undefined : basename(folders.at(-1)!);
         watching = folders.flatMap((folder) => watchFolder(folder, heard));
+        analystGoesQuiet();
     };
 
     // A save writes a new file and renames it: the events of one save come together, and the pages hear of it once. Of the ponder agent's thoughts,
@@ -380,8 +393,20 @@ function watchGame(served: Served): () => void
 
     return () => {
         clearTimeout(waiting);
+        clearTimeout(quiet);
         watching.forEach((watcher) => watcher.close());
     };
+}
+
+// How long the analyst at work may still write nothing before it counts as gone; none without one, one gone already, or while the data folder cannot be made.
+function analystQuietIn(served: Served): number | undefined
+{
+    try {
+        const left = (analystQuietAt(served.context)?.getTime() ?? 0) - served.context.now().getTime();
+        return left > 0 ? left : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 // None while the data folder cannot be made: each tool call tells the chat why, and the page reads the game as it loads. The game's folder last.

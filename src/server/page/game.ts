@@ -3,7 +3,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
     analyseGame,
-    analystOf,
     answerDraw,
     bookPlies,
     ChatNotClear,
@@ -54,7 +53,7 @@ import { tellWatchers } from "./events.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
-import { chatToRelaunch, chatToWaitFor, refuseWaited, relaunchChat, tableShown } from "./table.ts";
+import { analystAtWork, chatToRelaunch, chatToWaitFor, refuseWaited, relaunchChat, tableShown } from "./table.ts";
 import { updateShown } from "./update.ts";
 
 /** Answers the page's requests about the game: true when the request was one. */
@@ -565,11 +564,10 @@ function analysisShown(served: Served): { name: string; pgn: string; book: numbe
     try {
         const { name, record } = namedGame(served.context, analysis.game);
         // Without a review, an AI is at it only while the chat is in a turn, or hears the player while its analyst holds the game (D-89): one the chat has
-        // started again since is gone (Priya). On the table the chat's start is in the chat's own folder.
+        // started again since is gone (Priya).
         const { bell } = served;
-        const chat = { ...served.context, folder: served.attached?.chat.folder ?? served.folder };
         const reviewed = isReviewed(record);
-        const reviewing = !reviewed && (bell.inTurn || (bell.listening && analystOf(chat, analysis.game) !== undefined));
+        const reviewing = !reviewed && (bell.inTurn || (bell.listening && analystAtWork(served, analysis.game)));
         // Without a review and with nobody at it, the analysis is incomplete: the page offers to bring it back to the AI (D-109).
         const state = reviewed ? {} : reviewing ? { reviewing: true as const } : { incomplete: true as const };
         // How far the book goes, which the page cannot tell without the book's moves: its card names the opening on those moves.

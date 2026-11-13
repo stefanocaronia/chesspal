@@ -148,7 +148,7 @@ describe("the page's server", () => {
         expect(await reviewing()).toBeUndefined();
 
         // The chat's turn has ended and its hook waits for the bell, while the analyst works in the background.
-        expect(await shortly(waitForBell(JSON.stringify({ cwd: folder }), [Number(new URL(page.url).port)]))).toBe("waiting");
+        await hookWaits(page, { cwd: folder });
         expect(await reviewing()).toBe(true);
 
         // A chat started clean since has no analyst at work any more.
@@ -161,18 +161,18 @@ describe("the page's server", () => {
         const context = testContext(folder);
         const page = await open(folder, undefined, context);
         const kept = "study/2026-11-02-153012.pgn";
-        const port = Number(new URL(page.url).port);
         const shown = async (): Promise<unknown> => JSON.parse((await get(page, "/api/game")).body).analysis;
         const running = [{ id: "a1", type: "subagent", status: "running", agent_type: "chesspal-analyst" }];
 
         await run(folder, "analyse_game", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' }, context);
         startAnalysis(gameFolder(context.home()), kept, context.now(), { analyst: { game: kept, run: "analyst-1", since: context.now().toISOString() } });
-        expect(await shortly(waitForBell(JSON.stringify({ cwd: folder, background_tasks: running }), [port]))).toBe("waiting");
+        const first = await hookWaits(page, { cwd: folder, background_tasks: running });
         expect(await shown()).toMatchObject({ reviewing: true });
 
-        // Another agent still running is no analyst.
+        // Another agent still running is no analyst. The second hook waits once the page lets the first one go, which a ring would not.
         const other = [{ ...running[0], agent_type: "chesspal-coach" }];
-        expect(await shortly(waitForBell(JSON.stringify({ cwd: folder, background_tasks: other }), [port]))).toBe("waiting");
+        void waitForBell(JSON.stringify({ cwd: folder, background_tasks: other }), [Number(new URL(page.url).port)]);
+        expect(await first.heard).toBe(false);
         expect(await shown()).toMatchObject({ incomplete: true });
         expect(gameInAnalysis(gameFolder(context.home()))?.analyst).toBeUndefined();
     });
@@ -188,7 +188,7 @@ describe("the page's server", () => {
 
         await run(folder, "analyse_game", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' }, context);
         startAnalysis(gameFolder(context.home()), kept, now, { analyst: { game: kept, run: "analyst-1", since: now.toISOString() } });
-        expect(await shortly(waitForBell(JSON.stringify({ cwd: folder }), [Number(new URL(page.url).port)]))).toBe("waiting");
+        await hookWaits(page, { cwd: folder });
 
         // Thinking long without a write is still at work.
         now = new Date(started.now().getTime() + 29 * 60_000);
@@ -1500,6 +1500,14 @@ function hookAt(bell: Bell): { heard?: string; }
     return hook;
 }
 
+/** A hook at the page's doorbell, once the page hears it wait: a loaded machine may take long to get it there, so no fixed time. What it hears, later. */
+async function hookWaits(page: Page, input: object): Promise<{ heard: Promise<boolean>; }>
+{
+    const heard = waitForBell(JSON.stringify(input), [Number(new URL(page.url).port)]);
+    await untilListening(page);
+    return { heard };
+}
+
 /** What the hook heard within a short while: "waiting" while the bell has not rung. */
 function shortly(waiting: Promise<boolean>): Promise<boolean | string>
 {
@@ -1518,7 +1526,7 @@ function listenTo(page: Page): { next: () => Promise<string>; close: () => void;
     const heard: string[] = [];
     const waiting: ((event: string) => void)[] = [];
     let text = "";
-    const sent = request({ host: url.hostname, port: url.port, path: url.pathname, headers: { host: url.host } }, (response) => {
+    const sent = request({ host: url.hostname, port: url.port, path: url.pathname, agent: false, headers: { host: url.host } }, (response) => {
         response.setEncoding("utf8");
         response.on("data", (chunk: string) => {
             text += chunk;
