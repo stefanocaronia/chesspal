@@ -1,63 +1,92 @@
-/* The chat's window (D-107): narrow, a row for each host, its button with the tick of the one at the table and its model and effort under their titles,
-   their columns shared through the subgrid; the command to type instead */
-.dialog:has(> .chat-hosts) {
+/* The chat's window (D-107), as the new game's: narrow, a card for each host with the tick of the one at the table, the selected one's model and effort
+   as rows of small choices, then the one button and the command to type instead */
+.dialog:has(> .chat-window) {
     width: min(460px, calc(100vw - 32px));
+}
+
+.profile-form.chat-window fieldset {
+    margin-bottom: 16px;
 }
 
 .chat-hosts {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 6px;
-    margin: 8px 0 12px;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
 }
 
-.chat-head,
-.chat-host {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
+.chat-hosts .level > span {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 48px;
+    padding: 10px 14px;
+    font-size: 16px;
 }
 
-.chat-head {
-    color: var(--soft);
-    font-size: 12px;
-}
-
-.chat-host .choice {
+/* A host's whole name, on two lines rather than cut on a phone */
+.chat-hosts b {
     min-width: 0;
-    font-size: 15px;
-    text-align: left;
+    line-height: 1.2;
 }
 
-.chat-host .choice span {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+@media (max-width: 420px) {
+    .chat-hosts .level > span {
+        padding: 8px 12px;
+    }
 }
 
-.chat-host .in-use {
+.chat-hosts .at-table {
+    display: flex;
     flex: none;
-    width: 18px;
-    height: 18px;
+}
+
+.chat-hosts .in-use {
+    width: 20px;
+    height: 20px;
     color: var(--accent);
 }
 
-.chat-host .choice[aria-disabled="true"] {
-    border-color: var(--line);
-    opacity: 0.6;
-    cursor: default;
+.chat-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
-.chat-host select {
-    padding: 4px;
+.chat-choices .level > span {
+    flex-direction: row;
+    min-width: 40px;
+    justify-content: center;
+    padding: 6px 10px;
+    font-size: 14px;
+}
+
+/* The choice the chat at the table started with: a dot in the corner, so that one changed shows beside the one kept */
+.chat-choices .started::after {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    content: "";
+}
+
+/* The button that only closes: the frame of a card and not the accent, so that the one that acts stands out when a choice changes it */
+.profile-form .start.quiet {
     border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--card);
+    background: none;
     color: var(--ink);
-    font: inherit;
-    font-size: 13px;
+    font-weight: 400;
+}
+
+.profile-form .start.quiet:hover {
+    border-color: var(--soft);
+}
+
+.chat-window .problem.chat-state {
+    margin-top: -4px;
 }
 
 /* The header's mark of a newer Chesspal (D-108): its border as the other buttons', not the accent, which reads as focus; inside, a full accent disc with a
@@ -135,6 +164,7 @@
 }
 
 .chat-command {
+    margin: 12px 0 0;
     color: var(--soft);
     font-size: 12.5px;
 }

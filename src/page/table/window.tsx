@@ -1,7 +1,6 @@
-// The chat at the table in a window of its own, opened from the AI's name as «Chi gioca?» is from the player's (D-107): a row for each host installed,
-// with its model and effort kept in the profile and the tick on the one at the table, a ↻ once they differ from the ones it started with; a row opens a
-// chat with no chat at the table, and starts the one chesspal play holds again, clean, in the same terminal, once it has ended its answer, or at once if
-// the player says so where the page says it waits.
+// The chat at the table in a window of its own, opened from the AI's name as «Chi gioca?» is from the player's (D-107), laid out as the new game's: a card
+// for each host installed, the tick on the one at the table; the selected one's model and effort, kept in the profile; and one button that says what it
+// does: open a chat, start the one chesspal play holds again, clean, once it has ended its answer, or in another host, or only close the window.
 import type { VNode } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { ChatHost, TableShown } from "../app/served.ts";
@@ -9,6 +8,7 @@ import { Dialog } from "../dialogs/dialog.tsx";
 import { checkIcon } from "../dialogs/profiles.tsx";
 import type { Settings } from "../profile/settings.ts";
 import type { Text } from "../text.ts";
+import { type ChatAction, chatAction, choiceKeys, chosen, firstHost, offeredHosts } from "./action.ts";
 
 /** The chat's window: closed once a chat opens or starts again, the page then saying where it stands; `review` when it opened to have a game analysed. */
 export function ChatDialog({ open, review = false, table, settings, onChange, name, onClose, text }: {
@@ -22,91 +22,9 @@ export function ChatDialog({ open, review = false, table, settings, onChange, na
     text: Text;
 })
 {
-    const [sending, setSending] = useState(false);
-    const [failed, setFailed] = useState(false);
-    useEffect(() => setFailed(false), [open]);
-    const words = text.table;
-    const installed = table.hosts.filter((host) => host.installed && host.name in choiceKeys);
-    // A chat opened by hand is the player's: Chesspal cannot start it again. Its rows stay readable, as the ones waiting.
-    const byHand = table.chat && !table.held;
-    const busy = sending || table.opening !== undefined || table.waiting !== undefined;
-
-    const choose = async (host: string): Promise<void> => {
-        setSending(true);
-        setFailed(false);
-        const done = table.chat ? await restartChat(host) : await openChat(host);
-        setSending(false);
-
-        if (done) {
-            onClose();
-        } else {
-            setFailed(true);
-        }
-    };
-
-    // While a chat opens or waits to start again, the rows wait too, and the note says why.
-    const chooseNote = review ? words.reviewChoose : words.choose;
-    const note = installed.length === 0
-        ? words.install(name)
-        : busy
-        ? chatState(table, name, text) ?? chooseNote
-        : byHand
-        ? words.byHand(name)
-        : table.chat
-        ? words.restartHint
-        : chooseNote;
-    const offersChoices = installed.some((host) => host.models.length > 0 || host.efforts.length > 0);
-    // The chat at the table started with other choices than the ones kept now: its row starts it again with these, else it only closes the window.
-    const started = table.held ? table.started : undefined;
-    const changed = (host: ChatHost): boolean => started !== undefined && (chosen(host, "model", settings) !== (started.model ?? "") || chosen(host, "effort", settings) !== (started.effort ?? ""));
     return (
-        <Dialog open={open} title={review ? words.reviewTitle : words.title} onClose={onClose} text={text}>
-            <p class="note">{note}</p>
-            <div class="chat-hosts" role="group" aria-label={review ? words.reviewTitle : words.title}>
-                {offersChoices
-                    ? (
-                        <div class="chat-head" aria-hidden="true">
-                            <span />
-                            <span>{words.model}</span>
-                            <span>{words.effort}</span>
-                        </div>
-                    )
-                    : null}
-                {installed.map((host) => {
-                    const atTable = table.chat && table.host === host.name;
-                    const off = busy || byHand;
-                    const again = !atTable || changed(host);
-                    return (
-                        <div class="chat-host" key={host.name}>
-                            <button
-                                class="choice"
-                                type="button"
-                                title={atTable && again ? words.restartChanged : undefined}
-                                aria-current={atTable ? "true" : undefined}
-                                aria-disabled={off}
-                                onClick={off ? undefined : again ? () => void choose(host.name) : onClose}
-                            >
-                                <span>{hostTitles[host.name] ?? host.name}</span>
-                                {atTable ? (again ? restartIcon : checkIcon) : null}
-                            </button>
-                            <Choice host={host} kind="model" settings={settings} onChange={onChange} text={text} />
-                            <Choice host={host} kind="effort" settings={settings} onChange={onChange} text={text} />
-                        </div>
-                    );
-                })}
-            </div>
-            <p class="chat-state" role="status">{failed ? (table.chat ? words.notRestarted : words.failed) : null}</p>
-            {table.chat || installed.length === 0 ? null : (
-                <p class="chat-command">
-                    {words.typeIt} {installed.map((host, index) => (
-                        <span key={host.name}>
-                            {/* The dot goes to the next line with the command after it */}
-                            {index === 0 ? "" : " · "}
-                            <code>{host.command}</code>
-                        </span>
-                    ))}
-                </p>
-            )}
+        <Dialog open={open} title={review ? text.table.reviewTitle : text.table.title} onClose={onClose} text={text}>
+            <ChatForm review={review} table={table} settings={settings} onChange={onChange} name={name} onClose={onClose} text={text} />
         </Dialog>
     );
 }
@@ -186,12 +104,6 @@ export function chatState(table: TableShown, name: string, text: Text): string |
 
 const hostTitles: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex" };
 
-// The settings that keep each host's choice.
-const choiceKeys = {
-    claude: { model: "claudeModel", effort: "claudeEffort" },
-    codex: { model: "codexModel", effort: "codexEffort" },
-} as const satisfies Record<string, Record<"model" | "effort", keyof Settings>>;
-
 /** The ↻ of a chat that starts again. */
 const restartIcon = (
     <svg class="icon in-use" viewBox="0 0 24 24" aria-hidden="true">
@@ -199,36 +111,151 @@ const restartIcon = (
     </svg>
 );
 
-/** A host's model or effort as the settings keep it: "" for the host's own, and for a choice it no longer offers. */
-function chosen(host: ChatHost, kind: "model" | "effort", settings: Settings): string
+/** The window's form, made again at each opening with the host at the table selected, else the first. */
+function ChatForm({ review, table, settings, onChange, name, onClose, text }: {
+    review: boolean;
+    table: TableShown;
+    settings: Settings;
+    onChange: (settings: Settings) => void;
+    name: string;
+    onClose: () => void;
+    text: Text;
+})
 {
-    const key = choiceKeys[host.name as keyof typeof choiceKeys][kind];
-    const offered = kind === "model" ? host.models : host.efforts;
-    return offered.includes(settings[key]) ? settings[key] : "";
+    const words = text.table;
+    const installed = offeredHosts(table);
+    const [selected, setSelected] = useState(() => firstHost(table));
+    const [sending, setSending] = useState(false);
+    const [failed, setFailed] = useState(false);
+    // The host at the table may come or go while the window is open: the selection follows it only if it was on none offered.
+    const host = installed.find((one) => one.name === selected) ?? installed.find((one) => one.name === firstHost(table));
+    useEffect(() => setFailed(false), [selected]);
+    const action = chatAction(table, host, settings, review);
+    // A chat opened by hand is the player's: Chesspal cannot start it again, so the button only closes, and the note says why.
+    const byHand = table.chat && !table.held;
+    const busy = table.opening !== undefined || table.waiting !== undefined;
+    const chooseNote = review ? words.reviewChoose : words.choose;
+    const note = installed.length === 0 ? words.install(name) : busy ? chatState(table, name, text) ?? chooseNote : byHand ? words.byHand(name) : table.chat ? words.restartHint : chooseNote;
+    // What the chat held started with, marked among the choices of its host: "" for the host's own.
+    const startedWith = (kind: "model" | "effort"): string | undefined => (table.held && table.host === host?.name ? table.started?.[kind] ?? "" : undefined);
+
+    const submit = async (event: Event): Promise<void> => {
+        event.preventDefault();
+
+        if (action === "close" || host === undefined) {
+            onClose();
+            return;
+        }
+
+        setSending(true);
+        setFailed(false);
+        const done = table.chat ? await restartChat(host.name) : await openChat(host.name);
+        setSending(false);
+
+        if (done) {
+            onClose();
+        } else {
+            setFailed(true);
+        }
+    };
+
+    return (
+        <form class="profile-form chat-window" onSubmit={(event) => void submit(event)} onKeyDown={submitOnEnter}>
+            <p class="note">{note}</p>
+            {installed.length === 0 ? null : (
+                <fieldset>
+                    <legend>{words.chat}</legend>
+                    <div class="chat-hosts">
+                        {installed.map((one) => {
+                            const atTable = table.chat && table.host === one.name;
+                            return (
+                                <label class="level" key={one.name}>
+                                    <input type="radio" name="chat-host" checked={one.name === host?.name} onChange={() => setSelected(one.name)} autofocus={one.name === host?.name} />
+                                    <span>
+                                        <b>{hostTitles[one.name] ?? one.name}</b>
+                                        {atTable ? <span class="at-table" title={words.atTable} role="img" aria-label={words.atTable}>{checkIcon}</span> : null}
+                                    </span>
+                                </label>
+                            );
+                        })}
+                    </div>
+                </fieldset>
+            )}
+            {host === undefined ? null : (
+                <>
+                    <Choices host={host} kind="model" settings={settings} started={startedWith("model")} onChange={onChange} text={text} />
+                    <Choices host={host} kind="effort" settings={settings} started={startedWith("effort")} onChange={onChange} text={text} />
+                </>
+            )}
+            <p class="problem chat-state" role="status">{failed ? (table.chat ? words.notRestarted : words.failed) : null}</p>
+            <button class={action === "close" ? "start quiet" : "start"} type="submit" disabled={sending} aria-busy={sending}>
+                {buttonWords(action, host, text)}
+            </button>
+            {table.chat || host === undefined ? null : (
+                <p class="chat-command">
+                    {words.typeIt} <code>{host.command}</code>
+                </p>
+            )}
+        </form>
+    );
 }
 
-/** A host's model or effort: a dash keeps the host's own; a choice it no longer offers shows as the dash. Its title says what it stands at, the dash too. */
-function Choice({ host, kind, settings, onChange, text }: { host: ChatHost; kind: "model" | "effort"; settings: Settings; onChange: (settings: Settings) => void; text: Text; })
+/** Enter on a choice presses the button, the window's default action, as it would in a text field: the browser does not for radios. */
+function submitOnEnter(event: KeyboardEvent): void
+{
+    if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+        event.preventDefault();
+        (event.currentTarget as HTMLFormElement).requestSubmit();
+    }
+}
+
+/** The button's words: what it does, with the host selected; Close when it only closes. */
+function buttonWords(action: ChatAction, host: ChatHost | undefined, text: Text): string
+{
+    if (action === "close" || host === undefined) {
+        return text.close;
+    }
+
+    return text.table.act[action](hostTitles[host.name] ?? host.name);
+}
+
+/**
+ * A host's model or effort as a row of choices: the dash keeps the host's own, as its title says; a choice it no longer offers shows as the dash. The one
+ * the chat at the table `started` with bears a dot.
+ */
+function Choices({ host, kind, settings, started, onChange, text }: {
+    host: ChatHost;
+    kind: "model" | "effort";
+    settings: Settings;
+    started: string | undefined;
+    onChange: (settings: Settings) => void;
+    text: Text;
+})
 {
     const key = choiceKeys[host.name as keyof typeof choiceKeys][kind];
     const offered = kind === "model" ? host.models : host.efforts;
     const value = chosen(host, kind, settings);
-    const title = hostTitles[host.name] ?? host.name;
+    const own = text.table.asHost(hostTitles[host.name] ?? host.name);
 
     if (offered.length === 0) {
-        return <span />;
+        return null;
     }
 
     return (
-        <select
-            aria-label={`${text.table[kind]}, ${title}`}
-            title={`${text.table[kind]}: ${value === "" ? text.table.asHost(title) : value}`}
-            value={value}
-            onChange={(event) => onChange({ ...settings, [key]: event.currentTarget.value })}
-        >
-            <option value="">—</option>
-            {offered.map((one) => <option key={one} value={one}>{shortName(one)}</option>)}
-        </select>
+        <fieldset>
+            <legend>{text.table[kind]}</legend>
+            <div class="chat-choices">
+                {["", ...offered].map((one) => {
+                    const words = (one === "" ? own : one) + (one === started ? ` · ${text.table.atTable}` : "");
+                    return (
+                        <label class={one === started ? "level started" : "level"} key={one} title={words}>
+                            <input type="radio" name={`chat-${kind}`} checked={value === one} onChange={() => onChange({ ...settings, [key]: one })} aria-label={words} />
+                            <span>{one === "" ? "—" : shortName(one)}</span>
+                        </label>
+                    );
+                })}
+            </div>
+        </fieldset>
     );
 }
 

@@ -161,9 +161,14 @@ export interface Text
         readonly noChat: string;
         readonly change: string;
         install(name: string): string;
+        /** The titles of the hosts' cards and of the selected one's choices, and the tick's on the one at the table. */
+        readonly chat: string;
         readonly model: string;
         readonly effort: string;
+        readonly atTable: string;
         asHost(host: string): string;
+        /** The window's button, by what it does with the host selected: open a chat to play or review the game, start the one held again, or in this host. */
+        readonly act: { open(host: string): string; review(host: string): string; restart(host: string): string; switch(host: string): string; };
         /** Where the asleep note stands: a chat opening, starting again for a new game, or with another model or host, and waiting to. */
         readonly opening: string;
         again(name: string): string;
@@ -171,8 +176,7 @@ export interface Text
         waiting(name: string): string;
         /** A new game that waits for the chat to end its answer, to start it again clean for the game. */
         newGameWaiting(name: string): string;
-        /** The marks on a start again: the ↻ of the row whose choices changed, and those of the one that waits, to start it at once or let it go. */
-        readonly restartChanged: string;
+        /** The marks on a start again that waits: to start it at once, or let it go. */
         readonly restartNow: string;
         readonly cancel: string;
         /** The marks on a new game that waits: to start it at once, or let it go. */
@@ -715,20 +719,22 @@ const english: Text = {
         choose: "Choose the chat to play with: it opens in a window of its own, to keep open.",
         reviewTitle: "Who reviews the game?",
         reviewChoose: "Choose the chat that reviews the game: it opens in a window of its own, to keep open.",
-        restartHint: "Choose the model and effort, then press Claude Code or Codex: the chat starts again, clean, in the same window, once it has ended its answer. The game stays as it is.",
+        restartHint: "Change the chat, its model or effort: it starts again, clean, in the same window, once it has ended its answer. The game stays as it is.",
         byHand: (name) => `You opened this chat yourself: change ${name}'s model with /model in its window, or close it and open one from here, with the choices below.`,
         noChat: "No chat at the table: choose one",
         change: "Change the chat or its model",
         install: (name) => `To play with ${name}, install Claude Code or Codex, then open this page again.`,
+        chat: "Chat",
         model: "Model",
         effort: "Effort",
+        atTable: "At the table",
         asHost: (host) => `as set in ${host}`,
+        act: { open: (host) => `Start ${host}`, review: (host) => `Review with ${host}`, restart: (host) => `Restart ${host}`, switch: (host) => `Switch to ${host}` },
         opening: "Opening the chat… In the terminal, if it asks whether you trust the folder, say yes (in Claude Code, go down to Yes with the arrow keys) and press Enter; with Codex, on the hooks, choose Trust all and continue.",
         again: (name) => `${name} starts again with a clean chat for the new game…`,
         restart: "The chat starts again, clean…",
         waiting: (name) => `${name} starts again once it has ended its answer…`,
         newGameWaiting: (name) => `The new game starts once ${name} has ended its answer…`,
-        restartChanged: "Starts again, clean, with the new choices",
         restartNow: "Start again now: it cuts the answer it is giving",
         cancel: "Do not start again",
         newGameNow: "Start the new game now: it cuts the answer it is giving",
@@ -1158,20 +1164,22 @@ const italian: Text = {
         choose: "Scegli la chat con cui giocare: parte in una finestra a parte, da tenere aperta.",
         reviewTitle: "Chi analizza la partita?",
         reviewChoose: "Scegli la chat che analizza la partita: parte in una finestra a parte, da tenere aperta.",
-        restartHint: "Scegli modello e ragionamento, poi premi Claude Code o Codex: la chat riparte pulita nella stessa finestra, appena ha finito di rispondere. La partita resta com'è.",
+        restartHint: "Cambia chat, modello o ragionamento: la chat riparte pulita nella stessa finestra, appena ha finito di rispondere. La partita resta com'è.",
         byHand: (name) => `Questa chat l'hai aperta tu: cambia il modello di ${name} con /model nella sua finestra, oppure chiudila e aprine una da qui, con le scelte qui sotto.`,
         noChat: "Nessuna chat al tavolo: scegline una",
         change: "Cambia la chat o il modello",
         install: (name) => `Per giocare con ${name}, installa Claude Code o Codex, poi apri di nuovo questa pagina.`,
+        chat: "Chat",
         model: "Modello",
         effort: "Ragionamento",
+        atTable: "Al tavolo",
         asHost: (host) => `come è impostato in ${host}`,
+        act: { open: (host) => `Avvia ${host}`, review: (host) => `Analizza con ${host}`, restart: (host) => `Riavvia ${host}`, switch: (host) => `Passa a ${host}` },
         opening: "Apro la chat… Nel terminale, se ti chiede se ti fidi della cartella, rispondi sì (in Claude Code scendi su Yes con le frecce) e premi Invio; con Codex, sugli «hook», scegli Trust all and continue.",
         again: (name) => `${name} riparte con una chat pulita per la nuova partita…`,
         restart: "La chat riparte pulita…",
         waiting: (name) => `${name} riparte appena ha finito di rispondere…`,
         newGameWaiting: (name) => `La nuova partita comincia appena ${name} ha finito di rispondere…`,
-        restartChanged: "Riparte pulita con le nuove scelte",
         restartNow: "Riparti adesso: interrompe la risposta in corso",
         cancel: "Non ripartire",
         newGameNow: "Comincia adesso la nuova partita: interrompe la risposta in corso",
