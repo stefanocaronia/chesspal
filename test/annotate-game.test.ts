@@ -229,6 +229,18 @@ describe("annotate_game (D-69)", () => {
         await expect(async () => annotate(context, { game: kept, summary: "Fine." })).rejects.toThrow(/^A game is going on/);
     });
 
+    it("names the texts that write a move with another language's letters, which the page shows as plain text (D-87)", async () => {
+        const context = playerFolder();
+        await analyse(context, { pgn });
+
+        const notes = [{ move: "3...", badge: "blunder", note: "Cf6 lascia **f7** alla donna" }, { move: "4.", note: "Dxf7# chiude" }, { move: "2.", note: "♗c4 e Bc4 puntano f7" }];
+        expect(await annotate(context, { notes, closing: "Vince la Dxf7#." }))
+            .toContain("\n3..., 4., your last word write moves with another language's letters, which the page shows as plain text: give them again with the figurines (♞f6 for Cf6).\n");
+        expect(await annotate(context, { notes: [{ move: "3...", note: "Cesare in C4, poi ♞f6" }], summary: "Il Txf7 non c'era." }))
+            .toContain("\nyour summary writes moves with another language's letters, which the page shows as plain text: give it again with the figurines (♜xf7 for Txf7).\n");
+        expect(await annotate(context, { notes: [{ move: "3...", note: "♞f6 lascia f7: Nf6?" }] })).not.toContain("letters");
+    });
+
     it("marks the game played here once it is over, in the archive", async () => {
         const context = playerFolder();
         await newGame.run(newGame.input.parse({ ai_colour: "black", level: "beginner" }), context);

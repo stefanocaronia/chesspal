@@ -340,6 +340,13 @@ export function withSanLetters(text: string): string
     return text.replace(/[︎️]/g, "").replace(/[–—−×♔-♟]/g, (sign) => asciiOf[sign] ?? sign);
 }
 
+/** The moves a text writes with a piece's letter of another language, each with its SAN: Cxe5 as Nxe5. */
+export function foreignMovesIn(text: string): { written: string; san: string; }[]
+{
+    return [...text.matchAll(/(?<![\p{L}\d])[CSAFLTD][a-h]?[1-8]?x?[a-h][1-8][+#]?(?![\p{L}\d])/gu)]
+        .map(([written]) => ({ written, san: `${foreignPieces[written[0]!]![1]}${written.slice(1)}` }));
+}
+
 // The pieces' letters of other languages that name one piece only: the Italian, French, Spanish and German ones; R is the rook in SAN.
 const foreignPieces: Readonly<Record<string, readonly [string, string]>> = {
     C: ["knight", "N"],
