@@ -3,7 +3,7 @@
 // says so (D-107); it installs a newer Chesspal between games (D-108). A page a chat serves itself has none of these routes.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
-import { analystOf, gameAt, samePosition } from "../../commands/index.ts";
+import { analystOf, gameAt, pliesBeforeClearing, samePosition } from "../../commands/index.ts";
 import { endOf, gameInAnalysis } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { tellWatchers } from "./events.ts";
@@ -167,6 +167,21 @@ export function relaunchChat(served: Served, how: "again" | "restart" = "again",
 export function chatToWaitFor(served: Served): boolean
 {
     return heldChat(served) !== undefined && !chatAtRest(served) && !analystAtWork(served);
+}
+
+/**
+ * Whether the chat at the table has played the game `current` at length (D-57), counted from the first position it was shown of it. A chat the table
+ * started again for a game began after it, and new_game takes it for one cleared since: it holds the whole game all the same.
+ */
+export function chatPlayedAtLength(served: Served, current: { readonly started: string; } | undefined): boolean
+{
+    const { positionSeen: seen, positionFirstSeen: first } = served.chat;
+
+    if (current === undefined || seen?.started !== current.started) {
+        return false;
+    }
+
+    return seen.plies - (first?.started === seen.started ? first.plies : 0) >= pliesBeforeClearing;
 }
 
 /**

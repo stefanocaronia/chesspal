@@ -506,6 +506,29 @@ describe("a new game at the table that wants a clean chat", () => {
         }
     });
 
+    it("waits as well for a chat the table started again for the game, which began after the game and played it all", async () => {
+        const { chats, relaunched } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const played = await longGameInTurn(home, chat, page, table.url);
+            // Started clean just after the game, it was first shown the game's first position.
+            saveChatStart(tableFolder(home), { source: "startup", at: new Date(Date.parse(played) + 5_000).toISOString() });
+            chat.positionFirstSeen = { started: played, plies: 0 };
+            page.toolEnded();
+
+            expect(await newGameWith(table.url)).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+            expect(relaunched).toEqual([]);
+            expect(loadGame(gameFolder(home))?.started).toBe(played);
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
     it("lets the page start the waiting game at once, cutting the chat's answer, or let it go; a new game replaces a start again that waits", async () => {
         const { chats, relaunched, asked } = playChats();
         const { home, table } = await tableOn(undefined, chats);

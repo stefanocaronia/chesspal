@@ -232,9 +232,11 @@ describe("the seat chesspal play takes at the table", () => {
 
     it("is held while its play process refreshes it, and goes to the next one when it stops, whatever process takes its id, the request left with it", () => {
         const folder = temporary();
-        takeSeat(folder, { pid: 3, host: "claude" });
-        askAgain(folder);
-        const later = new Date(Date.now() + seatTimes.heldFor);
+        // A minute before the clock, so the seat is held from the time it is given, not from the file's.
+        const now = new Date(Date.now() - 60_000);
+        takeSeat(folder, { pid: 3, host: "claude" }, now);
+        askAgain(folder, now);
+        const later = new Date(now.getTime() + seatTimes.heldFor);
 
         expect(seatTaken(folder, later)).toBe(false);
         refreshSeat(folder, 4, later);

@@ -11,7 +11,7 @@ import { type Context, withProfile } from "../src/commands/registry/context.ts";
 import { archivedGames, gameInAnalysis, keepThought, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
-import { Bell, bellHeard, bellLine, codexBellAnswer, notePagePort, noteSilence, waitForBell } from "../src/server/bell/bell.ts";
+import { Bell, bellHeard, bellLine, codexBellAnswer, notePagePort, noteSilence, stopCheck, waitForBell } from "../src/server/bell/bell.ts";
 import { analysesOf } from "../src/server/page/analyses.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { profilesShown } from "../src/server/page/profiles.ts";
@@ -931,6 +931,62 @@ describe("the doorbell of the chat", () => {
         seconds = 65;
         page.chatCalls();
         expect((await served()).game.clock).toMatchObject({ since: new Date(start + 65_000).toISOString(), left: { black: 300_000 } });
+    });
+
+    it("ends the turn of a chat stopped in it, which runs no hook, once a ring waits for it and the host says so; never that of a chat merely at work", () => {
+        vi.useFakeTimers();
+
+        try {
+            let told = 0;
+            let stopped = false;
+            const bell = new Bell(() => true, () => told++, () => stopped);
+
+            // The player writes in the chat: the hook of the turn before goes, and the chat is at work, long, with no tool.
+            hookAt(bell);
+            bell.chatPrompted();
+            bell.ring();
+            vi.advanceTimersByTime(10 * stopCheck);
+            expect([bell.listening, bell.inTurn, told]).toEqual([true, true, 2]);
+
+            // Esc: no hook ends the turn, but the host says the chat was stopped, and the page hears nobody listens.
+            stopped = true;
+            vi.advanceTimersByTime(stopCheck);
+            expect([bell.listening, bell.inTurn, told]).toEqual([false, false, 3]);
+
+            // The player writes in the chat again: its first tool starts the AI's clock, and its hook hears what the player did on the page.
+            expect(bell.chatCalls()).toBe(true);
+            expect(hookAt(bell).heard).toBe("ring");
+
+            // A chat found stopped as the ring comes is out of its turn at once.
+            hookAt(bell);
+            bell.chatPrompted();
+            bell.ring();
+            expect(bell.listening).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("tells the page nobody hears the player when Claude Code's transcript ends with the chat stopped, and the player moves there", async () => {
+        const folder = playerFolder();
+        const context = testContext(folder);
+        const page = await open(folder, undefined, context);
+        const transcript = join(folder, "chat.jsonl");
+        const line = (entry: object): string => `${JSON.stringify(entry)}\n`;
+        writeFileSync(transcript, line({ type: "user", message: { role: "user", content: "Your move." } }) + line({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "I" }] } }));
+        saveChatStart(folder, { source: "startup", at: context.now().toISOString(), session: "a-chat", transcript });
+
+        // The new game wakes the chat, which answers and waits for the bell; then the player writes in the chat.
+        expect(await post(page, "/api/new", { ai_colour: "black" })).toMatchObject({ status: 200 });
+        expect(await (await hookWaits(page, { cwd: folder })).heard).toBe(true);
+        const hook = await hookWaits(page, { cwd: folder });
+        expect((await get(page, "/api/bell/prompt")).body).toBe("at work");
+        expect(await hook.heard).toBe(false);
+
+        // Esc: Claude Code writes the player's interruption, then lines of its own.
+        writeFileSync(transcript, line({ type: "user", message: { role: "user", content: [{ type: "text", text: "[Request interrupted by user]" }] } }) + line({ type: "queue-operation" }), { flag: "a" });
+        expect(await post(page, "/api/move", { move: "e4" })).toMatchObject({ status: 200 });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ listening: false });
     });
 
     it("knows whether the doorbell woke the chat in the turn it is in, and tells when it wakes it or the turn ends", () => {
