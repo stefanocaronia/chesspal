@@ -5,7 +5,9 @@ import { createServer, get, type Server } from "node:http";
 import type { Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { Readable } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
+import { answerPrompt } from "../src/cli/prompt-hook.ts";
 import { newGame, startNewGame } from "../src/commands/game/new.ts";
 import { status } from "../src/commands/game/status.ts";
 import type { Context } from "../src/commands/index.ts";
@@ -13,9 +15,10 @@ import { aiNameOf } from "../src/core/index.ts";
 import { forgetAnalyst, gameInAnalysis, loadGame, noteAiModel, saveChatStart, saveTableTalk, startAnalysis, type TableTalk, talkLine } from "../src/games/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { activateProfile, createProfile, gameFolder, profileFolder } from "../src/profiles/index.ts";
-import { bellHeard, notedPagePorts, pageAt, pagePorts } from "../src/server/bell/bell.ts";
+import { bellHeard } from "../src/server/bell/bell.ts";
 import { type Page, startPage } from "../src/server/page/page.ts";
 import type { TableChats } from "../src/server/page/table.ts";
+import { notedPagePorts, pageAt, pagePorts } from "../src/server/ports/ports.ts";
 import { attachTable, startTable, type Table } from "../src/server/table/index.ts";
 import { version } from "../src/version.ts";
 import { testContext } from "./commands.ts";
@@ -465,6 +468,39 @@ describe("a new game at the table that wants a clean chat", () => {
             const shown = await gameShown(table.url);
             expect(shown).toMatchObject({ table: { chat: false, opening: "again" } });
             expect(shown.table).not.toHaveProperty("waiting");
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
+    it("waits as well between the player's message in the chat and the chat's first tool", async () => {
+        const { chats, relaunched } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const played = await longGameInTurn(home, chat, page, table.url);
+            // The chat's turn ends, and its hook waits: the chat is at rest.
+            const ended = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(async () => (await gameShown(table.url)).thinking === undefined);
+
+            // The player writes in the chat: its turn starts, and its hook goes without a ring.
+            await answerPrompt(Readable.from([JSON.stringify({ cwd: chat.folder, hook_event_name: "UserPromptSubmit", prompt: "Shall we play another?" })]));
+            expect(await ended).toMatchObject({ rang: false });
+
+            expect(await newGameWith(table.url)).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+            expect(relaunched).toEqual([]);
+            expect(loadGame(gameFolder(home))?.started).toBe(played);
+
+            // The turn ends: the game starts as the player chose it, and the chat again.
+            const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(() => Promise.resolve(relaunched.length > 0));
+            expectChosenGame(home, played);
+            await page.close();
+            expect(await hook).toMatchObject({ rang: false });
         } finally {
             restore("CHESSPAL_HOME", before);
         }

@@ -8,7 +8,8 @@ import { aiNameOf } from "../../core/index.ts";
 import { forgetAnalyst, gameStamp, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { Bell, bellProbe, forgetPagePort, notePagePort, pagePorts, type TableChat } from "../bell/index.ts";
+import { Bell, forgetPagePort, notePagePort } from "../bell/index.ts";
+import { bellProbe, pagePorts, type TableChat } from "../ports/index.ts";
 import { analysesOf, answerAnalyses, sendSiteGames } from "./analyses.ts";
 import { answerChat } from "./attach.ts";
 import { type Attached, attachedSeen, type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";
@@ -281,6 +282,10 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
             const shown = url.searchParams.get("shown");
             served.bell.listen(request, response, shown !== null && shown === stampNow(served));
         }
+    } else if (path === "/api/bell/prompt") {
+        // The prompt hook: a message starts the chat's turn. A path of its own, which a page of an older Chesspal answers with a 404, not as a hook waiting.
+        served.bell.chatPrompted();
+        send(response, 200, "text/plain; charset=utf-8", "at work");
     } else {
         sendFile(response, path);
     }
