@@ -272,7 +272,7 @@
 .app.talk-folded .talk {
     visibility: hidden;
     opacity: 0;
-    transition: opacity 120ms 80ms, visibility 0s 200ms;
+    transition: opacity 120ms 80ms, visibility 0ms 200ms;
 }
 
 /* A column's tab, a drawer's handle at the top: open, on the outer edge of the column's first card; folded, the column slides under the board and the
@@ -381,7 +381,7 @@
 .app.talk-folded .faces {
     display: flex;
     visibility: hidden;
-    transition: visibility 0s 200ms;
+    transition: visibility 0ms 200ms;
 }
 
 .app.flipped .faces {
@@ -536,16 +536,16 @@
 
 .thought.move .dot {
     fill: var(--on-accent);
-    animation: thought-dot 1.2s ease-in-out infinite;
+    animation: thought-dot 1200ms ease-in-out infinite;
 }
 
 /* In order from the left: nth-of-type would count the trail, a circle too */
 .thought.move .dot + .dot {
-    animation-delay: 0.2s;
+    animation-delay: 200ms;
 }
 
 .thought.move .dot + .dot + .dot {
-    animation-delay: 0.4s;
+    animation-delay: 400ms;
 }
 
 .thought.ponder .cloud {
@@ -556,7 +556,7 @@
 
 .thought.ponder .dot {
     fill: var(--soft);
-    animation: thought-breath 3s ease-in-out infinite;
+    animation: thought-breath 3000ms ease-in-out infinite;
 }
 
 @keyframes thought-in {
@@ -684,7 +684,7 @@
 
 .app.folded .side {
     visibility: hidden;
-    transition: visibility 0s 200ms;
+    transition: visibility 0ms 200ms;
 }
 
 /* With no game, the game's column opens with this note, as tall as the game's card, so the column's tab sits in its middle */
@@ -1003,7 +1003,7 @@
     color: var(--ink);
     font-size: 14px;
     line-height: 1.45;
-    box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
 }
 
 /* On a phone it would cover the chat's line at the foot: it stands at the top of the column instead (Zoe) */

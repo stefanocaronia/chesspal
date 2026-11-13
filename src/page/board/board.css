@@ -789,7 +789,7 @@
 .notice.right,
 .notice.left {
     top: calc((var(--row) + 0.5) * 12.5cqw);
-    max-width: min(calc((var(--room) * 12.5cqw) - 12px), 340px);
+    max-width: min(calc(var(--room) * 12.5cqw - 12px), 340px);
 }
 
 .notice.right {
@@ -887,7 +887,9 @@
 }
 
 .promotion-piece:hover {
-    box-shadow: var(--shadow), inset 0 0 0 max(2px, 0.625cqw) var(--hover-edge);
+    box-shadow:
+        var(--shadow),
+        inset 0 0 0 max(2px, 0.625cqw) var(--hover-edge);
 }
 
 /* White inside dark reads on every square and every theme. */
