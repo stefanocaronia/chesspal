@@ -610,7 +610,7 @@
 
 /* Beside the board the talk is a row a side, each half the column, or what its card, note and box need when that is more: only the words give way, and
    never spill over the other side (Stefano, Zoe). Turned round, the player's row comes first. In analysis the AI's note keeps its height while the thread
-   gives way, and scrolls by itself only when nothing else is left to give */
+   gives way, and never scrolls by itself */
 @media (min-width: 841px) {
     .talk {
         display: grid;
@@ -643,19 +643,36 @@
         contain: size;
     }
 
+    /* The note is always whole: when the column cannot hold it with the box and the cards, the column scrolls under the wheel or the finger, with no
+       scrollbar, fading at its edges as the game's column does; a halo keeps the cards' shadows. Positioned, so the words hidden for screen readers
+       scroll with it instead of stretching the page */
     .talk.studied {
-        grid-template-rows: minmax(0, max-content) minmax(min-content, 1fr);
-        overflow: hidden;
+        --halo: 16px;
+        position: relative;
+        grid-template-rows: max-content minmax(min-content, 1fr);
+        margin: calc(-1 * var(--halo));
+        padding: var(--halo);
+        overflow: hidden auto;
+        scrollbar-width: none;
+        mask-image: linear-gradient(transparent, #000 var(--halo), #000 calc(100% - var(--halo)), transparent);
     }
 
+    /* Turned round the note is at the foot: a column laid from its foot opens scrolled to it */
     .flipped .talk.studied {
-        grid-template-rows: minmax(min-content, 1fr) minmax(0, max-content);
+        display: flex;
+    }
+
+    .flipped .talk.studied > .you-block {
+        flex: 1 1 0;
+        min-height: auto;
+    }
+
+    .flipped .talk.studied > .ai-block {
+        flex: none;
     }
 
     .talk.studied > .ai-block > .ai-note {
-        flex: 0 1 auto;
-        min-height: 0;
-        overflow-y: auto;
+        flex: none;
     }
 }
 

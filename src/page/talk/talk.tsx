@@ -5,7 +5,8 @@ import type { Mood, MoveReview, Opening, Side } from "../../core/index.ts";
 import { Torretta } from "../avatars/torretta.tsx";
 import { BadgeIcon, NoteIcon } from "../game/badges.tsx";
 import { Figurines } from "../game/move-list.tsx";
-import { type Ply, talkLimits, type TalkLine } from "../game/plies.ts";
+import { type Ply, type ReviewCount, talkLimits, type TalkLine } from "../game/plies.ts";
+import { ReviewProgress } from "../game/review-progress.tsx";
 import { signature } from "../players/model-name.ts";
 import type { Text } from "../text.ts";
 import { hush, speak, type Voice } from "./voice.ts";
@@ -35,13 +36,15 @@ export function AiWords({ words, newestFirst, voice }: { words: readonly string[
  * The AI's word on the move shown of a game in analysis (D-69), in a bubble under the Torretta beside the AI's name, pointing up at it: the move, its badge by name,
  * and its note when it wrote one; read out as the player steps through the game. The Torretta and the name stay when the move has no word.
  */
-export function AiNote({ ply, opening, closing, summary, reviewing, onComplete, name, by, mood, voice, text }: {
+export function AiNote({ ply, opening, closing, summary, reviewing, count, onComplete, name, by, mood, voice, text }: {
     ply?: Ply;
     opening?: Opening;
     closing?: string;
     summary?: string;
     /** The AI is still reviewing the game: the Torretta says so too. */
     reviewing?: true;
+    /** How far the review has got, under the line that says the AI reviews, or that the review is not complete. */
+    count?: ReviewCount;
     /** Nobody is finishing the review: the note says so, with the button that brings the game back to the AI (D-109). */
     onComplete?: () => void;
     name: string;
@@ -108,17 +111,20 @@ export function AiNote({ ply, opening, closing, summary, reviewing, onComplete, 
             )}
             {reviewing === true
                 ? (
-                    <p class="say reviewing">
-                        <span class="spinner" aria-hidden="true" />
-                        {text.reviewing(name)}
-                    </p>
+                    <div class="say reviewing">
+                        <p role="status">{text.reviewing(name)}</p>
+                        {count === undefined ? null : <ReviewProgress count={count} label={text.reviewing(name)} />}
+                    </div>
                 )
                 : null}
             {onComplete === undefined ? null : (
-                <p class="say incomplete">
-                    <span role="status">{text.incomplete}</span>
-                    <button type="button" title={text.completeHint} aria-label={text.completeHint} onClick={onComplete}>{text.complete}</button>
-                </p>
+                <div class="say incomplete">
+                    <p>
+                        <span role="status">{text.incomplete}</span>
+                        <button type="button" title={text.completeHint} aria-label={text.completeHint} onClick={onComplete}>{text.complete}</button>
+                    </p>
+                    {count === undefined || count.done === 0 ? null : <ReviewProgress count={count} label={text.incomplete} stopped />}
+                </div>
             )}
         </div>
     );
@@ -472,9 +478,9 @@ function useOnlyWhole(list: RefObject<HTMLElement>, lines: readonly string[], ne
             for (const item of element.children) {
                 const place = item.getBoundingClientRect();
                 const style = (item as HTMLElement).style;
-                // The newest never hides: one longer than the column, as a note with the helps on (D-78), scrolls in itself.
+                // The newest never hides: one longer than the column, as a note with the helps on (D-78), scrolls in itself with no scrollbar (talk.css).
                 style.maxHeight = item === newest ? room + "px" : "";
-                style.overflowY = item === newest && item.scrollHeight > room ? "auto" : "";
+                item.classList.toggle("scrolls", item === newest && item.scrollHeight > room);
                 style.visibility = item === newest || (place.top >= box.top - 1 && place.bottom <= box.bottom + 1) ? "" : "hidden";
             }
         };
