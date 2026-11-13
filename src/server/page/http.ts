@@ -17,6 +17,7 @@ export interface Refused
         | "ai-to-move"
         | "illegal"
         | "clear-chat"
+        | "new-game-profile"
         | `words-${WordsRefused["reason"]}`
         | `draw-${DrawRefused["reason"]}`
         | "profile-game"

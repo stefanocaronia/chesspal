@@ -12,15 +12,23 @@ export interface BrowserSystem
     output: (command: string, args: string[]) => Promise<string>;
 }
 
+/** How the table's page opened: in a window of its own, marked with its opening; in a tab of the default browser, which is not; or not at all. */
+export type Opened = "window" | "tab" | "none";
+
 /**
- * Opens an address in a window of its own, marked with the table's opening, else in a tab of the default browser, without waiting for it: whether a
- * browser started. A tab is not marked: a page cannot close a tab it did not open.
+ * Opens an address in a window of its own, marked with the table's opening, else in a tab of the default browser, without waiting for it: how it opened.
+ * A tab is not marked: a page cannot close a tab it did not open.
  */
-export async function openInBrowser(url: string, platform: string, opening?: number): Promise<boolean>
+export async function openInBrowser(url: string, platform: string, opening?: number): Promise<Opened>
 {
     const browser = await appBrowser(platform, process.env);
+
+    if (browser !== undefined && await started(browser, [`--app=${openedAddress(url, opening)}`])) {
+        return "window";
+    }
+
     // Explorer, open and xdg-open take an address as they take a folder, and hand it to the default browser.
-    return (browser !== undefined && await started(browser, [`--app=${openedAddress(url, opening)}`])) || openFolder(url, platform);
+    return await openFolder(url, platform) ? "tab" : "none";
 }
 
 /**

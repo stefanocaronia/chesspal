@@ -29,6 +29,19 @@ export function giveOpening(served: Served): { opening: number | null; }
     return { opening: windows.given };
 }
 
+/** Lets go of an opening whose window will never reach the table, as no browser started or only a tab did: whether it was the one pending. */
+export function releaseOpening(served: Served, opening: unknown): { released: boolean; }
+{
+    const windows = windowsOf(served);
+    const released = windows.pending !== undefined && windows.pending.opening === opening;
+
+    if (released) {
+        windows.pending = undefined;
+    }
+
+    return { released };
+}
+
 /** A page connects to the events with the opening of its window, when the table opened it: every page hears which window is the newest. */
 export function windowConnected(served: Served, url: URL): void
 {

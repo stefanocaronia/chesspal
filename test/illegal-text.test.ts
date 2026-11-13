@@ -48,6 +48,7 @@ describe("the page's words for a refusal", () => {
             "ai-to-move": true,
             "illegal": true,
             "clear-chat": true,
+            "new-game-profile": true,
             "words-empty": true,
             "words-spent": true,
             "words-long": true,

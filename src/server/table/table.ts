@@ -116,8 +116,14 @@ export async function askToOpen(port: number): Promise<number | null | undefined
     return typeof opening === "number" || opening === null ? opening : undefined;
 }
 
+/** Lets go of the opening the table at a port gave, whose window will never reach it: the next `chesspal` opens its own at once. */
+export async function askToRelease(port: number, opening: number): Promise<void>
+{
+    await askTable(port, "/api/table/open", { release: opening });
+}
+
 // A POST of JSON to a route of the table: its answer read as JSON, undefined when it could not be reached or read in time.
-function askTable(port: number, path: string): Promise<unknown>
+function askTable(port: number, path: string, body: object = {}): Promise<unknown>
 {
     return new Promise((done) => {
         const asked = request({ host: "127.0.0.1", port, path, method: "POST", headers: { "Content-Type": "application/json" }, agent: false }, (response) => {
@@ -136,7 +142,7 @@ function askTable(port: number, path: string): Promise<unknown>
         });
         asked.setTimeout(tableWait, () => asked.destroy());
         asked.on("error", () => done(undefined));
-        asked.end("{}");
+        asked.end(JSON.stringify(body));
     });
 }
 

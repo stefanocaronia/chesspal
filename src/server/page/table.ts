@@ -9,7 +9,7 @@ import { gameFolder } from "../../profiles/index.ts";
 import { tellWatchers } from "./events.ts";
 import { bodyOf, isJson, jsonOf, type Refused, runRoute, sendJson } from "./http.ts";
 import type { Served } from "./page.ts";
-import { giveOpening } from "./windows.ts";
+import { giveOpening, releaseOpening } from "./windows.ts";
 
 /** A host the table offers a chat in: whether it is installed, the models and efforts the player may choose, and the command to open one by hand. */
 export interface ChatHost
@@ -47,7 +47,8 @@ export type Opening = "chat" | "again" | "restart";
 
 /**
  * What waits for the chat at the table to end its answer (D-107): a start again with another host, or a new game that wants a clean chat, which starts
- * it again; the later request replaces the earlier. `start` starts the new game with the choices kept: whether the chat starts again for it.
+ * it again; the later request replaces the earlier. `start` starts the new game with the choices kept: whether the chat starts again for it; one that
+ * cannot start says why to the pages.
  */
 export type ChatWait = { readonly for: "restart"; readonly host: string; } | { readonly for: "new-game"; readonly start: () => boolean; };
 
@@ -64,7 +65,12 @@ export interface TableShown
     readonly opening?: Opening;
     /** A start again or a new game asked while the chat was at work, waiting for it to end its answer, or to be started at once or let go from the page. */
     readonly waiting?: ChatWait["for"];
+    /** Why the last new game that waited for the chat could not start, numbered so that each page says it once. */
+    readonly refused?: WaitRefused;
 }
+
+/** A new game that waited for the chat and could not start: why, and its number, larger for each. */
+export type WaitRefused = Refused & { readonly number: number; };
 
 /** What the table's page shows of its chat: whether one is at the table, with which host, the hosts it can open one in, and one opening. */
 export function tableShown(served: Served): { table?: TableShown; }
@@ -87,6 +93,7 @@ export function tableShown(served: Served): { table?: TableShown; }
             hosts: table.chats?.hosts() ?? [],
             ...(now === undefined ? {} : { opening: now }),
             ...(served.chatWait === undefined ? {} : { waiting: served.chatWait.for }),
+            ...(served.waitRefused === undefined ? {} : { refused: served.waitRefused }),
         },
     };
 }
@@ -105,8 +112,7 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
         sendJson(response, 200, { quitting: true });
         served.table.quit();
     } else if (path === "/api/table/open") {
-        // chesspal asks to open the table's window: the newest one stays, the others close.
-        sendJson(response, 200, giveOpening(served));
+        runRoute(response, () => openWindow(request, response, served));
     } else if (path === "/api/table/chat") {
         runRoute(response, () => openChat(request, response, served));
     } else if (path === "/api/table/restart") {
@@ -181,6 +187,23 @@ export function startWhenAtRest(served: Served): void
     if (!gone || wanted.for === "new-game") {
         startWaited(served, wanted);
     }
+}
+
+/** A new game that waited for the chat could not start (D-107): the pages say why, each once. */
+export function refuseWaited(served: Served, refused: Refused): void
+{
+    served.waitRefused = { ...refused, number: (served.waitRefused?.number ?? 0) + 1 };
+    tellWatchers(served.watchers);
+}
+
+/**
+ * chesspal asks to open the table's window, the newest one staying and the others closing; or, with `release`, lets go of the opening it was given when no
+ * window that reaches the table opened, so that the next chesspal opens its own.
+ */
+async function openWindow(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
+{
+    const release = jsonOf(await bodyOf(request))?.release;
+    sendJson(response, 200, release === undefined ? giveOpening(served) : releaseOpening(served, release));
 }
 
 // A terminal takes a few seconds to open and its chat to attach: a second click meanwhile would open a second chat, which serves a page of its own.

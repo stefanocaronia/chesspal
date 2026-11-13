@@ -476,6 +476,7 @@ export type ServerRefusal =
     | "ai-to-move"
     | "illegal"
     | "clear-chat"
+    | "new-game-profile"
     | "words-empty"
     | "words-spent"
     | "words-long"
@@ -746,6 +747,7 @@ const english: Text = {
         "ai-to-move": () => "Wait for the AI's move.",
         illegal: () => "That move is not legal here.",
         "clear-chat": (most, name) => english.clearChat(name),
+        "new-game-profile": () => "The new game did not start: you changed profile while it waited. Start it again from this one.",
         "words-empty": () => "Write something first.",
         "words-spent": () => "You have used up your words for this move: write again after the AI's move.",
         "words-long": (most) => `Write at most ${most} characters.`,
@@ -1188,6 +1190,7 @@ const italian: Text = {
         "ai-to-move": () => "Aspetta la mossa dell'AI.",
         illegal: () => "Questa mossa qui non è legale.",
         "clear-chat": (most, name) => italian.clearChat(name),
+        "new-game-profile": () => "La nuova partita non è cominciata: hai cambiato profilo mentre aspettava. Ricominciala da questo.",
         "words-empty": () => "Scrivi prima qualcosa.",
         "words-spent": () => "Hai finito le parole per questa mossa: scrivi di nuovo dopo quella dell'AI.",
         "words-long": (most) => `Scrivi al massimo ${most} caratteri.`,

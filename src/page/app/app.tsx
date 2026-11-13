@@ -68,7 +68,7 @@ import { textFor } from "../text.ts";
 import { anchorName, type LinkIgnored, useAnchor } from "./anchor.ts";
 import { useBrowseKeys, useFoldKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
 import { phaseOf, verdictOf } from "./phase.ts";
-import { ask, type PageData, post, sendMessage, sendMove, useServed } from "./served.ts";
+import { ask, type PageData, post, refusedText, sendMessage, sendMove, useServed } from "./served.ts";
 import { tabTitle, useTabTitle } from "./title.ts";
 
 /**
@@ -173,6 +173,24 @@ export function App({ start }: { start: Settings; })
     const name = served?.opponent ?? text.ai;
     // Under it, the model and effort the AI played its last move with (D-82).
     const signed = served?.aiModel === undefined ? undefined : signature(served.aiModel.model, served.aiModel.effort);
+
+    // A new game that waited for the chat and could not start says why on the board, as one refused at once (D-107): once, and never one from before the
+    // page loaded.
+    const waitRefused = served?.table?.refused;
+    const waitRefusedSeen = useRef<number | undefined>(undefined);
+    useEffect(() => {
+        if (served === undefined) {
+            return;
+        }
+
+        const number = waitRefused?.number ?? 0;
+
+        if (waitRefused !== undefined && waitRefusedSeen.current !== undefined && number > waitRefusedSeen.current) {
+            setRefusal({ text: refusedText(waitRefused, text, name) ?? "" });
+        }
+
+        waitRefusedSeen.current = number;
+    }, [served === undefined, waitRefused?.number]);
 
     // The game is replayed from its PGN once for each one the server sends, not at every click. Once no game goes on, the game in analysis shows in its place
     // (D-69), with the AI's badges and notes: replayed again only when its review changed.

@@ -7,7 +7,7 @@ import type { Context } from "../src/commands/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { pageAt, pagePorts } from "../src/server/bell/bell.ts";
 import { startPage } from "../src/server/page/page.ts";
-import { openTable, processLauncher, startTable, type Table, type TableLauncher, type TableTimes } from "../src/server/table/index.ts";
+import { type Opened, openTable, processLauncher, startTable, type Table, type TableLauncher, type TableTimes } from "../src/server/table/index.ts";
 import { version } from "../src/version.ts";
 import { testContext } from "./commands.ts";
 import { removeFolder } from "./folders.ts";
@@ -80,6 +80,16 @@ describe("the table", () => {
         expect(await post(table.url, "/api/table/quit")).toBe(200);
         await table.closed;
     });
+
+    it("refuses to open a window or quit when another site's page asks through the player's browser; chesspal and another table, which send no origin, are heard", async () => {
+        const { table } = await freshTable();
+
+        expect(await post(table.url, "/api/table/open", "http://example.com")).toBe(403);
+        expect(await post(table.url, "/api/table/quit", "http://example.com")).toBe(403);
+        expect(await post(table.url, "/api/table/open")).toBe(200);
+        expect(await post(table.url, "/api/table/quit")).toBe(200);
+        await table.closed;
+    });
 });
 
 describe("chesspal alone", () => {
@@ -130,6 +140,17 @@ describe("chesspal alone", () => {
         second.close();
     });
 
+    it("lets go at once of an opening whose window will never reach the table, as no browser started or only a tab did: the next chesspal opens its own", async () => {
+        for (const how of ["tab", "none"] as const) {
+            const context = homeContext();
+            const { launcher, openings } = inProcess(context, how);
+
+            await openTable(context, launcher);
+            await openTable(context, launcher);
+            expect(openings, how).toHaveLength(2);
+        }
+    });
+
     it("asks a table of another version to quit, and starts its own in its place", async () => {
         const context = homeContext();
         const folder = tableFolder(context.home());
@@ -168,7 +189,7 @@ describe("chesspal alone", () => {
         process.env.CHESSPAL_HOME = context.home();
         const cli = join(import.meta.dirname, "..", "src", "cli", "cli.ts");
         const opened: string[] = [];
-        const launcher = { ...processLauncher("linux", ["--experimental-strip-types", "--no-warnings", cli]), open: (url: string) => Promise.resolve(opened.push(url) > 0) };
+        const launcher = { ...processLauncher("linux", ["--experimental-strip-types", "--no-warnings", cli]), open: (url: string) => Promise.resolve(opened.push(url) > 0 ? "window" : "none") } satisfies TableLauncher;
 
         try {
             await openTable(context, launcher);
@@ -220,10 +241,10 @@ function freshTable(times = patient): Promise<{ context: Context; table: Table; 
 }
 
 /**
- * A launcher that starts the table in this process, and opens no browser: the addresses it was asked to open with their openings, and how many tables it
- * started.
+ * A launcher that starts the table in this process, and opens no browser, though it says it opened as `how` says: the addresses it was asked to open with
+ * their openings, and how many tables it started.
  */
-function inProcess(context: Context): { launcher: TableLauncher; opened: string[]; openings: (number | undefined)[]; starts: () => number; }
+function inProcess(context: Context, how: Opened = "window"): { launcher: TableLauncher; opened: string[]; openings: (number | undefined)[]; starts: () => number; }
 {
     const opened: string[] = [];
     const openings: (number | undefined)[] = [];
@@ -235,14 +256,15 @@ function inProcess(context: Context): { launcher: TableLauncher; opened: string[
         },
         open: (url, opening) => {
             openings.push(opening);
-            return Promise.resolve(opened.push(url) > 0);
+            opened.push(url);
+            return Promise.resolve(how);
         },
         wait: (milliseconds) => new Promise((done) => setTimeout(done, milliseconds)),
     };
     return { launcher, opened, openings, starts: () => starts };
 }
 
-/** A window the table opened, listening to its events with its opening: whether it hears an event within a second, and closing it. */
+/** A window the table opened, listening to its events with its opening: whether it hears an event within five seconds, as `until` waits elsewhere, and closing it. */
 function tableWindow(url: string, opening: number | undefined): Promise<{ heard: (data: string) => Promise<boolean>; close: () => void; }>
 {
     return new Promise((done) => {
@@ -252,7 +274,7 @@ function tableWindow(url: string, opening: number | undefined): Promise<{ heard:
             response.on("data", (chunk: string) => said.push(chunk));
             done({
                 heard: async (data) => {
-                    for (let waited = 0; waited < 1000; waited += 20) {
+                    for (let waited = 0; waited < 5_000; waited += 20) {
                         if (
                             said.join("").includes(`data: ${data}
 `)
@@ -286,10 +308,12 @@ function status(url: string): Promise<number | undefined>
     );
 }
 
-function post(url: string, path: string): Promise<number | undefined>
+/** A POST of JSON to a route of the page, with the origin of the page that sends it, none as from chesspal: the answer's status. */
+function post(url: string, path: string, origin?: string): Promise<number | undefined>
 {
     return new Promise((done) => {
-        const asked = request(new URL(path, url), { method: "POST", headers: { "Content-Type": "application/json" } }, (response) => {
+        const headers = { "Content-Type": "application/json", ...(origin === undefined ? {} : { Origin: origin }) };
+        const asked = request(new URL(path, url), { method: "POST", headers }, (response) => {
             response.resume();
             done(response.statusCode);
         });

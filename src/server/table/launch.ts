@@ -6,16 +6,16 @@ import { styleText } from "node:util";
 import { type Context, speaksItalian } from "../../commands/index.ts";
 import { tableFolder } from "../../home/index.ts";
 import { version } from "../../version.ts";
-import { openInBrowser } from "./browser.ts";
-import { askToOpen, askToQuit, tableAt } from "./table.ts";
+import { type Opened, openInBrowser } from "./browser.ts";
+import { askToOpen, askToQuit, askToRelease, tableAt } from "./table.ts";
 
 /** What opening the table does outside this process: start the table apart, open the browser, wait. The tests give their own. */
 export interface TableLauncher
 {
     /** Starts `chesspal table` apart from this process, which it outlives, in the data folder. */
     start(home: string): void;
-    /** Opens the page in the browser, its window marked with its opening when the table gave one: whether it could. */
-    open(url: string, opening?: number): Promise<boolean>;
+    /** Opens the page in the browser, its window marked with its opening when the table gave one: how it opened. */
+    open(url: string, opening?: number): Promise<Opened>;
     wait(milliseconds: number): Promise<void>;
 }
 
@@ -84,11 +84,23 @@ export function processLauncher(platform: string, command: string[] = [...proces
     };
 }
 
-// The table's window, opened unless another opening has not reached the table yet, as two clicks on the icon ask: then the one opening is as good.
+// The table's window, opened unless another opening has not reached the table yet, as two clicks on the icon ask: then the one opening is as good. One
+// that will never reach it, as no browser started or only a tab with no opening did, is let go at once: the next chesspal opens its own.
 async function openWindow(url: string, port: number, launcher: TableLauncher): Promise<boolean>
 {
     const opening = await askToOpen(port);
-    return opening === null || await launcher.open(url, opening);
+
+    if (opening === null) {
+        return true;
+    }
+
+    const opened = await launcher.open(url, opening);
+
+    if (opening !== undefined && opened !== "window") {
+        await askToRelease(port, opening);
+    }
+
+    return opened !== "none";
 }
 
 // A table answers within ten seconds of its start, an older one quitting first, looked for every tenth of a second.

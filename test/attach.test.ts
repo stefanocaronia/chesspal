@@ -1,6 +1,6 @@
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, get, type Server } from "node:http";
 import type { Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -10,9 +10,9 @@ import { newGame, startNewGame } from "../src/commands/game/new.ts";
 import { status } from "../src/commands/game/status.ts";
 import type { Context } from "../src/commands/index.ts";
 import { aiNameOf } from "../src/core/index.ts";
-import { gameInAnalysis, loadGame, noteAiModel, saveChatStart, saveTableTalk, startAnalysis, type TableTalk, talkLine } from "../src/games/index.ts";
+import { forgetAnalyst, gameInAnalysis, loadGame, noteAiModel, saveChatStart, saveTableTalk, startAnalysis, type TableTalk, talkLine } from "../src/games/index.ts";
 import { tableFolder } from "../src/home/index.ts";
-import { gameFolder } from "../src/profiles/index.ts";
+import { activateProfile, createProfile, gameFolder, profileFolder } from "../src/profiles/index.ts";
 import { bellHeard, notedPagePorts, pageAt, pagePorts } from "../src/server/bell/bell.ts";
 import { type Page, startPage } from "../src/server/page/page.ts";
 import type { TableChats } from "../src/server/page/table.ts";
@@ -502,6 +502,98 @@ describe("a new game at the table that wants a clean chat", () => {
         }
     });
 
+    it("says once why the game it waited for could not start, and leaves the game before as it was", async () => {
+        const { chats, relaunched } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const played = await longGameInTurn(home, chat, page, table.url);
+            expect(await newGameWith(table.url)).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+
+            // The game before cannot go to the archive: a file stands where its folder would be.
+            const archive = join(gameFolder(home), "games");
+            rmSync(archive, { recursive: true, force: true });
+            writeFileSync(archive, "");
+
+            // Its turn ends: the game does not start, and the pages are told why.
+            const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(async () => (await gameShown(table.url)).table?.refused !== undefined);
+            const shown = await gameShown(table.url);
+            expect(shown.table).toMatchObject({ refused: { number: 1, error: expect.stringContaining("archive") as string } });
+            expect(shown.table).not.toHaveProperty("waiting");
+            expect(loadGame(gameFolder(home))?.started).toBe(played);
+            expect(relaunched).toEqual([]);
+
+            // Said once: nothing waits any more, and nothing more is said as the chat goes.
+            await page.close();
+            expect(await hook).toMatchObject({ rang: false });
+            expect((await gameShown(table.url)).table).toMatchObject({ refused: { number: 1 } });
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
+    it("drops the waiting game when another profile is in use by the time it would start, and says so", async () => {
+        const { chats, relaunched } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const asked = createProfile(home, { name: "Anna" });
+            const other = createProfile(home, { name: "Marco" }, false);
+            const played = await longGameInTurn(home, chat, page, table.url);
+            expect(await newGameWith(table.url)).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+
+            activateProfile(home, other.id);
+            expect(await waitingAt(table.url, true)).toEqual({ status: 200, text: JSON.stringify({ restarting: false }) });
+            expect((await gameShown(table.url)).table).toMatchObject({ refused: { number: 1, refusal: "new-game-profile" } });
+            expect(loadGame(profileFolder(home, asked.id))?.started).toBe(played);
+            expect(loadGame(profileFolder(home, other.id))).toBeUndefined();
+            expect(relaunched).toEqual([]);
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
+    it("starts once an analyst at work when the chat ended its answer has ended too", async () => {
+        const { chats, relaunched } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const played = await longGameInTurn(home, chat, page, table.url);
+            expect(await newGameWith(table.url)).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+
+            // An analyst of the chat's starts on another game, and is still at work as the chat's turn ends: the game waits.
+            startAnalysis(gameFolder(home), "games/2026-11-01-100000.pgn", new Date(), { analyst: { game: "games/2026-11-01-100000.pgn", run: "a-run", since: new Date().toISOString() } });
+            const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(async () => (await gameShown(table.url)).thinking === undefined);
+            expect(relaunched).toEqual([]);
+            expect(await gameShown(table.url)).toMatchObject({ table: { waiting: "new-game" } });
+
+            // The analyst ends: the game starts, and the chat again, clean.
+            forgetAnalyst(gameFolder(home));
+            await until(() => Promise.resolve(relaunched.length > 0));
+            expect(relaunched).toEqual([chat.folder]);
+            expectChosenGame(home, played);
+
+            await page.close();
+            expect(await hook).toMatchObject({ rang: false });
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
     it("asks a chat opened by hand for /clear, as before", async () => {
         const { chats, relaunched } = playChats(false);
         const { home, table } = await tableOn(undefined, chats);
@@ -854,7 +946,7 @@ function fakeTableOn(other: string, chat?: FakeChat): Promise<{ home: string; fa
     });
 }
 
-async function gameShown(url: string): Promise<{ opponent?: string; listening?: boolean; thinking?: string; talk?: { heard?: string; }[]; aiModel?: { model: string; }; table?: unknown; }>
+async function gameShown(url: string): Promise<{ opponent?: string; listening?: boolean; thinking?: string; talk?: { heard?: string; }[]; aiModel?: { model: string; }; table?: { refused?: unknown; }; }>
 {
     return JSON.parse((await sent(new URL("/api/game", url))).text) as never;
 }

@@ -17,7 +17,7 @@ import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls, thinkingChanged } from "./game.ts";
 import { json, send } from "./http.ts";
 import { answerProfiles, readRatingsOf } from "./profiles.ts";
-import { answerTable, type ChatWait, type Opening, startWhenAtRest, type TableChats, updateWhenAtRest } from "./table.ts";
+import { answerTable, type ChatWait, type Opening, startWhenAtRest, type TableChats, updateWhenAtRest, type WaitRefused } from "./table.ts";
 import { watchForUpdates } from "./update.ts";
 import { type TableWindows, windowConnected } from "./windows.ts";
 
@@ -178,6 +178,8 @@ export interface Served
     chatOpened?: { readonly at: number; readonly how: Opening; } | undefined;
     /** What the page asked while the chat was at work, waiting for it to end its answer: a start again with another host, or a new game (D-107). */
     chatWait?: ChatWait | undefined;
+    /** Why the last new game that waited for the chat could not start, numbered so that each page says it once. */
+    waitRefused?: WaitRefused | undefined;
     /** The newer Chesspal npm has (D-108); the table installing it, installed and waiting to be at rest, or starting again from it. */
     newer?: string;
     updating?: "installing" | "installed" | "restarting" | undefined;
@@ -367,7 +369,8 @@ function watchGame(served: Served): () => void
                     tellWatchers(served.watchers);
                 }
 
-                // A game that has ended lets an update installed meanwhile start the table again (D-108).
+                // An analyst that has ended lets what waited for the chat start (D-107), and a game that has ended an update installed meanwhile (D-108).
+                startWhenAtRest(served);
                 updateWhenAtRest(served);
             }, 30);
         }

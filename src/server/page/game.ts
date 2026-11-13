@@ -54,7 +54,7 @@ import { tellWatchers } from "./events.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
-import { chatToRelaunch, chatToWaitFor, relaunchChat, tableShown } from "./table.ts";
+import { chatToRelaunch, chatToWaitFor, refuseWaited, relaunchChat, tableShown } from "./table.ts";
 import { updateShown } from "./update.ts";
 
 /** Answers the page's requests about the game: true when the request was one. */
@@ -262,14 +262,23 @@ type NewGameChoices = Parameters<typeof startNewGame>[0];
 
 /**
  * The new game waits, with the player's choices, for the chat at the table to end its answer; then it starts and the chat starts again, clean, for it, or
- * one gone meanwhile hears the doorbell when another comes. A game that cannot start then leaves everything as it was.
+ * one gone meanwhile hears the doorbell when another comes. It starts in the profile it was asked in: with another in use by then it is dropped. A game
+ * that cannot start leaves everything as it was, and the pages say why.
  */
 function waitForChat(served: Served, chosen: NewGameChoices): void
 {
+    const askedIn = gameFolder(served.context.home());
+
     const start = (): boolean => {
         try {
+            if (gameFolder(served.context.home()) !== askedIn) {
+                refuseWaited(served, { error: "Another profile is in use since the new game was asked: ask for it again in this one.", refusal: "new-game-profile" });
+                return false;
+            }
+
             rerunIfChanged(() => startNewGame(chosen, { ...served.context, pageOpen: () => true }, "page"));
-        } catch {
+        } catch (error) {
+            refuseWaited(served, refusalFrom(error));
             return false;
         }
 

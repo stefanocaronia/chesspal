@@ -120,6 +120,16 @@ export interface TableShown
     readonly hosts: readonly ChatHost[];
     readonly opening?: "chat" | "again" | "restart";
     readonly waiting?: "restart" | "new-game";
+    /** Why the last new game that waited for the chat could not start, numbered so that the page says it once. */
+    readonly refused?: ServerRefused & { readonly number: number; };
+}
+
+/** A refusal as the server sends it: its words, and the code of one the page says in the player's language, with the characters left for words too long. */
+export interface ServerRefused
+{
+    readonly error?: string;
+    readonly refusal?: string;
+    readonly most?: number;
 }
 
 /** A host the table opens a chat in: whether it is installed, the models and efforts offered, and the command to type in a terminal instead. */
@@ -152,12 +162,18 @@ export async function ask(path: string, body: object, text: Text, name: string):
             return { answer: await response.json().catch(() => ({})) as Record<string, unknown> };
         }
 
-        const refused = (await response.json()) as { error?: string; refusal?: string; most?: number; };
-        const known = refused.refusal === undefined ? undefined : text.refused[refused.refusal as ServerRefusal] as ((most: number, name: string) => string) | undefined;
-        return { refused: { text: known?.(refused.most ?? 0, name) ?? refused.error ?? response.statusText, words: refused.refusal?.startsWith("words-") === true } };
+        const refused = (await response.json()) as ServerRefused;
+        return { refused: { text: refusedText(refused, text, name) ?? response.statusText, words: refused.refusal?.startsWith("words-") === true } };
     } catch (error) {
         return { refused: { text: String(error), words: false } };
     }
+}
+
+/** A refusal of the server's in the player's language when the page knows its code, with the host's name where it sends the player; else its words. */
+export function refusedText(refused: ServerRefused, text: Text, name: string): string | undefined
+{
+    const known = refused.refusal === undefined ? undefined : text.refused[refused.refusal as ServerRefusal] as ((most: number, name: string) => string) | undefined;
+    return known?.(refused.most ?? 0, name) ?? refused.error;
 }
 
 /** Sends the player's move to the server, which plays it as the chat would, with the words written for the AI: the reason it was refused, or undefined. */
