@@ -1,6 +1,7 @@
 // The clock in the commands (D-13): a flag that falls ends the game as soon as a command reads it, and the clock's line for the AI.
 import { canMate, clockText, Game, type Side, timeControlText, timeLeft } from "../../core/index.ts";
 import { archiveEnded, type CurrentGame, endOf, loadGame, saveGame } from "../../games/index.ts";
+import { openingTags } from "./opening-tags.ts";
 import { colourName } from "./view.ts";
 
 /** What the AI reads of the clock: the time control, and the time each side has left when the command ran, in milliseconds. */
@@ -30,7 +31,7 @@ export function gameAt(folder: string, now: Date): CurrentGame | undefined
     const ended = outOfTime(current, turn, now);
     saveGame(folder, ended);
     // An archive that cannot be written leaves the game in game.json, where status shows it, until a new game archives it.
-    archiveEnded(folder, ended);
+    archiveEnded(folder, ended, openingTags(ended.game.record));
     return ended;
 }
 

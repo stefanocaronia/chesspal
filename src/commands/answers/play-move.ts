@@ -2,6 +2,7 @@
 import { clockAfterMove, clockTag } from "../../core/index.ts";
 import { archiveEnded, type CurrentGame, endOf, loadGame, saveGame, talkLine } from "../../games/index.ts";
 import type { Context, SeenPosition } from "../registry/index.ts";
+import { openingTags } from "./opening-tags.ts";
 import { gameGoingOn, type MovePlayed, summaryOf, withThought } from "./summary.ts";
 import { colourName } from "./view.ts";
 
@@ -64,7 +65,7 @@ export function playMove(folder: string, now: Date, mover: Mover, text: string, 
 
     saveGame(folder, current);
 
-    const { archive, warning } = endOf(game) === undefined ? {} : archiveEnded(folder, current);
+    const { archive, warning } = endOf(game) === undefined ? {} : archiveEnded(folder, current, openingTags(game.record));
     const result: MovePlayed = { move: `${position.moveNumber}${position.turn === "white" ? "." : "..."}${played.move.san}`, game: withThought(summaryOf(current, now, archive), folder, current, coached) };
 
     if (played.note !== undefined) {

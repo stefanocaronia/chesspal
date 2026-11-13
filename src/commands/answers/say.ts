@@ -5,6 +5,7 @@ import { gameFolder, helpsIn } from "../../profiles/index.ts";
 import type { Context } from "../registry/index.ts";
 import { gameAt } from "./clock.ts";
 import { shownMove } from "./lines.ts";
+import { openingTags } from "./opening-tags.ts";
 
 /**
  * Adds a line to the talk of the current game, going on or just over, and saves it; the AI's mood once the game is over, which the archive keeps too (D-70).
@@ -34,7 +35,7 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
     saveGame(folder, current);
 
     if (mood !== undefined) {
-        archiveEnded(folder, current);
+        archiveEnded(folder, current, openingTags(current.game.record));
     }
 
     return current;

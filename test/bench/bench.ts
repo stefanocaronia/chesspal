@@ -29,7 +29,7 @@ export async function report(cases: BenchCase[], runs = 25): Promise<void>
         console.log(`| ${name} | ${format(median)} | ${format(budget)}${median > budget ? " ✗ over" : ""} |`);
     }
 
-    process.exitCode = over ? 1 : 0;
+    process.exitCode = over ? 1 : process.exitCode;
 }
 
 /** The time of one of the operations a piece of work does, in milliseconds. */

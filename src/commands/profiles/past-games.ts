@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { type GameRecord, writePgn } from "../../core/index.ts";
-import { archivedGame, archivedGames, archivedWhen } from "../../games/index.ts";
+import { writePgn } from "../../core/index.ts";
+import { archivedGame, archivedGames, archivedTags, archivedWhen } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { openingName } from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
@@ -35,7 +35,7 @@ export const pastGames = defineCommand({
 
 /**
  * The latest games of the archive, one line each as the AI reads them, those holding every word searched: none when there is no archive. A game closed
- * before any move is no game played.
+ * before any move is no game played. A game is read from its tags alone when the archive wrote the opening's and the plies', or else whole.
  */
 export function pastGameLines(folder: string, count: number, search = ""): string[]
 {
@@ -48,8 +48,7 @@ export function pastGameLines(folder: string, count: number, search = ""): strin
         }
 
         try {
-            const record = archivedGame(folder, name);
-            const line = record.moves.length > 0 ? pastGameLine(name, record) : undefined;
+            const line = pastGameLine(folder, name);
             // The ending names the player's colour too, as "(Black resigns)": a colour searched is the AI's alone.
             const searched = line?.replace(/ \((?:White|Black) [^)]*\)/, "").toLowerCase();
 
@@ -66,15 +65,33 @@ export function pastGameLines(folder: string, count: number, search = ""): strin
 
 const listed = 20;
 
-/** 2026-11-03 12:04, you (AI) played Black and won 0-1 (White resigns), B50 Sicilian Defense, 15 moves. games/2026-11-03-120423.pgn */
-function pastGameLine(name: string, record: GameRecord): string
+/** A game's line, from its tags when they say all of it, or else from the whole game: none for a game closed before any move. */
+function pastGameLine(folder: string, name: string): string | undefined
 {
-    const ai = record.tags.Black === "AI" ? "black" : "white";
-    const result = record.tags.Result ?? "*";
+    const tags = archivedTags(folder, name);
+    const { ECO: eco, Opening: opening, PlyCount: plies = "" } = tags;
+
+    // The archive that writes the plies writes the opening too, or none for a game that has none: from another position, or outside the book.
+    if (/^\d+$/.test(plies)) {
+        return lineOf(name, tags, Number(plies), eco === undefined || opening === undefined ? undefined : `${eco} ${opening}`);
+    }
+
+    const record = archivedGame(folder, name);
+    return lineOf(name, record.tags, record.moves.length, openingName(record));
+}
+
+/** 2026-11-03 12:04, you (AI) played Black and won 0-1 (White resigns), B50 Sicilian Defense, 15 moves. games/2026-11-03-120423.pgn */
+function lineOf(name: string, tags: Readonly<Record<string, string>>, plies: number, opening: string | undefined): string | undefined
+{
+    if (plies === 0) {
+        return undefined;
+    }
+
+    const ai = tags.Black === "AI" ? "black" : "white";
+    const result = tags.Result ?? "*";
     const outcome = result === "*" ? ", unfinished" : ` and ${resultFor(result, ai)} ${result}`;
-    const termination = record.tags.Termination === undefined || result === "*" ? "" : ` (${record.tags.Termination})`;
-    const opening = openingName(record);
-    const moves = Math.ceil(record.moves.length / 2);
+    const termination = tags.Termination === undefined || result === "*" ? "" : ` (${tags.Termination})`;
+    const moves = Math.ceil(plies / 2);
     return `${archivedWhen(name)}, you (AI) played ${ai === "white" ? "White" : "Black"}${outcome}${termination}${opening === undefined ? "" : `, ${opening}`}, ${moves} moves. ${name}`;
 }
 
