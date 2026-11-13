@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { phaseOf, verdictOf } from "../src/page/app/phase.ts";
+import { helpsShown, phaseOf, verdictOf } from "../src/page/app/phase.ts";
 import { textFor } from "../src/page/text.ts";
 
 const text = textFor(["en"]);
@@ -17,6 +17,21 @@ describe("where the page stands", () => {
         expect(phaseOf(false, null, false, false)).toBe("idle");
         expect(phaseOf(false, game, true, false)).toBe("idle");
         expect(phaseOf(false, game, true, true)).toBe("over");
+    });
+});
+
+describe("the helps on the board", () => {
+    it("are always on in analysis, whatever the switch (D-114)", () => {
+        expect(helpsShown("analysis", false)).toBe(true);
+        expect(helpsShown("analysis", true)).toBe(true);
+    });
+
+    it("follow the switch in a game, and are off between games", () => {
+        expect(helpsShown("going", true)).toBe(true);
+        expect(helpsShown("going", false)).toBe(false);
+        expect(helpsShown("over", true)).toBe(false);
+        expect(helpsShown("idle", true)).toBe(false);
+        expect(helpsShown(undefined, true)).toBe(false);
     });
 });
 

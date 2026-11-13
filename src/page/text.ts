@@ -17,6 +17,8 @@ export interface Text
     readonly voice: string;
     /** Why the voice's switch is off for good: the browser has no voice for the page's language. */
     readonly noVoice: string;
+    /** Why the helps' switch is on and cannot be turned off: in analysis the helps are always on (D-114). */
+    readonly helpsInAnalysis: string;
     /** The mark on the bubble being read aloud, which stops its reading and goes on with the next. */
     readonly skipReading: string;
     /** A move the AI wrote as the voice reads it (Stefano): ♞xf6+ as "knight takes f6, check", never the figurine's name. */
@@ -574,6 +576,7 @@ const english: Text = {
     sounds: "Sounds",
     voice: "Read the AI's words aloud",
     noVoice: "This browser has no voice for this language: add one in your system's settings",
+    helpsInAnalysis: "In analysis the helps are always on: the switch counts in a game",
     skipReading: "Stop reading this aloud",
     saidMove: (move) => moveInWords(englishMoveWords, move),
     newGame: "New game",
@@ -1018,6 +1021,7 @@ const italian: Text = {
     sounds: "Suoni",
     voice: "Leggi ad alta voce le parole dell'AI",
     noVoice: "Questo browser non ha una voce per questa lingua: aggiungila nelle impostazioni del sistema",
+    helpsInAnalysis: "Nell'analisi gli aiuti sono sempre accesi: l'interruttore vale in partita",
     skipReading: "Smetti di leggere questo a voce",
     saidMove: (move) => moveInWords(italianMoveWords, move),
     newGame: "Nuova partita",

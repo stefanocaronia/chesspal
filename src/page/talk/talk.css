@@ -266,6 +266,14 @@
     color: var(--accent);
 }
 
+/* In analysis the chat that answers, over the box as its addressee: its name opens the chat's window, as on the AI's card in a game */
+.sent + .ai-name {
+    align-self: flex-start;
+    margin: 0 0 6px 12px;
+    color: var(--soft);
+    font-size: 0.875rem;
+}
+
 /* The bubbles: the AI's under its card, the tail under the Torretta's centre (14 px of padding, 48 px picture), and the player's above their box */
 .says,
 .sent {

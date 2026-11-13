@@ -7,10 +7,11 @@ import { type Look, looks, pieceSets, type Settings } from "../profile/settings.
 import { hasVoice, onVoices } from "../talk/voice.ts";
 import type { Text } from "../text.ts";
 
-/** The panel of the settings, open while `open` is true: every change goes to `onChange` at once. */
-export function SettingsPanel({ open, settings, onChange, onClose, text }: {
+/** The panel of the settings, open while `open` is true: every change goes to `onChange` at once; `analysing` while a game is in analysis. */
+export function SettingsPanel({ open, settings, analysing, onChange, onClose, text }: {
     open: boolean;
     settings: Settings;
+    analysing: boolean;
     onChange: (settings: Settings) => void;
     onClose: () => void;
     text: Text;
@@ -86,9 +87,9 @@ export function SettingsPanel({ open, settings, onChange, onClose, text }: {
                         <Switch on={settings.squareNames} onSwitch={(on) => set("squareNames", on)}>{text.squareNames}</Switch>
                         <Switch on={settings.explain} onSwitch={(on) => set("explain", on)}>{text.explain}</Switch>
                         <Switch on={settings.book} onSwitch={(on) => set("book", on)}>{text.bookBadges}</Switch>
-                        <Switch on={settings.helps} onSwitch={(on) => set("helps", on)}>{text.helps}</Switch>
+                        <Switch on={settings.helps} onSwitch={(on) => set("helps", on)} {...(analysing ? { locked: { on: true, why: text.helpsInAnalysis } } : {})}>{text.helps}</Switch>
                         <Switch on={settings.sound} onSwitch={(on) => set("sound", on)}>{text.sounds}</Switch>
-                        <Switch on={settings.voice} onSwitch={(on) => set("voice", on)} {...(voiced ? {} : { unavailable: text.noVoice })}>{text.voice}</Switch>
+                        <Switch on={settings.voice} onSwitch={(on) => set("voice", on)} {...(voiced ? {} : { locked: { on: false, why: text.noVoice } })}>{text.voice}</Switch>
                     </Section>
                     <Section title={text.languageChoice} icon={languageIcon}>
                         <Segments label={text.languageChoice}>
@@ -176,15 +177,13 @@ function Choice({ on, onPick, children }: { on: boolean; onPick: () => void; chi
     );
 }
 
-/** A switch; one that cannot be used here is off and disabled, and its tooltip says why. */
-function Switch({ on, onSwitch, unavailable, children }: { on: boolean; onSwitch: (on: boolean) => void; unavailable?: string; children: ComponentChildren; })
+/** A switch; one `locked` here holds its value, disabled, and its tooltip says why. */
+function Switch({ on, onSwitch, locked, children }: { on: boolean; onSwitch: (on: boolean) => void; locked?: { on: boolean; why: string; }; children: ComponentChildren; })
 {
-    const usable = unavailable === undefined;
-
     return (
-        <label class="switch" title={unavailable}>
+        <label class="switch" title={locked?.why}>
             <span>{children}</span>
-            <input type="checkbox" role="switch" checked={on && usable} disabled={!usable} title={unavailable} onChange={(event) => onSwitch(event.currentTarget.checked)} />
+            <input type="checkbox" role="switch" checked={locked?.on ?? on} disabled={locked !== undefined} title={locked?.why} onChange={(event) => onSwitch(event.currentTarget.checked)} />
         </label>
     );
 }

@@ -67,7 +67,7 @@ import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.t
 import { textFor } from "../text.ts";
 import { anchorName, type LinkIgnored, useAnchor } from "./anchor.ts";
 import { useBrowseKeys, useFoldKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
-import { phaseOf, verdictOf } from "./phase.ts";
+import { helpsShown, phaseOf, verdictOf } from "./phase.ts";
 import { ask, type PageData, post, refusedText, sendMessage, sendMove, useServed } from "./served.ts";
 import { tabTitle, useTabTitle } from "./title.ts";
 
@@ -121,8 +121,9 @@ export function App({ start }: { start: Settings; })
         setDialog(first ? "chat" : "new-game");
     };
 
+    // In analysis the chat is who answers on the game: its window asks who reviews it.
     const askChat = (): void => {
-        setChatToReview(false);
+        setChatToReview(served?.analysis !== undefined);
         setDialog("chat");
     };
 
@@ -256,14 +257,15 @@ export function App({ start }: { start: Settings; })
     const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
     // A square lit from the AI's words goes off with the position: a touch keeps it lit until then, a mouse until it leaves the word.
     useEffect(() => setPointed(noSquares), [shown]);
-    // With the helps on, the player sees all of Chesspal's facts, whatever the AI's level (D-79), in a game and in the analysis of one (Stefano).
+    // The player sees all of Chesspal's facts, whatever the AI's level (D-79): in a game with the helps on, always in analysis (D-114).
     const analysing = studied !== undefined;
+    const helped = helpsShown(phase, settings.helps);
     // Seen from the player's side (D-91): theirs in a game, in analysis the side the game names theirs, none when it names neither.
     const you = analysing ? playerIn(studiedSides(live.record.tags, served?.profile.name ?? "", playedAs, text.sides, served?.profile.accounts)) : game?.ai === undefined ? undefined : game.ai === "white" ? "black" : "white";
-    const helps = useMemo(() => (going || analysing) && settings.helps ? helpsOf(shown, you) : undefined, [shown, going, analysing, settings.helps, you]);
-    // Who the AI saw ahead, the coach's with the helps on in a game and the analyst's in analysis, for the bar and the chart (D-90).
+    const helps = useMemo(() => helped ? helpsOf(shown, you) : undefined, [shown, helped, you]);
+    // Who the AI saw ahead, the coach's in a game and the analyst's in analysis, for the bar and the chart (D-90).
     const drawnOnBoard = live.outcome.over && live.outcome.result === "1/2-1/2";
-    const standings = useMemo(() => (going && settings.helps) || analysing ? standingsOf(plies, drawnOnBoard) : undefined, [plies, drawnOnBoard, going, analysing, settings.helps]);
+    const standings = useMemo(() => helped ? standingsOf(plies, drawnOnBoard) : undefined, [plies, drawnOnBoard, helped]);
     useMapKey(helps !== undefined, setMapping);
     // A new move or a new game ends what the player was doing on the one before: the move sent, the look back, the choice of a promotion. The same game
     // sent again, for the talk, the coach's words or the settings, leaves them where they are (Zoe); so does a review written on the game in analysis.
@@ -385,7 +387,7 @@ export function App({ start }: { start: Settings; })
         />
     );
 
-    const panel = <SettingsPanel open={setting} settings={settings} onChange={change} onClose={() => setSetting(false)} text={text} />;
+    const panel = <SettingsPanel open={setting} settings={settings} analysing={analysing} onChange={change} onClose={() => setSetting(false)} text={text} />;
     // The guide opens before the page has its data too.
     const guide = <GuideDialog open={dialog === "guide"} onClose={() => setDialog(undefined)} text={text} />;
 
@@ -490,6 +492,8 @@ export function App({ start }: { start: Settings; })
     // Where to wake the chat, under the AI's card (over the board when the talk is folded); the button that starts the clocks, under the player's (Zoe).
     // On the table, what its chat is doing stands there, and in a game with no chat at it a line that opens the chat's window (D-107).
     const table = offline ? undefined : served.table;
+    // In analysis the chat that answers stands over the box: its name opens its window, as on the AI's card in a game.
+    const chatName = table === undefined ? undefined : <AiNameButton name={name} table={table} onOpen={askChat} text={text} />;
     const atTable = table === undefined ? null : tableNote({ table, name, inGame: going, onOpen: askChat, text });
     const asleepNote = atTable !== null
         ? atTable
@@ -759,6 +763,7 @@ export function App({ start }: { start: Settings; })
                                                 name={name}
                                                 problem={unsent}
                                                 about={{ ...(at === 0 ? {} : { ply: plies[at - 1]! }), onShow: goTo }}
+                                                {...(chatName === undefined ? {} : { to: chatName })}
                                                 text={text}
                                             />
                                         </div>

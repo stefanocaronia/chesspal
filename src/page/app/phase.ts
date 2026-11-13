@@ -27,6 +27,12 @@ export function phaseOf(analysing: boolean, game: object | null | undefined, ove
     return sawEnd ? "over" : "idle";
 }
 
+/** Whether the board shows the helps: always in analysis, where the player uses every tool there is (D-114); in a game, with the helps `switched` on. */
+export function helpsShown(phase: PagePhase, switched: boolean): boolean
+{
+    return phase === "analysis" || (phase === "going" && switched);
+}
+
 /** What the header says of the game, with the kind that gives it a colour and an icon: in analysis, none going on, how it ended, or the draw offered. */
 export function verdictOf(phase: PagePhase, how: HowEnded | undefined, winner: Side | undefined, offer: "player" | "ai" | undefined, declined: boolean, text: Text): Verdict
 {

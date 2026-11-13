@@ -201,7 +201,7 @@ export interface About
  * move takes them with it. 200 characters from one move of the AI's to the next: once they are written, the box goes until its move (D-54). In analysis the
  * AI's answers are in the same thread, each by a small Torretta, and each line of the player's names the move it was written on (D-101).
  */
-export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, canMove, name, problem, about, text }: {
+export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, canMove, name, problem, about, to, text }: {
     lines: readonly TalkLine[];
     /** On a board turned round the box is above the words, and the newest come first. */
     newestFirst: boolean;
@@ -213,6 +213,8 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
     name: string;
     problem?: string;
     about?: About;
+    /** Who the words go to, over the box. */
+    to?: ComponentChildren;
     text: Text;
 })
 {
@@ -257,6 +259,7 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
                     newestFirst,
                 )}
             </ol>
+            {to}
             {left <= 0 ? null : (
                 <form
                     class={about === undefined ? "compose" : "compose asking"}

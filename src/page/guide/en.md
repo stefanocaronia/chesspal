@@ -37,14 +37,14 @@ No chess engine plays for the AI: every move and every judgment is its own. Ches
 
 - You talk with the AI in the **box under its name**, a few words with each move: it reads them with your move. You can also write to it in its window. With Codex, if you write there while it waits for your move, press **Esc** after Enter: else it reads your message only after your move.
 - A **move written** in the chat counts too: `e4`, `Nf3`, with the English letters of the pieces (K Q R B N), or in words.
-- **The AI's name** opens the choice of its chat: Claude Code or Codex, the model (which AI: some are faster, others stronger) and how much it reasons. The more it reasons, the slower it plays. If you change them, the chat starts afresh in the same window: the AI forgets what you talked about, and the game stays as it is.
+- **The AI's name** opens the choice of its chat: Claude Code or Codex, the model (which AI: some are faster, others stronger) and how much it reasons. The more it reasons, the slower it plays. If you change them, the chat starts afresh in the same window: the AI forgets what you talked about, and the game stays as it is. In analysis the name stands over the box where you write to it.
 - At each **new game**, the chat the page opened starts afresh by itself, once the AI has stopped thinking: a long chat makes the AI slower.
 
 ## Helps and marks
 
 ![Coloured arrows and badges on the board, beside the helps' card](helps)
 
-- With **"The AI teaches as you play"**, in the settings, the **Helps** card shows the pieces in danger, the pins and the pawns, and the AI, as your coach, gives you an idea.
+- With **"The AI teaches as you play"**, in the settings, the **Helps** card shows the pieces in danger, the pins and the pawns, and the AI, as your coach, gives you an idea. In analysis the card and its marks are always there.
 - The AI draws **coloured arrows** on the board: the **?** beside the moves explains every mark.
 - In the review, a **badge** on a move gives the AI's judgment: a great move, an inaccuracy, a blunder.
 
