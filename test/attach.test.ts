@@ -955,7 +955,7 @@ async function gameShown(url: string): Promise<{ opponent?: string; listening?: 
 function listening(url: string, told: () => void = () => undefined): Promise<ReturnType<typeof get>>
 {
     return new Promise((done) => {
-        const events = get(new URL("/api/events", url), (response) => {
+        const events = get(new URL("/api/events", url), { agent: false }, (response) => {
             response.on("data", told);
             done(events);
         });

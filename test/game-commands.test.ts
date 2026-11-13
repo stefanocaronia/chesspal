@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import { answerDraw, offerDraw } from "../src/commands/game/draw-offer.ts";
 import type { Context } from "../src/commands/registry/context.ts";
+import { archiveGame, loadGame, rerunIfChanged } from "../src/games/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
 
@@ -249,6 +250,69 @@ describe("a game in chat", () => {
             `New game: you play White, the player Black, at the strong level (board, tactical and positional facts).\nThe game before is saved with the player's games.\n`,
         );
         expect(readArchive(context)).toContain("[%plan Mate.]");
+    });
+
+    it("leaves the archive as it was when game.json cannot take the new game, and archives the game before once, later", async () => {
+        const context = playerFolder();
+        const folder = gameFolder(context.home());
+        await run(context, "new_game", { ai_colour: "white" });
+        await run(context, "ai_move", { move: "e4", plan: "p", comment: "c" });
+        const blocked = join(folder, `game.json.${process.pid}.tmp`);
+        mkdirSync(blocked);
+
+        await expect(run(context, "new_game", { ai_colour: "black", replace: true })).rejects.toThrow(/^Chesspal could not save the game: .* Nothing changed\.$/);
+        expect(gameFile(context).pgn).toContain("1. e4");
+        expect(existsSync(join(folder, archive))).toBe(false);
+
+        rmSync(blocked, { recursive: true });
+
+        expect(await run(context, "new_game", { ai_colour: "black", replace: true })).toContain("The game before is saved with the player's games, unfinished.");
+        expect(readdirSync(join(folder, "games"))).toEqual(["2026-11-02-153012.pgn"]);
+    });
+
+    it("archives a game once when a process stopped between its archive and the new game: the game goes on, and its end rewrites the same file", async () => {
+        const context = playerFolder();
+        const folder = gameFolder(context.home());
+        await run(context, "new_game", { ai_colour: "white" });
+        await run(context, "ai_move", { move: "e4", plan: "p", comment: "c" });
+        // What a process that stopped after the archive and before game.json leaves behind.
+        archiveGame(folder, loadGame(folder)!, {});
+
+        await run(context, "player_move", { move: "e5" });
+        await run(context, "end_game", { result: "player_resigns" });
+        expect(await run(context, "new_game", { ai_colour: "black" })).toContain("New game: ");
+
+        expect(readdirSync(join(folder, "games"))).toEqual(["2026-11-02-153012.pgn"]);
+        expect(readArchive(context)).toContain("1. e4 {c [%plan p]} 1... e5 1-0");
+    });
+
+    it("never archives a game another process changed after it was read: the archive it wrote stays", async () => {
+        const context = playerFolder();
+        const folder = gameFolder(context.home());
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "f3" });
+        await run(context, "ai_move", { move: "e5", plan: "p", comment: "c" });
+        await run(context, "player_move", { move: "g4" });
+        const mated = '[Event "Chesspal"]\n[Result "0-1"]\n\n1. f3 e5 2. g4 Qh4# 0-1\n';
+        let played = false;
+
+        // Between new_game's reading of the game and its archive, another process mates and archives the game.
+        const other = () => {
+            if (!played) {
+                played = true;
+                writeFileSync(join(folder, "game.json"), JSON.stringify({ ...gameFile(context), pgn: mated }));
+                mkdirSync(join(folder, "games"));
+                writeFileSync(join(folder, archive), mated);
+            }
+
+            return 0;
+        };
+
+        const { input, run: start, format } = command("new_game");
+        const started = await rerunIfChanged(() => start(input.parse({ ai_colour: "random", replace: true }), { ...context, random: other }));
+
+        expect(format(started)).toContain("New game: ");
+        expect(readFileSync(join(folder, archive), "utf8")).toBe(mated);
     });
 
     it("names each game in the archive by a second of its own, when summer time ends or the clock goes back", async () => {

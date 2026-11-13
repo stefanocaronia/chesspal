@@ -1,6 +1,8 @@
+import { existsSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { z } from "zod";
 import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../../core/index.ts";
-import { archivedName, archiveGame, cleanSince, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../../games/index.ts";
+import { archivedName, archiveGame, archiveName, cleanSince, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../../games/index.ts";
 import { gameFolder, gameFolders } from "../../profiles/index.ts";
 import { coachRuns, gameAt, type GameSummary, nextStep, openingTags, positionLines, refuseUnseenPosition, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "../answers/index.ts";
 import { pastGameLines, playerLine } from "../profiles/index.ts";
@@ -111,8 +113,7 @@ export function startNewGame({ ai_colour: colour, from, clock, level: chosen, re
     const current: CurrentGame = control === undefined
         ? { game, ai, started: started.toISOString(), talk: [] }
         : { game, ai, started: started.toISOString(), talk: [], clock: startClock(control, now, context.pageOpen?.() === true) };
-    const archived = before === undefined || (going === undefined && archivedName(folder, before) !== undefined) ? undefined : archiveBefore(folder, before);
-    saveGame(folder, current);
+    const archived = replaceGame(folder, current, before, going !== undefined);
     endAnalysis(folder);
     endTableTalk(folder);
     const past = pastGameLines(folder, remembered);
@@ -235,6 +236,33 @@ function chatToClear(context: Context): boolean
 
 // The hosts whose SessionStart hook, written by init, notes how each chat starts: Claude Code and Codex, by the names they give the server.
 const hostsNotingChats = new Set(["claude-code", "codex-mcp-client"]);
+
+/**
+ * Writes the new game over the one before, archived first: both under game.json's lock, on the game before as read, so a game another process changed
+ * since is neither archived stale nor lost. When game.json cannot be written, an archive this call made goes: nothing changed.
+ */
+function replaceGame(folder: string, current: CurrentGame, before: CurrentGame | undefined, going: boolean): string | undefined
+{
+    let archived: string | undefined;
+    let made = false;
+
+    try {
+        saveGame(folder, current, () => {
+            if (before !== undefined && (going || archivedName(folder, before) === undefined)) {
+                made = !existsSync(join(folder, archiveName(before)));
+                archived = archiveBefore(folder, before);
+            }
+        });
+    } catch (error) {
+        if (made && archived !== undefined) {
+            rmSync(join(folder, archived), { force: true });
+        }
+
+        throw error;
+    }
+
+    return archived;
+}
 
 function archiveBefore(folder: string, before: CurrentGame): string | undefined
 {

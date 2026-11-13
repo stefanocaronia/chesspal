@@ -269,7 +269,7 @@ function tableWindow(url: string, opening: number | undefined): Promise<{ heard:
 {
     return new Promise((done) => {
         const said: string[] = [];
-        const events = get(new URL(`/api/events?window=${opening}`, url), (response) => {
+        const events = get(new URL(`/api/events?window=${opening}`, url), { agent: false }, (response) => {
             response.setEncoding("utf8");
             response.on("data", (chunk: string) => said.push(chunk));
             done({
@@ -308,12 +308,15 @@ function status(url: string): Promise<number | undefined>
     );
 }
 
-/** A POST of JSON to a route of the page, with the origin of the page that sends it, none as from chesspal: the answer's status. */
+/**
+ * A POST of JSON to a route of the page, with the origin of the page that sends it, none as from chesspal: the answer's status. On a connection of its own:
+ * a table closed before may have had the same port, and a connection kept to it is reset.
+ */
 function post(url: string, path: string, origin?: string): Promise<number | undefined>
 {
     return new Promise((done) => {
         const headers = { "Content-Type": "application/json", ...(origin === undefined ? {} : { Origin: origin }) };
-        const asked = request(new URL(path, url), { method: "POST", headers }, (response) => {
+        const asked = request(new URL(path, url), { method: "POST", headers, agent: false }, (response) => {
             response.resume();
             done(response.statusCode);
         });
@@ -326,7 +329,7 @@ function post(url: string, path: string, origin?: string): Promise<number | unde
 function listening(url: string): Promise<ClientRequest>
 {
     return new Promise((done) => {
-        const events = get(new URL("/api/events", url), () => done(events));
+        const events = get(new URL("/api/events", url), { agent: false }, () => done(events));
     });
 }
 

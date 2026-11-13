@@ -78,9 +78,9 @@ export function loadGame(folder: string): CurrentGame | undefined
 
 /**
  * Writes the current game to game.json, whole or not at all; from then on it is the one kept in memory. Refused with GameChanged when another process wrote
- * the file since this one read it: the change made on the game read before would lose theirs.
+ * the file since this one read it: the change made on the game read before would lose theirs. `first` runs just before the write, on the game read.
  */
-export function saveGame(folder: string, current: CurrentGame): void
+export function saveGame(folder: string, current: CurrentGame, first?: () => void): void
 {
     const path = join(folder, fileName);
     whileLocked(path, () => {
@@ -89,6 +89,7 @@ export function saveGame(folder: string, current: CurrentGame): void
             throw new GameChanged();
         }
 
+        first?.();
         write(path, current);
     });
 }
