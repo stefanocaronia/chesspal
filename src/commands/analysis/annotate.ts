@@ -1,7 +1,7 @@
 // The AI's review of a game over (D-69): a badge on each move that matters, as chess.com marks them, with a note when it needs one, and its word on the
 // whole game, kept in the game's PGN for the board page. The judgment is the AI's alone: Chesspal gives no criteria (D-6, D-43).
 import { z } from "zod";
-import { annotatorOf, badges, Game, type GameRecord, gameReviewOf, type Lead, leadOf, reviewed, reviewOf, withAnnotator, withGameReview, withLead } from "../../core/index.ts";
+import { annotatorOf, badges, figurinesOf, foreignMovesIn, Game, type GameRecord, gameReviewOf, type Lead, leadOf, reviewed, reviewOf, withAnnotator, withGameReview, withLead } from "../../core/index.ts";
 import { gameInAnalysis, rewriteGame, startAnalysis } from "../../games/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
@@ -27,6 +27,8 @@ interface Annotated
     left: string[];
     /** The chat corrected a note of a review that already has its word on the game. */
     summaryStands: boolean;
+    /** Where this call wrote a move with another language's letters (5., your summary), and the first such move: the page shows them as plain text (D-87). */
+    lettered: { where: string[]; first?: { written: string; san: string; }; };
 }
 
 // How many moves still without who is ahead the answer names; the rest it counts.
@@ -145,9 +147,10 @@ export const annotateGame = defineCommand({
             left: [...corrected],
             // A correction after the review's word on the game: that word may now say otherwise (Priya).
             summaryStands: correction && gameReviewOf(studied.record) !== undefined,
+            lettered: letteredIn([...notes.map(({ move, note }) => [move, note] as const), ["your summary", summary], ["your last word", closing]]),
         };
     },
-    format: ({ game, marked, summary, closing, bookUnnoted, estimated, unestimated, left, summaryStands }) => {
+    format: ({ game, marked, summary, closing, bookUnnoted, estimated, unestimated, left, summaryStands, lettered }) => {
         const kept = [
             marked === 0 ? undefined : `${marked} ${marked === 1 ? "move" : "moves"} marked`,
             estimated === 0 ? undefined : `who is ahead after ${estimated} ${estimated === 1 ? "move" : "moves"}`,
@@ -171,9 +174,26 @@ export const annotateGame = defineCommand({
             }.`];
         const head = kept.length === 0 ? `Nothing new kept in ${game}.` : `Kept in ${game}: ${[kept.slice(0, -1).join(", "), kept.at(-1)].filter((part) => part !== "").join(" and ")}. The board page shows them.`;
         const stands = summaryStands ? ["The review's word on the game stays as written: if it says otherwise, give summary again."] : [];
-        return [head, ...stands, ...corrected, ...book, ...ahead].join("\n");
+        const single = lettered.where.length === 1;
+        const letters = lettered.first === undefined
+            ? []
+            : [
+                `${lettered.where.join(", ")} ${single ? "writes" : "write"} moves with another language's letters, which the page shows as plain text: give ${single ? "it" : "them"} `
+                + `again with the figurines (${figurinesOf(lettered.first.san)} for ${lettered.first.written}).`,
+            ];
+        return [head, ...stands, ...corrected, ...letters, ...book, ...ahead].join("\n");
     },
 });
+
+/** Where the texts of a call write a move with another language's letters, by the move or the part they were given for, and the first such move. */
+function letteredIn(texts: readonly (readonly [string, string | undefined])[]): Annotated["lettered"]
+{
+    const found = texts.flatMap(([where, text]) => {
+        const [first] = foreignMovesIn(text ?? "");
+        return first === undefined ? [] : [{ where, first }];
+    });
+    return { where: [...new Set(found.map(({ where }) => where))], ...(found[0] === undefined ? {} : { first: found[0].first }) };
+}
 
 /** The moves without who is ahead after them, as analyse_game numbers them: all but the last when the board ended the game there, which says it. */
 function unestimatedMoves(record: GameRecord, numbers: readonly string[], over: boolean): string[]
