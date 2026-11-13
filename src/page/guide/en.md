@@ -18,7 +18,7 @@ No chess engine plays for the AI: every move and every judgment is its own. Ches
 
 ### Getting started
 
-1. Click the **AI's name**, at the top left, and choose its chat among those on your computer: **Claude Code** or **Codex**. It opens in a window of its own: keep it open while you play. The first time it asks some questions. Whether you trust the folder: **Yes**. With Codex, about the hooks, Chesspal's two helpers: **Trust all and continue**. On Windows Codex also asks whether to set up its sandbox, the protected space it works in: choose the first option, and yes when Windows asks for permission.
+1. Click the **AI's name**, at the top left, and choose its chat among those on your computer: **Claude Code** or **Codex**. It opens in a window of its own: keep it open while you play. The first time it asks some questions. Whether you trust the folder: **Yes** (in Claude Code No is chosen already: go down to Yes with the arrow keys, then Enter). With Codex, about the hooks, Chesspal's two helpers: **Trust all and continue**. On Windows Codex also asks whether to set up its sandbox, the protected space it works in: choose the first option, and yes when Windows asks for permission.
 2. Press **New game**, choose your colour, the clock and the AI's level, and press **Start**.
 3. Move: the AI answers on the board, and with a few words under its name.
 
