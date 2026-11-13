@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import { iconsRemoved, offerIcon, type Terminal } from "../src/cli/icon.ts";
 import { windowPlace } from "../src/page/layout/window.ts";
-import { appBrowser, iconAsked, type IconCommand, iconCommand, iconToRemake, makeIcons, noteIconAsked, noteIconMade, openedAddress } from "../src/server/table/index.ts";
+import { appBrowser, type BrowserSystem, iconAsked, type IconCommand, iconCommand, iconToRemake, makeIcons, noteIconAsked, noteIconMade, openedAddress } from "../src/server/table/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -17,22 +17,56 @@ afterEach(() => {
 });
 
 describe("the table's window", () => {
-    it("opens in Chrome on Windows, else in Edge, wherever each installs itself; else none, and the default browser opens a tab", () => {
-        const env = { ProgramFiles: "C:\\Program Files", "ProgramFiles(x86)": "C:\\Program Files (x86)", LOCALAPPDATA: "C:\\Users\\ann\\AppData\\Local" };
-        const chrome = "C:\\Users\\ann\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe";
-        const edge = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+    const env = { ProgramFiles: "C:\\Program Files", "ProgramFiles(x86)": "C:\\Program Files (x86)", LOCALAPPDATA: "C:\\Users\\ann\\AppData\\Local" };
+    const chrome = "C:\\Users\\ann\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe";
+    const edge = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+    const brave = "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe";
+    const choices = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http";
 
-        expect(appBrowser("win32", env, (path) => path === chrome || path === edge)).toBe(chrome);
-        expect(appBrowser("win32", env, (path) => path === edge)).toBe(edge);
-        expect(appBrowser("win32", env, () => false)).toBeUndefined();
+    // A system with these files, whose commands print what is given for them, and nothing else.
+    const system = (files: string[], printed: Record<string, string> = {}): BrowserSystem => ({
+        exists: (path) => files.includes(path),
+        output: (command) => Promise.resolve(printed[command] ?? ""),
     });
 
-    it("finds Chrome and Edge in the Applications of macOS, and on the PATH of Linux", () => {
+    // What reg prints of the default browser for http: the old key, and the newer one Windows reads in its place when it has it.
+    const userChoice = (progId: string, latest?: string): string =>
+        [
+            `${choices}\\UserChoice`,
+            `    ProgId    REG_SZ    ${progId}`,
+            "    Hash    REG_SZ    q+gbcZIEf5c=",
+            "",
+            ...(latest === undefined ? [] : [`${choices}\\UserChoiceLatest`, "    Hash    REG_SZ    24lQryKfioE=", "", `${choices}\\UserChoiceLatest\\ProgId`, `    ProgId    REG_SZ    ${latest}`]),
+            "",
+        ].join("\r\n");
+
+    it("opens in Chrome on Windows, else in Edge, wherever each installs itself; else none, and the default browser opens a tab", async () => {
+        expect(await appBrowser("win32", env, system([chrome, edge]))).toBe(chrome);
+        expect(await appBrowser("win32", env, system([edge]))).toBe(edge);
+        expect(await appBrowser("win32", env, system([]))).toBeUndefined();
+    });
+
+    it("opens in the default browser of Windows when it is a Chromium that takes --app, by the ProgId Windows reads, the newer key first", async () => {
+        const installed = system([chrome, edge, brave], { reg: userChoice("MSEdgeHTM") });
+
+        expect(await appBrowser("win32", env, installed)).toBe(edge);
+        expect(await appBrowser("win32", env, system([chrome, edge, brave], { reg: userChoice("MSEdgeHTM", "BraveHTML") }))).toBe(brave);
+        expect(await appBrowser("win32", env, system([chrome, edge], { reg: userChoice("ChromeHTML.ABCDEF") }))).toBe(chrome);
+        // Firefox chosen in the newer key is the default, whatever the old one still says: the window opens in Chrome, as with no default known.
+        expect(await appBrowser("win32", env, system([chrome, edge], { reg: userChoice("MSEdgeHTM", "FirefoxURL-308046B0AF4A39CB") }))).toBe(chrome);
+        // A default that is not where it installs itself gives way to Chrome or Edge.
+        expect(await appBrowser("win32", env, system([edge], { reg: userChoice("BraveHTML") }))).toBe(edge);
+    });
+
+    it("finds Chrome and Edge in the Applications of macOS, and on the PATH of Linux, the default browser first there", async () => {
         const mac = "/Users/ann/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge";
         const linux = "/snap/bin/chromium";
+        const linuxEdge = "/usr/bin/microsoft-edge";
 
-        expect(appBrowser("darwin", { HOME: "/Users/ann" }, (path) => path === mac)).toBe(mac);
-        expect(appBrowser("linux", { PATH: "/usr/bin:/snap/bin" }, (path) => path === linux)).toBe(linux);
+        expect(await appBrowser("darwin", { HOME: "/Users/ann" }, system([mac]))).toBe(mac);
+        expect(await appBrowser("linux", { PATH: "/usr/bin:/snap/bin" }, system([linux]))).toBe(linux);
+        expect(await appBrowser("linux", { PATH: "/usr/bin:/snap/bin" }, system([linux, linuxEdge], { "xdg-settings": "microsoft-edge.desktop\n" }))).toBe(linuxEdge);
+        expect(await appBrowser("linux", { PATH: "/usr/bin:/snap/bin" }, system([linux, linuxEdge], { "xdg-settings": "firefox.desktop\n" }))).toBe(linux);
     });
 
     it("opens marked, so that the page sizes it the first time: 1600×900 centred, or the screen's room when it has less", () => {
