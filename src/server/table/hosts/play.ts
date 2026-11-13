@@ -5,9 +5,9 @@ import { existsSync } from "node:fs";
 import { win32 } from "node:path";
 import { type Context, speaksItalian } from "../../../commands/index.ts";
 import { tableFolder } from "../../../home/index.ts";
-import { codexHooksPath, setUpHosts } from "../../../host-files/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
 import { programPath } from "./find.ts";
+import { type HooksNews, setUpTable, takeHooksNews } from "./hooks.ts";
 import { choiceIn, hostArgs, type HostChoice, type HostName, isHostName, startMessage } from "./hosts.ts";
 import { askedAgain, leaveSeat, refreshSeat, seatTimes, takeSeat } from "./seat.ts";
 import { cmdQuoted } from "./terminal.ts";
@@ -24,14 +24,15 @@ export interface HostLaunch
     readonly env: NodeJS.ProcessEnv;
     readonly shell: boolean;
     readonly choice: HostChoice;
-    /** Codex's hooks were there and Chesspal wrote them again: Codex runs them only once the player trusts them again. */
-    readonly hooksChanged?: true;
+    /** Chesspal wrote Codex's hooks, the first time or again: Codex runs them only once the player trusts them. */
+    readonly hooks?: HooksNews;
 }
 
 /**
  * Runs the host in the table's folder, in this terminal, until it ends: its exit code; started again, clean, when the table asks for a new game (D-57),
- * or for another model or host, which then takes its place (D-107); after an update, by the Chesspal installed (D-108). Ctrl+C is the host's: this
- * process ignores it, or the terminal would close with the chat.
+ * or for another model or host, which then takes its place (D-107); after an update, by the Chesspal installed (D-108). Claude Code closed at its
+ * start with an error, as when the player keeps No at its question on the folder, is told how to answer and started once more. Ctrl+C is the host's:
+ * this process ignores it, or the terminal would close with the chat.
  */
 export async function playHost(context: Context, host: HostName): Promise<number>
 {
@@ -51,6 +52,8 @@ export async function playHost(context: Context, host: HostName): Promise<number
     let refreshed = Date.now();
     // Chesspal was updated under this process (D-108): the new one plays on.
     let updated = false;
+    // Claude Code was started once more after it closed at its start.
+    let startedOnceMore = false;
 
     const asked = (): boolean => {
         if (Date.now() - refreshed >= seatTimes.refresh) {
@@ -68,6 +71,7 @@ export async function playHost(context: Context, host: HostName): Promise<number
         for (;;) {
             // A request left from a second click while the host before was ending is not for this one.
             askedAgain(folder, process.pid);
+            const startedAt = context.now();
             const ran = await started(context, playing, asked).catch((error: unknown) => {
                 if (before === undefined) {
                     throw error;
@@ -86,7 +90,19 @@ export async function playHost(context: Context, host: HostName): Promise<number
             before = undefined;
 
             if (!ran.again) {
-                return ran.code;
+                if (playing !== "claude" || ran.code === 0 || context.now().getTime() - startedAt.getTime() >= closedAtStart) {
+                    return ran.code;
+                }
+
+                const words = speaksItalian(context.language) ? closedAtStartWords.italian : closedAtStartWords.english;
+                process.stdout.write(`\n${words.join("\n")}\n`);
+
+                if (startedOnceMore) {
+                    return ran.code;
+                }
+
+                startedOnceMore = true;
+                continue;
             }
 
             if (updated) {
@@ -156,9 +172,10 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
         throw new Error(`${hostTitle[host]} is not installed on this computer, or not on its PATH: install it (${installHint[host]}), then try again.`);
     }
 
-    const hooks = codexHooksPath(folder);
-    const hadHooks = host === "codex" && existsSync(hooks);
-    const hooksChanged = setUpHosts(folder, context.platform).includes(hooks) && hadHooks ? { hooksChanged: true as const } : {};
+    setUpTable(folder, context.platform);
+    // Codex's hooks written, by this play or by the table before it: the note is for Codex's chat, and waits for it.
+    const news = host === "codex" ? takeHooksNews(folder) : undefined;
+    const hooks = news === undefined ? {} : { hooks: news };
     const choice = choiceIn(profileSettings(home, activeProfile(home).id), host);
     const args = hostArgs(host, startMessage(languageIn(gameFolder(home), context.language)), choice);
     // An effort the player set for every chat would win over the one chosen on the page: spawn leaves out a variable that is undefined.
@@ -168,17 +185,30 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     const script = npmScript(host, found, context.platform, exists ?? existsSync);
 
     if (script !== undefined) {
-        return { program: process.execPath, args: [script, ...args], folder, env: childEnv, shell: false, choice, ...hooksChanged };
+        return { program: process.execPath, args: [script, ...args], folder, env: childEnv, shell: false, choice, ...hooks };
     }
 
-    return { program: found, args, folder, env: childEnv, shell: context.platform === "win32" && /\.(cmd|bat)$/i.test(found), choice, ...hooksChanged };
+    return { program: found, args, folder, env: childEnv, shell: context.platform === "win32" && /\.(cmd|bat)$/i.test(found), choice, ...hooks };
 }
 
 const hostTitle: Record<HostName, string> = { claude: "Claude Code", codex: "Codex" };
 
-const hooksChangedWords = {
-    english: "Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.",
-    italian: "Gli «hook» di Chesspal per Codex sono cambiati: quando Codex te lo chiede, scegli di nuovo Trust all.",
+// What the player is told before Codex asks about the hooks Chesspal wrote: the first time, and when they changed.
+const hooksWords: Record<HooksNews, { english: string; italian: string; }> = {
+    new: {
+        english: "Codex will ask about Chesspal's two hooks, small helpers that let it see your moves on the board: choose Trust all and continue.",
+        italian: "Codex ti chiederà dei due «hook» di Chesspal, piccoli aiuti che gli fanno vedere le tue mosse sulla scacchiera: scegli Trust all and continue.",
+    },
+    changed: {
+        english: "Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.",
+        italian: "Gli «hook» di Chesspal per Codex sono cambiati: quando Codex te lo chiede, scegli di nuovo Trust all.",
+    },
+};
+
+// What the player is told when Claude Code closed at its start: its question on the folder starts on No.
+const closedAtStartWords = {
+    english: ["Claude Code closed as soon as it opened.", 'If it asks whether you trust this folder, go down to "Yes, I trust this folder" with the arrow keys, then press Enter.'],
+    italian: ["Claude Code si è chiuso appena aperto.", "Se ti chiede se ti fidi della cartella, scendi con le frecce su «Yes, I trust this folder», poi premi Invio."],
 };
 
 // Runs the host as runHost does, the seat noting the model and effort it is given; one not installed, or that could not start, fails saying so.
@@ -187,9 +217,10 @@ async function started(context: Context, host: HostName, again: () => boolean): 
     const launch = hostLaunch(context, host);
     takeSeat(launch.folder, { pid: process.pid, host, ...launch.choice });
 
-    // After an update the player is asked about the hooks again: said here, above the host's question, as init says it.
-    if (launch.hooksChanged === true) {
-        process.stdout.write(`${speaksItalian(context.language) ? hooksChangedWords.italian : hooksChangedWords.english}\n`);
+    // Codex asks the player to trust the hooks Chesspal wrote: said here, above its question, as init says it.
+    if (launch.hooks !== undefined) {
+        const words = hooksWords[launch.hooks];
+        process.stdout.write(`${speaksItalian(context.language) ? words.italian : words.english}\n`);
     }
 
     return runHost(launch, again, context.platform).catch((error: unknown) => {
@@ -228,6 +259,8 @@ function playUpdated(host: HostName): Promise<number>
 const killAfter = 3_000;
 // A play process that ends sooner never got to its host.
 const quickExit = 10_000;
+// Claude Code ends 1.5 s after No at its question on the folder, a chat the player ends ends with no error (Priya): a minute is the time to read it.
+const closedAtStart = 60_000;
 
 // A host ended in the middle leaves the modes it set: colours, scroll region, synchronized output, bracketed paste, focus and mouse reports, kitty's
 // keyboard flags, its own screen, a hidden cursor (Priya). All off, and the screen cleared, as a new chat.

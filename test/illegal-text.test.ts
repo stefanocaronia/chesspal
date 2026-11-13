@@ -58,6 +58,8 @@ describe("the page's words for a refusal", () => {
             "profile-game": true,
             "game-going": true,
             "pgn-unreadable": true,
+            "game-missing": true,
+            "game-not-archived": true,
             "update-game": true,
             "update-chat": true,
         };

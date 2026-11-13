@@ -481,6 +481,8 @@ export type ServerRefusal =
     | "profile-game"
     | "game-going"
     | "pgn-unreadable"
+    | "game-missing"
+    | "game-not-archived"
     | "update-game"
     | "update-chat";
 
@@ -715,7 +717,7 @@ const english: Text = {
         model: "Model",
         effort: "Effort",
         asHost: (host) => `as set in ${host}`,
-        opening: "Opening the chat… In the terminal, if it asks whether you trust the folder, choose Yes with the arrow keys and press Enter.",
+        opening: "Opening the chat… In the terminal, if it asks whether you trust the folder, say yes (in Claude Code, go down to Yes with the arrow keys) and press Enter; with Codex, on the hooks, choose Trust all and continue.",
         again: (name) => `${name} starts again with a clean chat for the new game…`,
         restart: "The chat starts again, clean…",
         waiting: (name) => `${name} starts again once it has ended its answer…`,
@@ -746,6 +748,8 @@ const english: Text = {
         "profile-game": () => english.profile.whilePlaying,
         "game-going": () => "A game is going on: finish it before you bring another to analyse.",
         "pgn-unreadable": () => "Chesspal cannot read this PGN: check you copied the whole game, its tags and its moves.",
+        "game-missing": () => "This game is no longer there: pick another.",
+        "game-not-archived": () => "The game just over is not saved yet: try again in a moment.",
         "update-game": () => english.update.whilePlaying,
         "update-chat": (most, name) => `${name} is answering: update once it has done.`,
     },
@@ -1152,7 +1156,7 @@ const italian: Text = {
         model: "Modello",
         effort: "Ragionamento",
         asHost: (host) => `come è impostato in ${host}`,
-        opening: "Apro la chat… Nel terminale, se ti chiede se ti fidi della cartella, scegli Yes con le frecce e premi Invio.",
+        opening: "Apro la chat… Nel terminale, se ti chiede se ti fidi della cartella, rispondi sì (in Claude Code scendi su Yes con le frecce) e premi Invio; con Codex, sugli «hook», scegli Trust all and continue.",
         again: (name) => `${name} riparte con una chat pulita per la nuova partita…`,
         restart: "La chat riparte pulita…",
         waiting: (name) => `${name} riparte appena ha finito di rispondere…`,
@@ -1183,6 +1187,8 @@ const italian: Text = {
         "profile-game": () => italian.profile.whilePlaying,
         "game-going": () => "C'è una partita in corso: finiscila prima di portarne un'altra da analizzare.",
         "pgn-unreadable": () => "Chesspal non riesce a leggere questo PGN: controlla di aver copiato la partita intera, intestazioni e mosse.",
+        "game-missing": () => "Questa partita non c'è più: scegline un'altra.",
+        "game-not-archived": () => "La partita appena finita non è ancora salvata: riprova fra un momento.",
         "update-game": () => italian.update.whilePlaying,
         "update-chat": (most, name) => `${name} sta rispondendo: aggiorna quando ha finito.`,
     },

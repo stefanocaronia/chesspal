@@ -33,6 +33,7 @@ import {
     drawOfferOf,
     endOf,
     gameInAnalysis,
+    GameMissing,
     heardLines,
     loadGame,
     loadTableTalk,
@@ -365,7 +366,7 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
         // A game not yet reviewed is marked as brought, for status to ask the AI to go over it; one reviewed is ready, and the chat sleeps on.
         startAnalysis(gameFolder(served.context.home()), opened.name, served.context.now(), { brought, redo });
     } catch (error) {
-        send(response, 400, json, JSON.stringify({ error: (error as Error).message, refusal: "pgn-unreadable" }));
+        send(response, 400, json, JSON.stringify({ error: (error as Error).message, refusal: refusalOfStudy(error) }));
         return;
     }
 
@@ -520,10 +521,29 @@ function lastPlayed(context: Context): { name: string; record: GameRecord; }
     const { name, record } = gameToStudy(context);
 
     if (name === undefined) {
-        throw new Error("The game just over is not in the archive yet: try again in a moment.");
+        throw new GameNotArchived();
     }
 
     return { name, record };
+}
+
+/** The refusal of the game just over asked to analyse before the archive keeps it. */
+class GameNotArchived extends Error
+{
+    constructor()
+    {
+        super("The game just over is not in the archive yet: try again in a moment.");
+    }
+}
+
+/** Why a game to study was refused, for the page to say it: a name no game has, the game just over not kept yet, or a game that cannot be read. */
+function refusalOfStudy(error: unknown): Refused["refusal"]
+{
+    if (error instanceof GameMissing) {
+        return "game-missing";
+    }
+
+    return error instanceof GameNotArchived ? "game-not-archived" : "pgn-unreadable";
 }
 
 /** A game brought as a PGN, kept to study as analyse_game keeps it: the one already kept when it is the same game, with its review. */

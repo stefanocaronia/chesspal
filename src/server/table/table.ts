@@ -3,9 +3,9 @@
 import { request } from "node:http";
 import type { Context } from "../../commands/index.ts";
 import { samePath, tableFolder } from "../../home/index.ts";
-import { setUpHosts } from "../../host-files/index.ts";
 import { pageAt, pagePorts } from "../bell/index.ts";
 import { type Page, startPage, type TableChats } from "../page/index.ts";
+import { setUpTable } from "./hosts/index.ts";
 import type { TableUpdater } from "./update.ts";
 
 /** A table served: its address, and how to close it. */
@@ -44,7 +44,7 @@ export interface TableFound
 export async function startTable(context: Context, times: TableTimes = tableTimes, chats?: TableChats, updater?: TableUpdater): Promise<Table | undefined>
 {
     const folder = tableFolder(context.home());
-    setUpHosts(folder, context.platform);
+    setUpTable(folder, context.platform);
     let quit = (): void => undefined;
     const quitting = new Promise<void>((done) => {
         quit = done;

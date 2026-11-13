@@ -216,6 +216,18 @@ describe("the page's server", () => {
         expect(await statusOf(folder)).not.toContain("In analysis");
     });
 
+    it("refuses a game to study by a name no game has as missing, and one there that cannot be read as unreadable", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        mkdirSync(join(gameFolder(folder), "games"), { recursive: true });
+        writeFileSync(join(gameFolder(folder), "games", "2026-11-01-100000.pgn"), "1. e4 e5 2. Ke3 Ke6 3. Kxe5 *\n");
+
+        expect(await post(page, "/api/study", { game: "games/2026-11-02-153012.pgn" })).toMatchObject({ status: 400, body: expect.stringContaining('"refusal":"game-missing"') });
+        expect(await post(page, "/api/study", { game: "study/2026-11-02-153012.pgn" })).toMatchObject({ status: 400, body: expect.stringContaining('"refusal":"game-missing"') });
+        expect(await post(page, "/api/study", { game: "games/2026-11-01-100000.pgn" })).toMatchObject({ status: 400, body: expect.stringContaining('"refusal":"pgn-unreadable"') });
+        expect(gameInAnalysis(gameFolder(folder))).toBeUndefined();
+    });
+
     it("keeps the player's words on a game in analysis with the move the page shows, rings the chat for each, and tells it where the player stood (D-101)", async () => {
         const folder = playerFolder();
         // The chat's context, as the MCP server shares it with the page: the bell rings for what changed since the chat's last tool.
@@ -356,6 +368,20 @@ describe("the page's server", () => {
 
         expect(await post(page, "/api/study", { last: true })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
         expect(await statusOf(folder)).toContain("call analyse_game");
+    });
+
+    it("refuses the game just over to analyse while the archive does not keep it yet, saying so rather than a PGN it cannot read", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        await run(folder, "new_game", { ai_colour: "black" });
+        await post(page, "/api/move", { move: "e4" });
+        await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." });
+        await post(page, "/api/resign", {});
+        const { game } = JSON.parse((await get(page, "/api/game")).body) as { game: { name: string; }; };
+        rmSync(join(gameFolder(folder), game.name));
+
+        expect(await post(page, "/api/study", { last: true })).toMatchObject({ status: 400, body: expect.stringContaining('"refusal":"game-not-archived"') });
+        expect(gameInAnalysis(gameFolder(folder))).toBeUndefined();
     });
 
     it("answers only at its own address, and changes nothing but by a move", async () => {

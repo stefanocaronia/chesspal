@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import type { Context } from "../src/commands/index.ts";
 import { tableFolder } from "../src/home/index.ts";
@@ -10,7 +10,8 @@ import { activeProfile, saveProfileSettings } from "../src/profiles/index.ts";
 import type { TableChats } from "../src/server/page/table.ts";
 import { playCommand } from "../src/server/table/hosts/chats.ts";
 import { hostArgs, startMessage } from "../src/server/table/hosts/hosts.ts";
-import { type HostLaunch, runHost } from "../src/server/table/hosts/play.ts";
+import { setUpTable } from "../src/server/table/hosts/index.ts";
+import { type HostLaunch, playHost, runHost } from "../src/server/table/hosts/play.ts";
 import { askAgain, askedAgain, leaveSeat, refreshSeat, seatTaken, seatTimes, takeSeat } from "../src/server/table/hosts/seat.ts";
 import { terminals } from "../src/server/table/hosts/terminal.ts";
 import { hostLaunch, startTable, type Table, terminalChats } from "../src/server/table/index.ts";
@@ -20,6 +21,8 @@ import { sent } from "./http.ts";
 import { onFreePorts } from "./ports.ts";
 
 const folders: string[] = [];
+// The note the table leaves for chesspal play when it wrote Codex's hooks.
+const hooksNote = "codex-hooks-note.json";
 const tables: Table[] = [];
 
 afterEach(async () => {
@@ -62,16 +65,67 @@ describe("a chat the table opens", () => {
         expect(() => hostLaunch(context, "codex", env, () => false)).toThrow("Codex is not installed on this computer, or not on its PATH: install it (npm install -g @openai/codex), then try again.");
     });
 
-    it("says when it wrote Codex's hooks again over older ones, which Codex then asks the player to trust again", () => {
+    it("says when it wrote Codex's hooks, the first time or again over older ones, which Codex then asks the player to trust", () => {
         const context = homeContext("linux");
         const env = { PATH: "/usr/bin" };
         const found = (path: string): boolean => path === "/usr/bin/codex";
         const hooks = join(tableFolder(context.home()), ".codex", "hooks.json");
 
-        expect(hostLaunch(context, "codex", env, found).hooksChanged).toBeUndefined();
+        expect(hostLaunch(context, "codex", env, found).hooks).toBe("new");
+        expect(hostLaunch(context, "codex", env, found).hooks).toBeUndefined();
         writeFileSync(hooks, "{}\n");
-        expect(hostLaunch(context, "codex", env, found).hooksChanged).toBe(true);
-        expect(hostLaunch(context, "codex", env, found).hooksChanged).toBeUndefined();
+        expect(hostLaunch(context, "codex", env, found).hooks).toBe("changed");
+        expect(hostLaunch(context, "codex", env, found).hooks).toBeUndefined();
+        expect(existsSync(join(tableFolder(context.home()), hooksNote))).toBe(false);
+    });
+
+    it("keeps hooks Codex never asked about as new when Chesspal writes them again before it does", () => {
+        const context = homeContext("linux");
+        const env = { PATH: "/usr/bin" };
+        const hooks = join(tableFolder(context.home()), ".codex", "hooks.json");
+
+        hostLaunch(context, "claude", env, (path) => path === "/usr/bin/claude");
+        writeFileSync(hooks, "{}\n");
+        expect(hostLaunch(context, "codex", env, (path) => path === "/usr/bin/codex").hooks).toBe("new");
+    });
+
+    it("says once what the table wrote of Codex's hooks before chesspal play started, and nothing when it wrote none", async () => {
+        const context = homeContext("linux");
+        const folder = tableFolder(context.home());
+        const env = { PATH: "/usr/bin" };
+        const found = (path: string): boolean => path === "/usr/bin/codex";
+
+        // A first table writes Codex's hooks where there were none: the next Codex play says they are new; Claude Code's play leaves it to Codex's.
+        const table = await onFreePorts(() => startTable(context, { idle: 60_000, every: 1_000 }, fakeChats().chats));
+        tables.push(table!);
+        expect(existsSync(join(folder, hooksNote))).toBe(true);
+        hostLaunch(context, "claude", env, (path) => path === "/usr/bin/claude");
+        expect(hostLaunch(context, "codex", env, found).hooks).toBe("new");
+        await table!.close();
+
+        // A table that writes none leaves no note.
+        const same = await onFreePorts(() => startTable(context, { idle: 60_000, every: 1_000 }, fakeChats().chats));
+        tables.push(same!);
+        expect(existsSync(join(folder, hooksNote))).toBe(false);
+        await same!.close();
+
+        // Older hooks the table writes again: the next play says they changed, once, and takes the note.
+        writeFileSync(join(folder, ".codex", "hooks.json"), "{}\n");
+        const again = await onFreePorts(() => startTable(context, { idle: 60_000, every: 1_000 }, fakeChats().chats));
+        tables.push(again!);
+        expect(hostLaunch(context, "codex", env, found).hooks).toBe("changed");
+        expect(existsSync(join(folder, hooksNote))).toBe(false);
+        expect(hostLaunch(context, "codex", env, found).hooks).toBeUndefined();
+    });
+
+    it("takes a note it cannot read as no note", () => {
+        const context = homeContext("linux");
+        const folder = tableFolder(context.home());
+        setUpTable(folder, "linux");
+        writeFileSync(join(folder, hooksNote), "{ not json");
+
+        expect(hostLaunch(context, "codex", { PATH: "/usr/bin" }, (path) => path === "/usr/bin/codex").hooks).toBeUndefined();
+        expect(existsSync(join(folder, hooksNote))).toBe(false);
     });
 
     it("opens in Windows Terminal, else in the console Windows starts; in macOS's Terminal; on Linux in the terminals installed", () => {
@@ -202,6 +256,73 @@ describe("the seat chesspal play takes at the table", () => {
         expect(await runHost(host, () => ++asked === 2, process.platform, 20)).toMatchObject({ again: true });
     }, 15_000);
 });
+
+describe("a host that closes at its start", () => {
+    const closed = "Claude Code closed as soon as it opened.";
+
+    it("is Claude Code told how to trust the folder and started once more, then left to end the play", async () => {
+        const { code, starts, said } = await played("claude", [1, 1], () => new Date(2026, 10, 13));
+
+        expect({ code, starts }).toEqual({ code: 1, starts: 2 });
+        expect(said.split(closed)).toHaveLength(3);
+        expect(said).toContain('If it asks whether you trust this folder, go down to "Yes, I trust this folder" with the arrow keys, then press Enter.');
+    }, 30_000);
+
+    it("plays on once Claude Code started once more opens", async () => {
+        const { code, starts, said } = await played("claude", [1, 0], () => new Date(2026, 10, 13));
+
+        expect({ code, starts }).toEqual({ code: 0, starts: 2 });
+        expect(said.split(closed)).toHaveLength(2);
+    }, 30_000);
+
+    it("is not started again when it ends with no error, after a minute, or is Codex", async () => {
+        let minutes = 0;
+        const later = (): Date => new Date(2026, 10, 13, 10, minutes++);
+
+        expect(await played("claude", [0], () => new Date(2026, 10, 13))).toEqual({ code: 0, starts: 1, said: "" });
+        expect(await played("claude", [1], later)).toEqual({ code: 1, starts: 1, said: "" });
+        expect(await played("codex", [1], () => new Date(2026, 10, 13))).toMatchObject({ code: 1, starts: 1 });
+    }, 30_000);
+});
+
+/**
+ * Plays a fake host on the PATH, which ends with the codes given, one per start, in a context whose time is `now`: the play's code, how many times the
+ * host started and what the play said.
+ */
+async function played(host: "claude" | "codex", codes: readonly number[], now: () => Date): Promise<{ code: number; starts: number; said: string; }>
+{
+    const bin = temporary();
+    const count = join(bin, "starts");
+    const script = join(bin, "host.cjs");
+    writeFileSync(
+        script,
+        `const fs = require("node:fs"); const n = fs.existsSync(${JSON.stringify(count)}) ? Number(fs.readFileSync(${JSON.stringify(count)}, "utf8")) : 0;
+fs.writeFileSync(${JSON.stringify(count)}, String(n + 1)); process.exit(${JSON.stringify(codes)}[n] ?? 0);\n`,
+    );
+
+    if (process.platform === "win32") {
+        writeFileSync(join(bin, `${host}.cmd`), `@"${process.execPath}" "${script}" %*\r\n`);
+    } else {
+        writeFileSync(join(bin, host), `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, { mode: 0o755 });
+    }
+
+    const path = process.env.PATH;
+    const writes: string[] = [];
+    const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
+        writes.push(String(chunk));
+        return true;
+    });
+
+    try {
+        process.env.PATH = bin;
+        const code = await playHost({ ...homeContext(process.platform), language: "en", now }, host);
+        const said = writes.join("").replace(/^Codex will ask about Chesspal's two hooks.*\n/m, "");
+        return { code, starts: Number(readFileSync(count, "utf8")), said };
+    } finally {
+        process.env.PATH = path;
+        write.mockRestore();
+    }
+}
 
 describe("the table's page, with no chat at it", () => {
     it("shows the hosts, and opens a chat when its own page asks, once, for a host installed", async () => {
