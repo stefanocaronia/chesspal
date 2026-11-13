@@ -108,6 +108,16 @@ describe("the AI thinking on the player's time (D-72)", () => {
         expect(await run(context, "ponder", { position: 0, done: true })).toBe("Stop now: the player has moved, or the game is over. End with one word.");
     });
 
+    it("reads a position 0 given alone as ponder {}, as a quick model writes it, past the start too", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "e4" });
+        await run(context, "ai_move", { move: "e5", plan: "p" });
+
+        expect(await run(context, "ponder", { position: 0 })).toBe(await run(context, "ponder"));
+        expect(await run(context, "ponder", { position: 0, reply: "Nf3" })).toBe("Stop now: the player has moved, or the game is over. End with one word.");
+    });
+
     it("tells the AI to start the agent after its move only in Claude Code and Codex, in a folder set up with it, by its level", async () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "black" });

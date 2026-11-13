@@ -49,7 +49,10 @@ export const ponder = defineCommand({
     }),
     byAgents: ponderAgents,
     hosts: agentHosts,
-    run: async ({ position, reply, move, why, say, done = false }, context): Promise<Pondered> => {
+    run: async (input, context): Promise<Pondered> => {
+        const { reply, move, why, say, done = false } = input;
+        // A quick model writes ponder {} as ponder {position: 0}, and was told to stop: alone, it asks for the position too (Priya).
+        const position = input.position === 0 && Object.keys(input).length === 1 ? undefined : input.position;
         const folder = gameFolder(context.home());
         const current = toPonder(folder, context.now(), position);
 

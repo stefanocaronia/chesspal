@@ -57,7 +57,7 @@ interface Status
     analysis?: { game: string; brought?: true; redo?: true; analyst?: "done" | "offer"; codex?: true; review?: string; };
     /** A game going on from before this chat, told once a chat: the player says whether to go on with it. */
     fromBefore?: true;
-    /** The coach to start, once, for the player's move that ended the game (D-88). */
+    /** The coach to start, once a move ended the game, for the player's last move (D-88). */
     coach?: true;
     /** The files an older init wrote in the player's folder, which this version would write otherwise. */
     outdated?: string[];
@@ -121,7 +121,7 @@ export const status = defineCommand({
                     status.fromBefore = true;
                 }
 
-                // The player's move on the board page that ended the game: the coach judges it too (D-88).
+                // A move that ended the game: the coach judges the player's last move, told until it starts (D-88).
                 if (coachOnEnd(context, folder, current)) {
                     status.coach = true;
                 }
