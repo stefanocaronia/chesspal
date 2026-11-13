@@ -11,10 +11,11 @@ import { type Context, withProfile } from "../src/commands/registry/context.ts";
 import { archivedGames, gameInAnalysis, keepThought, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
-import { Bell, bellHeard, bellLine, codexBellAnswer, notedPagePorts, notePagePort, noteSilence, pageAt, pagePorts, waitForBell } from "../src/server/bell/bell.ts";
+import { Bell, bellHeard, bellLine, codexBellAnswer, notePagePort, noteSilence, waitForBell } from "../src/server/bell/bell.ts";
 import { analysesOf } from "../src/server/page/analyses.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { profilesShown } from "../src/server/page/profiles.ts";
+import { notedPagePorts, pageAt, pagePorts } from "../src/server/ports/ports.ts";
 import { version } from "../src/version.ts";
 import { testContext } from "./commands.ts";
 

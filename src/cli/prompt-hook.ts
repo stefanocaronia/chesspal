@@ -1,12 +1,17 @@
 // `chesspal prompt`, Claude Code's UserPromptSubmit hook (D-36): a prompt that is one move and nothing else, Chesspal plays as the player sends it and
-// tells the AI beside the prompt; any other goes to the AI as it is. Only the move's shape is checked before the commands load.
+// tells the AI beside the prompt; any other goes to the AI as it is. Every prompt tells the chat's page the chat is at work. Only the move's shape is
+// checked before the commands load.
 import type { Context } from "../commands/index.ts";
 
-/** Reads the hook's input and, when the prompt is a move Chesspal plays, writes what the AI is told; it never blocks the prompt. */
+/**
+ * Reads the hook's input, tells the chat's page the chat is at work and, when the prompt is a move Chesspal plays, writes what the AI is told; it never
+ * blocks the prompt.
+ */
 export async function answerPrompt(input: NodeJS.ReadableStream = process.stdin, sent = new Date()): Promise<void>
 {
     try {
-        const answer = await promptAnswer(await textOf(input), (hook) => hookContext(hook, sent));
+        const text = await textOf(input);
+        const [answer] = await Promise.all([promptAnswer(text, (hook) => hookContext(hook, sent)), tellPage(hookInput(text))]);
 
         if (answer !== undefined) {
             process.stdout.write(`${answer}\n`);
@@ -72,10 +77,24 @@ export interface HookInput
 // One move and nothing else, as player_move takes it: SAN with K, Q, R, B and N, small or as figurines, or as squares, or castling; a check or mate sign.
 const moveShape = /^(?:[KQRBNkqrbn♔-♟]?[a-h]?[1-8]?[-x:×–—−]?[a-h][1-8](?:=?[QRBNqrbn])?|[0Oo]-[0Oo](?:-[0Oo])?)[+#]?$/u;
 
+/**
+ * Tells the chat's page that the prompt starts its turn: the doorbell lets the hook of the turn before go, and a new game asked on the page waits for
+ * the turn's end. A slash command or a shell line may start no turn, and so no Stop hook to end it: the page is not told.
+ */
+async function tellPage(hook: HookInput): Promise<void>
+{
+    if (hook.prompt === undefined || /^[/!]/.test(hook.prompt)) {
+        return;
+    }
+
+    // A page not told leaves the doorbell as it was: the move, when the prompt is one, is played all the same.
+    await import("../server/ports/index.ts").then(({ tellChatAtWork }) => tellChatAtWork(hook), () => false);
+}
+
 /** The context of the chat's folder: the data folder its server is given, the moment the player sent the move, and Claude Code, which runs this hook. */
 async function hookContext(hook: HookInput, sent: Date): Promise<Context>
 {
-    const [{ defaultContext }, { chatFolder, serverHome }] = await Promise.all([import("../commands/index.ts"), import("../server/bell/index.ts")]);
+    const [{ defaultContext }, { chatFolder, serverHome }] = await Promise.all([import("../commands/index.ts"), import("../server/ports/index.ts")]);
     const folder = chatFolder(hook);
     const home = serverHome(folder);
 
