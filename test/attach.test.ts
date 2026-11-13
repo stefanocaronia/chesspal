@@ -330,7 +330,8 @@ describe("a chat at the table", () => {
 describe("a chat's own page off its usual ports", () => {
     it("notes its port in the data folder, and forgets it as the host goes", async () => {
         const home = temporary();
-        const folder = temporary();
+        // The folder as the server names it, its real path: on macOS the temporary folder is a link, and the ports are the path's.
+        const folder = realpathSync(temporary());
         const taken = await Promise.all(pagePorts(folder).map(holdPort));
         const server = mcpServer(folder, home);
 
@@ -338,7 +339,7 @@ describe("a chat's own page off its usual ports", () => {
             const port = Number(/http:\/\/127\.0\.0\.1:(\d+)\//.exec(await server.call("status"))?.[1]);
 
             expect(pagePorts(folder)).not.toContain(port);
-            expect(notedPagePorts(home, realpathSync(folder))).toEqual([port]);
+            expect(notedPagePorts(home, folder)).toEqual([port]);
             await server.close();
             expect(existsSync(join(home, "pages", `${port}.json`))).toBe(false);
         } finally {
