@@ -2,46 +2,61 @@
 import type { PieceLetter } from "../../core/index.ts";
 import type { SaidMove, Text } from "../text.ts";
 
-/** What the voice needs of the page's words: the language it reads in and how it says a move. */
-export type Voice = Pick<Text, "language" | "saidMove">;
+/** What the voice needs of the page's words: the language it reads in, how it says a move and the words of the mark that skips a reading. */
+export type Voice = Pick<Text, "language" | "saidMove" | "skipReading">;
 
-/** Reads the words aloud in the voice's language, the moves in words, cutting short what was being read. */
-export function speak(words: string, voice: Voice): void
+/** One bubble's words to read, by the key the page knows the bubble by. */
+export interface Reading
+{
+    readonly key: string;
+    readonly words: string;
+}
+
+/** Reads the bubbles aloud one after the other in the voice's language, the moves in words, cutting short what was being read. */
+export function speak(readings: readonly Reading[], voice: Voice): void
 {
     if (typeof speechSynthesis === "undefined") {
         return;
     }
 
-    const said = spokenMoves(words.replace(/\*\*/g, ""), voice.saidMove).trim();
-    speechSynthesis.cancel();
-    clearTimeout(pending);
-
-    if (said === "") {
-        return;
-    }
-
-    // Chrome drops words spoken right after a cancel, and lists its voices late the first time: the words wait a moment.
-    pending = setTimeout(() => {
-        const utterance = new SpeechSynthesisUtterance(said);
-        const reader = readerFor(voice.language);
-        utterance.lang = reader?.lang ?? voice.language;
-
-        if (reader !== undefined) {
-            utterance.voice = reader;
-        }
-
-        speechSynthesis.resume();
-        speechSynthesis.speak(utterance);
-    }, 150);
+    stop();
+    queue = readings.map((reading) => ({ key: reading.key, said: spokenMoves(reading.words.replace(/\*\*/g, ""), voice.saidMove).trim() })).filter((reading) => reading.said !== "");
+    language = voice.language;
+    readNextSoon();
 }
 
-/** Stops reading. */
+/** Stops reading the bubble the key names, when it is the one read, and goes on with the next. */
+export function skip(key: string): void
+{
+    if (current?.key === key) {
+        stop();
+        readNextSoon();
+    }
+}
+
+/** Stops reading, and forgets what was waiting. */
 export function hush(): void
 {
     if (typeof speechSynthesis !== "undefined") {
-        clearTimeout(pending);
-        speechSynthesis.cancel();
+        queue = [];
+        stop();
     }
+}
+
+/** The key of the bubble being read, from the moment the voice starts it to its end; none while nothing is read. */
+export function reading(): string | undefined
+{
+    return current?.started === true ? current.key : undefined;
+}
+
+/** Calls the listener whenever the bubble being read changes: what it returns stops it. */
+export function onReading(listener: (key: string | undefined) => void): () => void
+{
+    listeners.add(listener);
+
+    return () => {
+        listeners.delete(listener);
+    };
 }
 
 /** Whether the browser has a voice for the language: without one the words cannot be read. */
@@ -87,7 +102,102 @@ export function spokenMoves(words: string, say: (move: SaidMove) => string): str
     });
 }
 
+// What waits to be read, what is read and in which language, and who wants to know which bubble is read.
+let queue: { key: string; said: string; }[] = [];
+let current: Read | undefined;
+let language = "";
 let pending: ReturnType<typeof setTimeout> | undefined;
+const listeners = new Set<(key: string | undefined) => void>();
+
+// A bubble being read: the utterance is held so the browser does not drop it, and its events with it, before it ends.
+interface Read
+{
+    readonly key: string;
+    readonly utterance: SpeechSynthesisUtterance;
+    started: boolean;
+    watch?: ReturnType<typeof setInterval>;
+}
+
+// Chrome drops words spoken right after a cancel, and lists its voices late the first time: the words wait a moment.
+function readNextSoon(): void
+{
+    pending = setTimeout(readNext, 150);
+}
+
+function readNext(): void
+{
+    const next = queue.shift();
+
+    if (next === undefined) {
+        return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(next.said);
+    const reader = readerFor(language);
+    utterance.lang = reader?.lang ?? language;
+
+    if (reader !== undefined) {
+        utterance.voice = reader;
+    }
+
+    const reading: Read = { key: next.key, utterance, started: false };
+    current = reading;
+
+    // A cancel fires end or error in some browsers and nothing in others: only the events of the utterance read now count, and the page drops its own at once.
+    utterance.onstart = () => {
+        if (current === reading) {
+            reading.started = true;
+            // The voice may stop with no event at all: a look each second at whether it still speaks, so no mark stays on a bubble nobody reads.
+            reading.watch = setInterval(() => {
+                if (current === reading && !speechSynthesis.speaking) {
+                    finished(reading);
+                }
+            }, 1000);
+            tell();
+        }
+    };
+
+    utterance.onend = () => finished(reading);
+    utterance.onerror = () => finished(reading);
+    speechSynthesis.resume();
+    speechSynthesis.speak(utterance);
+}
+
+function finished(reading: Read): void
+{
+    if (current === reading) {
+        drop();
+        readNext();
+    }
+}
+
+// Cuts short what is read, keeping what waits.
+function stop(): void
+{
+    clearTimeout(pending);
+    drop();
+    speechSynthesis.cancel();
+}
+
+function drop(): void
+{
+    const was = current;
+    clearInterval(was?.watch);
+    current = undefined;
+
+    if (was?.started === true) {
+        tell();
+    }
+}
+
+function tell(): void
+{
+    const key = reading();
+
+    for (const listener of listeners) {
+        listener(key);
+    }
+}
 
 // A move in SAN, with the pieces' letters or figurines, as the AI writes it; the parts named, castling apart.
 const movePattern =

@@ -1,6 +1,6 @@
 // The talk on the board page (D-51, D-53): the AI's words in bubbles that point at the Torretta, the player's above the box they write in.
 import { type ComponentChildren, createContext, type RefObject } from "preact";
-import { useContext, useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { Mood, MoveReview, Opening, Side } from "../../core/index.ts";
 import { Torretta } from "../avatars/torretta.tsx";
 import { BadgeIcon, NoteIcon } from "../game/badges.tsx";
@@ -9,7 +9,7 @@ import { type Ply, type ReviewCount, talkLimits, type TalkLine } from "../game/p
 import { ReviewProgress } from "../game/review-progress.tsx";
 import { signature } from "../players/model-name.ts";
 import type { Text } from "../text.ts";
-import { hush, speak, type Voice } from "./voice.ts";
+import { hasVoice, hush, onReading, type Reading, reading, skip, speak, type Voice } from "./voice.ts";
 
 /** The AI's words of the game, a bubble each, the newest by the Torretta: below it, or above it on a board turned round; the first points at it. */
 export function AiWords({ words, newestFirst, voice }: { words: readonly string[]; newestFirst: boolean; voice?: Voice; })
@@ -17,12 +17,14 @@ export function AiWords({ words, newestFirst, voice }: { words: readonly string[
     const list = useRef<HTMLOListElement>(null);
     useOnlyWhole(list, words, newestFirst);
     useSpokenNews(words, voice);
+    const read = useReading(voice);
 
     return (
         <ol ref={list} class="says" aria-live="polite">
             {inOrder(
                 words.map((word, index) => (
                     <li key={index} class="say" style={aged(words.length - 1 - index)}>
+                        <SkipReading at={wordKey(index, word)} read={read} voice={voice} />
                         <Marked text={word} />
                     </li>
                 )),
@@ -62,7 +64,15 @@ export function AiNote({ ply, opening, closing, summary, reviewing, count, onCom
     const shown: MoveReview | undefined = ply?.review ?? (book === undefined ? undefined : { badge: "book" });
     const title = [shown?.badge === undefined || (book !== undefined && shown.badge === "book") ? undefined : text.badges[shown.badge], book?.family].filter((part) => part !== undefined).join(" · ");
     const note = shown?.note ?? book?.variation;
-    const spoken = [ply === undefined || shown === undefined ? undefined : title, ply === undefined ? undefined : note, summary?.replace(/\s*•\s+/g, ". "), closing].filter((part) => part !== undefined && part !== "").join(". ");
+    // Each bubble read on its own, so the mark that skips one sits on the one read: the move's, the game's review, the end.
+    const moveWords = ply === undefined || shown === undefined ? "" : [title, note].filter((part) => part !== undefined && part !== "").join(". ");
+    const spoken: Reading[] = [
+        { key: `move:${moveWords}`, words: moveWords },
+        { key: `review:${summary ?? ""}`, words: summary?.replace(/\s*•\s+/g, ". ") ?? "" },
+        { key: `closing:${closing ?? ""}`, words: closing ?? "" },
+    ];
+    const keys = spoken.map((part) => part.key).join("\n");
+    const read = useReading(voice);
 
     useEffect(() => {
         if (voice !== undefined) {
@@ -70,7 +80,7 @@ export function AiNote({ ply, opening, closing, summary, reviewing, count, onCom
         }
 
         return hush;
-    }, [spoken, voice]);
+    }, [keys, voice]);
 
     // The Torretta stays in sight through the whole analysis, over its bubbles, which show only where it wrote something.
     return (
@@ -84,6 +94,7 @@ export function AiNote({ ply, opening, closing, summary, reviewing, count, onCom
             </p>
             {ply === undefined || shown === undefined ? null : (
                 <p class={`say move-note ${shown.badge ?? ""}`}>
+                    <SkipReading at={spoken[0]!.key} read={read} voice={voice} />
                     <span class="head">
                         {shown.badge === undefined ? <NoteIcon /> : <BadgeIcon badge={shown.badge} />}
                         <b>
@@ -103,9 +114,10 @@ export function AiNote({ ply, opening, closing, summary, reviewing, count, onCom
                     {shown.arrows === undefined && shown.squares === undefined ? null : <Legend review={shown} words={text.drawn} />}
                 </p>
             )}
-            {summary === undefined ? null : <GameReview by={name} summary={summary} text={text} />}
+            {summary === undefined ? null : <GameReview by={name} summary={summary} skipping={<SkipReading at={spoken[1]!.key} read={read} voice={voice} />} text={text} />}
             {closing === undefined ? null : (
                 <p class="say closing">
+                    <SkipReading at={spoken[2]!.key} read={read} voice={voice} />
                     <Marked text={closing} />
                 </p>
             )}
@@ -372,12 +384,13 @@ function squareIn(word: string): string | undefined
 }
 
 /** The AI's word on the whole game (D-69), in the Torretta's bubble at the start of the game: a paragraph, and its points as a list. */
-function GameReview({ by, summary, text }: { by: string; summary: string; text: Text; })
+function GameReview({ by, summary, skipping, text }: { by: string; summary: string; skipping: ComponentChildren; text: Text; })
 {
     const [lead = "", ...points] = summary.split(/\s*•\s+/);
 
     return (
         <section class="say review" aria-label={text.reviewBy(by)}>
+            {skipping}
             <p class="head">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 4V20M8 20H16M5 7H19M5 7L2.5 13A2.5 2 0 0 0 7.5 13ZM19 7L16.5 13A2.5 2 0 0 0 21.5 13Z" />
@@ -421,18 +434,58 @@ function RailPlayer({ place, picture, name, side, moves, unread = false }: {
     );
 }
 
-/** Reads aloud each word the AI adds while the page is open, not those already there. */
+/** Reads aloud each word the AI adds while the page is open, not those already there, a bubble after the other; the voice turned off stops it. */
 function useSpokenNews(words: readonly string[], voice: Voice | undefined): void
 {
     const heard = useRef(words.length);
+    const speaking = voice !== undefined;
 
     useEffect(() => {
         if (voice !== undefined && words.length > heard.current) {
-            speak(words.slice(heard.current).join(" "), voice);
+            speak(words.slice(heard.current).map((word, index) => ({ key: wordKey(heard.current + index, word), words: word })), voice);
         }
 
         heard.current = words.length;
     }, [words.length, voice]);
+
+    useEffect(() => speaking ? hush : undefined, [speaking]);
+}
+
+/** A word of the AI's by its place in the game and its text, so a word of another game in the same place is not taken for it. */
+function wordKey(index: number, word: string): string
+{
+    return `${index}:${word}`;
+}
+
+/** The key of the bubble the voice reads, none while it reads nothing or is off. */
+function useReading(voice: Voice | undefined): string | undefined
+{
+    const [key, setKey] = useState(reading);
+    useEffect(() => onReading(setKey), []);
+    return voice === undefined ? undefined : key;
+}
+
+/**
+ * In the corner of a bubble the voice may read, a mark that stops reading it while it is read, and the next goes on; its room is kept while the voice is on,
+ * so the words never move when it comes and goes.
+ */
+function SkipReading({ at, read, voice }: { at: string; read: string | undefined; voice: Voice | undefined; })
+{
+    if (voice === undefined || (read !== at && !hasVoice(voice.language))) {
+        return null;
+    }
+
+    if (read !== at) {
+        return <span class="skip-reading" aria-hidden="true" />;
+    }
+
+    return (
+        <button type="button" class="skip-reading" title={voice.skipReading} aria-label={voice.skipReading} onClick={() => skip(at)}>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 7L12 12L5 17ZM12 7L19 12L12 17ZM19 6.5V17.5" />
+            </svg>
+        </button>
+    );
 }
 
 /** A list's items, the newest first when it asks. */

@@ -17,6 +17,8 @@ export interface Text
     readonly voice: string;
     /** Why the voice's switch is off for good: the browser has no voice for the page's language. */
     readonly noVoice: string;
+    /** The mark on the bubble being read aloud, which stops its reading and goes on with the next. */
+    readonly skipReading: string;
     /** A move the AI wrote as the voice reads it (Stefano): ♞xf6+ as "knight takes f6, check", never the figurine's name. */
     readonly saidMove: (move: SaidMove) => string;
     readonly newGame: string;
@@ -572,6 +574,7 @@ const english: Text = {
     sounds: "Sounds",
     voice: "Read the AI's words aloud",
     noVoice: "This browser has no voice for this language: add one in your system's settings",
+    skipReading: "Stop reading this aloud",
     saidMove: (move) => moveInWords(englishMoveWords, move),
     newGame: "New game",
     offerDraw: "Offer a draw",
@@ -1015,6 +1018,7 @@ const italian: Text = {
     sounds: "Suoni",
     voice: "Leggi ad alta voce le parole dell'AI",
     noVoice: "Questo browser non ha una voce per questa lingua: aggiungila nelle impostazioni del sistema",
+    skipReading: "Smetti di leggere questo a voce",
     saidMove: (move) => moveInWords(italianMoveWords, move),
     newGame: "Nuova partita",
     offerDraw: "Proponi patta",

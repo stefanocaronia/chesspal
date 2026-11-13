@@ -314,6 +314,42 @@
     overflow-wrap: anywhere;
 }
 
+/* The mark that skips the bubble read aloud, in its corner; the corner is kept while the voice is on, so the words never move when it comes and goes (Zoe) */
+.skip-reading {
+    float: right;
+    width: 22px;
+    height: 20px;
+    margin: 0 -7px 0 6px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+}
+
+.skip-reading .icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+    margin: auto;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+}
+
+.skip-reading:hover,
+.skip-reading:focus-visible {
+    color: var(--say-ink);
+    background: color-mix(in oklab, currentColor 14%, transparent);
+}
+
+.skip-reading:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
 .say:first-child::before {
     content: "";
     position: absolute;
