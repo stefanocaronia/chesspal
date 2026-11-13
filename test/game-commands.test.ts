@@ -166,8 +166,7 @@ describe("a game in chat", () => {
         const speech = "\nThe player speaks Italian.\n";
         expect(await run(context, "new_game", { ai_colour: "black" })).toContain(speech);
         expect(await run(context, "status")).toContain(speech);
-        await expect(run(context, "player_move", { move: "Cf3" })).rejects.toThrow('"Cf3" is not a move: SAN writes the pieces K, Q, R, B and N');
-        expect(await run(context, "player_move", { move: "Nf3" })).toMatch(/^Player: 1\.♞f3 \(g1-f3\)\.\n/);
+        expect(await run(context, "player_move", { move: "Cf3" })).toMatch(/^Player: 1\.♞f3 \(g1-f3\)\.\n/);
         expect(await run(context, "ai_move", { move: "d5", plan: "p" })).toMatch(/^Played 1\.\.\.d5\.\n/);
         expect(await run(context, "player_move", { move: "d4" })).toMatch(/^Player: 2\.d4 \(d2-d4\)\.\n/);
         expect(await run(context, "ai_move", { move: "Nf6", plan: "p" })).toMatch(/^Played 2\.\.\.♞f6\.\n/);

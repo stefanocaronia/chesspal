@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Move } from "../../core/index.ts";
+import { type Move, withSanPieces } from "../../core/index.ts";
 import { endOf, gameStamp, loadGame, rerunIfChanged } from "../../games/index.ts";
 import { hasDoorbell } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
@@ -85,8 +85,11 @@ function playersMove({ move, offer_draw: offerDraw = false }: { move: string; of
 
     refuseKingAsRook(move, folder);
 
+    // A piece's letter of another language is read as SAN's (D-113): Cf3 is the knight's move, Tf1 the rook's.
+    const read = withSanPieces(move);
+    const readAs = read === move ? "" : `${move.trim()} is read as ${read.trim()}. `;
     const started = context.positionSeen === null ? positionIn(folder).started : context.positionSeen?.started;
-    const played = playMove(folder, context.now(), "player", move, (message) => `${message} Ask the player again. Nothing changed.`, { allowance, offerDraw, coached: coachRuns(context) });
+    const played = playMove(folder, context.now(), "player", read, (message) => `${readAs}${message} Ask the player again. Nothing changed.`, { allowance, offerDraw, coached: coachRuns(context) });
     // A game over by this move has no more moves to play there: the next game's window gives the address (Federico, round of D-85).
     const invite = played.game.end === undefined ? pageInvite(context, started) : undefined;
     const ended = played.game.end === undefined ? undefined : loadGame(folder);
@@ -95,8 +98,8 @@ function playersMove({ move, offer_draw: offerDraw = false }: { move: string; of
 }
 
 /**
- * Refuses a move written R and a square when the player's king could go there as well as a rook: R is the king in Italian, French and Spanish, and only
- * the player's words tell which. A rook's move that names its file or rank, or given as squares, is never the king's.
+ * Refuses a move written R and a square when the player's king could go there: R is the king in Italian, French and Spanish, and only the player's words
+ * tell which. A rook's move that names its file or rank, or given as squares, is never the king's.
  */
 function refuseKingAsRook(move: string, folder: string): void
 {
@@ -117,6 +120,13 @@ function refuseKingAsRook(move: string, folder: string): void
         throw new Error(
             `${written} may be the rook's move, ${rooks.join(" or ")}, or the king's, ${squaresOf(king)}: R is the king in Italian, French and Spanish. `
                 + "Unless the player's words name the piece, ask them which; then give it as squares. Nothing changed.",
+        );
+    }
+
+    if (rooks.length === 0 && king !== undefined) {
+        throw new Error(
+            `${written} is not legal: R is the rook in SAN, and no rook can go to ${target}. The king can, ${king.san}, and R is the king in Italian, French and Spanish: `
+                + `ask the player whether they meant the king, and give ${king.san} only once they say so. Nothing changed.`,
         );
     }
 }

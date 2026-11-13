@@ -71,7 +71,7 @@ describe("a move the player writes alone in the chat", () => {
     it("leaves every other prompt to the AI, the game as it was", async () => {
         const context = gameWith("black");
         const before = readFileSync(join(gameFolder(context.home()), "game.json"), "utf8");
-        const prompts = ["I think I'll play e4 now", "e4?", "e4!", "gioco e4", "e4 e5", "e5", "Ke2", "Cf3", "", "   ", "<task-notification>e4</task-notification>", "1.e4"];
+        const prompts = ["I think I'll play e4 now", "e4?", "e4!", "gioco e4", "e4 e5", "e5", "Ke2", "Cf3 e5", "", "   ", "<task-notification>e4</task-notification>", "1.e4"];
 
         for (const text of prompts) {
             expect(await prompt(context, text), text).toBeUndefined();

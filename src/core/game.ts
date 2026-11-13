@@ -355,6 +355,17 @@ export function foreignMovesIn(text: string): { written: string; san: string; }[
         .map(([written]) => ({ written, san: `${foreignPieces[written[0]!]![1]}${written.slice(1)}` }));
 }
 
+/**
+ * A player's move written with a piece's letter of another language that names one piece only, in SAN's (D-113): Cf3 as Nf3, Tf1 as Rf1, e8=D as e8=Q;
+ * a small t too, which is no file. Any other text as it is: B stays the bishop, K the king, R the rook, a small letter a file.
+ */
+export function withSanPieces(move: string): string
+{
+    return move
+        .replace(foreignPieceMove, (_, before: string, letter: string) => `${before}${foreignPieces[letter.toUpperCase()]![1]}`)
+        .replace(foreignPromotion, (_, before: string, letter: string) => `${before}${foreignPieces[letter]![1]}`);
+}
+
 // The pieces' letters of other languages that name one piece only: the Italian, French, Spanish and German ones; R is the rook in SAN.
 const foreignPieces: Readonly<Record<string, readonly [string, string]>> = {
     C: ["knight", "N"],
@@ -368,6 +379,10 @@ const foreignPieces: Readonly<Record<string, readonly [string, string]>> = {
 
 // A move written with one of those letters, standing alone in a text.
 const foreignMove = new RegExp(`(?<![\\p{L}\\d])[${Object.keys(foreignPieces).join("")}][a-h]?[1-8]?x?[a-h][1-8][+#]?(?![\\p{L}\\d])`, "gu");
+
+// A whole move with such a letter, after its number if any: Tf1, 4. Cxe5+, D d1; and a pawn's move to the last rank that becomes such a piece: e8=D, exd1T.
+const foreignPieceMove = /^(\s*(?:\d+\s*(?:\.[\s.]*|…\s*))?)([CSAFLTDt])(?=\s*[a-h]?[1-8]?[-x:×]?[a-h][1-8][+#]*[!?]*\s*$)/;
+const foreignPromotion = /^(\s*(?:\d+\s*(?:\.[\s.]*|…\s*))?[a-h]?[1-8]?[-x:×]?[a-h][18]=?)([CSAFLTD])(?=[+#]*[!?]*\s*$)/;
 
 // The legal moves of the positions seen last, by their key: about 4 KB each.
 const legalByPosition = new Map<string, readonly Move[]>();
