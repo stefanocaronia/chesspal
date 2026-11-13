@@ -21,10 +21,11 @@
     border-color: var(--accent);
 }
 
-/* Over the cards under it, the board in sight beside it; placed under its button by the page, since the cards clip what overflows them */
+/* Over the whole page, in the browser's top layer as a popover, the board in sight beside it; placed by its button by the page */
 .legend-panel {
     position: fixed;
-    z-index: 20;
+    inset: auto;
+    margin: 0;
     width: 300px;
     max-width: calc(100vw - 32px);
     overflow-y: auto;
@@ -171,7 +172,7 @@
     font-size: 12px;
 }
 
-/* On a phone the ? is the last on the right under the board, and the legend opens below the board's row, as wide as it, never over the board */
+/* On a phone the ? is the last on the right under the board, and the legend opens below the board's row, as wide as it, never over the board (legend.tsx) */
 .board-map .marks-legend {
     position: static;
     float: right;
@@ -183,20 +184,7 @@
     margin-left: 0;
 }
 
-.legend-panel.under {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    left: 0;
-    width: auto;
-    max-width: none;
-}
-
 @media (max-width: 840px) {
-    .board-map {
-        position: relative;
-    }
-
     .helps-card .marks-legend {
         display: none;
     }

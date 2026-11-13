@@ -9,8 +9,8 @@ import type { LegendRow } from "./view.ts";
 
 /**
  * The ? beside the map's button, and the legend it opens: a click, the ? key, Esc or a click elsewhere closes it, and puts out the squares it lit; while
- * open it follows the board. The pointer on a line lights the squares that bear its mark, as a square in the AI's words. Under the board on a phone,
- * `under` opens it below the board's row, never over the board.
+ * open it follows the board. The pointer on a line lights the squares that bear its mark, as a square in the AI's words. It stands over the whole page, in
+ * the browser's top layer, so that no card clips it; under the board on a phone, `under` opens it below the board's row, never over the board.
  */
 export function MarksLegend({ rows, open, onOpen, drawn, onPoint, under = false, text }: {
     rows: readonly LegendRow[];
@@ -24,12 +24,19 @@ export function MarksLegend({ rows, open, onOpen, drawn, onPoint, under = false,
 })
 {
     const button = useRef<HTMLButtonElement>(null);
+    const section = useRef<HTMLElement>(null);
     const panel = useId();
     useClosing(open, () => onOpen(false));
     usePutOut(open, onPoint);
-    const place = usePlace(button, open && !under);
+    const place = usePlace(button, open, under);
     const words = text.legend;
-    const shown = open && (under || place !== undefined);
+    const shown = open && place !== undefined;
+
+    useLayoutEffect(() => {
+        if (shown) {
+            section.current?.showPopover();
+        }
+    }, [shown]);
 
     return (
         <span class="marks-legend">
@@ -50,7 +57,7 @@ export function MarksLegend({ rows, open, onOpen, drawn, onPoint, under = false,
             </button>
             {shown
                 ? (
-                    <section id={panel} class={`legend-panel${under ? " under" : ""}`} aria-label={words.title} style={under ? undefined : place}>
+                    <section ref={section} id={panel} class="legend-panel" popover="manual" aria-label={words.title} style={place}>
                         <p class="legend-title">{words.title}</p>
                         {rows.length === 0 ? <p class="legend-none">{words.none}</p> : (
                             <ul>
@@ -230,10 +237,10 @@ function useClosing(open: boolean, close: () => void): void
 
 /**
  * Where the legend opens: under its button, or over it when the window has more room there, its right edge on the button's and no wider than the card it
- * sits in, so that it leaves the board in sight; over the page, since the cards clip what overflows them. It follows the button as the window changes or
- * scrolls.
+ * sits in, so that it leaves the board in sight, inside the window; `under`, below the row under the board and as wide as it. None while the button is not
+ * shown, as the one of the layout the window does not use. It follows the button as the window changes or scrolls, kept inside the window.
  */
-function usePlace(button: RefObject<HTMLElement>, open: boolean): Place | undefined
+function usePlace(button: RefObject<HTMLElement>, open: boolean, under: boolean): Place | undefined
 {
     const [place, setPlace] = useState<Place | undefined>(undefined);
 
@@ -244,18 +251,22 @@ function usePlace(button: RefObject<HTMLElement>, open: boolean): Place | undefi
         }
 
         const follow = (): void => {
-            const box = button.current?.getBoundingClientRect();
+            const shown = button.current !== null && button.current.getClientRects().length > 0;
+            const box = (under ? button.current?.closest(".board-map") ?? button.current : button.current)?.getBoundingClientRect();
             const card = button.current?.closest(".card")?.getBoundingClientRect();
 
-            if (box !== undefined) {
+            if (!shown || box === undefined) {
+                setPlace(undefined);
+            } else {
                 const { clientWidth: width, clientHeight: height } = document.documentElement;
                 const below = height - box.bottom - panelGap - edge;
                 const above = box.top - panelGap - edge;
-                const side = { right: `${Math.max(edge, width - box.right)}px`, width: `${Math.min(panelWidth, box.right - (card?.left ?? box.right - panelWidth))}px` };
+                const across = under ? box.width : Math.min(panelWidth, box.right - (card?.left ?? box.right - panelWidth));
+                const side = { right: `${Math.max(edge, width - box.right)}px`, width: `${Math.min(across, width - 2 * edge)}px` };
                 setPlace(
-                    below >= roomEnough || below >= above
-                        ? { top: `${box.bottom + panelGap}px`, ...side, maxHeight: `${below}px` }
-                        : { bottom: `${height - box.top + panelGap}px`, ...side, maxHeight: `${above}px` },
+                    under || below >= roomEnough || below >= above
+                        ? { top: `${Math.max(edge, box.bottom + panelGap)}px`, ...side, maxHeight: `${under ? Math.max(roomLeast, below) : below}px` }
+                        : { bottom: `${Math.max(edge, height - box.top + panelGap)}px`, ...side, maxHeight: `${above}px` },
                 );
             }
         };
@@ -268,7 +279,7 @@ function usePlace(button: RefObject<HTMLElement>, open: boolean): Place | undefi
             window.removeEventListener("resize", follow);
             window.removeEventListener("scroll", follow, true);
         };
-    }, [open]);
+    }, [open, under]);
 
     return place;
 }
@@ -280,6 +291,8 @@ const panelGap = 6;
 const edge = 16;
 const panelWidth = 300;
 const roomEnough = 320;
+// The least room the legend takes under the board's row on a phone, never over the board: the page scrolls to the rest, and the legend follows.
+const roomLeast = 120;
 
 function keyOf(row: LegendRow): string
 {
