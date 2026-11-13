@@ -35,7 +35,7 @@ No chess engine plays for the AI: every move and every judgment is its own. Ches
 
 ![The box to write in under the AI's name, and its answer](talk)
 
-- You talk with the AI in the **box under its name**, a few words with each move: it reads them with your move. You can also write to it in its window.
+- You talk with the AI in the **box under its name**, a few words with each move: it reads them with your move. You can also write to it in its window. With Codex, if you write there while it waits for your move, press **Esc** after Enter: else it reads your message only after your move.
 - A **move written** in the chat counts too: `e4`, `Nf3`, with the English letters of the pieces (K Q R B N), or in words.
 - **The AI's name** opens the choice of its chat: Claude Code or Codex, the model (which AI: some are faster, others stronger) and how much it reasons. The more it reasons, the slower it plays. If you change them, the chat starts afresh in the same window: the AI forgets what you talked about, and the game stays as it is.
 - At each **new game**, the chat the page opened starts afresh by itself, once the AI has stopped thinking: a long chat makes the AI slower.
