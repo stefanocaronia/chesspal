@@ -435,10 +435,13 @@ function inOrder<Item>(items: Item[], newestFirst: boolean): Item[]
     return newestFirst ? items.reverse() : items;
 }
 
-/** A word fades with age: the newest whole, the older ones far back, so they never pass for the newest (Stefano), each fainter down to a floor. */
+/**
+ * A word fades with age: the newest whole, the older ones well back, so they never pass for the newest (Stefano), each fainter down to a floor where its text still
+ * keeps 3.5:1 on its bubble in the light theme.
+ */
 function aged(age: number): { opacity: number; }
 {
-    return { opacity: age === 0 ? 1 : Math.max(0.2, 0.4 - (age - 1) * 0.1) };
+    return { opacity: age === 0 ? 1 : Math.max(0.6, 0.7 - (age - 1) * 0.05) };
 }
 
 /** In analysis the talk is read again: the AI's last answer and what follows it whole, the older lines a little back, still readable (Zoe). */
@@ -483,16 +486,23 @@ function useOnlyWhole(list: RefObject<HTMLElement>, lines: readonly string[], ne
     }, [list, lines.length, lines.at(-1)]);
 }
 
-/** Under the player's last line: one check once written, two once the AI has read it. */
+/**
+ * Under the player's last line, a mark with its words as title: one check once written, two once the AI has read it; once it has answered, its answer says it and
+ * the mark leaves, its room kept so the line does not move.
+ */
 function Status({ heard, name, text }: { heard: TalkLine["heard"]; name: string; text: Text; })
 {
-    const read = heard === "read" || heard === "answered";
+    if (heard === "answered") {
+        return <span class="status" aria-hidden="true" />;
+    }
+
+    const read = heard === "read";
+    const label = read ? text.readBy(name) : text.sent;
     return (
-        <span class={read ? "status read" : "status"}>
+        <span class={read ? "status read" : "status"} role="img" title={label} aria-label={label}>
             <svg class="icon" viewBox="0 0 21 24" aria-hidden="true">
                 {read ? <path d="M2 12.5L6 16.5L13.5 8M10 15.5L11 16.5L18.5 8" /> : <path d="M3.5 12.5L7.5 16.5L15 8" />}
             </svg>
-            {read ? text.readBy(name) : text.sent}
         </span>
     );
 }

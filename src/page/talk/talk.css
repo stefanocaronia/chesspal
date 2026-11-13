@@ -343,12 +343,11 @@
     overflow-wrap: anywhere;
 }
 
+/* A mark under the player's last line, its words in its title; empty once answered, still as high */
 .status {
     display: inline-flex;
-    align-items: center;
-    gap: 3px;
+    min-height: 15px;
     margin-top: 3px;
-    font-size: 12px;
     color: var(--soft);
 }
 
@@ -360,7 +359,6 @@
 
 .status.read {
     color: var(--accent);
-    font-weight: 600;
 }
 
 /* The box the player writes in: a bubble whose tail points at their picture */
