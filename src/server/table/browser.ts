@@ -12,19 +12,25 @@ export interface BrowserSystem
     output: (command: string, args: string[]) => Promise<string>;
 }
 
-/** Opens an address in a window of its own, else in a tab of the default browser, without waiting for it: whether a browser started. */
-export async function openInBrowser(url: string, platform: string): Promise<boolean>
+/**
+ * Opens an address in a window of its own, marked with the table's opening, else in a tab of the default browser, without waiting for it: whether a
+ * browser started. A tab is not marked: a page cannot close a tab it did not open.
+ */
+export async function openInBrowser(url: string, platform: string, opening?: number): Promise<boolean>
 {
     const browser = await appBrowser(platform, process.env);
     // Explorer, open and xdg-open take an address as they take a folder, and hand it to the default browser.
-    return (browser !== undefined && await started(browser, [`--app=${openedAddress(url)}`])) || openFolder(url, platform);
+    return (browser !== undefined && await started(browser, [`--app=${openedAddress(url, opening)}`])) || openFolder(url, platform);
 }
 
-/** The address of the window the table opens, marked so that the page sizes it as it opens (page/layout/window.ts). */
-export function openedAddress(url: string): string
+/**
+ * The address of the window the table opens, marked so that the page sizes it as it opens, with its opening, so that it closes once a newer window has
+ * opened (page/layout/window.ts).
+ */
+export function openedAddress(url: string, opening?: number): string
 {
     const address = new URL(url);
-    address.searchParams.set("opened", "");
+    address.searchParams.set("opened", opening === undefined ? "" : String(opening));
     return address.href;
 }
 

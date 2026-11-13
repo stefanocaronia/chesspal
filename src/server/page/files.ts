@@ -59,8 +59,10 @@ const policy = `default-src 'self'; script-src 'self' 'sha256-${createHash("sha2
 
 const html = [
     "<!doctype html>",
-    '<html lang="en">',
+    '<html lang="en" translate="no">',
     '<meta charset="utf-8">',
+    // The page speaks the player's language, set once the app starts, and moves are never translated: no browser offers to.
+    '<meta name="google" content="notranslate">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     '<meta name="color-scheme" content="light dark">',
     "<title>Chesspal</title>",

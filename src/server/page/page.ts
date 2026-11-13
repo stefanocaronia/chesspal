@@ -19,6 +19,7 @@ import { json, send } from "./http.ts";
 import { answerProfiles, readRatingsOf } from "./profiles.ts";
 import { answerTable, type Opening, restartWhenAtRest, type TableChats, updateWhenAtRest } from "./table.ts";
 import { watchForUpdates } from "./update.ts";
+import { type TableWindows, windowConnected } from "./windows.ts";
 
 /**
  * The page of a player's folder, served by the chat's process or by the table it is attached to (D-104): its address, how to tell it what the chat does
@@ -180,6 +181,8 @@ export interface Served
     /** The newer Chesspal npm has (D-108); the table installing it, installed and waiting to be at rest, or starting again from it. */
     newer?: string;
     updating?: "installing" | "installed" | "restarting" | undefined;
+    /** The windows the table opened: the newest stays, the others close (D-104). */
+    windows?: TableWindows;
 }
 
 /**
@@ -261,6 +264,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         sendSiteGames(response, served);
     } else if (path === "/api/events") {
         keepPosted(request, response, served.watchers);
+        windowConnected(served, url);
         // A page that opens reads the player's ratings again after a day (D-106).
         readRatingsOf(served);
     } else if (path === "/api/bell") {
