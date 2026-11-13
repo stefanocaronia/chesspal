@@ -33,7 +33,7 @@ export { type CoachHint, type CoachJudgment, type CoachLead, coachShown, coachSt
 export { bothSidesMoved, type CurrentGame, drawOfferOf, endOf, GameChanged, type GameEnd, gameStamp, loadGame, removeGame, rerunIfChanged, saveGame, type Shown, type Speaker, type TalkLine } from "./current-game.ts";
 export { makeFolder, renameOver, writeAtomically } from "./files.ts";
 export { commentWithPlan, currentPlan, planOf, withoutPlans } from "./plans.ts";
-export { forgetPositionShown, notePositionShown, type PositionShown, positionShownNote } from "./position-shown.ts";
+export { forgetPositionShown, hostProcess, notePositionShown, type PositionShown, positionShownNote } from "./position-shown.ts";
 export { endTableTalk, loadTableTalk, saveTableTalk, type TableTalk, tableTalkStamp } from "./table-talk.ts";
 export { type Heard, heardLines, type Sayer, type Talk, talkLimits, talkLine, unheardWords, wakesTheChat, type Words, WordsRefused } from "./talk.ts";
 export { keepThought, notePondering, ponderingOn, ponderingUntil, type Thought, thoughtForLastMove, thoughtKey, waitingSince } from "./thoughts.ts";

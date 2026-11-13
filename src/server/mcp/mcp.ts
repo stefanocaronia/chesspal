@@ -6,7 +6,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, homeForOneCall, inputProblems, isBoolean, PositionChanged, positionIn, samePosition } from "../../commands/index.ts";
 import { aiNameOf } from "../../core/index.ts";
-import { endOf, forgetPositionShown, lastChatStart, loadGame, noteAiHost, noteAiModel, positionShownNote, rerunIfChanged } from "../../games/index.ts";
+import { endOf, forgetPositionShown, hostProcess, lastChatStart, loadGame, noteAiHost, noteAiModel, type PositionShown, positionShownNote, rerunIfChanged } from "../../games/index.ts";
 import { agentTools, hasAgent, startInstructions } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
@@ -302,7 +302,7 @@ function takePositionShown(context: Context, home: () => string): void
         return;
     }
 
-    if (current && !chatSession(shown.session, context.folder)) {
+    if (current && !chatsNote(shown, context.folder)) {
         return;
     }
 
@@ -318,13 +318,18 @@ function takePositionShown(context: Context, home: () => string): void
 }
 
 /**
- * Whether the hooks' session is this server's chat: Claude Code starts the server with its session, and gives the hooks a new one after /clear, which the
- * chat's start notes; a chat started or resumed since in the folder is another Claude Code, with a server of its own.
+ * Whether a note of the hooks is this server's chat's: by the Claude Code process, which names itself alike to the server and its hooks, when both have its
+ * name. Else by the session: the server's is the one Claude Code started it with, and the hooks get a new one after /clear, which the chat's start notes;
+ * a chat started or resumed since in the folder is taken for another Claude Code.
  */
-function chatSession(session: string, folder: string, own = process.env.CLAUDE_CODE_SESSION_ID): boolean
+function chatsNote({ process: noted, session }: PositionShown, folder: string, own = hostProcess(), ownSession = process.env.CLAUDE_CODE_SESSION_ID): boolean
 {
+    if (noted !== undefined && own !== undefined) {
+        return noted === own;
+    }
+
     const start = lastChatStart(folder);
-    return session === own || (start?.session === session && start.source !== "startup" && start.source !== "resume");
+    return session === ownSession || (start?.session === session && start.source !== "startup" && start.source !== "resume");
 }
 
 /**

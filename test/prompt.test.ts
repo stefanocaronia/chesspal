@@ -5,7 +5,7 @@ import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { answerPrompt, promptAnswer } from "../src/cli/prompt-hook.ts";
 import { commands, type Context, say } from "../src/commands/index.ts";
 import { loadGame, saveChatStart } from "../src/games/index.ts";
@@ -21,6 +21,11 @@ const pages: Page[] = [];
 let client: Client | undefined;
 const start = new Date(2026, 10, 13, 18, 0, 0);
 const noteFile = "position-shown.json";
+
+// Claude Code names its process to the server and the hooks; the tests run in one, and name theirs when a test needs it.
+beforeEach(() => {
+    vi.stubEnv("CLAUDE_CODE_MESSAGING_SOCKET", "");
+});
 
 afterEach(async () => {
     await client?.close();
@@ -211,6 +216,34 @@ describe("the chat's server after a move the hook played (D-71)", () => {
         expect(await answer(server, "ai_move", { move: "e5", plan: "Mirror." })).toMatchObject({ isError: false });
     });
 
+    it("tells the chat's note by its Claude Code process when the hook and the server both name it, by the session when either does not", async () => {
+        vi.stubEnv("CLAUDE_CODE_SESSION_ID", "chat-1");
+        vi.stubEnv("CLAUDE_CODE_MESSAGING_SOCKET", "cc-one");
+        // /resume typed in the chat: the hooks have the resumed session, the server its first, the process is the same.
+        const resumed = gameWith("black");
+        const server = await connect(resumed);
+        await server.callTool({ name: "status", arguments: {} });
+        saveChatStart(resumed.folder, { source: "resume", at: start.toISOString(), session: "chat-0" });
+        expect(await prompt(resumed, "e4", "chat-0")).toBeDefined();
+        expect(await answer(server, "ai_move", { move: "e5", plan: "Mirror." })).toMatchObject({ isError: false });
+        await client?.close();
+
+        // Another Claude Code in the folder, cleared: its session is the chat start's, its process another.
+        const other = gameWith("black");
+        const second = await connect(other);
+        await second.callTool({ name: "status", arguments: {} });
+        saveChatStart(other.folder, { source: "clear", at: start.toISOString(), session: "chat-2" });
+        vi.stubEnv("CLAUDE_CODE_MESSAGING_SOCKET", "cc-two");
+        expect(await prompt(other, "e4", "chat-2")).toBeDefined();
+        vi.stubEnv("CLAUDE_CODE_MESSAGING_SOCKET", "cc-one");
+        expect(await answer(second, "ai_move", { move: "e5", plan: "Mirror." })).toMatchObject({ isError: true });
+        expect(existsSync(join(other.folder, noteFile))).toBe(true);
+
+        // The server names no process: the session decides, the cleared one is this chat's.
+        vi.stubEnv("CLAUDE_CODE_MESSAGING_SOCKET", "");
+        expect(await answer(second, "ai_move", { move: "e5", plan: "Mirror." })).toMatchObject({ isError: false });
+    });
+
     it("drops a note on a position that is no longer the game's", async () => {
         vi.stubEnv("CLAUDE_CODE_SESSION_ID", "chat-1");
         const context = gameWith("black");
@@ -241,6 +274,50 @@ describe("the board page after a move the hook played", () => {
 
         expect(await Promise.race([heard, new Promise((done) => setTimeout(() => done("waiting"), 300))])).toBe("waiting");
         expect(await game()).toMatchObject({ listening: true, game: { clock: { since: new Date(start.getTime() + 30_000).toISOString() } } });
+    });
+});
+
+describe("the doorbell after a move the hook played", () => {
+    it("rings for nothing the player's message tells the chat, and again for what comes after it", async () => {
+        const base = gameWith("black");
+        vi.stubEnv("CLAUDE_PROJECT_DIR", base.folder);
+        const page = await startPage(base);
+        pages.push(page);
+        const port = Number(new URL(page.url).port);
+        const hook = (session: string) => JSON.stringify({ session_id: session, cwd: base.folder });
+
+        // Words on the page while the AI is in its turn, then the move written in the chat: the hook gives both.
+        await ask(page, "POST", "/api/message", { text: "Here it comes." });
+        expect(await prompt(base, "e4")).toContain("Here it comes.");
+        // The AI's turn ends with text alone, before the player's message reaches it: its Stop hook hears no ring for it.
+        const quiet = waitForBell(hook("chat-1"), [port]);
+        expect(await Promise.race([quiet, new Promise((done) => setTimeout(() => done("waiting"), 300))])).toBe("waiting");
+
+        // What the player does on the page after it rings as ever.
+        await ask(page, "POST", "/api/resign", {});
+        expect(await quiet).toBe(true);
+    });
+
+    it("rings at once when the game changed on the page after the hook's move, before the chat's turn ended", async () => {
+        const base = gameWith("black");
+        vi.stubEnv("CLAUDE_PROJECT_DIR", base.folder);
+        const page = await startPage(base);
+        pages.push(page);
+        expect(await prompt(base, "e4")).toBeDefined();
+        await ask(page, "POST", "/api/resign", {});
+
+        expect(await waitForBell(JSON.stringify({ session_id: "chat-1", cwd: base.folder }), [Number(new URL(page.url).port)])).toBe(true);
+    });
+
+    it("rings as before for the hook of another chat, whose note is not its own", async () => {
+        const base = gameWith("black");
+        vi.stubEnv("CLAUDE_PROJECT_DIR", base.folder);
+        const page = await startPage(base);
+        pages.push(page);
+        await ask(page, "POST", "/api/message", { text: "Here it comes." });
+        expect(await prompt(base, "e4", "chat-2")).toBeDefined();
+
+        expect(await waitForBell(JSON.stringify({ session_id: "chat-1", cwd: base.folder }), [Number(new URL(page.url).port)])).toBe(true);
     });
 });
 

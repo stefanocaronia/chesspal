@@ -277,10 +277,22 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
                 forgetGoneAnalyst(served);
             }
 
-            served.bell.listen(request, response);
+            // Nothing changed the game since the prompt hook played the move for the chat: the chat hears of it from the player's message.
+            const shown = url.searchParams.get("shown");
+            served.bell.listen(request, response, shown !== null && shown === stampNow(served));
         }
     } else {
         sendFile(response, path);
+    }
+}
+
+/** The stamp of the game in the data folder now; none when there is none or the folder cannot be read. */
+function stampNow(served: Served): string | undefined
+{
+    try {
+        return gameStamp(gameFolder(served.context.home()));
+    } catch {
+        return undefined;
     }
 }
 

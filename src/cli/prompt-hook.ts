@@ -28,7 +28,7 @@ export async function promptAnswer(input: string, contextOf: (hook: HookInput) =
         return undefined;
     }
 
-    const [context, { playMoveSentAlone }, { notePositionShown }] = await Promise.all([contextOf(hook), import("../commands/index.ts"), import("../games/index.ts")]);
+    const [context, { playMoveSentAlone }, { hostProcess, notePositionShown }] = await Promise.all([contextOf(hook), import("../commands/index.ts"), import("../games/index.ts")]);
     let played;
 
     try {
@@ -43,7 +43,16 @@ export async function promptAnswer(input: string, contextOf: (hook: HookInput) =
     }
 
     try {
-        notePositionShown(context.folder, { session: hook.session, ...played.position, at: context.now().toISOString(), given: played.given });
+        const { position, stamp, given } = played;
+        const host = hostProcess();
+        notePositionShown(context.folder, {
+            session: hook.session,
+            ...(host === undefined ? {} : { process: host }),
+            ...(stamp === undefined ? {} : { stamp }),
+            ...position,
+            at: context.now().toISOString(),
+            given,
+        });
     } catch (error) {
         // The move is played: the AI hears it all the same, and its server asks it for status before its own, which may give the words again.
         process.stderr.write(`Chesspal could not note the position it showed the chat: ${(error as Error).message}\n`);

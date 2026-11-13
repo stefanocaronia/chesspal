@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { type ClientRequest, get, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
-import { writeAtomically } from "../../games/index.ts";
+import { positionShownNote, writeAtomically } from "../../games/index.ts";
 import { dataFolder, realPath, samePath, tableFolder } from "../../home/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { version } from "../../version.ts";
@@ -90,12 +90,15 @@ export class Bell
         this.changed();
     }
 
-    /** A hook waits for the bell, so the chat's turn has ended; the hook before it, of a turn already ended, is let go. */
-    listen(request: IncomingMessage, response: ServerResponse): void
+    /**
+     * A hook waits for the bell, so the chat's turn has ended; the hook before it, of a turn already ended, is let go. A ring no hook heard is dropped when
+     * the chat is `told` all of it otherwise: by the player's message that came with the move the prompt hook played.
+     */
+    listen(request: IncomingMessage, response: ServerResponse, told = false): void
     {
         response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
         this.hooked = true;
-        const missed = this.pending;
+        const missed = this.pending && !told;
         this.pending = false;
 
         if (missed && this.news()) {
@@ -297,8 +300,12 @@ export async function bellHeard(input: string, ports?: number[]): Promise<BellHe
         return { folder, rang: false, why: `${pages} at ports ${tried.join(", ")}${others.length > 0 ? `; ${others.join(", ")}` : ""}` };
     }
 
-    // The page lets the analyst go as the hook starts waiting, when none runs any more.
-    const said = await body(port, hook.analystGone === true ? "/api/bell?analyst=gone" : "/api/bell");
+    // The page lets the analyst go as the hook starts waiting, when none runs any more; and it rings for nothing older than the move the prompt hook played
+    // for this chat, which hears it from the player's message itself.
+    const shown = hook.session === undefined ? undefined : positionShownNote(folder);
+    const told = shown !== undefined && shown.session === hook.session ? shown.stamp : undefined;
+    const query = new URLSearchParams({ ...(hook.analystGone === true ? { analyst: "gone" } : {}), ...(told === undefined ? {} : { shown: told }) });
+    const said = await body(port, `/api/bell${query.size === 0 ? "" : `?${query}`}`);
     return said === "ring" ? { folder, rang: true } : { folder, rang: false, why: said === undefined ? `the page at port ${port} did not answer` : `the page at port ${port} said "${said}"` };
 }
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { loadGame, rerunIfChanged } from "../../games/index.ts";
+import { gameStamp, loadGame, rerunIfChanged } from "../../games/index.ts";
 import { hasDoorbell } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { closingLines, coachOnEnd, coachOnEndLine, coachRuns, lastMoveText, moveLines, type MovePlayed, newWords, playMove, positionIn, refuseUnseenPosition, shownMove, withAnalyst } from "../answers/index.ts";
@@ -31,13 +31,14 @@ export const playerMove = defineCommand({
 });
 
 /**
- * A move the player sent alone in the chat, played by Chesspal before the AI reads it: what the AI is told, the position it then sees, and the keys of the
- * player's words on the board page given with it, for the chat's server to count them as given.
+ * A move the player sent alone in the chat, played by Chesspal before the AI reads it: what the AI is told, the position it then sees, the stamp of
+ * game.json after it, and the keys of the player's words on the board page given with it, for the chat's server to count them as given.
  */
 export interface MoveSentAlone
 {
     answer: string;
     position: SeenPosition;
+    stamp?: string;
     given: string[];
 }
 
@@ -52,9 +53,11 @@ export function playMoveSentAlone(move: string, context: Context): MoveSentAlone
     refuseKingAsRook(move, folder);
     const before = new Set(context.given);
     const played = rerunIfChanged(() => playersMove({ move }, context, 0));
+    const stamp = gameStamp(folder);
     return {
         answer: `Chesspal has already played the move the player wrote alone in the chat: don't call player_move for it.\n${playerMove.format(played, context)}`,
         position: positionIn(folder),
+        ...(stamp === undefined ? {} : { stamp }),
         given: [...context.given].filter((key) => !before.has(key)),
     };
 }
