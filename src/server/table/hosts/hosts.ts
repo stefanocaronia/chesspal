@@ -35,9 +35,16 @@ export function isHostName(name: unknown): name is HostName
     return hostNames.includes(name as HostName);
 }
 
-/** The message a chat opened by the table starts with, in the player's language: the AI answers it by calling status, as every chat does. */
-export function startMessage(language: string | undefined): string
+/**
+ * The message a chat opened by the table starts with, in the player's language: the AI answers it by calling status, as every chat does. A chat opened
+ * `toAnalyse` the game the page shows is asked for that: told to play, it opened the New game window over the analysis it had just started.
+ */
+export function startMessage(language: string | undefined, toAnalyse = false): string
 {
+    if (toAnalyse) {
+        return speaksItalian(language) ? "Analizziamo la partita!" : "Let's analyse the game!";
+    }
+
     return speaksItalian(language) ? "Giochiamo!" : "Let's play!";
 }
 

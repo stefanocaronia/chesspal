@@ -3,10 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
-import type { Context } from "../src/commands/index.ts";
+import { commands, type Context } from "../src/commands/index.ts";
+import { startAnalysis } from "../src/games/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { settingsFrom } from "../src/page/profile/settings.ts";
-import { activeProfile, saveProfileSettings } from "../src/profiles/index.ts";
+import { activeProfile, gameFolder, saveProfileSettings } from "../src/profiles/index.ts";
 import type { TableChats } from "../src/server/page/table.ts";
 import { playCommand } from "../src/server/table/hosts/chats.ts";
 import { hostArgs, startMessage } from "../src/server/table/hosts/hosts.ts";
@@ -36,6 +37,8 @@ describe("a chat the table opens", () => {
         expect(hostArgs("claude", "Let's play!", { model: "gpt-6-luna", effort: "ultra" })).toEqual(["Let's play!"]);
         expect(startMessage("it-IT")).toBe("Giochiamo!");
         expect(startMessage(undefined)).toBe("Let's play!");
+        expect(startMessage("it-IT", true)).toBe("Analizziamo la partita!");
+        expect(startMessage(undefined, true)).toBe("Let's analyse the game!");
     });
 
     it("starts Codex with no update screen, its model and the effort in its config, the message last", () => {
@@ -52,6 +55,21 @@ describe("a chat the table opens", () => {
         expect(launch).toMatchObject({ program: "/usr/bin/claude", args: ["Giochiamo!", "--model", "sonnet", "--effort", "max"], folder: tableFolder(home), shell: false });
         // An effort set for every chat would win over the page's; a chat's session, when the table was started from one, is not the host's.
         expect(launch.env).toMatchObject({ PATH: "/usr/bin", CLAUDE_CODE_EFFORT_LEVEL: undefined, CLAUDECODE: undefined });
+    });
+
+    it("is asked to analyse the game in analysis on the page when none goes on, and to play once a game does", async () => {
+        const context = homeContext("linux");
+        const home = context.home();
+        const there = (path: string) => path === "/usr/bin/claude";
+        startAnalysis(gameFolder(home), "2026-11-13-192013.pgn", context.now(), { brought: true });
+        expect(hostLaunch(context, "claude", { PATH: "/usr/bin" }, there).args[0]).toBe("Let's analyse the game!");
+
+        // A game the AI has gone over is on the page all the same: the chat opened there talks it over.
+        startAnalysis(gameFolder(home), "2026-11-13-192013.pgn", context.now());
+        expect(hostLaunch(context, "claude", { PATH: "/usr/bin" }, there).args[0]).toBe("Let's analyse the game!");
+
+        await commands.find((command) => command.name === "new_game")!.run({ ai_colour: "black" }, context);
+        expect(hostLaunch(context, "claude", { PATH: "/usr/bin" }, there).args[0]).toBe("Let's play!");
     });
 
     it("runs Codex's npm script with Node on Windows, without cmd, and its shim through cmd only when the script is not beside it", () => {

@@ -4,6 +4,7 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { win32 } from "node:path";
 import { type Context, speaksItalian } from "../../../commands/index.ts";
+import { endOf, gameInAnalysis, loadGame } from "../../../games/index.ts";
 import { tableFolder } from "../../../home/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
 import { programPath } from "./find.ts";
@@ -177,7 +178,8 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     const news = host === "codex" ? takeHooksNews(folder) : undefined;
     const hooks = news === undefined ? {} : { hooks: news };
     const choice = choiceIn(profileSettings(home, activeProfile(home).id), host);
-    const args = hostArgs(host, startMessage(languageIn(gameFolder(home), context.language)), choice);
+    const games = gameFolder(home);
+    const args = hostArgs(host, startMessage(languageIn(games, context.language), analysisAsked(games)), choice);
     // An effort the player set for every chat would win over the one chosen on the page: spawn leaves out a variable that is undefined.
     const effort = host === "claude" && choice.effort !== undefined ? { CLAUDE_CODE_EFFORT_LEVEL: undefined } : {};
     // The seat this play holds, by which its chat's server tells the table it is the chat held, and not another opened in the same folder.
@@ -189,6 +191,18 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     }
 
     return { program: found, args, folder, env: childEnv, shell: context.platform === "win32" && /\.(cmd|bat)$/i.test(found), choice, ...hooks };
+}
+
+/** Whether the board page shows a game in analysis, none going on: the chat opened there is for that game, brought to review or to talk over, not for a new one. */
+function analysisAsked(folder: string): boolean
+{
+    try {
+        const current = loadGame(folder);
+        return (current === undefined || endOf(current.game) !== undefined) && gameInAnalysis(folder) !== undefined;
+    } catch {
+        // A game that cannot be read is status's to report.
+        return false;
+    }
 }
 
 const hostTitle: Record<HostName, string> = { claude: "Claude Code", codex: "Codex" };
