@@ -1,6 +1,6 @@
 {
   "name": "chesspal",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "description": "Play chess against an AI with a character, and learn with an AI coach: Chesspal keeps the rules, the board, the games and the memory; the AI plays, reasons and talks.",
   "type": "module",
   "bin": {
