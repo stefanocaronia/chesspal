@@ -221,7 +221,7 @@ export class ChatNotClear extends Error
 const remembered = 3;
 
 /** From how many plies a game played in a chat asks for a clean one before the next (D-57): one left after a few moves does not. */
-const pliesBeforeClearing = 20;
+export const pliesBeforeClearing = 20;
 
 // A FEN's board: eight ranks of pieces and empty counts.
 const fenPattern = /^[pnbrqkPNBRQK1-8]+(?:\/[pnbrqkPNBRQK1-8]+){7}(?:\s|$)/;

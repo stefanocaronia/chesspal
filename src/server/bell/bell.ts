@@ -26,20 +26,25 @@ export class Bell
     private woken = false;
     // A hook has waited for the bell since the chat came: its host runs Chesspal's hooks, and only they tell where a turn ends.
     private hooked = false;
+    // Looks again, while a ring waits for a chat in a turn, whether the chat was stopped meanwhile.
+    private stopWatch: NodeJS.Timeout | undefined;
     private readonly news: () => boolean;
     private readonly changed: () => void;
+    private readonly stopped: () => boolean;
 
     /**
      * `news` says whether a ring no hook heard is still worth waking the chat for; `changed` is told when what the page shows of the chat may change: it
-     * starts or stops listening, the doorbell wakes it, its turn ends.
+     * starts or stops listening, the doorbell wakes it, its turn ends; `stopped` whether the host says the chat was stopped in its turn (Esc), which no
+     * hook tells.
      */
-    constructor(news: () => boolean = () => true, changed: () => void = () => undefined)
+    constructor(news: () => boolean = () => true, changed: () => void = () => undefined, stopped: () => boolean = () => false)
     {
         this.news = news;
         this.changed = changed;
+        this.stopped = stopped;
     }
 
-    /** Whether the chat is in a turn, as far as the doorbell knows: a chat stopped with Esc stays in it until its next tool. */
+    /** Whether the chat is in a turn, as far as the doorbell knows: a chat stopped with Esc stays in it until its next tool, or until a ring finds it stopped. */
     get inTurn(): boolean
     {
         return this.busy;
@@ -86,6 +91,7 @@ export class Bell
     /**
      * The player acted on the page: the hook waiting hears it now, or the next one as soon as it comes. In a host that runs no hook nothing tells the end of
      * a turn: an act the chat waits for finds it out of its turn, and nobody hears the player, unless the chat `mayBeAtWork` on the AI's move meanwhile.
+     * A chat stopped in its turn ends no turn either: while the ring waits, the doorbell looks every `stopCheck` whether the host says so.
      */
     ring(mayBeAtWork = false): void
     {
@@ -95,6 +101,8 @@ export class Bell
             if (!this.hooked && !mayBeAtWork && this.busy) {
                 this.busy = false;
                 this.changed();
+            } else {
+                this.watchForStop();
             }
 
             return;
@@ -158,7 +166,36 @@ export class Bell
             this.changed();
         }
     }
+
+    /** A ring waits for a chat in its turn: a chat stopped there, which nobody hears, is out of it now, and the page says where to wake it. */
+    private watchForStop(): void
+    {
+        if (this.stopWatch !== undefined || !this.waitsInTurn()) {
+            return;
+        }
+
+        if (this.stopped()) {
+            this.busy = false;
+            this.woken = false;
+            this.changed();
+            return;
+        }
+
+        this.stopWatch = setTimeout(() => {
+            this.stopWatch = undefined;
+            this.watchForStop();
+        }, stopCheck);
+        this.stopWatch.unref();
+    }
+
+    private waitsInTurn(): boolean
+    {
+        return this.pending && this.busy && this.listener === undefined;
+    }
 }
+
+/** How often the doorbell looks whether a chat a ring waits for was stopped in its turn. */
+export const stopCheck = 2_000;
 
 /**
  * Notes in the data folder the port a chat's page took off its folder's usual ports, one file per page, for the hook to find it there; then forgets, off

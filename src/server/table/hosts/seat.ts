@@ -29,6 +29,8 @@ export function takeSeat(folder: string, seat: Seat, now: Date = new Date()): vo
     mkdirSync(folder, { recursive: true });
     rmSync(join(folder, againFile), { force: true });
     writeAtomically(join(folder, seatFile), `${JSON.stringify(seat)}\n`);
+    // The seat is held from `now`, not from the file system's clock, which on Windows may run ahead of it.
+    utimesSync(join(folder, seatFile), now, now);
 }
 
 /** Tells the table this play process still holds the seat; nothing when it lost it. */

@@ -8,7 +8,7 @@ import { aiNameOf } from "../../core/index.ts";
 import { forgetAnalyst, gameStamp, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { Bell, forgetPagePort, notePagePort } from "../bell/index.ts";
+import { Bell, chatInterrupted, forgetPagePort, notePagePort } from "../bell/index.ts";
 import { bellProbe, pagePorts, type TableChat } from "../ports/index.ts";
 import { analysesOf, answerAnalyses, sendSiteGames } from "./analyses.ts";
 import { answerChat } from "./attach.ts";
@@ -89,11 +89,15 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
         chat,
         opponent: options.opponent ?? (() => aiNameOf(chat.host())),
         // A start again or a new game asked while the chat was at work comes once it has ended its answer (D-107), as an update installed meanwhile (D-108).
-        bell: new Bell(() => hasNews(context, chat), () => {
-            startWhenAtRest(served);
-            updateWhenAtRest(served);
-            tellWatchers(watchers);
-        }),
+        bell: new Bell(
+            () => hasNews(context, chat),
+            () => {
+                startWhenAtRest(served);
+                updateWhenAtRest(served);
+                tellWatchers(watchers);
+            },
+            () => chatInterrupted(folder),
+        ),
         watchers,
         port: 0,
         outdated: outdatedHostFiles(folder, context.platform).length > 0,

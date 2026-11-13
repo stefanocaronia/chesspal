@@ -53,7 +53,7 @@ import { tellWatchers } from "./events.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
-import { analystAtWork, chatToRelaunch, chatToWaitFor, refuseWaited, relaunchChat, tableShown } from "./table.ts";
+import { analystAtWork, chatPlayedAtLength, chatToRelaunch, chatToWaitFor, refuseWaited, relaunchChat, tableShown } from "./table.ts";
 import { updateShown } from "./update.ts";
 
 /** Answers the page's requests about the game: true when the request was one. */
@@ -235,6 +235,13 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
 
         // The game starts from the page, open: its clocks wait for the player's Start there. A chat the table starts again is clean: no /clear is asked.
         relaunching = chatToRelaunch(served);
+
+        if (!relaunching && chatToWaitFor(served) && chatPlayedAtLength(served, before)) {
+            waitForChat(served, input.data);
+            send(response, 200, json, JSON.stringify({ waiting: true }));
+            return;
+        }
+
         const sight = relaunching ? served.context : asTheChatSees(served.context, served.chat);
         chosen = input.data;
         rerunIfChanged(() => startNewGame(input.data, { ...sight, pageOpen: () => true }, "page"));
