@@ -11,7 +11,7 @@ interface Said
     /** The game, none when the AI spoke before the first (D-77). */
     game?: GameSummary;
     words: Written[];
-    /** The coach yet to start on the player's move that ended the game (D-88). */
+    /** The coach yet to start once a move ended the game (D-88). */
     coach?: true;
 }
 

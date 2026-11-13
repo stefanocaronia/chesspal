@@ -87,13 +87,12 @@ export function agentRuns(context: Context, agent: string): boolean
 }
 
 /**
- * Whether to start the coach after the player's own move has ended the game on the board, with the helps on: it judges that move too (D-88). Told again
- * until it starts, since a chat woken by the page may lose the line on its way to its words (Priya).
+ * Whether to start the coach once a move has ended the game on the board, with the helps on: it judges the player's last move, their own that ended it too
+ * (D-88). Told again until it starts, since a chat busy telling the end may lose the line on its way to its words (Priya).
  */
 export function coachOnEnd(context: Context, folder: string, current: CurrentGame): boolean
 {
-    const { game, ai } = current;
-    return game.outcome.over && game.position.turn === ai && helpsIn(folder) && coachRuns(context) && !coachStarted(folder, current);
+    return current.game.outcome.over && helpsIn(folder) && coachRuns(context) && !coachStarted(folder, current);
 }
 
 /**

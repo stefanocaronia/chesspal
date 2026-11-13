@@ -35,6 +35,10 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
                 + "ended, and write nothing about it in the chat, now or when it ends.\n",
         );
         expect(mate).not.toContain("chesspal-ponder");
+        // Told again until it starts, as after the player's own move that ends the game: a quick model told once lost it telling the end (Priya).
+        expect(await run(context, "ai_say", { text: "Mate.", mood: "happy" })).toContain('start the chesspal-coach agent in the background with the prompt "Coach.", whatever');
+        await run(context, "coach");
+        expect(await run(context, "status")).not.toContain("chesspal-coach");
 
         const going = { ...playerFolder(), host: () => "claude-code" };
         setUpHosts(going.folder, "linux");
