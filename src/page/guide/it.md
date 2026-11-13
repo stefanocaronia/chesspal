@@ -35,7 +35,7 @@ Nessun motore di scacchi gioca al posto dell'AI: ogni mossa e ogni giudizio sono
 
 ![La casella per scrivere sotto il nome dell'AI, e la sua risposta](talk)
 
-- Parli con l'AI nella **casella sotto il suo nome**, qualche parola a ogni mossa: le legge con la tua mossa. Puoi scriverle anche nella sua finestra.
+- Parli con l'AI nella **casella sotto il suo nome**, qualche parola a ogni mossa: le legge con la tua mossa. Puoi scriverle anche nella sua finestra. Con Codex, se gli scrivi lì mentre aspetta la tua mossa, dopo Invio premi **Esc**: se no legge il messaggio solo dopo la tua mossa.
 - Anche una **mossa scritta** nella chat vale: `e4`, `Nf3`, con le lettere inglesi dei pezzi (K Q R B N), o a parole.
 - **Il nome dell'AI** apre la scelta della chat: Claude Code o Codex, il modello (quale AI: alcune sono più veloci, altre più forti) e quanto ragiona. Più ragiona, più gioca lenta. Se cambi, la chat riparte da capo nella stessa finestra: l'AI dimentica la chiacchierata di prima, la partita resta com'è.
 - A ogni **nuova partita** la chat aperta dalla pagina riparte da capo da sola, se l'AI ha finito di pensare: una chat lunga rende l'AI più lenta.
