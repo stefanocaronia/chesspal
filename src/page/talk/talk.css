@@ -328,6 +328,11 @@
     cursor: pointer;
 }
 
+/* In the game's review the mark ends the title's line */
+.review .head > .skip-reading {
+    margin-left: auto;
+}
+
 .skip-reading .icon {
     display: block;
     width: 16px;

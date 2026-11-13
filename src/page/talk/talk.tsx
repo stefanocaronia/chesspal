@@ -390,12 +390,13 @@ function GameReview({ by, summary, skipping, text }: { by: string; summary: stri
 
     return (
         <section class="say review" aria-label={text.reviewBy(by)}>
-            {skipping}
+            {/* The mark that skips the reading sits in the title's line, at its end: the review is a grid, where a float would be a row of its own */}
             <p class="head">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 4V20M8 20H16M5 7H19M5 7L2.5 13A2.5 2 0 0 0 7.5 13ZM19 7L16.5 13A2.5 2 0 0 0 21.5 13Z" />
                 </svg>
                 {text.reviewBy(by)}
+                {skipping}
             </p>
             {lead === "" ? null : (
                 <p>
