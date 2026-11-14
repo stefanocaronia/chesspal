@@ -924,6 +924,47 @@ describe("the doorbell of the chat", () => {
         expect([bell.listening, told]).toEqual([true, 4]);
     });
 
+    it("leaves the chat deaf and out of its turn when its hook goes without the bell, until it calls a tool, a hook waits, or a message starts its turn", () => {
+        let told = 0;
+        const bell = new Bell(() => true, () => told++);
+        const response = { writeHead: () => response, end: () => undefined };
+
+        const hookThatGoes = (): EventEmitter => {
+            const request = new EventEmitter();
+            bell.listen(request as never, response as never);
+            return request;
+        };
+
+        // The host ends the hook that waits: the chat hears nobody, and is not at work.
+        hookThatGoes().emit("close");
+        expect([bell.deaf, bell.listening, bell.inTurn, told]).toEqual([true, false, false, 2]);
+
+        // A tool call puts it in a turn again.
+        bell.chatCalls();
+        expect([bell.deaf, bell.inTurn, told]).toEqual([false, true, 3]);
+
+        // A hook another takes the place of, or one the prompt hook lets go, leaves nobody deaf.
+        const replaced = hookThatGoes();
+        hookAt(bell);
+        replaced.emit("close");
+        bell.chatPrompted();
+        expect([bell.deaf, bell.inTurn]).toEqual([false, true]);
+
+        // The player's message wakes a deaf chat: in its turn, still unheard until its first tool.
+        hookThatGoes().emit("close");
+        expect(bell.deaf).toBe(true);
+        bell.chatPrompted();
+        expect([bell.deaf, bell.listening]).toEqual([false, false]);
+
+        // A hook that waits, or the chat leaving, ends it too.
+        hookThatGoes().emit("close");
+        hookAt(bell);
+        expect(bell.deaf).toBe(false);
+        hookThatGoes().emit("close");
+        bell.chatLeft();
+        expect(bell.deaf).toBe(false);
+    });
+
     it("ends the chat's turn at the player's act in a host that runs no hook, but for words while it may think on its move, until a hook waits", () => {
         let told = 0;
         const bell = new Bell(() => true, () => told++);
@@ -986,7 +1027,7 @@ describe("the doorbell of the chat", () => {
             // Esc: no hook ends the turn, but the host says the chat was stopped, and the page hears nobody listens.
             stopped = true;
             vi.advanceTimersByTime(stopCheck);
-            expect([bell.listening, bell.inTurn, told]).toEqual([false, false, 3]);
+            expect([bell.listening, bell.inTurn, bell.deaf, told]).toEqual([false, false, true, 3]);
 
             // The player writes in the chat again: its first tool starts the AI's clock, and its hook hears what the player did on the page.
             expect(bell.chatCalls()).toBe(true);

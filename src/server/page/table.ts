@@ -435,11 +435,11 @@ function heldChat(served: Served): HeldChat | undefined
     return held === undefined || held.seat !== attached?.chat.seat ? undefined : { model: held.model, effort: held.effort };
 }
 
-// The chat waits for the doorbell, out of a turn, and no analyst of it is at work: starting it again loses nothing.
+// The chat is out of a turn, waiting for the doorbell or deaf to it, and no analyst of it is at work: starting it again loses nothing.
 function chatAtRest(served: Served): boolean
 {
     const { bell } = served;
-    return bell.listening && !bell.inTurn && !analystAtWork(served);
+    return (bell.listening || bell.deaf) && !bell.inTurn && !analystAtWork(served);
 }
 
 /**

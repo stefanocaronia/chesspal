@@ -27,6 +27,8 @@ export class Bell
     private woken = false;
     // A hook has waited for the bell since the chat came: its host runs Chesspal's hooks, and only they tell where a turn ends.
     private hooked = false;
+    // The chat's last hook went without the bell, or a ring found it stopped in its turn: it is out of its turn, and nobody hears the player.
+    private unheard = false;
     // Looks again, while a ring waits for a chat in a turn, whether the chat was stopped meanwhile.
     private stopWatch: NodeJS.Timeout | undefined;
     private readonly news: () => boolean;
@@ -57,6 +59,12 @@ export class Bell
         return this.woken;
     }
 
+    /** Whether the chat is out of its turn and hears nobody: its hook went without the bell, or it was stopped; until it calls a tool or a hook waits again. */
+    get deaf(): boolean
+    {
+        return this.unheard;
+    }
+
     /** Whether the chat hears the player: in a turn, or waiting for the bell with a hook. */
     get listening(): boolean
     {
@@ -68,6 +76,7 @@ export class Bell
     {
         const asleep = !this.listening;
         this.busy = true;
+        this.unheard = false;
         this.tellIf(asleep);
         return asleep;
     }
@@ -79,7 +88,11 @@ export class Bell
      */
     chatPrompted(): void
     {
+        // A chat nobody heard is in its turn now, though still unheard.
         if (this.listener === undefined) {
+            const deaf = this.unheard;
+            this.unheard = false;
+            this.tellIf(deaf);
             return;
         }
 
@@ -124,6 +137,7 @@ export class Bell
     {
         response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
         this.hooked = true;
+        this.unheard = false;
         const missed = this.pending && !told;
         this.pending = false;
 
@@ -142,9 +156,11 @@ export class Bell
         this.changed();
         request.on("close", () => {
             if (this.listener === response) {
-                // The hook went without the bell (the chat stopped, cleared or closed): nobody hears the player until the chat calls a tool again.
+                // The hook went without the bell (the chat stopped, cleared or closed, or its host ended the hook): nobody hears the player until the chat calls
+                // a tool again, but the chat is out of its turn.
                 this.listener = undefined;
-                this.tellIf(!this.busy);
+                this.unheard = !this.busy;
+                this.tellIf(this.unheard);
             }
         });
     }
@@ -155,6 +171,7 @@ export class Bell
         this.hooked = false;
         this.busy = false;
         this.woken = false;
+        this.unheard = false;
         this.pending = false;
         this.listener?.end("dismissed");
         this.listener = undefined;
@@ -178,6 +195,7 @@ export class Bell
         if (this.stopped()) {
             this.busy = false;
             this.woken = false;
+            this.unheard = true;
             this.changed();
             return;
         }

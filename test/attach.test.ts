@@ -851,6 +851,27 @@ describe("the chat's window at the table", () => {
         expect(beside.relaunched).toEqual([]);
     });
 
+    it("starts again at once a chat whose hook its host ended without the bell, which hears nobody but is at rest; never once it calls a tool", async () => {
+        const { chats, relaunched, asked } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const page = await attached({ ...chatOn(home), host: () => "antigravity-client" });
+        await page.chatCalls();
+
+        // The chat ends its turn, and its host ends the hook that waits at the table.
+        const hook = get(new URL("/api/bell", table.url)).on("error", () => undefined);
+        await until(async () => (await gameShown(table.url)).listening === true);
+        hook.destroy();
+        await until(async () => (await gameShown(table.url)).listening === false);
+
+        expect(await restartAt(table.url, "claude")).toEqual({ status: 200, text: JSON.stringify({ restarting: true }) });
+        expect([relaunched.length, asked]).toEqual([1, ["claude"]]);
+
+        // Once it calls a tool, it is at work, and a start again waits for its turn's end.
+        await page.chatCalls();
+        expect(await restartAt(table.url, "codex")).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+        expect(relaunched.length).toBe(1);
+    });
+
     it("lets the page start a waiting request at once, cutting the chat's answer, or let it go; and shows the model the chat started with", async () => {
         const { chats, relaunched, asked } = playChats();
         const { home, table } = await tableOn(undefined, chats);
