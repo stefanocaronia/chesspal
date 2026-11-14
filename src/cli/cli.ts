@@ -26,9 +26,9 @@ if (args.length === 0) {
     // The server and its SDK load only here: every other command starts faster without them.
     const { startMcpServer } = await import("../server/mcp/index.ts");
     await startMcpServer();
-} else if (args[0] === "listen" && (args.length === 1 || (args.length === 2 && args[1] === "--codex"))) {
+} else if (args[0] === "listen" && (args.length === 1 || (args.length === 2 && (args[1] === "--codex" || args[1] === "--antigravity")))) {
     const { listen } = await import("../server/bell/index.ts");
-    await listen(args[1] === "--codex");
+    await listen(args[1] === "--codex" ? "codex" : args[1] === "--antigravity" ? "antigravity" : "claude");
 } else if (args.length === 1 && args[0] === "chat") {
     const { recordChatStart } = await import("./chat-hook.ts");
     await recordChatStart();
@@ -95,7 +95,7 @@ async function playHere(host: string): Promise<void>
     const [{ isHostName, playHost }, { defaultContext }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts")]);
 
     if (!isHostName(host)) {
-        console.error(`chesspal play takes claude or codex, not ${host}.`);
+        console.error(`chesspal play takes claude, codex or antigravity, not ${host}.`);
         process.exitCode = 1;
         return;
     }

@@ -399,7 +399,7 @@ function hostsOffered(served: Served): string
     return `Name a host the table offers and this computer has: ${served.table?.chats?.hosts().filter((one) => one.installed).map((one) => one.name).join(", ") || "none"}.`;
 }
 
-// The host of the chat at the table, among those offered: it says its name as its MCP client does, «claude-code» or «codex-mcp-client».
+// The host of the chat at the table, among those offered: it says its name as its MCP client does, «claude-code», «codex-mcp-client» or «antigravity-client».
 function hostAtTable(served: Served): string | undefined
 {
     const said = served.chat.host()?.toLowerCase() ?? "";

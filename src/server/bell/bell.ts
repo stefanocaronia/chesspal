@@ -1,4 +1,4 @@
-// The doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes for Claude Code and Codex, waits at the page of its chat and, when
+// The doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes for Claude Code, Codex and Antigravity, waits at the page of its chat and, when
 // the player moves or writes there, tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -7,6 +7,7 @@ import { positionShownNote, writeAtomically } from "../../games/index.ts";
 import { samePath } from "../../home/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { askPage, chatFolder, findChatPage, notedFolder, notedPagePorts, pageNote, probeOf, probeWait } from "../ports/index.ts";
+import { watchNewTurn } from "./antigravity.ts";
 
 /** What the chat hears from the doorbell: one line for whatever the player did, never what, only where to read it. */
 export const bellLine = "The player acted on the board page: call status to see it.";
@@ -227,11 +228,19 @@ export function forgetPagePort(home: string, folder: string, port: number): void
 /** What Codex's Stop hook answers to wake the chat: its turn goes on with the doorbell's line. */
 export const codexBellAnswer = JSON.stringify({ decision: "block", reason: bellLine });
 
+/** What Antigravity's Stop hook answers to wake the chat: its turn goes on, the doorbell's line given as a system message (D-115). */
+export const antigravityBellAnswer = JSON.stringify({ decision: "continue", reason: bellLine });
+
+/** The host whose Stop hook runs `chesspal listen`, as its flag names it: Claude Code with none. */
+export type ListeningHost = "claude" | "codex" | "antigravity";
+
 /**
  * Reads the hook's input, waits for the bell, and ends the process as the host reads it: for Claude Code's asyncRewake, 2 with the line on stderr; for
- * Codex's Stop hook, 0 with its answer on stdout, since Windows PowerShell, which runs Codex's hooks, turns an exit code 2 into 1. Else 0, saying nothing.
+ * Codex's and Antigravity's Stop hooks, 0 with their answer on stdout, since Windows PowerShell, which runs Codex's hooks, turns an exit code 2 into 1.
+ * Else 0, saying nothing, or for Antigravity an empty answer, which lets its chat stop. Antigravity's hook holds the chat: it lets it go as soon as the
+ * player writes in the chat or stops it, without the bell.
  */
-export async function listen(codex = false): Promise<void>
+export async function listen(host: ListeningHost = "claude"): Promise<void>
 {
     let input = "";
 
@@ -239,21 +248,42 @@ export async function listen(codex = false): Promise<void>
         input += String(chunk);
     }
 
-    const heard = await bellHeard(input).catch((error: unknown): BellHeard => ({ folder: chatFolder(hookInput(input)), rang: false, why: `failed: ${(error as Error).message}` }));
+    const conversation = host === "antigravity" ? hookInput(input).session : undefined;
+    const turn = conversation === undefined ? undefined : watchNewTurn(conversation);
+    const waited = bellHeard(input).catch((error: unknown): BellHeard => ({ folder: chatFolder(hookInput(input)), rang: false, why: `failed: ${(error as Error).message}` }));
+    const newTurn = turn?.started.then((): BellHeard => ({ folder: chatFolder(hookInput(input)), rang: false, why: "the player started a new turn" }));
+    const heard = await (newTurn === undefined ? waited : Promise.race([waited, newTurn]));
+    turn?.stop();
 
     // Codex's turn ends with a hook that heard no bell, and the player's next move on the page wakes nobody: the log keeps why.
-    if (codex && !heard.rang) {
+    if (host === "codex" && !heard.rang) {
         noteSilence(heard.folder, heard.why);
     }
 
     // It ends as soon as it knows: the chat hears the hook only once it ends.
-    if (!heard.rang) {
+    const answer = hookAnswer(host, heard.rang);
+
+    if (answer === undefined) {
         process.exit(0);
-    } else if (codex) {
-        process.stdout.write(`${codexBellAnswer}\n`, () => process.exit(0));
+    } else if (host === "claude") {
+        process.stderr.write(`${answer}\n`, () => process.exit(2));
     } else {
-        process.stderr.write(`${bellLine}\n`, () => process.exit(2));
+        process.stdout.write(`${answer}\n`, () => process.exit(0));
     }
+}
+
+/** What the hook says as it ends, by its host: the doorbell's line or answer when it rang; else nothing, but for Antigravity, which reads an answer. */
+export function hookAnswer(host: ListeningHost, rang: boolean): string | undefined
+{
+    if (host === "antigravity") {
+        return rang ? antigravityBellAnswer : "{}";
+    }
+
+    if (!rang) {
+        return undefined;
+    }
+
+    return host === "codex" ? codexBellAnswer : bellLine;
 }
 
 /**
@@ -326,12 +356,14 @@ export function noteSilence(folder: string, why: string, now = new Date()): void
     }
 }
 
+/** What the hook reads of its host's input: the chat's session, Antigravity's conversation, its folder, and whether its analyst has gone. */
 function hookInput(input: string): { session?: string; cwd?: string; analystGone?: true; }
 {
     try {
-        const parsed = JSON.parse(input) as { session_id?: unknown; cwd?: unknown; background_tasks?: unknown; };
+        const parsed = JSON.parse(input) as { session_id?: unknown; conversationId?: unknown; cwd?: unknown; background_tasks?: unknown; };
+        const session = typeof parsed.session_id === "string" ? parsed.session_id : parsed.conversationId;
         return {
-            ...(typeof parsed.session_id === "string" ? { session: parsed.session_id } : {}),
+            ...(typeof session === "string" ? { session } : {}),
             ...(typeof parsed.cwd === "string" ? { cwd: parsed.cwd } : {}),
             ...(analystGone(parsed.background_tasks) ? { analystGone: true } : {}),
         };

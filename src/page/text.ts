@@ -120,7 +120,7 @@ export interface Text
     readonly opening: string;
     readonly outOfBook: string;
     readonly inBook: string;
-    /** Before a new game the chat is cleared in the host named (Claude, Codex), not on the page. */
+    /** Before a new game the chat is cleared in the host named (Claude, Codex, Gemini), not on the page. */
     clearChat(name: string): string;
     /** The page lost its server, which lives in the host's chat: where to write to bring it back. */
     offline(name: string): string;
@@ -728,7 +728,7 @@ const english: Text = {
         byHand: (name) => `You opened this chat yourself: change ${name}'s model with /model in its window, or close it and open one from here, with the choices below.`,
         noChat: "No chat at the table: choose one",
         change: "Change the chat or its model",
-        install: (name) => `To play with ${name}, install Claude Code or Codex, then open this page again.`,
+        install: (name) => `To play with ${name}, install Claude Code, Codex or Antigravity, then open this page again.`,
         chat: "Chat",
         model: "Model",
         effort: "Effort",
@@ -1174,7 +1174,7 @@ const italian: Text = {
         byHand: (name) => `Questa chat l'hai aperta tu: cambia il modello di ${name} con /model nella sua finestra, oppure chiudila e aprine una da qui, con le scelte qui sotto.`,
         noChat: "Nessuna chat al tavolo: scegline una",
         change: "Cambia la chat o il modello",
-        install: (name) => `Per giocare con ${name}, installa Claude Code o Codex, poi apri di nuovo questa pagina.`,
+        install: (name) => `Per giocare con ${name}, installa Claude Code, Codex o Antigravity, poi apri di nuovo questa pagina.`,
         chat: "Chat",
         model: "Modello",
         effort: "Ragionamento",

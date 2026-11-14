@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -24,6 +24,11 @@ const codexBellHook = {
 };
 // How each chat starts, noted in Codex too.
 const codexChatHook = { type: "command", command: "chesspal chat", commandWindows: "chesspal.cmd chat" };
+// Antigravity's hooks, under Chesspal's name beside the player's own.
+const antigravityHooks = {
+    SessionStart: [{ type: "command", command: "chesspal chat", timeout: 30 }],
+    Stop: [{ type: "command", command: "chesspal listen --antigravity", timeout: 86_400 }],
+};
 
 afterEach(() => {
     for (const folder of folders.splice(0)) {
@@ -32,7 +37,7 @@ afterEach(() => {
 });
 
 describe("chesspal init", () => {
-    it("sets up a folder for Claude Code and Codex, with the opponent's instructions, and says how to go into it", async () => {
+    it("sets up a folder for Claude Code, Codex and Antigravity, with the opponent's instructions, and says how to go into it", async () => {
         const folder = playerFolder();
         const { output, exitCode } = await runCommandLine(["init", "chess"], testContext(folder));
         const chess = join(folder, "chess");
@@ -41,12 +46,14 @@ describe("chesspal init", () => {
         expect(output).toBe(
             `♜ Chesspal is ready in ${chess}\n\n  To play:\n`
                 + "  1. Go into the folder: cd chess\n"
-                + "     then open Claude Code (claude) or Codex (codex).\n"
+                + "     then open Claude Code (claude), Codex (codex) or Antigravity (agy).\n"
                 + "  2. The first time, it asks whether to trust the folder: say yes.\n"
                 + "     Codex also asks about Chesspal's two hooks: choose Trust all.\n"
                 + "     They are small helpers that let it notice your moves on the board.\n"
+                + "     Antigravity asks about each of Chesspal's tools the first time:\n"
+                + "     choose to always allow it (Persist to settings.json).\n"
                 + "  3. Say hello: the AI gives you the link to the board.\n\n"
-                + "  Updated 14 files.",
+                + "  Updated 15 files.",
         );
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${startInstructions()}\n<!-- chesspal: end -->\n`);
@@ -58,6 +65,7 @@ describe("chesspal init", () => {
         });
         expect(text(chess, ".codex/config.toml")).toBe('[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\nenv_vars = ["CHESSPAL_HOME", "CHESSPAL_SEAT"]\n');
         expect(json(chess, ".codex/hooks.json")).toEqual({ hooks: { Stop: [{ hooks: [codexBellHook] }], SessionStart: [{ hooks: [codexChatHook] }] } });
+        expect(json(chess, ".agents/hooks.json")).toEqual({ chesspal: antigravityHooks });
         expect(startInstructions()).toContain("even to a greeting, call `instructions` and `status`");
         expect(text(chess, ".claude/agents/chesspal-ponder-quick.md")).toMatch(
             /^---\nname: chesspal-ponder-quick\n.*\ntools: mcp__chesspal__ponder\nmodel: haiku\n---\n\nYou are the player's chess opponent/s,
@@ -102,13 +110,16 @@ describe("chesspal init", () => {
         const ownStop = { hooks: [{ type: "command", command: "say done" }] };
         writeFileSync(join(folder, ".claude", "settings.json"), "﻿" + JSON.stringify({ model: "opus", permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [ownStop] } }));
         writeFileSync(join(folder, ".codex", "hooks.json"), JSON.stringify({ hooks: { Stop: [ownStop] } }));
+        const ownAntigravity = { Stop: [{ type: "command", command: "say done" }] };
+        mkdirSync(join(folder, ".agents"));
+        writeFileSync(join(folder, ".agents", "hooks.json"), JSON.stringify({ mine: ownAntigravity, chesspal: { Stop: [] } }));
         writeFileSync(
             join(folder, ".codex", "config.toml"),
             'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\nenv = { CHESSPAL_HOME = "D:/runs" }\nenv_vars = ["HOME", "CHESSPAL_HOME"]\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n',
         );
         // Codex runs hooks that changed only once the player trusts them again.
         expect((await runCommandLine(["init"], testContext(folder))).output).toContain(
-            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 14 files.",
+            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 15 files.",
         );
 
         expect(json(folder, ".mcp.json")).toEqual({ mcpServers: { other: { command: "other" }, chesspal: { command: "chesspal", args: ["mcp"], env: { CHESSPAL_HOME: "D:/runs" } } } });
@@ -125,6 +136,7 @@ describe("chesspal init", () => {
             'model = "gpt-5"\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n\n[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\nenv_vars = ["CHESSPAL_HOME", "CHESSPAL_SEAT", "HOME"]\nenv = { CHESSPAL_HOME = "D:/runs" }\n',
         );
         expect(json(folder, ".codex/hooks.json")).toEqual({ hooks: { Stop: [ownStop, { hooks: [codexBellHook] }], SessionStart: [{ hooks: [codexChatHook] }] } });
+        expect(json(folder, ".agents/hooks.json")).toEqual({ mine: ownAntigravity, chesspal: antigravityHooks });
         expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/^♜ Chesspal is ready in .*: nothing to change\n/);
     });
 
@@ -132,11 +144,11 @@ describe("chesspal init", () => {
         const folder = playerFolder();
         const output = (await runCommandLine(["init"], { ...testContext(folder), language: "it-IT" })).output;
 
-        expect(output).toMatch(/^♜ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code o Codex in questa cartella\.\n/);
-        expect(output).toMatch(/\n\n {2}Aggiornati 14 file\.$/);
+        expect(output).toMatch(/^♜ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code, Codex o Antigravity in questa cartella\.\n/);
+        expect(output).toMatch(/\n\n {2}Aggiornati 15 file\.$/);
         expect(output).not.toContain("consentili di nuovo");
         expect((await runCommandLine(["init", "la mia scacchiera"], { ...testContext(folder), language: "it-IT" })).output).toContain(
-            '  1. Entra nella cartella: cd "la mia scacchiera"\n     poi apri Claude Code (claude) o Codex (codex).\n',
+            '  1. Entra nella cartella: cd "la mia scacchiera"\n     poi apri Claude Code (claude), Codex (codex) o Antigravity (agy).\n',
         );
         expect((await runCommandLine(["init"], { ...testContext(folder), language: "fr-FR" })).output).toMatch(/^♜ Chesspal is ready in .*: nothing to change\n/);
     });
@@ -156,6 +168,48 @@ describe("chesspal init", () => {
         const chat: Context = { ...testContext(folder), told: new Set() };
         expect(status.format(await status.run({}, chat))).toMatch(/set up by an older Chesspal/);
         expect(status.format(await status.run({}, chat))).not.toMatch(/older Chesspal/);
+    });
+
+    it("adds the server to Antigravity's settings for every folder, only where it is installed, beside the player's servers", async () => {
+        const folder = playerFolder();
+        const home = playerFolder();
+        const global = join(home, ".gemini", "config", "mcp_config.json");
+        const withHome = (platform = "linux"): Context => ({ ...testContext(folder, 0, undefined, platform), userHome: () => home });
+
+        // Not installed: nothing is written in the home.
+        await runCommandLine(["init"], withHome());
+        expect(existsSync(join(home, ".gemini"))).toBe(false);
+
+        // Its folder made at its first start: the file is new, with no backslash, which Antigravity refuses.
+        mkdirSync(join(home, ".gemini", "antigravity-cli"), { recursive: true });
+        const { output } = await runCommandLine(["init", "--json"], withHome("win32"));
+        expect((JSON.parse(output) as { written: string[]; }).written).toContain(global);
+        expect(json(home, ".gemini/config/mcp_config.json")).toEqual({ mcpServers: { chesspal: { command: "cmd", args: ["/c", "chesspal", "mcp"] } } });
+        expect(text(home, ".gemini/config/mcp_config.json")).not.toContain("\\");
+
+        // An empty file, as Antigravity leaves it, is no server at all.
+        writeFileSync(global, "");
+        await runCommandLine(["init"], withHome());
+        expect(json(home, ".gemini/config/mcp_config.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
+
+        // The player's servers stay, and the environment they gave Chesspal's.
+        writeFileSync(global, JSON.stringify({ theme: "dark", mcpServers: { other: { command: "other" }, chesspal: { command: "old", env: { CHESSPAL_HOME: "D:/runs" } } } }));
+        await runCommandLine(["init"], withHome());
+        expect(json(home, ".gemini/config/mcp_config.json")).toEqual({
+            theme: "dark",
+            mcpServers: { other: { command: "other" }, chesspal: { command: "chesspal", args: ["mcp"], env: { CHESSPAL_HOME: "D:/runs" } } },
+        });
+        expect((await runCommandLine(["init"], withHome())).output).toMatch(/: nothing to change\n/);
+    });
+
+    it("finds Antigravity installed by its program too, where its installer puts it", async () => {
+        const folder = playerFolder();
+        const home = playerFolder();
+        mkdirSync(join(home, "AppData", "Local", "agy", "bin"), { recursive: true });
+        writeFileSync(join(home, "AppData", "Local", "agy", "bin", "agy.exe"), "");
+        await runCommandLine(["init"], { ...testContext(folder, 0, undefined, "win32"), userHome: () => home });
+
+        expect(json(home, ".gemini/config/mcp_config.json")).toEqual({ mcpServers: { chesspal: { command: "cmd", args: ["/c", "chesspal", "mcp"] } } });
     });
 
     it("refuses a settings file that is not JSON, and says how to fix it", async () => {

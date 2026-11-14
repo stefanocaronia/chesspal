@@ -7,7 +7,7 @@ import { type Context, speaksItalian } from "../../../commands/index.ts";
 import { endOf, gameInAnalysis, loadGame } from "../../../games/index.ts";
 import { tableFolder } from "../../../home/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
-import { programPath } from "./find.ts";
+import { hostProgramPath } from "./find.ts";
 import { type HooksNews, setUpTable, takeHooksNews } from "./hooks.ts";
 import { choiceIn, hostArgs, type HostChoice, type HostName, isHostName, startMessage } from "./hosts.ts";
 import { askedAgain, leaveSeat, refreshSeat, seatTimes, takeSeat } from "./seat.ts";
@@ -162,24 +162,27 @@ export function runHost(launch: HostLaunch, again: () => boolean, platform: stri
     });
 }
 
-/** How the host starts for the profile in use: found on the PATH, with its choice; it throws, saying how to install it, when it is not there. */
+/**
+ * How the host starts for the profile in use: found on the PATH, or where its installer puts it, with its choice; it throws, saying how to install it, when
+ * it is not there.
+ */
 export function hostLaunch(context: Context, host: HostName, env: NodeJS.ProcessEnv = process.env, exists?: (path: string) => boolean): HostLaunch
 {
     const home = context.home();
     const folder = tableFolder(home);
-    const found = programPath(host, context.platform, env, exists);
+    const found = hostProgramPath(host, context.platform, env, exists);
 
     if (found === undefined) {
         throw new Error(`${hostTitle[host]} is not installed on this computer, or not on its PATH: install it (${installHint[host]}), then try again.`);
     }
 
-    setUpTable(folder, context.platform);
+    setUpTable(folder, context.platform, context.userHome?.());
     // Codex's hooks written, by this play or by the table before it: the note is for Codex's chat, and waits for it.
     const news = host === "codex" ? takeHooksNews(folder) : undefined;
     const hooks = news === undefined ? {} : { hooks: news };
     const choice = choiceIn(profileSettings(home, activeProfile(home).id), host);
     const games = gameFolder(home);
-    const args = hostArgs(host, startMessage(languageIn(games, context.language), analysisAsked(games)), choice);
+    const args = hostArgs(host, startMessage(languageIn(games, context.language), analysisAsked(games)), choice, folder);
     // An effort the player set for every chat would win over the one chosen on the page: spawn leaves out a variable that is undefined.
     const effort = host === "claude" && choice.effort !== undefined ? { CLAUDE_CODE_EFFORT_LEVEL: undefined } : {};
     // The seat this play holds, by which its chat's server tells the table it is the chat held, and not another opened in the same folder.
@@ -205,7 +208,7 @@ function analysisAsked(folder: string): boolean
     }
 }
 
-const hostTitle: Record<HostName, string> = { claude: "Claude Code", codex: "Codex" };
+const hostTitle: Record<HostName, string> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity" };
 
 // What the player is told before Codex asks about the hooks Chesspal wrote: the first time, and when they changed.
 const hooksWords: Record<HooksNews, { english: string; italian: string; }> = {
@@ -318,7 +321,11 @@ function savedTerminal(platform: string): { restore(): void; }
 
 // What marks a chat's own session, which a table started from inside a chat would hand down, and the host take for its own (Priya).
 const sessionMarks = ["CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ATTENDED", "CLAUDE_PID", "CLAUDE_EFFORT", "AI_AGENT", "TRACEPARENT"];
-const installHint: Record<HostName, string> = { claude: "https://claude.com/claude-code", codex: "npm install -g @openai/codex" };
+const installHint: Record<HostName, string> = {
+    claude: "https://claude.com/claude-code",
+    codex: "npm install -g @openai/codex",
+    antigravity: "https://antigravity.google/docs/getting-started",
+};
 
 /**
  * The script behind npm's Windows shim of Codex, which Node runs as the shim would, without cmd and its quoting of the start message (Priya); none for

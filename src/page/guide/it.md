@@ -18,7 +18,7 @@ Nessun motore di scacchi gioca al posto dell'AI: ogni mossa e ogni giudizio sono
 
 ### Per cominciare
 
-1. Clicca il **nome dell'AI**, in alto a sinistra, e scegli la chat fra quelle che hai sul computer: **Claude Code** o **Codex**. Si apre in una finestra sua: tienila aperta mentre giochi. La prima volta fa qualche domanda. Se ti fidi della cartella: **Sì** (in Claude Code è già scelto No: scendi su Yes con le frecce, poi Invio). Con Codex, sugli hook, i due aiutanti di Chesspal: **Trust all and continue**. Su Windows Codex chiede anche se preparare la sua sandbox, lo spazio protetto dove lavora: scegli la prima opzione, e sì quando Windows chiede il permesso.
+1. Clicca il **nome dell'AI**, in alto a sinistra, e scegli la chat fra quelle che hai sul computer: **Claude Code**, **Codex** o **Antigravity**. Si apre in una finestra sua: tienila aperta mentre giochi. La prima volta fa qualche domanda. Se ti fidi della cartella: **Sì** (in Claude Code è già scelto No: scendi su Yes con le frecce, poi Invio). Con Codex, sugli hook, i due aiutanti di Chesspal: **Trust all and continue**. Su Windows Codex chiede anche se preparare la sua sandbox, lo spazio protetto dove lavora: scegli la prima opzione, e sì quando Windows chiede il permesso.
 2. Premi **Nuova partita**, scegli il colore, l'orologio e il livello dell'AI, e premi **Inizia**.
 3. Muovi: l'AI risponde sulla scacchiera, e con qualche parola sotto il suo nome.
 
@@ -37,7 +37,7 @@ Nessun motore di scacchi gioca al posto dell'AI: ogni mossa e ogni giudizio sono
 
 - Parli con l'AI nella **casella sotto il suo nome**, qualche parola a ogni mossa: le legge con la tua mossa. Puoi scriverle anche nella sua finestra. Con Codex, se gli scrivi lì mentre aspetta la tua mossa, dopo Invio premi **Esc**: se no legge il messaggio solo dopo la tua mossa.
 - Anche una **mossa scritta** nella chat vale: `e4`, `Nf3`, con le lettere inglesi dei pezzi (K Q R B N), o a parole.
-- **Il nome dell'AI** apre la scelta della chat: Claude Code o Codex, il modello (quale AI: alcune sono più veloci, altre più forti) e quanto ragiona. Più ragiona, più gioca lenta. Se cambi, la chat riparte da capo nella stessa finestra: l'AI dimentica la chiacchierata di prima, la partita resta com'è. Nell'analisi il nome sta sopra la casella dove le scrivi.
+- **Il nome dell'AI** apre la scelta della chat: Claude Code, Codex o Antigravity, il modello (quale AI: alcune sono più veloci, altre più forti) e quanto ragiona. Più ragiona, più gioca lenta. Se cambi, la chat riparte da capo nella stessa finestra: l'AI dimentica la chiacchierata di prima, la partita resta com'è. Nell'analisi il nome sta sopra la casella dove le scrivi.
 - A ogni **nuova partita** la chat aperta dalla pagina riparte da capo da sola, se l'AI ha finito di pensare: una chat lunga rende l'AI più lenta.
 
 ## Gli aiuti e i segni

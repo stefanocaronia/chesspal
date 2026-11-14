@@ -1,5 +1,5 @@
 // What every command runs with besides its input, injected by the command line, the MCP server or the tests: the folders, the time, the randomness.
-import { userInfo } from "node:os";
+import { homedir, userInfo } from "node:os";
 import { dataFolder, openFolder } from "../../home/index.ts";
 import { ensureProfile } from "../../profiles/index.ts";
 
@@ -18,6 +18,11 @@ export interface Context
     pause?: (milliseconds: number) => Promise<void>;
     /** The operating system, as process.platform names it: how a host starts the server. */
     platform: string;
+    /**
+     * The home folder of the computer's user, where a host keeps the settings of all its folders: init adds Chesspal's server to Antigravity's there
+     * (D-115). None in the tests, which never write there.
+     */
+    userHome?: () => string;
     /** The player's language, as the system names it (it-IT): the command line's words to the player, in English when none or another. */
     language?: string;
     /** The address of the board page, when the MCP server serves it (D-47). */
@@ -94,6 +99,7 @@ export function defaultContext(): Context
         random: Math.random,
         now: () => new Date(),
         platform: process.platform,
+        userHome: homedir,
         language: systemLanguage(),
         given: new Set(),
         openFolder: (folder) => openFolder(folder, process.platform),

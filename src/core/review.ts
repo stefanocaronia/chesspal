@@ -183,11 +183,13 @@ export function aiHostIn(record: GameRecord): string | undefined
 }
 
 /**
- * The AI's name from its host: Claude Code and the desktop app are Claude, Codex is Codex; without a host it names, from the model, a Claude model is
- * Claude (D-97). Undefined otherwise.
+ * The AI's name from its host: Claude Code and the desktop app are Claude, Codex is Codex, Antigravity is Gemini, unless its model is known to be another
+ * (D-97, D-115); without a host it names, from the model, a Claude model is Claude. Undefined otherwise.
  */
 export function aiNameOf(host: string | undefined, model?: string): string | undefined
 {
+    const named = model?.trim() ?? "";
+
     if (/claude/i.test(host ?? "")) {
         return "Claude";
     }
@@ -196,7 +198,11 @@ export function aiNameOf(host: string | undefined, model?: string): string | und
         return "Codex";
     }
 
-    return /^claude/i.test(model?.trim() ?? "") ? "Claude" : undefined;
+    if (/antigravity/i.test(host ?? "")) {
+        return named === "" || /^gemini/i.test(named) ? "Gemini" : /^claude/i.test(named) ? "Claude" : "Antigravity";
+    }
+
+    return /^claude/i.test(named) ? "Claude" : undefined;
 }
 
 /** The record with the AI's word on the whole game, or its last word on the ending, in place of the one it had: each only when given. */

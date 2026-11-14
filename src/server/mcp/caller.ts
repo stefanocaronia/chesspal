@@ -1,5 +1,6 @@
 // Who makes a tool call (D-81): only what the host ties to that call, never what the AI says of itself nor a setting the chat may have changed.
-// Codex sends the model and the effort with each call; Claude Code writes them into the chat's transcript, on the line of the call.
+// Codex sends the model and the effort with each call; Claude Code writes them into the chat's transcript, on the line of the call; Antigravity sends the
+// conversation, whose transcript names the model with its effort on each of the AI's steps (D-115).
 import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -27,6 +28,16 @@ export async function callerOf(meta: Record<string, unknown> | undefined, client
 
     if (typeof call === "string" && transcript !== undefined) {
         const found = await lineOfCall(transcript, call, wait);
+
+        if (found !== undefined) {
+            return found;
+        }
+    }
+
+    const conversation = meta?.["antigravity.google/artifacts_dir"];
+
+    if (typeof conversation === "string" && conversation !== "") {
+        const found = await antigravityModel(join(conversation, ".system_generated", "logs", "transcript_full.jsonl"), wait);
 
         if (found !== undefined) {
             return found;
@@ -129,6 +140,28 @@ function callerIn(text: string, call: string): Caller | undefined
 
         if (entry?.type === "assistant" && typeof message?.model === "string" && message.model !== "<synthetic>") {
             return withEffort(message.model, entry.effort);
+        }
+    }
+
+    return undefined;
+}
+
+/**
+ * The model of the AI's last step in an Antigravity conversation, as its transcript names it, the effort after it (gemini-3.8-flash-medium); the step of
+ * the call is written after it, but the chat's steps before it had the same model. None when no step names one in time.
+ */
+async function antigravityModel(transcript: string, wait: number): Promise<Caller | undefined>
+{
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        const model = tailOf(transcript).split("\n").reverse().map((line) => objectOf(line)).find((entry) => entry?.type === "PLANNER_RESPONSE" && typeof entry.model === "string")?.model;
+
+        if (typeof model === "string") {
+            const [, name, effort] = /^(.+)-(low|medium|high|xhigh|max)$/.exec(model) ?? [];
+            return name === undefined ? { annotator: model } : withEffort(name, effort);
+        }
+
+        if (attempt < attempts - 1) {
+            await new Promise((done) => setTimeout(done, wait));
         }
     }
 

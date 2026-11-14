@@ -77,6 +77,7 @@ function initialised(): { command: string; args: string[]; }
     const start = readFileSync(join(installed, "node_modules", "chesspal", "instructions", "start.md"), "utf8").trim();
     check("chesspal init writes the lines that start a chat in AGENTS.md", readFileSync(join(player, "AGENTS.md"), "utf8").includes(start));
     check("chesspal init sets Claude Code's hook for a move written alone in the chat", readFileSync(join(player, ".claude", "settings.json"), "utf8").includes('"chesspal prompt"'));
+    check("chesspal init sets Antigravity's doorbell", readFileSync(join(player, ".agents", "hooks.json"), "utf8").includes('"chesspal listen --antigravity"'));
     const input = JSON.stringify({ session_id: "smoke", cwd: player, hook_event_name: "UserPromptSubmit", prompt: "Hello, shall we play?" });
     const prompted = spawnSync("chesspal prompt", { cwd: player, env: environment, shell: true, encoding: "utf8", input });
     check("chesspal prompt lets a message that is no move go to the AI, saying nothing", prompted.status === 0 && prompted.stdout === "" && prompted.stderr === "");
@@ -257,12 +258,15 @@ function npm(args: string[], cwd: string): string
     return run.stdout;
 }
 
-/** The environment of a player: the installed bin first on the PATH, and a data folder of the smoke's own, never the real Documents (D-71). */
+/**
+ * The environment of a player: the installed bin first on the PATH, a data folder of the smoke's own, never the real Documents (D-71), and a home of its
+ * own, where init would add Chesspal to an Antigravity installed on this computer.
+ */
 function playerEnvironment(): NodeJS.ProcessEnv
 {
     // Windows names it Path, and a copy of the environment is no longer blind to case.
     const pathName = Object.keys(process.env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-    return { ...process.env, [pathName]: `${bin}${delimiter}${process.env[pathName] ?? ""}`, CHESSPAL_HOME: join(temporary, "data") };
+    return { ...process.env, [pathName]: `${bin}${delimiter}${process.env[pathName] ?? ""}`, CHESSPAL_HOME: join(temporary, "data"), HOME: join(temporary, "home"), USERPROFILE: join(temporary, "home") };
 }
 
 // A folder that cannot go, still held by a process, is named, and the failure before it stays the one told.

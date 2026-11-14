@@ -102,7 +102,7 @@ export function chatState(table: TableShown, name: string, text: Text): string |
     return table.opening === "chat" ? words.opening : table.opening === "again" ? words.again(name) : table.opening === "restart" ? words.restart : undefined;
 }
 
-const hostTitles: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex" };
+const hostTitles: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity" };
 
 /** The ↻ of a chat that starts again. */
 const restartIcon = (

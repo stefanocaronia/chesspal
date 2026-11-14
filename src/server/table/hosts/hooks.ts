@@ -8,13 +8,16 @@ import { codexHooksPath, setUpHosts } from "../../../host-files/index.ts";
 /** Codex's hooks as Chesspal last wrote them, which Codex asks the player to trust: the first time, or changed over ones trusted before. */
 export type HooksNews = "new" | "changed";
 
-/** Sets the table's folder up as init does, noting when Chesspal wrote Codex's hooks: Codex then asks the player to trust them. */
-export function setUpTable(folder: string, platform: string): void
+/**
+ * Sets the table's folder up as init does, Antigravity's settings in the user's home too when given, noting when Chesspal wrote Codex's hooks: Codex
+ * then asks the player to trust them.
+ */
+export function setUpTable(folder: string, platform: string, userHome?: string): void
 {
     const hooks = codexHooksPath(folder);
     const hadHooks = existsSync(hooks);
 
-    if (setUpHosts(folder, platform).includes(hooks)) {
+    if (setUpHosts(folder, platform, userHome).includes(hooks)) {
         // Hooks never trusted stay new, whatever Chesspal wrote over them before Codex asked.
         const news: HooksNews = hadHooks && readNote(folder) !== "new" ? "changed" : "new";
         writeAtomically(join(folder, hooksNoteFile), `${JSON.stringify({ hooks: news })}\n`);

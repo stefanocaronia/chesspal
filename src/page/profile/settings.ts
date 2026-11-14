@@ -41,6 +41,8 @@ export interface Settings
     readonly claudeEffort: string;
     readonly codexModel: string;
     readonly codexEffort: string;
+    readonly antigravityModel: string;
+    readonly antigravityEffort: string;
 }
 
 /** The settings this browser remembers, each one it does not know taking its default; the theme and the sounds chosen before the panel come along. */
@@ -75,6 +77,8 @@ export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | 
         claudeEffort: word(stored.claudeEffort),
         codexModel: word(stored.codexModel),
         codexEffort: word(stored.codexEffort),
+        antigravityModel: word(stored.antigravityModel),
+        antigravityEffort: word(stored.antigravityEffort),
     };
 }
 

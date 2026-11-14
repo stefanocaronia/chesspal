@@ -172,7 +172,7 @@ export function App({ start }: { start: Settings; })
         }
     }, [profileId]);
 
-    // The AI as the host names it (Claude, Codex), also where the page sends the player to write; the last known while the page is offline.
+    // The AI as the host names it (Claude, Codex, Gemini), also where the page sends the player to write; the last known while the page is offline.
     const name = served?.opponent ?? text.ai;
     // Under it, the model and effort the AI played its last move with (D-82).
     const signed = served?.aiModel === undefined ? undefined : signature(served.aiModel.model, served.aiModel.effort);

@@ -3,7 +3,7 @@
 import type { Context } from "../../../commands/index.ts";
 import { samePath, tableFolder } from "../../../home/index.ts";
 import type { ChatHost, TableChats } from "../../page/index.ts";
-import { programPath } from "./find.ts";
+import { hostProgramPath } from "./find.ts";
 import { hostChoices, hostNames, isHostName } from "./hosts.ts";
 import { askAgain, seatHeld } from "./seat.ts";
 import { openTerminal } from "./terminal.ts";
@@ -51,5 +51,5 @@ const lookAgain = 10_000;
 
 function chatHost(name: typeof hostNames[number], platform: string, env: NodeJS.ProcessEnv): ChatHost
 {
-    return { name, installed: programPath(name, platform, env) !== undefined, ...hostChoices[name], command: `chesspal play ${name}` };
+    return { name, installed: hostProgramPath(name, platform, env) !== undefined, ...hostChoices[name], command: `chesspal play ${name}` };
 }

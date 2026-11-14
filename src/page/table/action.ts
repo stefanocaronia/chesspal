@@ -31,6 +31,7 @@ export interface ChatTable<Host extends HostChoices = HostChoices>
 export const choiceKeys = {
     claude: { model: "claudeModel", effort: "claudeEffort" },
     codex: { model: "codexModel", effort: "codexEffort" },
+    antigravity: { model: "antigravityModel", effort: "antigravityEffort" },
 } as const satisfies Record<string, Record<"model" | "effort", keyof Settings>>;
 
 /** The hosts the window offers: those installed whose choices the settings keep. */

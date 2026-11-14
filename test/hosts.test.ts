@@ -47,6 +47,30 @@ describe("a chat the table opens", () => {
         expect(hostArgs("codex", "Let's play!")).toEqual(["-c", "check_for_update_on_startup=false", "-m", "gpt-6.1-terra", "-c", "model_reasoning_effort=medium", "Let's play!"]);
     });
 
+    it("starts Antigravity with -i, which keeps its chat open, its Gemini Flash and effort, and Chesspal's tools allowed for this chat alone", () => {
+        const allowed = ["--settings", '{"permissions":{"allow":["mcp(chesspal/*)"]}}'];
+        expect(hostArgs("antigravity", "Giochiamo!", { model: "gemini-3.8-flash", effort: "high" })).toEqual(["-i", "Giochiamo!", "--model", "gemini-3.8-flash", "--effort", "high", ...allowed]);
+        expect(hostArgs("antigravity", "Let's play!", { model: "claude-sonnet-4-6", effort: "max" })).toEqual(["-i", "Let's play!", "--model", "gemini-3.8-flash", "--effort", "medium", ...allowed]);
+    });
+
+    it("trusts the table's folder for Antigravity's chat alone, so that its first chat runs the hooks", () => {
+        const args = hostArgs("antigravity", "Giochiamo!", {}, "C:\\Users\\player\\Chesspal\\table");
+        expect(JSON.parse(args.at(-1) ?? "")).toEqual({ permissions: { allow: ["mcp(chesspal/*)"] }, trustedWorkspaces: ["C:\\Users\\player\\Chesspal\\table"] });
+    });
+
+    it("finds Antigravity on the PATH, else where its installer puts it, which a terminal opened before it does not have on its PATH", () => {
+        const context = homeContext("win32");
+        const installed = "C:\\Users\\ann\\AppData\\Local\\agy\\bin\\agy.exe";
+        const env = { PATH: "C:\\Windows", PATHEXT: ".EXE", LOCALAPPDATA: "C:\\Users\\ann\\AppData\\Local" };
+
+        expect(hostLaunch(context, "antigravity", env, (path) => path === installed)).toMatchObject({ program: installed, shell: false });
+        expect(hostLaunch(context, "antigravity", env, (path) => path === "C:\\Windows\\agy.exe" || path === installed)).toMatchObject({ program: "C:\\Windows\\agy.exe" });
+        expect(hostLaunch(homeContext("linux"), "antigravity", { PATH: "/usr/bin", HOME: "/home/ann" }, (path) => path === "/home/ann/.local/bin/agy")).toMatchObject({ program: "/home/ann/.local/bin/agy" });
+        expect(() => hostLaunch(context, "antigravity", { PATH: "C:\\Windows" }, () => false)).toThrow(
+            "Antigravity is not installed on this computer, or not on its PATH: install it (https://antigravity.google/docs/getting-started), then try again.",
+        );
+    });
+
     it("plays with the model and effort the profile in use chose on the page, in the table's folder, set up as init does", () => {
         const context = homeContext("linux");
         const home = context.home();
@@ -168,6 +192,7 @@ describe("a chat the table opens", () => {
         expect(chats.hosts()).toEqual([
             expect.objectContaining({ name: "claude", installed: true, models: ["fable", "opus", "sonnet", "haiku"], command: "chesspal play claude" }),
             expect.objectContaining({ name: "codex", installed: false }),
+            expect.objectContaining({ name: "antigravity", installed: false, models: ["gemini-3.8-flash"], efforts: ["low", "medium", "high"], command: "chesspal play antigravity" }),
         ]);
         expect(await chats.open("gemini")).toBe(false);
 
@@ -199,12 +224,12 @@ describe("a chat the table opens", () => {
     });
 
     it("keeps each host's choice in the page's settings, a word alone", () => {
-        expect(settingsFrom({ claudeModel: "opus", codexEffort: "x high!" })).toMatchObject({ claudeModel: "opus", claudeEffort: "", codexEffort: "" });
+        expect(settingsFrom({ claudeModel: "opus", codexEffort: "x high!", antigravityEffort: "low" })).toMatchObject({ claudeModel: "opus", claudeEffort: "", codexEffort: "", antigravityEffort: "low" });
     });
 
     it("is chesspal play <host>, whose help the command line gives", async () => {
-        expect((await runCommandLine(["play", "--help"], testContext())).output).toContain("chesspal play <claude|codex>");
-        expect(await runCommandLine(["play"], testContext())).toMatchObject({ exitCode: 1, output: expect.stringContaining("chesspal play takes one host, claude or codex: none given.") });
+        expect((await runCommandLine(["play", "--help"], testContext())).output).toContain("chesspal play <claude|codex|antigravity>");
+        expect(await runCommandLine(["play"], testContext())).toMatchObject({ exitCode: 1, output: expect.stringContaining("chesspal play takes one host, claude, codex or antigravity: none given.") });
     });
 });
 

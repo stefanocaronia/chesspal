@@ -1,10 +1,13 @@
-// The AI hosts the table opens a chat in (D-104): Claude Code and Codex, each with the start message, and the model and effort the player chose on the page
+// The AI hosts the table opens a chat in (D-104, D-115): Claude Code, Codex and Antigravity, each with the start message, and the model and effort the player chose on the page
 // for the profile in use, or each host's middle ones until they choose: the chat never starts with whatever the host was left at.
 import { speaksItalian } from "../../../commands/index.ts";
 
-/** The hosts the page offers, by their command's name. */
-export const hostNames = ["claude", "codex"] as const;
+/** The hosts the page offers, by the name `chesspal play` takes. */
+export const hostNames = ["claude", "codex", "antigravity"] as const;
 export type HostName = typeof hostNames[number];
+
+/** Each host's program, as its installer names it. */
+export const hostPrograms: Readonly<Record<HostName, string>> = { claude: "claude", codex: "codex", antigravity: "agy" };
 
 /**
  * The models and efforts the player may choose for a host, as its command line names them: aliases, which follow the host's newest models; and the
@@ -27,11 +30,12 @@ export interface HostChoice
 
 /**
  * Each host's choices, as tried in each (Priya): a value outside them would fail only at the chat's first turn. Claude Code's are its aliases; Codex's, the
- * models a ChatGPT account lists, which change with its releases.
+ * models a ChatGPT account lists, which change with its releases; Antigravity's, the Gemini Flash its free plan gives, its effort apart (D-115).
  */
 export const hostChoices: Readonly<Record<HostName, HostChoices>> = {
     claude: { models: ["fable", "opus", "sonnet", "haiku"], efforts: ["low", "medium", "high", "xhigh", "max"], model: "sonnet", effort: "medium" },
     codex: { models: ["gpt-6.1-sol", "gpt-6-astra", "gpt-6.1-terra", "gpt-6-luna"], efforts: ["low", "medium", "high", "xhigh", "max"], model: "gpt-6.1-terra", effort: "medium" },
+    antigravity: { models: ["gemini-3.8-flash"], efforts: ["low", "medium", "high"], model: "gemini-3.8-flash", effort: "medium" },
 };
 
 /** Whether a word names a host the page offers. */
@@ -55,9 +59,11 @@ export function startMessage(language: string | undefined, toAnalyse = false): s
 
 /**
  * The start message and the choices the host knows: first for Claude Code, whose options may take the word after; last for Codex, where "resume" is no
- * subcommand, kept from its update screen, which an Enter would accept.
+ * subcommand, kept from its update screen, which an Enter would accept; for Antigravity after -i, which keeps the chat open, with Chesspal's tools
+ * allowed and the table's `folder` trusted for this chat alone, never saved in its settings: a folder trusted only at its first chat's dialog leaves that
+ * chat without its hooks.
  */
-export function hostArgs(host: HostName, message: string, choice: HostChoice = {}): string[]
+export function hostArgs(host: HostName, message: string, choice: HostChoice = {}, folder?: string): string[]
 {
     const { model, effort } = offered(host, choice);
 
@@ -65,10 +71,15 @@ export function hostArgs(host: HostName, message: string, choice: HostChoice = {
         return [message, ...(model === undefined ? [] : ["--model", model]), ...(effort === undefined ? [] : ["--effort", effort])];
     }
 
+    if (host === "antigravity") {
+        const settings = { ...antigravityAllowed, ...(folder === undefined ? {} : { trustedWorkspaces: [folder] }) };
+        return ["-i", message, ...(model === undefined ? [] : ["--model", model]), ...(effort === undefined ? [] : ["--effort", effort]), "--settings", JSON.stringify(settings)];
+    }
+
     return ["-c", "check_for_update_on_startup=false", ...(model === undefined ? [] : ["-m", model]), ...(effort === undefined ? [] : ["-c", `model_reasoning_effort=${effort}`]), message];
 }
 
-/** The settings' keys that keep a host's choice in the profile: claudeModel, claudeEffort, codexModel, codexEffort. */
+/** The settings' keys that keep a host's choice in the profile: claudeModel, claudeEffort, codexModel, codexEffort, antigravityModel, antigravityEffort. */
 export function choiceKeys(host: HostName): { model: string; effort: string; }
 {
     return { model: `${host}Model`, effort: `${host}Effort` };
@@ -81,6 +92,9 @@ export function choiceIn(settings: Readonly<Record<string, unknown>> | undefined
     const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
     return offered(host, { model: text(settings?.[keys.model]), effort: text(settings?.[keys.effort]) });
 }
+
+// Antigravity's settings for one chat: Chesspal's tools allowed, which it would otherwise ask for at each first use.
+const antigravityAllowed = { permissions: { allow: ["mcp(chesspal/*)"] } };
 
 // The choice kept to the values the host offers: its middle model and effort where none is chosen, or one it does not offer.
 function offered(host: HostName, choice: HostChoice): HostChoice

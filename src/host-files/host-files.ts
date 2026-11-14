@@ -5,14 +5,15 @@ import { makeFolder, writeAtomically } from "../games/index.ts";
 import { agentFiles, agentHosts, instructionsFile } from "./agents.ts";
 
 /**
- * Sets up the player's folder for Claude Code and Codex (D-31): .mcp.json with the chesspal server, AGENTS.md with the lines that start a chat between
- * Chesspal's marks (D-102), CLAUDE.md importing it, the hosts' settings with the server approved, and their hooks. What the player wrote there stays; it returns
- * the files written.
+ * Sets up the player's folder for Claude Code, Codex and Antigravity (D-31, D-115): .mcp.json with the chesspal server, AGENTS.md with the lines that start
+ * a chat between Chesspal's marks (D-102), CLAUDE.md importing it, the hosts' settings with the server approved, and their hooks. With the user's home
+ * given, where Antigravity is installed, the chesspal server in its settings for every folder too, which alone give the first chat its tools. What the
+ * player wrote there stays; it returns the files written.
  */
-export function setUpHosts(folder: string, platform: string): string[]
+export function setUpHosts(folder: string, platform: string, userHome?: string): string[]
 {
     makeFolder(folder);
-    const written = hostChanges(folder, platform);
+    const written = [...hostChanges(folder, platform), ...(userHome === undefined ? [] : globalChanges(userHome, platform))];
 
     for (const { path, text } of written) {
         makeFolder(join(path, ".."));
@@ -42,13 +43,17 @@ export function codexHooksPath(folder: string): string
 }
 
 /**
- * Whether the host runs the doorbell's hook init writes, Claude Code and Codex by the names they give the server, so the player's act on the page wakes
- * the chat; the command line, which names no host, is taken as one. Elsewhere the player tells the chat in its window.
+ * Whether the host runs the hooks init writes, the doorbell and the note of how each chat starts: Claude Code, Codex and Antigravity by the names they give
+ * the server, so the player's act on the page wakes the chat; the command line, which names no host, is taken as one. Elsewhere the player tells the
+ * chat in its window.
  */
 export function hasDoorbell(host: string | undefined): boolean
 {
-    return host === undefined || agentHosts.includes(host);
+    return host === undefined || hookedHosts.includes(host);
 }
+
+/** The hosts that run the hooks init writes, by the names they give the server: Antigravity's too (D-115). */
+export const hookedHosts: readonly string[] = [...agentHosts, "antigravity-client"];
 
 /** The instructions of the AI opponent, read from the package wherever it is installed: the MCP server's `instructions` tool gives them (D-102). */
 export function opponentInstructions(): string
@@ -76,8 +81,24 @@ const markedBlock = /<!-- chesspal: (?!end)[^\n]*\n[\s\S]*?<!-- chesspal: end --
 /** What init writes for each host, missing or changed: what the player wrote there stays. */
 function hostChanges(folder: string, platform: string): FileChange[]
 {
-    const changes = [mcpFile(folder, platform), agentsFile(folder), claudeFile(folder), claudeSettingsFile(folder), ...agentChanges(folder), codexConfigFile(folder, platform), codexHooksFile(folder)];
+    const changes = [
+        mcpFile(folder, platform),
+        agentsFile(folder),
+        claudeFile(folder),
+        claudeSettingsFile(folder),
+        ...agentChanges(folder),
+        codexConfigFile(folder, platform),
+        codexHooksFile(folder),
+        antigravityHooksFile(folder),
+    ];
     return changes.filter((change) => change !== undefined);
+}
+
+/** What init writes outside the player's folder, in the user's home: the chesspal server in Antigravity's settings for every folder, where it is installed. */
+function globalChanges(userHome: string, platform: string): FileChange[]
+{
+    const change = antigravityInstalled(userHome, platform) ? antigravityServerFile(userHome, platform) : undefined;
+    return change === undefined ? [] : [change];
 }
 
 /** How a host starts the server: on Windows through cmd, which finds npm's shim. */
@@ -219,6 +240,42 @@ const codexBellHook = {
 
 // Codex's SessionStart hook: it notes how each chat starts, as Claude Code's does (D-57).
 const codexChatHook = { type: "command", command: "chesspal chat", commandWindows: "chesspal.cmd chat" };
+
+/**
+ * Antigravity's hooks, which it runs in a folder the player trusts, under a name of Chesspal's beside the player's own (D-115): how each chat starts
+ * (D-57), and the doorbell, which holds the turn's end until the player acts on the page; a day at most. Both read the chat's folder from their input,
+ * since Antigravity runs them in .agents.
+ */
+function antigravityHooksFile(folder: string): FileChange | undefined
+{
+    const path = join(folder, ".agents", "hooks.json");
+    const hooks = {
+        SessionStart: [{ type: "command", command: "chesspal chat", timeout: 30 }],
+        Stop: [{ type: "command", command: "chesspal listen --antigravity", timeout: 86_400 }],
+    };
+    return changed(path, { ...jsonOf(path), chesspal: hooks });
+}
+
+/**
+ * Antigravity's MCP servers for every folder, with the chesspal server beside the player's: its first chat gets the tools of these alone, not of the
+ * folder's (Priya). No environment of Chesspal's, since Antigravity hands its own to the server, CHESSPAL_HOME with it; one the player gave stays. Never
+ * a backslash, which Antigravity refuses; a file left empty is no server at all.
+ */
+function antigravityServerFile(userHome: string, platform: string): FileChange | undefined
+{
+    const path = join(userHome, ".gemini", "config", "mcp_config.json");
+    const config = textOf(path)?.trim() === "" ? {} : jsonOf(path);
+    const servers = isObject(config.mcpServers) ? config.mcpServers : {};
+    const before = isObject(servers.chesspal) ? servers.chesspal : {};
+    return changed(path, { ...config, mcpServers: { ...servers, chesspal: { ...chesspalServer(platform), ...(isObject(before.env) ? { env: before.env } : {}) } } });
+}
+
+/** Whether Antigravity's command line is on this computer: its own folder in the user's home, made at its first start, or its program where its installer puts it. */
+function antigravityInstalled(userHome: string, platform: string): boolean
+{
+    const program = platform === "win32" ? join(userHome, "AppData", "Local", "agy", "bin", "agy.exe") : join(userHome, ".local", "bin", "agy");
+    return existsSync(join(userHome, ".gemini", "antigravity-cli")) || existsSync(program);
+}
 
 /** A JSON file's new content, when it differs from what is there. */
 function changed(path: string, value: Record<string, unknown>): FileChange | undefined

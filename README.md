@@ -6,18 +6,32 @@ Play chess against an AI on a real board, or learn with one.
 
 ## Get started
 
-Five steps, done once, in about 15 minutes. You need a paid Claude plan or a ChatGPT account. After these steps you open the board with a double click.
+Five steps, done once, in about 15 minutes. You need a paid Claude plan, a ChatGPT account or a Google account. After these steps you open the board with a double click.
 
-**1. Install Node.js.** Download it from [nodejs.org](https://nodejs.org): take the version marked **LTS**, the steady one (22.13 or newer). Install it like any program, keeping every choice as it is; on Windows, leave the box "Automatically install the necessary tools" unticked.
+**1. Install Node.js.** Chesspal needs **Node.js 22.13 or newer**, which comes with **npm 10.9.2 or newer**.
+
+- **Windows and macOS:** download it from [nodejs.org](https://nodejs.org): take the version marked **LTS**, the steady one. Install it like any program, keeping every choice as it is; on Windows, leave the box "Automatically install the necessary tools" unticked.
+- **Linux:** do not take the Node.js of your system's programs (`apt`): it is often older, and it asks for `sudo` to install Chesspal. Install it with nvm, which puts it in your home folder. Open a terminal (step 2) and run:
+
+  ```bash
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.41.0/install.sh | bash
+  ```
+
+  Close the terminal, open a new one, and run:
+
+  ```bash
+  nvm install 22
+  ```
 
 **2. Open a terminal**, the window where you type commands. Open it after installing Node.js: one opened before does not find it.
 
 - **Windows:** press Start, type `cmd` and press Enter. This opens Command Prompt. Use it rather than PowerShell: on a new computer PowerShell refuses these commands with "running scripts is disabled on this system".
 - **macOS:** press ⌘ and Space, type `Terminal` and press Enter.
+- **Linux:** press Ctrl+Alt+T, or look for "Terminal" among your programs.
 
 In the steps below, copy each command, paste it in the terminal (Ctrl+V or right-click; on macOS ⌘V) and press Enter. Wait for the terminal to finish before the next one. Lines with "WARN" are normal: go on.
 
-**3. Install the AI and sign in.** Choose one of the two. You need your own subscription: Chesspal never uses an API key, which is paid by the call.
+**3. Install the AI and sign in.** Choose one of the three. You need your own subscription: Chesspal never uses an API key, which is paid by the call.
 
 - **Claude Code**, with a paid Claude plan (Pro or higher; the free plan does not include it):
 
@@ -35,6 +49,19 @@ In the steps below, copy each command, paste it in the terminal (Ctrl+V or right
   ```
 
   Choose **Sign in with ChatGPT** and sign in in your browser.
+- **Antigravity**, Google's, with a Google account (the free plan is enough: Chesspal plays with Gemini Flash). On Windows, in Command Prompt:
+
+  ```bash
+  curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd
+  ```
+
+  On macOS and Linux:
+
+  ```bash
+  curl -fsSL https://antigravity.google/cli/install.sh | bash
+  ```
+
+  Then close the terminal, open a new one, run `agy` and sign in with your Google account.
 
 Once you are signed in, close that terminal window with its × and open a new one, as in step 2.
 
@@ -47,7 +74,7 @@ chesspal
 
 The board page opens in your browser, and you can close this terminal. The first time, Chesspal offers an icon on your desktop and in your menu of programs: accept it, and from then on you open the board with a double click on it, with no terminal.
 
-**5. Start the AI.** The first time, the board page asks who you are: fill it in and press **Start playing**. Then press **Claude Code** or **Codex**: the AI opens in a terminal of its own. Keep that window open while you play. The first time it asks some questions:
+**5. Start the AI.** The first time, the board page asks who you are: fill it in and press **Start playing**. Then press **Claude Code**, **Codex** or **Antigravity**: the AI opens in a terminal of its own. Keep that window open while you play. The first time it asks some questions:
 
 - whether you trust the folder: choose **Yes** with the arrow keys and press Enter;
 - with Codex, about Chesspal's two hooks, the small programs that tell the AI when you move on the board: choose **Trust all and continue**;
@@ -58,7 +85,9 @@ Now press **New game**: choose your colour, the clock and the AI's level, and pl
 **If a command fails:**
 
 - "npm is not recognized" or "command not found": close the terminal and open a new one; if it still fails, install Node.js again.
+- "Unsupported engine", or `node --version` says less than 22.13: your Node.js is too old. Install it again as in step 1.
 - On macOS, "EACCES" or "permission denied": npm cannot write where Node.js put it. Follow [npm's guide](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally), not `sudo`: with `sudo`, Chesspal and Claude Code cannot update themselves.
+- On Linux, "EACCES" or "permission denied": npm cannot write where your system's Node.js is. Do not use `sudo`: install Node.js with nvm, as in step 1, then run `npm install -g chesspal` again.
 - Anything else in red, or with "ERR!": copy the last lines and [tell us](#try-it-and-tell-us).
 
 ## What it does
@@ -75,16 +104,16 @@ Coming later: an AI coach that helps you grow, exercises chosen on your weak poi
 
 ## What you need
 
-- **Node.js 22.13** or newer.
-- **An AI agent** with your own subscription: [Claude Code](https://code.claude.com/docs/en/setup), with a paid Claude plan, or [Codex](https://developers.openai.com/codex), with a ChatGPT account.
+- **Node.js 22.13** or newer, with **npm 10.9.2** or newer, which comes with it.
+- **An AI agent** with your own subscription: [Claude Code](https://code.claude.com/docs/en/setup), with a paid Claude plan, [Codex](https://developers.openai.com/codex), with a ChatGPT account, or [Antigravity](https://antigravity.google/docs/getting-started), with a Google account.
 - **A web browser**, for the board page.
 
-Chesspal works with any agent that can use Chesspal's tools (MCP) and the files on your computer: we develop it with Claude Code, and Codex is connected too.
+Chesspal works with any agent that can use Chesspal's tools (MCP) and the files on your computer: we develop it with Claude Code, and Codex and Antigravity are connected too.
 
 ## Good to know
 
 - **For the next game**, press New game: the AI the board page opened starts again with a clean chat by itself, once it has stopped working. In a chat you opened yourself, type `/clear` first: a long chat makes the AI slower and costs you more.
-- **To play in a folder of your own**, as with the Claude desktop app, type `chesspal init chess`, then open your agent in the folder `chess` and say hello: the AI answers with the link to the board page. Any name will do; your games are kept [elsewhere](#where-your-games-are).
+- **To play in a folder of your own**, as with the Claude desktop app, type `chesspal init chess`, then open your agent in the folder `chess` and say hello: the AI answers with the link to the board page. Any name will do; your games are kept [elsewhere](#where-your-games-are). Antigravity opened there asks about each of Chesspal's tools the first time: choose to always allow it (Persist to settings.json). Its very first chat in a new folder does not notice your moves on the board: type `/clear` once before you play.
 - **A move written in the chat** counts too: `e4`, `Nf3`, in the international notation (K Q R B N in every language), or in words.
 - **To update**, when a new version is out the table's page shows an arrow at the top: press it between games, and the table installs it and starts again, with its chat. By hand: close the AI's terminal, run `npm install -g chesspal` again, then `chesspal`. In a folder of your own, run `chesspal init` there too: it updates its own lines and keeps what you wrote there. In Codex, allow the hooks again when it says so.
 - **To uninstall**, run `chesspal icon --remove` first, which takes the icon off your desktop and menu, then `npm uninstall -g chesspal`. Your games stay [where they are](#where-your-games-are).

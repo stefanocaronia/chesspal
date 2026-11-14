@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../../core/index.ts";
 import { archivedName, archiveGame, archiveName, cleanSince, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../../games/index.ts";
-import { hasDoorbell } from "../../host-files/index.ts";
+import { hasDoorbell, hookedHosts } from "../../host-files/index.ts";
 import { gameFolder, gameFolders } from "../../profiles/index.ts";
 import { coachRuns, gameAt, type GameSummary, nextStep, openingTags, positionLines, refuseUnseenPosition, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "../answers/index.ts";
 import { pastGameLines, playerLine } from "../profiles/index.ts";
@@ -228,22 +228,19 @@ const fenPattern = /^[pnbrqkPNBRQK1-8]+(?:\/[pnbrqkPNBRQK1-8]+){7}(?:\s|$)/;
 
 /**
  * Whether the chat must be cleared first: the last game begun, in any profile, was played in it at some length, and the host says how chats start (the hook
- * of Claude Code and Codex). Another profile does not clear the chat (D-66), nor a game another chat played, which this one was never shown (D-71).
+ * of Claude Code, Codex and Antigravity). Another profile does not clear the chat (D-66), nor a game another chat played, which this one was never shown (D-71).
  */
 function chatToClear(context: Context): boolean
 {
     const start = lastChatStart(context.folder);
 
-    if (!hostsNotingChats.has(context.host?.() ?? "") || start === undefined) {
+    if (!hookedHosts.includes(context.host?.() ?? "") || start === undefined) {
         return false;
     }
 
     const last = gameFolders(context.home()).flatMap((folder) => loadGame(folder) ?? []).sort((one, other) => Date.parse(other.started) - Date.parse(one.started))[0];
     return last !== undefined && last.started === context.positionSeen?.started && last.game.record.moves.length >= pliesBeforeClearing && !cleanSince(start, last.started);
 }
-
-// The hosts whose SessionStart hook, written by init, notes how each chat starts: Claude Code and Codex, by the names they give the server.
-const hostsNotingChats = new Set(["claude-code", "codex-mcp-client"]);
 
 /**
  * Writes the new game over the one before, archived first: both under game.json's lock, on the game before as read, so a game another process changed

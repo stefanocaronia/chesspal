@@ -18,7 +18,7 @@ No chess engine plays for the AI: every move and every judgment is its own. Ches
 
 ### Getting started
 
-1. Click the **AI's name**, at the top left, and choose its chat among those on your computer: **Claude Code** or **Codex**. It opens in a window of its own: keep it open while you play. The first time it asks some questions. Whether you trust the folder: **Yes** (in Claude Code No is chosen already: go down to Yes with the arrow keys, then Enter). With Codex, about the hooks, Chesspal's two helpers: **Trust all and continue**. On Windows Codex also asks whether to set up its sandbox, the protected space it works in: choose the first option, and yes when Windows asks for permission.
+1. Click the **AI's name**, at the top left, and choose its chat among those on your computer: **Claude Code**, **Codex** or **Antigravity**. It opens in a window of its own: keep it open while you play. The first time it asks some questions. Whether you trust the folder: **Yes** (in Claude Code No is chosen already: go down to Yes with the arrow keys, then Enter). With Codex, about the hooks, Chesspal's two helpers: **Trust all and continue**. On Windows Codex also asks whether to set up its sandbox, the protected space it works in: choose the first option, and yes when Windows asks for permission.
 2. Press **New game**, choose your colour, the clock and the AI's level, and press **Start**.
 3. Move: the AI answers on the board, and with a few words under its name.
 
@@ -37,7 +37,7 @@ No chess engine plays for the AI: every move and every judgment is its own. Ches
 
 - You talk with the AI in the **box under its name**, a few words with each move: it reads them with your move. You can also write to it in its window. With Codex, if you write there while it waits for your move, press **Esc** after Enter: else it reads your message only after your move.
 - A **move written** in the chat counts too: `e4`, `Nf3`, with the English letters of the pieces (K Q R B N), or in words.
-- **The AI's name** opens the choice of its chat: Claude Code or Codex, the model (which AI: some are faster, others stronger) and how much it reasons. The more it reasons, the slower it plays. If you change them, the chat starts afresh in the same window: the AI forgets what you talked about, and the game stays as it is. In analysis the name stands over the box where you write to it.
+- **The AI's name** opens the choice of its chat: Claude Code, Codex or Antigravity, the model (which AI: some are faster, others stronger) and how much it reasons. The more it reasons, the slower it plays. If you change them, the chat starts afresh in the same window: the AI forgets what you talked about, and the game stays as it is. In analysis the name stands over the box where you write to it.
 - At each **new game**, the chat the page opened starts afresh by itself, once the AI has stopped thinking: a long chat makes the AI slower.
 
 ## Helps and marks

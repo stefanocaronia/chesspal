@@ -44,7 +44,7 @@ export interface TableFound
 export async function startTable(context: Context, times: TableTimes = tableTimes, chats?: TableChats, updater?: TableUpdater): Promise<Table | undefined>
 {
     const folder = tableFolder(context.home());
-    setUpTable(folder, context.platform);
+    setUpTable(folder, context.platform, context.userHome?.());
     let quit = (): void => undefined;
     const quitting = new Promise<void>((done) => {
         quit = done;
