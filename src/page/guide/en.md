@@ -39,6 +39,7 @@ No chess engine plays for the AI: every move and every judgment is its own. Ches
 - A **move written** in the chat counts too: `e4`, `Nf3`, with the English letters of the pieces (K Q R B N), or in words.
 - **The AI's name** opens the choice of its chat: Claude Code, Codex or Antigravity, the model (which AI: some are faster, others stronger) and how much it reasons. The more it reasons, the slower it plays. If you change them, the chat starts afresh in the same window: the AI forgets what you talked about, and the game stays as it is. In analysis the name stands over the box where you write to it.
 - At each **new game**, the chat the page opened starts afresh by itself, once the AI has stopped thinking: a long chat makes the AI slower.
+- If the AI reads its words to you aloud, **Esc** or the **space bar** hushes it.
 
 ## Helps and marks
 
@@ -54,6 +55,8 @@ No chess engine plays for the AI: every move and every judgment is its own. Ches
 
 - When the game is over, press **Analyse the game**: the AI goes over it and puts its judgments and notes on the moves. Read them by stepping through the moves with the arrows at the foot of the column, or by clicking a move.
 - In analysis, **move the pieces**, White's and Black's, from any move: a variation starts, with a coloured edge round the board. Click a move of the game to go back to it; the ✕, or Esc, closes the variation.
+- Click a **badge** in a player's card: the board goes to their next move with that judgment, and to the one after at each click.
+- The **+** beside the arrows **replays from here**: it opens New game from the position on the board, and you play the colour to move.
 - **Analyses**, in the header, opens your analyses, and loads a game played elsewhere: paste its PGN, or choose a .pgn file.
 - With your names on Lichess and Chess.com in your profile, **Load a game** lists your latest games there: click one to analyse it.
 - Ask the AI about the game in the box under its name.

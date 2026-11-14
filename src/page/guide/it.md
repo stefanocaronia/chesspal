@@ -39,6 +39,7 @@ Nessun motore di scacchi gioca al posto dell'AI: ogni mossa e ogni giudizio sono
 - Anche una **mossa scritta** nella chat vale: `e4`, `Nf3`, con le lettere inglesi dei pezzi (K Q R B N), o a parole.
 - **Il nome dell'AI** apre la scelta della chat: Claude Code, Codex o Antigravity, il modello (quale AI: alcune sono più veloci, altre più forti) e quanto ragiona. Più ragiona, più gioca lenta. Se cambi, la chat riparte da capo nella stessa finestra: l'AI dimentica la chiacchierata di prima, la partita resta com'è. Nell'analisi il nome sta sopra la casella dove le scrivi.
 - A ogni **nuova partita** la chat aperta dalla pagina riparte da capo da sola, se l'AI ha finito di pensare: una chat lunga rende l'AI più lenta.
+- Se l'AI ti legge le sue parole a voce alta, **Esc** o la **barra spaziatrice** la zittiscono.
 
 ## Gli aiuti e i segni
 
@@ -54,6 +55,8 @@ Nessun motore di scacchi gioca al posto dell'AI: ogni mossa e ogni giudizio sono
 
 - A partita finita premi **Analizza la partita**: l'AI la ripassa e mette sulle mosse i suoi giudizi e le sue note. Le leggi scorrendo le mosse con le frecce in fondo alla colonna, o cliccando una mossa.
 - Nell'analisi **muovi i pezzi**, bianchi e neri, da qualunque mossa: nasce una variante, con un bordo colorato attorno alla scacchiera. Clicca una mossa della partita per tornarci; la ✕, o Esc, chiude la variante.
+- Clicca un **bollino** nella scheda di un giocatore: la scacchiera va alla sua prossima mossa con quel giudizio, e a ogni clic alla successiva.
+- Il **+** accanto alle frecce **rigioca da qui**: apre Nuova partita dalla posizione sulla scacchiera, e tu giochi col colore che deve muovere.
 - **Analisi**, nell'intestazione, apre le tue analisi e carica una partita giocata altrove: incolla il suo PGN, o scegli un file .pgn.
 - Con i tuoi nomi su Lichess e Chess.com nel profilo, **Carica una partita** elenca le tue ultime partite là: clicca su una per analizzarla.
 - Chiedi all'AI della partita nella casella sotto il suo nome.
