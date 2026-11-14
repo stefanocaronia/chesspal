@@ -53,7 +53,7 @@ import { tellWatchers } from "./events.ts";
 import { bodyOf, bytesOf, isJson, json, jsonOf, type Refused, runRoute, send, textOf } from "./http.ts";
 import type { Served } from "./page.ts";
 import { profilesShown } from "./profiles.ts";
-import { analystAtWork, chatPlayedAtLength, chatToRelaunch, chatToWaitFor, refuseWaited, relaunchChat, tableShown } from "./table.ts";
+import { analystAtWork, chatForAnalysis, chatPlayedAtLength, chatToRelaunch, chatToWaitFor, refuseWaited, relaunchChat, tableShown } from "./table.ts";
 import { updateShown } from "./update.ts";
 
 /** Answers the page's requests about the game: true when the request was one. */
@@ -210,7 +210,8 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
 /**
  * A new game from the page, with the sides, the level and the clock the player chose: the sides and the level they leave out are as in the game
  * before, and no clock means a game without one. One going on goes to the archive unfinished, and the doorbell tells the chat, unless the table starts
- * it again. A chat the table holds that must be clear for it, and is at work, has the game wait with the choices kept until it has ended its answer (D-107).
+ * it again. A chat the table holds that must be clear for it, or that it started for the analysis, and is at work, has the game wait with the choices kept
+ * until it has ended its answer (D-107).
  */
 async function newGameFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
@@ -236,7 +237,7 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
         // The game starts from the page, open: its clocks wait for the player's Start there. A chat the table starts again is clean: no /clear is asked.
         relaunching = chatToRelaunch(served);
 
-        if (!relaunching && chatToWaitFor(served) && chatPlayedAtLength(served, before)) {
+        if (!relaunching && chatToWaitFor(served) && (chatPlayedAtLength(served, before) || chatForAnalysis(served))) {
             waitForChat(served, input.data);
             send(response, 200, json, JSON.stringify({ waiting: true }));
             return;

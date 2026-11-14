@@ -704,6 +704,77 @@ describe("a new game at the table that wants a clean chat", () => {
     });
 });
 
+describe("a new game at the table, its chat started for the analysis", () => {
+    it("starts the chat again at once when it is at rest, though it has seen no game: it would analyse a game no longer there", async () => {
+        const { chats, relaunched } = playChats(true, true);
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(async () => (await gameShown(table.url)).listening === true);
+
+            expect(await newGameAt(table.url)).toBe(200);
+            expect(relaunched).toEqual([chat.folder]);
+
+            await page.close();
+            expect(await hook).toMatchObject({ rang: false });
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
+    it("waits for the chat at work to end its answer, then starts the game and the chat again", async () => {
+        const { chats, relaunched } = playChats(true, true);
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            // In its first turn, its hook not yet waiting.
+            const earlier = loadGame(gameFolder(home))?.started;
+            expect(await newGameWith(table.url)).toEqual({ status: 200, text: JSON.stringify({ waiting: true }) });
+            expect(relaunched).toEqual([]);
+            expect(loadGame(gameFolder(home))?.started).toBe(earlier);
+
+            const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(() => Promise.resolve(relaunched.length > 0));
+            expect(relaunched).toEqual([chat.folder]);
+            expect(loadGame(gameFolder(home))).toMatchObject({ ai: "black", game: { record: { moves: [] } } });
+
+            await page.close();
+            expect(await hook).toMatchObject({ rang: false });
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
+    it("never starts again a chat opened by hand beside the one chesspal play holds: the bell tells it", async () => {
+        const { chats, relaunched } = playChats(4242, true);
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "claude-code" };
+        await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(async () => (await gameShown(table.url)).listening === true);
+
+            expect(await newGameAt(table.url)).toBe(200);
+            expect(await hook).toMatchObject({ rang: true });
+            expect(relaunched).toEqual([]);
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+});
+
 describe("the chat's window at the table", () => {
     it("starts the chat chesspal play holds again with the host the page names: at once when it is at rest, else once its turn ends (D-107)", async () => {
         const { chats, relaunched, asked } = playChats();
@@ -806,16 +877,16 @@ describe("the chat's window at the table", () => {
 });
 
 /**
- * The chats of a table where chesspal play holds the seat, unless not `held`, or holds the seat numbered `held` for a chat of its own: the folders whose
- * chat it was asked to start again, and with which host.
+ * The chats of a table where chesspal play holds the seat, unless not `held`, or holds the seat numbered `held` for a chat of its own, started for the
+ * analysis when `analysis`: the folders whose chat it was asked to start again, and with which host.
  */
-function playChats(held: boolean | number = true): { chats: TableChats; relaunched: string[]; asked: (string | undefined)[]; }
+function playChats(held: boolean | number = true, analysis = false): { chats: TableChats; relaunched: string[]; asked: (string | undefined)[]; }
 {
     const relaunched: string[] = [];
     const asked: (string | undefined)[] = [];
     const hosts = ["claude", "codex"].map((name) => ({ name, installed: true, models: [], efforts: [], command: `chesspal play ${name}` }));
     const relaunch = (folder: string, host?: string): boolean => relaunched.push(folder) > 0 && asked.push(host) > 0;
-    const seat = typeof held === "number" ? { seat: held } : {};
+    const seat = { ...(typeof held === "number" ? { seat: held } : {}), ...(analysis ? { analysis: true as const } : {}) };
     return { chats: { hosts: () => hosts, open: () => Promise.resolve(false), held: () => (held === false ? undefined : { model: "opus", ...seat }), relaunch }, relaunched, asked };
 }
 

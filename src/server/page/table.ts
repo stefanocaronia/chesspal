@@ -36,12 +36,16 @@ export interface TableChats
     watch?(changed: () => void): void;
 }
 
-/** The chat `chesspal play` holds: the model and effort its host started with, none for the host's own, and the seat, the play's process. */
+/**
+ * The chat `chesspal play` holds: the model and effort its host started with, none for the host's own, the seat, the play's process, and `analysis` when
+ * it started it for the game in analysis on the page.
+ */
 export interface HeldChat
 {
     readonly model?: string | undefined;
     readonly effort?: string | undefined;
     readonly seat?: number;
+    readonly analysis?: true;
 }
 
 /** A chat opening at the table: one the page asked for, the one started again for a new game, or with another model or host (D-107). */
@@ -134,13 +138,14 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
 
 /**
  * Whether a new game starts the chat at the table again, clean (D-57): `chesspal play` holds it, it waits for the bell, no analyst of it is at work, and it
- * has seen a game move since it was first shown one; one that only greeted the player stays, as one opened from the chat's window before a new game.
+ * has seen a game move since it was first shown one; one that only greeted the player stays, as one opened from the chat's window before a new game. One
+ * `chesspal play` started for the analysis starts again all the same, at rest or still opening, or its first turn would analyse a game no longer there.
  */
 export function chatToRelaunch(served: Served): boolean
 {
     const { positionSeen, positionFirstSeen } = served.chat;
     const played = positionSeen?.started !== undefined && (positionFirstSeen === undefined || !samePosition(positionSeen, positionFirstSeen));
-    return played && heldChat(served) !== undefined && chatAtRest(served);
+    return chatForAnalysis(served) ? served.attached === undefined || chatAtRest(served) : played && heldChat(served) !== undefined && chatAtRest(served);
 }
 
 /**
@@ -149,12 +154,14 @@ export function chatToRelaunch(served: Served): boolean
  */
 export function relaunchChat(served: Served, how: "again" | "restart" = "again", host?: string): boolean
 {
-    const folder = served.attached?.chat.folder;
+    // One started for the analysis is asked again while it is still opening, in the table's folder.
+    const opening = served.attached === undefined && how === "again" && chatForAnalysis(served);
+    const folder = opening ? served.context.folder : served.attached?.chat.folder;
 
     // Another host may first ask whether it trusts the table's folder: the pages say so, as for a chat opened.
     const switching = how === "restart" && host !== undefined && host !== hostAtTable(served);
 
-    if (folder === undefined || heldChat(served) === undefined || served.table?.chats?.relaunch(folder, host) !== true) {
+    if (folder === undefined || (!opening && heldChat(served) === undefined) || served.table?.chats?.relaunch(folder, host) !== true) {
         return false;
     }
 
@@ -169,6 +176,17 @@ export function relaunchChat(served: Served, how: "again" | "restart" = "again",
 export function chatToWaitFor(served: Served): boolean
 {
     return heldChat(served) !== undefined && !chatAtRest(served) && !analystAtWork(served);
+}
+
+/**
+ * Whether the chat `chesspal play` holds was started for the analysis on the page: the one at the table, or, with none at it yet, the one still opening.
+ * A chat opened by hand never is.
+ */
+export function chatForAnalysis(served: Served): boolean
+{
+    const { attached, context, table } = served;
+    const held = table?.chats?.held(attached?.chat.folder ?? context.folder);
+    return held?.analysis === true && (attached === undefined || held.seat === attached.chat.seat);
 }
 
 /**

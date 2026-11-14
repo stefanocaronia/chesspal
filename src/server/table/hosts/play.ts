@@ -16,7 +16,7 @@ import { cmdQuoted } from "./terminal.ts";
 
 /**
  * What `chesspal play` starts: the host's program, its arguments, folder and environment, whether it needs cmd, as a .cmd shim does on Windows, and the
- * model and effort it is given, which the seat notes for the page (D-107).
+ * model and effort it is given, which the seat notes for the page (D-107), as it notes a chat started for the game in analysis.
  */
 export interface HostLaunch
 {
@@ -26,6 +26,8 @@ export interface HostLaunch
     readonly env: NodeJS.ProcessEnv;
     readonly shell: boolean;
     readonly choice: HostChoice;
+    /** Started for the game in analysis on the page, with no game going on: a new game from the page starts it again. */
+    readonly analysis: boolean;
     /** Chesspal wrote Codex's hooks, the first time or again: Codex runs them only once the player trusts them. */
     readonly hooks?: HooksNews;
 }
@@ -184,7 +186,8 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     const choices = tableChoices(folder, host);
     const choice = choiceIn(profileSettings(home, activeProfile(home).id), host, choices);
     const games = gameFolder(home);
-    const args = hostArgs(host, startMessage(languageIn(games, context.language), analysisAsked(games)), choice, folder, choices);
+    const analysis = analysisAsked(games);
+    const args = hostArgs(host, startMessage(languageIn(games, context.language), analysis), choice, folder, choices);
     // An effort the player set for every chat would win over the one chosen on the page: spawn leaves out a variable that is undefined.
     const effort = host === "claude" && choice.effort !== undefined ? { CLAUDE_CODE_EFFORT_LEVEL: undefined } : {};
     // The seat this play holds, by which its chat's server tells the table it is the chat held, and not another opened in the same folder.
@@ -192,10 +195,10 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     const script = npmScript(host, found, context.platform, exists ?? existsSync);
 
     if (script !== undefined) {
-        return { program: process.execPath, args: [script, ...args], folder, env: childEnv, shell: false, choice, ...hooks };
+        return { program: process.execPath, args: [script, ...args], folder, env: childEnv, shell: false, choice, analysis, ...hooks };
     }
 
-    return { program: found, args, folder, env: childEnv, shell: context.platform === "win32" && /\.(cmd|bat)$/i.test(found), choice, ...hooks };
+    return { program: found, args, folder, env: childEnv, shell: context.platform === "win32" && /\.(cmd|bat)$/i.test(found), choice, analysis, ...hooks };
 }
 
 /** Whether the board page shows a game in analysis, none going on: the chat opened there is for that game, brought to review or to talk over, not for a new one. */
@@ -230,11 +233,11 @@ const closedAtStartWords = {
     italian: ["Claude Code si è chiuso appena aperto.", "Se ti chiede se ti fidi della cartella, scendi con le frecce su «Yes, I trust this folder», poi premi Invio."],
 };
 
-// Runs the host as runHost does, the seat noting the model and effort it is given; one not installed, or that could not start, fails saying so.
+// Runs the host as runHost does, the seat noting the model and effort it is given, and whether for the analysis; one not installed, or that could not start, fails saying so.
 async function started(context: Context, host: HostName, again: () => boolean): Promise<{ code: number; again: boolean; }>
 {
     const launch = hostLaunch(context, host);
-    takeSeat(launch.folder, { pid: process.pid, host, ...launch.choice });
+    takeSeat(launch.folder, { pid: process.pid, host, ...launch.choice, ...(launch.analysis ? { analysis: true } : {}) });
 
     // Codex asks the player to trust the hooks Chesspal wrote: said here, above its question, as init says it.
     if (launch.hooks !== undefined) {

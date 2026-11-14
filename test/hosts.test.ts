@@ -404,6 +404,68 @@ describe("the table's page, with no chat at it", () => {
     });
 });
 
+describe("a new game from the table's page, with the chat chesspal play holds still opening", () => {
+    it("asks again for the chat started for the analysis, which then starts to play the game", async () => {
+        const { context, table, folder, launch } = await tableOpening(true);
+        expect(launch).toMatchObject({ analysis: true, args: ["Let's analyse the game!", ...launch.args.slice(1)] });
+
+        expect(await newGameAt(table.url)).toEqual({ started: true });
+        expect(askedAgain(folder, process.pid)).toEqual({});
+        expect((await getGame(table.url)).table).toMatchObject({ opening: "again" });
+        expect(hostLaunch(context, "claude", { PATH: "/usr/bin" }, (path) => path === "/usr/bin/claude")).toMatchObject({ analysis: false, args: ["Let's play!", ...launch.args.slice(1)] });
+    });
+
+    it("leaves one started for a game, or no seat held, to the bell", async () => {
+        const forPlay = await tableOpening(false);
+
+        expect(await newGameAt(forPlay.table.url)).toEqual({ started: true });
+        expect(askedAgain(forPlay.folder, process.pid)).toBeUndefined();
+
+        const none = await tableOpening(undefined);
+
+        expect(await newGameAt(none.table.url)).toEqual({ started: true });
+        expect(askedAgain(none.folder, process.pid)).toBeUndefined();
+    });
+});
+
+/**
+ * A table with a finished game in analysis on its page and its chat opening, none at it yet: chesspal play holds the seat with the launch it started
+ * its host with, for the analysis when `analysis` and none goes on; no one holds it when `analysis` is undefined.
+ */
+async function tableOpening(analysis: boolean | undefined): Promise<{ context: Context; table: Table; folder: string; launch: HostLaunch; }>
+{
+    const context = homeContext("linux");
+    const home = context.home();
+    const folder = tableFolder(home);
+    startAnalysis(gameFolder(home), "2026-11-13-192013.pgn", context.now(), { brought: true });
+
+    if (analysis === false) {
+        await commands.find((command) => command.name === "new_game")!.run({ ai_colour: "black" }, context);
+    }
+
+    const launch = hostLaunch(context, "claude", { PATH: "/usr/bin" }, (path) => path === "/usr/bin/claude");
+
+    if (analysis !== undefined) {
+        takeSeat(folder, { pid: process.pid, host: "claude", ...launch.choice, ...(launch.analysis ? { analysis: true } : {}) });
+    }
+
+    const table = await onFreePorts(() => startTable(context, { idle: 60_000, every: 1_000 }, terminalChats(context, ["node", "cli.js"], { PATH: "/nowhere" })));
+
+    if (table === undefined) {
+        throw new Error("The table did not start: another one holds its ports.");
+    }
+
+    tables.push(table);
+    return { context, table, folder, launch };
+}
+
+/** A new game asked from the table's page, as its window sends it: the answer. */
+async function newGameAt(url: string): Promise<unknown>
+{
+    const answer = await sent(new URL("/api/new", url), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai_colour: "white" }) });
+    return JSON.parse(answer.text) as unknown;
+}
+
 const fakeHosts = [
     { name: "claude", installed: true, models: ["opus"], efforts: ["high"], command: "chesspal play claude" },
     { name: "codex", installed: false, models: [], efforts: [], command: "chesspal play codex" },
@@ -444,7 +506,7 @@ async function openChat(url: string, host: string, origin?: string): Promise<{ s
 /** A Node script run as a host, in the folder given. */
 function nodeHost(folder: string, code: string): HostLaunch
 {
-    return { program: process.execPath, args: ["-e", code], folder, env: process.env, shell: false, choice: {} };
+    return { program: process.execPath, args: ["-e", code], folder, env: process.env, shell: false, choice: {}, analysis: false };
 }
 
 /** Whether a process is gone, within two seconds. */

@@ -4,13 +4,17 @@ import { mkdirSync, readFileSync, rmSync, statSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomically } from "../../../games/index.ts";
 
-/** The play process in the seat: its process id, its host, and the model and effort it started that host with, none for the host's own. */
+/**
+ * The play process in the seat: its process id, its host, and the model and effort it started that host with, none for the host's own; `analysis` when
+ * it started it for the game in analysis on the page, which a new game then starts again.
+ */
 export interface Seat
 {
     readonly pid: number;
     readonly host: string;
     readonly model?: string | undefined;
     readonly effort?: string | undefined;
+    readonly analysis?: true;
 }
 
 /**
@@ -108,14 +112,14 @@ const againFile = "play-again.json";
 
 function seatIn(folder: string): Seat | undefined
 {
-    const seat = jsonIn(join(folder, seatFile)) as { pid?: unknown; host?: unknown; model?: unknown; effort?: unknown; } | undefined;
+    const seat = jsonIn(join(folder, seatFile)) as { pid?: unknown; host?: unknown; model?: unknown; effort?: unknown; analysis?: unknown; } | undefined;
 
     if (typeof seat?.pid !== "number" || typeof seat.host !== "string") {
         return undefined;
     }
 
     const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
-    return { pid: seat.pid, host: seat.host, model: text(seat.model), effort: text(seat.effort) };
+    return { pid: seat.pid, host: seat.host, model: text(seat.model), effort: text(seat.effort), ...(seat.analysis === true ? { analysis: true } : {}) };
 }
 
 function jsonIn(path: string): unknown

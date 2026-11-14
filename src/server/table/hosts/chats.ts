@@ -51,7 +51,7 @@ export function terminalChats(
         // Only a chat in the table's folder can be the one chesspal play holds.
         held: (folder) => {
             const seat = samePath(folder, tableFolder(context.home())) ? seatHeld(folder, context.now()) : undefined;
-            return seat === undefined ? undefined : { model: seat.model, effort: seat.effort, seat: seat.pid };
+            return seat === undefined ? undefined : { model: seat.model, effort: seat.effort, seat: seat.pid, ...(seat.analysis === true ? { analysis: true } : {}) };
         },
         relaunch: (folder, host, updated) => samePath(folder, tableFolder(context.home())) && askAgain(folder, context.now(), { ...(host === undefined ? {} : { host }), ...(updated === true ? { updated } : {}) }),
     };
