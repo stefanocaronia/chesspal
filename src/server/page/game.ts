@@ -510,6 +510,12 @@ function sendGame(response: ServerResponse, served: Served): void
     const analysis = current === undefined || endOf(current.game) !== undefined ? analysisShown(served) : undefined;
     const aiModel = aiModelOf(folder);
     const thinking = thinkingShown(served, current);
+
+    // The doorbell's log keeps the sign the pages are given, as it comes or goes.
+    if (thinking.thinking !== thinkingSent.get(served)) {
+        served.bell.note(`sign ${thinking.thinking ?? "none"}`);
+    }
+
     thinkingSent.set(served, thinking.thinking);
     const body = {
         // The page loaded from another version loads again, its files and all (Federico).

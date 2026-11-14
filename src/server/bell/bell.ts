@@ -1,6 +1,6 @@
 // The doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes for Claude Code, Codex and Antigravity, waits at the page of its chat and, when
 // the player moves or writes there, tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { closeSync, fstatSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, join, resolve } from "node:path";
 import { positionShownNote, writeAtomically } from "../../games/index.ts";
@@ -34,17 +34,19 @@ export class Bell
     private readonly news: () => boolean;
     private readonly changed: () => void;
     private readonly stopped: () => boolean;
+    private readonly log: (line: string) => void;
 
     /**
      * `news` says whether a ring no hook heard is still worth waking the chat for; `changed` is told when what the page shows of the chat may change: it
      * starts or stops listening, the doorbell wakes it, its turn ends; `stopped` whether the host says the chat was stopped in its turn (Esc), which no
-     * hook tells.
+     * hook tells; `log` takes a line for the doorbell's log at each change of its state.
      */
-    constructor(news: () => boolean = () => true, changed: () => void = () => undefined, stopped: () => boolean = () => false)
+    constructor(news: () => boolean = () => true, changed: () => void = () => undefined, stopped: () => boolean = () => false, log: (line: string) => void = () => undefined)
     {
         this.news = news;
         this.changed = changed;
         this.stopped = stopped;
+        this.log = log;
     }
 
     /** Whether the chat is in a turn, as far as the doorbell knows: a chat stopped with Esc stays in it until its next tool, or until a ring finds it stopped. */
@@ -75,8 +77,15 @@ export class Bell
     chatCalls(): boolean
     {
         const asleep = !this.listening;
+        const changes = !this.busy || this.unheard;
         this.busy = true;
         this.unheard = false;
+
+        // Only a call that changes the state is logged: the chat calls a tool at every step of its turn.
+        if (changes) {
+            this.note("chatCalls");
+        }
+
         this.tellIf(asleep);
         return asleep;
     }
@@ -92,6 +101,7 @@ export class Bell
         if (this.listener === undefined) {
             const deaf = this.unheard;
             this.unheard = false;
+            this.note("chatPrompted");
             this.tellIf(deaf);
             return;
         }
@@ -99,6 +109,7 @@ export class Bell
         this.listener.end("dismissed");
         this.listener = undefined;
         this.busy = true;
+        this.note("chatPrompted, the hook dismissed");
         this.changed();
     }
 
@@ -109,13 +120,17 @@ export class Bell
      */
     ring(mayBeAtWork = false): void
     {
+        const ring = mayBeAtWork ? "ring mayBeAtWork" : "ring";
+
         if (this.listener === undefined) {
             this.pending = true;
 
             if (!this.hooked && !mayBeAtWork && this.busy) {
                 this.busy = false;
+                this.note(`${ring}, the chat out of its turn`);
                 this.changed();
             } else {
+                this.note(`${ring}, it waits`);
                 this.watchForStop();
             }
 
@@ -126,6 +141,7 @@ export class Bell
         this.listener = undefined;
         this.busy = true;
         this.woken = true;
+        this.note(`${ring}, the hook heard it`);
         this.changed();
     }
 
@@ -133,18 +149,20 @@ export class Bell
      * A hook waits for the bell, so the chat's turn has ended; the hook before it, of a turn already ended, is let go. A ring no hook heard is dropped when
      * the chat is `told` all of it otherwise: by the player's message that came with the move the prompt hook played.
      */
-    listen(request: IncomingMessage, response: ServerResponse, told = false): void
+    listen(request: IncomingMessage, response: ServerResponse, told = false, hook: HookSeen = {}): void
     {
         response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
         this.hooked = true;
         this.unheard = false;
         const missed = this.pending && !told;
         this.pending = false;
+        const who = hookNamed(hook);
 
         if (missed && this.news()) {
             response.end("ring");
             this.busy = true;
             this.woken = true;
+            this.note(`listen${who}, rung at once for a ring it missed`);
             this.changed();
             return;
         }
@@ -153,6 +171,7 @@ export class Bell
         this.woken = false;
         this.listener?.end("dismissed");
         this.listener = response;
+        this.note(`listen${who}${told ? ", told" : ""}`);
         this.changed();
         request.on("close", () => {
             if (this.listener === response) {
@@ -160,6 +179,7 @@ export class Bell
                 // a tool again, but the chat is out of its turn.
                 this.listener = undefined;
                 this.unheard = !this.busy;
+                this.note(`hook gone without the bell${who}`);
                 this.tellIf(this.unheard);
             }
         });
@@ -175,7 +195,14 @@ export class Bell
         this.pending = false;
         this.listener?.end("dismissed");
         this.listener = undefined;
+        this.note("chatLeft");
         this.changed();
+    }
+
+    /** Writes a line in the doorbell's log: what happened, and the doorbell's state after it. */
+    note(event: string): void
+    {
+        this.log(`bell ${event} -> ${this.state()}`);
     }
 
     private tellIf(changed: boolean): void
@@ -196,6 +223,7 @@ export class Bell
             this.busy = false;
             this.woken = false;
             this.unheard = true;
+            this.note("the chat found stopped in its turn");
             this.changed();
             return;
         }
@@ -211,6 +239,28 @@ export class Bell
     {
         return this.pending && this.busy && this.listener === undefined;
     }
+
+    /** The doorbell's state for its log: the names of what holds, `idle` when none. */
+    private state(): string
+    {
+        const held = { busy: this.busy, woken: this.woken, waiting: this.listener !== undefined, listening: this.listening, unheard: this.unheard, pending: this.pending, hooked: this.hooked };
+        const names = Object.entries(held).filter(([, holds]) => holds).map(([name]) => name);
+        return names.length === 0 ? "idle" : names.join(" ");
+    }
+}
+
+/** What the page hears of a hook that waits at its doorbell, for the log: its chat's session and its process, when it says them. */
+export interface HookSeen
+{
+    session?: string | undefined;
+    pid?: string | undefined;
+}
+
+function hookNamed(hook: HookSeen): string
+{
+    // What a request says goes in the log as one short word.
+    const word = (text: string): string => text.replace(/[^\w.-]/g, "?").slice(0, 64);
+    return `${hook.session === undefined ? "" : ` session=${word(hook.session)}`}${hook.pid === undefined ? "" : ` pid=${word(hook.pid)}`}`;
 }
 
 /** How often the doorbell looks whether a chat a ring waits for was stopped in its turn. */
@@ -266,25 +316,19 @@ export async function listen(host: ListeningHost = "claude"): Promise<void>
         input += String(chunk);
     }
 
-    // Antigravity's hook leaves a line as it starts: a chat its bell never woke shows whether the hook ran at all.
-    if (host === "antigravity") {
-        noteHook(chatFolder(hookInput(input)), "waiting");
-    }
+    // The hook leaves a line as it starts and as it ends, beside the page's: a chat its bell never woke shows whether the hook ran at all, and why it ended.
+    const hook = hookInput(input);
+    const folder = chatFolder(hook);
+    const who = `hook ${host} pid=${process.pid}`;
+    noteBell(folder, `${who}${hook.session === undefined ? "" : ` session=${hook.session}`} waiting`);
 
-    const conversation = host === "antigravity" ? hookInput(input).session : undefined;
+    const conversation = host === "antigravity" ? hook.session : undefined;
     const turn = conversation === undefined ? undefined : watchNewTurn(conversation);
-    const waited = bellHeard(input).catch((error: unknown): BellHeard => ({ folder: chatFolder(hookInput(input)), rang: false, why: `failed: ${(error as Error).message}` }));
-    const newTurn = turn?.started.then((): BellHeard => ({ folder: chatFolder(hookInput(input)), rang: false, why: "the player started a new turn" }));
+    const waited = bellHeard(input).catch((error: unknown): BellHeard => ({ folder, rang: false, why: `failed: ${(error as Error).message}` }));
+    const newTurn = turn?.started.then((): BellHeard => ({ folder, rang: false, why: "the player started a new turn" }));
     const heard = await (newTurn === undefined ? waited : Promise.race([waited, newTurn]));
     turn?.stop();
-
-    // Codex's turn ends with a hook that heard no bell, and the player's next move on the page wakes nobody: the log keeps why. Antigravity's keeps every
-    // end, the bell too, since its chat may not wake even then.
-    if (host === "antigravity") {
-        noteHook(heard.folder, heard.rang ? "rang" : heard.why);
-    } else if (host === "codex" && !heard.rang) {
-        noteHook(heard.folder, heard.why);
-    }
+    noteBell(heard.folder, `${who} ${heard.rang ? "rang" : heard.why}`);
 
     // It ends as soon as it knows: the chat hears the hook only once it ends.
     const answer = hookAnswer(host, heard.rang);
@@ -342,8 +386,14 @@ export async function bellHeard(input: string, ports?: number[]): Promise<BellHe
     // for this chat, which hears it from the player's message itself.
     const shown = hook.session === undefined ? undefined : positionShownNote(folder);
     const told = shown !== undefined && shown.session === hook.session ? shown.stamp : undefined;
-    const query = new URLSearchParams({ ...(hook.analystGone === true ? { analyst: "gone" } : {}), ...(told === undefined ? {} : { shown: told }) });
-    const said = (await askPage(port, `/api/bell${query.size === 0 ? "" : `?${query}`}`)).text;
+    // Its session and process go with it, for the page's log.
+    const query = new URLSearchParams({
+        ...(hook.analystGone === true ? { analyst: "gone" } : {}),
+        ...(told === undefined ? {} : { shown: told }),
+        ...(hook.session === undefined ? {} : { session: hook.session }),
+        pid: String(process.pid),
+    });
+    const said = (await askPage(port, `/api/bell?${query}`)).text;
     return said === "ring" ? { folder, rang: true } : { folder, rang: false, why: said === undefined ? `the page at port ${port} did not answer` : `the page at port ${port} said "${said}"` };
 }
 
@@ -365,20 +415,34 @@ async function forgetGonePages(home: string, folder: string, kept: number, wait:
     }));
 }
 
-// The log of the doorbell's hooks, in the chat's folder: Codex's that heard no bell, Antigravity's as they start and end; its last lines only.
-const hookLog = "listen.log";
-const hookLines = 100;
+// The doorbell's log, in the chat's folder: the page's changes of the doorbell and of the sign it shows, the hooks' starts and ends. A line is appended,
+// and only once the log grows past its size is it cut to its last half: no rewrite at every line.
+const bellLog = "listen.log";
+const bellLogBytes = 256 * 1024;
 
-/** Adds a line to the log of the doorbell's hooks, keeping its last lines; a log that cannot be written never stops the hook. */
-export function noteHook(folder: string, why: string, now = new Date()): void
+/** Adds a line to the doorbell's log, with the time to the millisecond; a log that cannot be written never stops the page or the hook. */
+export function noteBell(folder: string, line: string, now = new Date()): void
 {
-    const path = join(folder, hookLog);
+    const path = join(folder, bellLog);
 
     try {
-        const before = existsSync(path) ? readFileSync(path, "utf8").split("\n").filter((line) => line !== "") : [];
-        writeAtomically(path, `${[...before, `${now.toISOString()} ${why}`].slice(-hookLines).join("\n")}\n`);
+        const descriptor = openSync(path, "a");
+        let size = 0;
+
+        try {
+            // One write, so that the page's lines and the hook's, from two processes, never mix.
+            writeSync(descriptor, `${now.toISOString()} ${line.replace(/\s+/g, " ")}\n`);
+            size = fstatSync(descriptor).size;
+        } finally {
+            closeSync(descriptor);
+        }
+
+        if (size > bellLogBytes) {
+            const kept = readFileSync(path, "utf8").slice(-bellLogBytes / 2);
+            writeAtomically(path, kept.slice(kept.indexOf("\n") + 1));
+        }
     } catch {
-        // The log only explains; the hook ends the same.
+        // The log only explains; the page and the hook go on the same.
     }
 }
 

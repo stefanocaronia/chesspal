@@ -11,7 +11,7 @@ import { type Context, withProfile } from "../src/commands/registry/context.ts";
 import { archivedGames, gameInAnalysis, keepThought, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
-import { Bell, bellHeard, bellLine, codexBellAnswer, noteHook, notePagePort, stopCheck, waitForBell } from "../src/server/bell/bell.ts";
+import { Bell, bellHeard, bellLine, codexBellAnswer, noteBell, notePagePort, stopCheck, waitForBell } from "../src/server/bell/bell.ts";
 import { analysesOf } from "../src/server/page/analyses.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { profilesShown } from "../src/server/page/profiles.ts";
@@ -1156,6 +1156,30 @@ describe("the doorbell of the chat", () => {
         expect([bell.inTurn, bell.woke, told]).toEqual([false, false, 4]);
     });
 
+    it("logs the doorbell in the chat's folder, in order: the player's move rung, the chat's call that changed its state, the hook's wait, the sign", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        await run(folder, "new_game", { ai_colour: "black" });
+
+        // The move rings with no hook waiting; the chat's first call starts its turn, the next changes nothing and is not logged.
+        await post(page, "/api/move", { move: "e4" });
+        await page.chatCalls();
+        await page.chatCalls();
+        const { heard } = await hookWaits(page, { cwd: folder, session_id: "chat-1" });
+        expect(await heard).toBe(true);
+        // The page that reads the game now shows the AI on its move.
+        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ thinking: "move" });
+
+        const logged = readFileSync(join(folder, "listen.log"), "utf8").trimEnd().split("\n");
+        expect(logged.every((line) => /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z /.test(line))).toBe(true);
+        expect(logged.map((line) => line.slice(line.indexOf(" ") + 1))).toEqual([
+            "bell ring, it waits -> pending",
+            "bell chatCalls -> busy listening pending",
+            `bell listen session=chat-1 pid=${process.pid}, rung at once for a ring it missed -> busy woken listening hooked`,
+            "bell sign move -> busy woken listening hooked",
+        ]);
+    });
+
     it("tells the page what the AI thinks on: its move once the chat is on it, the player's time while it ponders, nothing once it waits", async () => {
         const folder = playerFolder();
         const context = testContext(folder);
@@ -1602,17 +1626,22 @@ describe("the doorbell of the chat", () => {
         }
     });
 
-    it("logs the doorbell's hooks in the chat's folder, keeping the last hundred", () => {
+    it("logs the doorbell in the chat's folder, a line each, cut to its last lines once it grows past its size", () => {
         const folder = playerFolder();
+        const padding = "x".repeat(1000);
 
-        for (let index = 0; index < 101; index++) {
-            noteHook(folder, `silence ${index}`, new Date(Date.UTC(2026, 10, 5, 0, 0, index)));
+        for (let index = 0; index < 300; index++) {
+            noteBell(folder, `line ${index}\n${padding}`, new Date(Date.UTC(2026, 10, 5, 0, 0, index)));
         }
 
-        const lines = readFileSync(join(folder, "listen.log"), "utf8").trimEnd().split("\n");
-        expect(lines).toHaveLength(100);
-        expect(lines[0]).toBe("2026-11-05T00:00:01.000Z silence 1");
-        expect(lines.at(-1)).toBe("2026-11-05T00:01:40.000Z silence 100");
+        const text = readFileSync(join(folder, "listen.log"), "utf8");
+        const lines = text.trimEnd().split("\n");
+        expect(text.length).toBeLessThan(256 * 1024);
+        expect(lines.length).toBeGreaterThan(100);
+        expect(lines.length).toBeLessThan(300);
+        // Whole lines only, the words of each on one line.
+        expect(lines.every((line) => /^2026-11-05T\d\d:\d\d:\d\d\.000Z line \d+ x{1000}$/.test(line))).toBe(true);
+        expect(lines.at(-1)).toBe(`2026-11-05T00:04:59.000Z line 299 ${padding}`);
     });
 });
 

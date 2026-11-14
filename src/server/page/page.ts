@@ -8,7 +8,7 @@ import { aiNameOf } from "../../core/index.ts";
 import { forgetAnalyst, gameStamp, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { Bell, chatInterrupted, forgetPagePort, notePagePort } from "../bell/index.ts";
+import { Bell, chatInterrupted, forgetPagePort, noteBell, notePagePort } from "../bell/index.ts";
 import { bellProbe, pagePorts, type TableChat } from "../ports/index.ts";
 import { analysesOf, answerAnalyses, sendSiteGames } from "./analyses.ts";
 import { answerChat } from "./attach.ts";
@@ -97,6 +97,7 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
                 tellWatchers(watchers);
             },
             () => chatInterrupted(folder),
+            (line) => noteBell(folder, line),
         ),
         watchers,
         port: 0,
@@ -285,7 +286,8 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
 
             // Nothing changed the game since the prompt hook played the move for the chat: the chat hears of it from the player's message.
             const shown = url.searchParams.get("shown");
-            served.bell.listen(request, response, shown !== null && shown === stampNow(served));
+            const hook = { session: url.searchParams.get("session") ?? undefined, pid: url.searchParams.get("pid") ?? undefined };
+            served.bell.listen(request, response, shown !== null && shown === stampNow(served), hook);
         }
     } else if (path === "/api/bell/prompt") {
         // The prompt hook: a message starts the chat's turn. A path of its own, which a page of an older Chesspal answers with a 404, not as a hook waiting.
