@@ -41,9 +41,10 @@ import { BadgeCounts } from "../game/badges.tsx";
 import { type Step, stepped } from "../game/browse.ts";
 import { GameColumn } from "../game/column.tsx";
 import { howEnded, useDeclined, useJustEnded, useSawEnd } from "../game/ending.ts";
-import { Steps } from "../game/move-list.tsx";
+import { type LineView, Steps, stepsLine } from "../game/move-list.tsx";
 import { useOpeningBook } from "../game/opening-book.ts";
-import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, reviewCount, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
+import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, type Ply, reviewCount, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
+import { afterMove, isJump, leaveLine, linePlies, lineRecord, onLine, type Place, stepLine, type Variation } from "../game/variation.ts";
 import { GuideDialog } from "../guide/guide.tsx";
 import { BareButton, HelpsCard, HintLine, MapButton } from "../helps/helps.tsx";
 import { helpsOf } from "../helps/view.ts";
@@ -66,7 +67,7 @@ import { AiNameButton, ChatDialog, tableNote } from "../table/window.tsx";
 import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
 import { textFor } from "../text.ts";
 import { anchorName, type LinkIgnored, useAnchor } from "./anchor.ts";
-import { useBrowseKeys, useFoldKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
+import { useBrowseKeys, useEscapeKey, useFoldKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
 import { helpsShown, phaseOf, verdictOf } from "./phase.ts";
 import { ask, type PageData, post, refusedText, sendMessage, sendMove, useServed } from "./served.ts";
 import { tabTitle, useTabTitle } from "./title.ts";
@@ -218,7 +219,7 @@ export function App({ start }: { start: Settings; })
     const playedAs = studied === undefined ? name : aiNameOf(aiHostIn(live.record), aiModelIn(live.record)?.model) ?? text.ai;
     const analyst = annotator === undefined ? name : aiNameOf(annotator.annotator, annotator.annotator) ?? text.ai;
     const material = useMemo(() => materialOf(live.position.fen), [live]);
-    const pieces = useMemo(() => piecesOf(live.position.fen), [live]);
+    const piecesOnBoard = useMemo(() => piecesOf(live.position.fen), [live]);
     // How many of the game's first plies a line of the book reaches, as the server counts them (D-68).
     const bookPlies = studied !== undefined ? studied.book : game?.book ?? 0;
     // While the game goes on, the book's first moves carry its badge, when the player wants it, as the AI's review gives it after (D-69).
@@ -252,13 +253,31 @@ export function App({ start }: { start: Settings; })
     // The legend of the marks on the board, open until the player closes it (D-99).
     const [legendOpen, setLegendOpen] = useState(false);
     useLegendKey(() => setLegendOpen((open) => !open));
-    const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
-    const next = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove, [live, viewing]);
-    const shown = useMemo(() => past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past]);
-    // A square lit from the AI's words goes off with the position: a touch keeps it lit until then, a mouse until it leaves the word.
-    useEffect(() => setPointed(noSquares), [shown]);
-    // The player sees all of Chesspal's facts, whatever the AI's level (D-79): in a game with the helps on, always in analysis (D-114).
+    // In analysis the player plays a variation from the move shown, White's moves and Black's (D-116): one line, kept by the page alone, faded once the board
+    // is back on the game.
+    const [line, setLine] = useState<Variation | undefined>(undefined);
     const analysing = studied !== undefined;
+    const onTheLine = analysing && onLine(line);
+    const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
+    const lineGame = useMemo(() => onTheLine ? new Game(lineRecord(live.record, line)) : undefined, [live, onTheLine ? line : undefined]);
+    const shown = useMemo(() => lineGame ?? past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past, lineGame]);
+    // The move after the position shown, which a step back slides home: the line's own on the line.
+    const next = useMemo(
+        () => onTheLine ? shown.legalMoves().find((move) => move.san === line.moves[line.cursor]) : viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove,
+        [live, viewing, shown],
+    );
+    // Where the line starts its numbers when it leaves from the game's first position.
+    const firstPosition = useMemo(() => new Game({ tags: live.record.tags, moves: [] }).position, [live]);
+    // A square lit from the AI's words goes off with the position: a touch keeps it lit until then, a mouse until it leaves the word; in analysis a refusal
+    // goes off with it too.
+    useEffect(() => {
+        setPointed(noSquares);
+
+        if (analysing) {
+            setRefusal(undefined);
+        }
+    }, [shown]);
+    // The player sees all of Chesspal's facts, whatever the AI's level (D-79): in a game with the helps on, always in analysis (D-114).
     const helped = helpsShown(phase, settings.helps);
     // Seen from the player's side (D-91): theirs in a game, in analysis the side the game names theirs, none when it names neither.
     const you = analysing ? playerIn(studiedSides(live.record.tags, served?.profile.name ?? "", playedAs, text.sides, served?.profile.accounts)) : game?.ai === undefined ? undefined : game.ai === "white" ? "black" : "white";
@@ -274,6 +293,7 @@ export function App({ start }: { start: Settings; })
         setPending(undefined);
         setViewing(undefined);
         setPromoting(undefined);
+        setLine(undefined);
     }, [gameKey]);
     const played = studied === undefined ? game : null;
     useGameSounds(played, replayed, sound);
@@ -307,18 +327,50 @@ export function App({ start }: { start: Settings; })
     const shownOpening = useMemo(() => bookAt === undefined || book === undefined ? undefined : openingOf(bookAt, book), [live, book, bookAt === undefined ? 0 : at]);
     // Whether the move shown is still the book's, whatever the badges show: the card says the move the game left it at, once it is past it.
     const leftBook = outOfBookMove(at, bookPlies);
-    // A jump of more than one move shows the position at once: only a step slides its pieces.
-    const shownBefore = useRef(at);
-    const jumped = Math.abs(shownBefore.current - at) > 1;
-    shownBefore.current = at;
+    // A jump of more than one move shows the position at once: only a step slides its pieces, on the game or on a variation.
+    const place: Place = { at, cursor: onTheLine ? line.cursor : 0 };
+    const shownBefore = useRef(place);
+    const jumped = isJump(shownBefore.current, place);
+    shownBefore.current = place;
 
+    // A move of the game shown takes the board off a variation, which stays faded.
     const goTo = (count: number): void => {
         setSelected(undefined);
+        setLine(leaveLine);
         setViewing(count >= total ? undefined : Math.max(0, count));
     };
 
-    const step = (to: Step): void => goTo(stepped(to, at, total));
+    // On a variation the arrows back and forward step through it; to either end of the game they leave it.
+    const step = (to: Step): void => {
+        if (onTheLine && (to === "back" || to === "forward")) {
+            setSelected(undefined);
+            setLine(stepLine(line, to));
+        } else {
+            goTo(stepped(to, at, total));
+        }
+    };
+
     useBrowseKeys(step, () => setFlipped(!flipped));
+
+    // A move of the variation shown: the board goes back on it, at the game's move it leaves from.
+    const showLine = (cursor: number): void => {
+        if (line !== undefined) {
+            setSelected(undefined);
+            setLine({ ...line, cursor });
+            setViewing(line.at >= total ? undefined : line.at);
+        }
+    };
+
+    // The cross and Esc close the variation: the board shows the game where it left it.
+    const closeLine = (): void => {
+        setSelected(undefined);
+        setLine(undefined);
+    };
+
+    // Esc first lets go of a piece picked, and leaves the legend, a promotion's choice, the settings and the dialogs to close themselves.
+    useEscapeKey(
+        line === undefined || legendOpen || promoting !== undefined || setting || dialog !== undefined ? undefined : () => selected === undefined ? closeLine() : setSelected(undefined),
+    );
     const wheel = useWheelSteps(step);
     // The move shown stays in the page's address, for a reload and a link to it; after the reset on a new game, which would undo the move it goes to. A
     // game a link opens is there to look at: the analyst starts on the player's yes alone (D-89; Zoe and Federico).
@@ -332,7 +384,8 @@ export function App({ start }: { start: Settings; })
     );
     // The tab names the game and the move shown, as the cards name its players; between games, Chesspal alone.
     const titled = idle || served === undefined ? undefined : studiedSides(live.record.tags, served.profile.name, playedAs, text.sides, served.profile.accounts, othersOf(served.profiles, served.profile.id));
-    useTabTitle(titled === undefined ? undefined : tabTitle(titled.white.name, titled.black.name, at === 0 ? undefined : plies[at - 1]));
+    const lineNumbered = line === undefined ? undefined : linePlies(line, lineStartOf(plies, line.at, firstPosition));
+    useTabTitle(titled === undefined ? undefined : onTheLine ? tabTitle(titled.white.name, titled.black.name, lineNumbered?.[line.cursor - 1], true) : tabTitle(titled.white.name, titled.black.name, at === 0 ? undefined : plies[at - 1]));
 
     // The header's theme switch picks the other of the two the page shows, leaving the system's.
     const switchTheme = (): void => change({ ...settings, theme: document.documentElement.dataset.theme === "dark" ? "light" : "dark" });
@@ -421,7 +474,8 @@ export function App({ start }: { start: Settings; })
     const mood = moodAt(live.record, sides?.white.who === "ai" ? "white" : sides?.black.who === "ai" ? "black" : ai, at).mood;
     const playerToMove = going && live.position.turn === player;
     const ahead = (side: Side): number => side === "white" ? material.balance : -material.balance;
-    const reviewed = judged || at <= inBook ? plies[at - 1] : undefined;
+    // On a variation the AI's badges, notes and drawings say nothing: they are of the game's moves (D-116).
+    const reviewed = onTheLine ? undefined : judged || at <= inBook ? plies[at - 1] : undefined;
     // With the helps on, the coach's judgments of the player's last move, once the AI has answered it, and of one a held note let go only now (D-78, D-88).
     const judgments = going && settings.helps ? judgmentsOf(plies, player, coached ?? noCoach) : [];
     const review = reviewed?.review;
@@ -429,7 +483,7 @@ export function App({ start }: { start: Settings; })
     const drawn = hintOpen && hint !== undefined && viewing === undefined && (hint.arrows !== undefined || hint.squares !== undefined) ? hint : review;
     const drawnByCoach = hint !== undefined && drawn === hint;
     // The game over, when this is its last position: the kings' signs, on the board and in the legend.
-    const boardEnd: BoardEnd | undefined = ended && !aborted && viewing === undefined && pending === undefined ? { how, winner, player, fresh: justEnded } : undefined;
+    const boardEnd: BoardEnd | undefined = ended && !aborted && viewing === undefined && pending === undefined && !onTheLine ? { how, winner, player, fresh: justEnded } : undefined;
     // The legend has the marks the board shows: none of the helps' or the drawings while the board is bare (D-99).
     const shownBare = bare && helps !== undefined;
     const legendRows = legendOf({
@@ -538,7 +592,7 @@ export function App({ start }: { start: Settings; })
         setSelected(undefined);
         setRefusal(undefined);
 
-        if (piece === undefined && promotes(pieces.get(from), to)) {
+        if (piece === undefined && promotes(piecesOnBoard.get(from), to)) {
             setPromoting({ from, to });
             return;
         }
@@ -560,9 +614,41 @@ export function App({ start }: { start: Settings; })
         });
     };
 
-    // A move the board refuses says why, without the AI (D-18), unless the player turned it off: the piece goes back, the reason over it.
+    // In analysis the player moves from the position shown, White's pieces and Black's, and a variation grows (D-116); the game's own next move only steps
+    // forward through it. The move sounds as the board stands after it.
+    const explore = (from: string, to: string, piece?: Promotion): void => {
+        setSelected(undefined);
+        setRefusal(undefined);
+
+        if (piece === undefined && promotes(piecesOf(shown.position.fen).get(from), to)) {
+            setPromoting({ from, to });
+            return;
+        }
+
+        setPromoting(undefined);
+        const move = shown.legalMoves(from as Square).find((legal) => legal.to === to && legal.promotion === piece);
+
+        if (move === undefined) {
+            return;
+        }
+
+        const after = afterMove(line, live.record.moves.map(({ san }) => san), at, move.san);
+        setLine(after.line);
+        setViewing(after.shown >= total ? undefined : after.shown);
+        const played = new Game(shown.record);
+        const moveSound = played.play(move.san).played && sound ? soundOf(played) : undefined;
+
+        if (moveSound !== undefined) {
+            playSound(moveSound);
+        }
+    };
+
+    // A move the board refuses says why, without the AI (D-18), unless the player turned it off: the piece goes back, the reason over it. In analysis, from
+    // the position shown.
     const refuse = (from: string, to: string): void => {
-        const illegal = settings.explain ? live.whyNot(from as Square, to as Square) : undefined;
+        const board = analysing ? shown : live;
+        const pieces = analysing ? piecesOf(shown.position.fen) : piecesOnBoard;
+        const illegal = settings.explain ? board.whyNot(from as Square, to as Square) : undefined;
 
         if (illegal !== undefined) {
             const letterOn = (square: string): PieceLetter => pieces.get(square)!.toUpperCase() as PieceLetter;
@@ -617,6 +703,11 @@ export function App({ start }: { start: Settings; })
                 text={text}
             />
         );
+
+    // The variation as the column and the steps show it.
+    const lineView: LineView | undefined = !analysing || line === undefined || lineNumbered === undefined
+        ? undefined
+        : { plies: lineNumbered, at: line.at, cursor: line.cursor, onShow: showLine, onClose: closeLine, onBack: () => goTo(line.at) };
 
     // A game brought to analyse: the page shows it once the server has it in analysis; a refusal stays in the dialog. One the AI has to go over, with no
     // chat at the table, opens the chat's window: the analyst works with the chat's model (D-109).
@@ -734,9 +825,9 @@ export function App({ start }: { start: Settings; })
                                         {asleepNote}
                                         <AiNote
                                             {...(reviewed === undefined ? {} : { ply: reviewed })}
-                                            {...(shownOpening === undefined ? {} : { opening: shownOpening })}
-                                            {...(at === total && closing !== undefined ? { closing } : {})}
-                                            {...(at === 0 && summary !== undefined ? { summary } : {})}
+                                            {...(shownOpening === undefined || onTheLine ? {} : { opening: shownOpening })}
+                                            {...(at === total && closing !== undefined && !onTheLine ? { closing } : {})}
+                                            {...(at === 0 && summary !== undefined && !onTheLine ? { summary } : {})}
                                             {...(reviewing ? { reviewing: true } : {})}
                                             {...(count === undefined ? {} : { count })}
                                             {...(completeIt === undefined ? {} : { onComplete: completeIt })}
@@ -833,7 +924,8 @@ export function App({ start }: { start: Settings; })
                     </div>
                     <div
                         // Between games the board goes off (D-77): a game the page saw end once its effects are over, its final position less off than the table set.
-                        class={between && !justEnded ? "board-wrap off" : "board-wrap"}
+                        // A variation rings the board in the accent (D-116).
+                        class={between && !justEnded ? "board-wrap off" : onTheLine ? "board-wrap variation" : "board-wrap"}
                         onWheel={wheel}
                         // A press on the board while the player looks back brings the game as it is: the next one plays.
                         onPointerDownCapture={viewing === undefined || studied !== undefined ? undefined : (event) => event.button === 0 && goTo(total)}
@@ -852,16 +944,22 @@ export function App({ start }: { start: Settings; })
                             jumped={jumped}
                             check={shown.position.check}
                             end={boardEnd}
-                            player={playerToMove && pending === undefined && viewing === undefined ? player : undefined}
+                            player={analysing ? (shown.outcome.over ? undefined : shown.position.turn) : playerToMove && pending === undefined && viewing === undefined ? player : undefined}
                             selected={selected}
-                            targets={selected === undefined || viewing !== undefined ? [] : live.legalMoves(selected as Square)}
+                            targets={selected === undefined ? [] : analysing ? shown.legalMoves(selected as Square) : viewing !== undefined ? [] : live.legalMoves(selected as Square)}
                             dots={settings.dots}
                             names={settings.squareNames}
-                            notice={viewing !== undefined ? undefined : refusal ?? (linkIgnored === undefined ? undefined : { text: text.link[linkIgnored] })}
-                            promotion={promoting === undefined || viewing !== undefined || !playerToMove ? undefined : { ...promoting, side: player }}
-                            onPromote={(piece) => piece === undefined ? setPromoting(undefined) : play(promoting!.from, promoting!.to, piece)}
+                            notice={viewing !== undefined && !analysing ? undefined : refusal ?? (linkIgnored === undefined ? undefined : { text: text.link[linkIgnored] })}
+                            promotion={promoting === undefined
+                                ? undefined
+                                : analysing
+                                ? { ...promoting, side: shown.position.turn }
+                                : viewing !== undefined || !playerToMove
+                                ? undefined
+                                : { ...promoting, side: player }}
+                            onPromote={(piece) => piece === undefined ? setPromoting(undefined) : (analysing ? explore : play)(promoting!.from, promoting!.to, piece)}
                             onSelect={select}
-                            onMove={play}
+                            onMove={analysing ? explore : play}
                             onRefuse={refuse}
                             text={text}
                         />
@@ -881,7 +979,7 @@ export function App({ start }: { start: Settings; })
                     }
                     {studied === undefined ? null : (
                         <div class="board-steps">
-                            <Steps shown={at} total={total} onStep={step} text={text} />
+                            <Steps shown={at} total={total} {...stepsLine(lineView, plies)} onStep={step} text={text} />
                             {standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={at} onShow={goTo} text={text} />}
                         </div>
                     )}
@@ -932,6 +1030,7 @@ export function App({ start }: { start: Settings; })
                             },
                         })}
                         shownPlies={at}
+                        {...(lineView === undefined ? {} : { line: lineView })}
                         onShow={goTo}
                         onStep={step}
                         {...(studied === undefined ? {} : { onDownload: () => download(studied.pgn, pgnName(live.record.tags, "analysis")) })}
@@ -1054,6 +1153,13 @@ function withMove(game: Game, move: string): Game
 {
     const copy = new Game(game.record);
     return copy.play(move).played ? copy : game;
+}
+
+/** Where a variation that leaves the game after `at` moves starts its numbers: after the game's move there, or from the game's first position. */
+function lineStartOf(plies: readonly Ply[], at: number, first: { moveNumber: number; turn: Side; }): { moveNumber: number; turn: Side; }
+{
+    const fork = plies[at - 1];
+    return fork === undefined ? first : fork.side === "white" ? { moveNumber: fork.number, turn: "black" } : { moveNumber: fork.number + 1, turn: "white" };
 }
 
 /** Whether a pawn's move takes it to the last rank, where the player chooses what it becomes. */

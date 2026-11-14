@@ -9,7 +9,7 @@ import type { Text } from "../text.ts";
 import type { Step } from "./browse.ts";
 import { FoldButton, useCardFold } from "./card-fold.tsx";
 import type { HowEnded } from "./ending.ts";
-import { MoveList, Steps } from "./move-list.tsx";
+import { type LineView, MoveList, Steps, stepsLine } from "./move-list.tsx";
 import type { Ply, ReviewCount } from "./plies.ts";
 import { ResultTile } from "./result-tile.tsx";
 import { ReviewProgress } from "./review-progress.tsx";
@@ -18,7 +18,7 @@ import { ReviewProgress } from "./review-progress.tsx";
  * The column, which the player folds with its tab; under the board, where three columns would leave the board small, always open. A game in analysis
  * (D-69) says above the moves that the AI is going over it, until its word on the whole game comes, which the talk shows.
  */
-export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, outOfBook, helps, legend, standings, analysis, shownPlies, onShow, onStep, onDownload, onSaveMoves, onAnalyse, text }: {
+export function GameColumn({ plies, result, how, lit, started, move, toMove, opening, outOfBook, helps, legend, standings, analysis, shownPlies, line, onShow, onStep, onDownload, onSaveMoves, onAnalyse, text }: {
     plies: readonly Ply[];
     result?: string;
     how?: HowEnded;
@@ -39,6 +39,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     /** The game in analysis: who reviews it, their word on the whole game once written, whether an AI is going over it now, or else what completes it. */
     analysis?: { by: string; summary?: string; reviewing?: true; count?: ReviewCount; onComplete?: () => void; };
     shownPlies: number;
+    /** The variation the player plays in analysis (D-116), under the move it leaves from. */
+    line?: LineView;
     onShow: (plies: number) => void;
     onStep: (step: Step) => void;
     /** In analysis: saves the game with its review as a PGN. */
@@ -88,7 +90,7 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                         </div>
                         {/* The moves, then the saves and the analysis, over the buttons that step through them (Stefano). */}
                         <div class="side-foot">
-                            {result !== undefined && plies.length === 0 ? null : <MoveList plies={plies} result={result} shown={shownPlies} onShow={onShow} tools={legend} text={text} />}
+                            {result !== undefined && plies.length === 0 ? null : <MoveList plies={plies} result={result} shown={shownPlies} {...(line === undefined ? {} : { line })} onShow={onShow} tools={legend} text={text} />}
                             {onDownload === undefined && onSaveMoves === undefined ? null : (
                                 <div class="card analysis-actions">
                                     {onDownload === undefined ? null : <SaveButton label={text.study.download} hint={text.study.downloadHint} onSave={onDownload} />}
@@ -96,7 +98,7 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                                 </div>
                             )}
                             {onAnalyse === undefined ? null : <AnalyseButton label={text.study.analyseIt} onAnalyse={onAnalyse} />}
-                            <Steps shown={shownPlies} total={plies.length} onStep={onStep} text={text} />
+                            <Steps shown={shownPlies} total={plies.length} {...stepsLine(line, plies)} onStep={onStep} text={text} />
                         </div>
                     </>
                 )}

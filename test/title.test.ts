@@ -7,6 +7,10 @@ describe("the tab's title", () => {
         expect(tabTitle("Stefano", "Claude", { san: "exd8=Q+", side: "black", number: 40 })).toBe("Stefano – Claude, 40... exd8=♛+");
     });
 
+    it("puts the fork before a move of a variation", () => {
+        expect(tabTitle("Stefano", "Claude", { san: "Nxe5", side: "white", number: 13 }, true)).toBe("Stefano – Claude, ⑂ 13. ♞xe5");
+    });
+
     it("names the players alone before the first move", () => {
         expect(tabTitle("Stefano", "Claude", undefined)).toBe("Stefano – Claude");
     });

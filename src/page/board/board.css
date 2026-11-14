@@ -960,3 +960,9 @@
         transition: opacity 400ms ease, --kept 400ms ease;
     }
 }
+
+/* A variation in analysis rings the board in the accent, just outside its edge, on the page, where every skin leaves it in sight: nothing else changes (D-116) */
+.board-wrap.variation > .board {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+}

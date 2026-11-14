@@ -3,11 +3,14 @@ import { useEffect } from "preact/hooks";
 import { figurinesOf } from "../../core/index.ts";
 import type { Ply } from "../game/plies.ts";
 
-/** The title of a game: its players by their first names, White first, so that the move fits in a tab (Zoe), and the move shown with its number, none before the first. */
-export function tabTitle(white: string, black: string, shown: Ply | undefined): string
+/**
+ * The title of a game: its players by their first names, White first, so that the move fits in a tab (Zoe), and the move shown with its number, none before
+ * the first; a move of a variation in analysis after its fork, ⑂ (D-116).
+ */
+export function tabTitle(white: string, black: string, shown: Pick<Ply, "san" | "side" | "number"> | undefined, line = false): string
 {
     const players = `${firstName(white)} – ${firstName(black)}`;
-    return shown === undefined ? players : `${players}, ${shown.number}${shown.side === "white" ? "." : "..."} ${figurinesOf(shown.san)}`;
+    return shown === undefined ? players : `${players}, ${line ? "⑂ " : ""}${shown.number}${shown.side === "white" ? "." : "..."} ${figurinesOf(shown.san)}`;
 }
 
 /** Keeps the tab's title, Chesspal's name while no game shows. */

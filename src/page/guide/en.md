@@ -53,6 +53,7 @@ No chess engine plays for the AI: every move and every judgment is its own. Ches
 ![The bar that steps through the moves, and the judgments on the moves](analysis)
 
 - When the game is over, press **Analyse the game**: the AI goes over it and puts its judgments and notes on the moves. Read them by stepping through the moves with the arrows at the foot of the column, or by clicking a move.
+- In analysis, **move the pieces**, White's and Black's, from any move: a variation starts, with a coloured edge round the board. Click a move of the game to go back to it; the ✕, or Esc, closes the variation.
 - **Analyses**, in the header, opens your analyses, and loads a game played elsewhere: paste its PGN, or choose a .pgn file.
 - With your names on Lichess and Chess.com in your profile, **Load a game** lists your latest games there: click one to analyse it.
 - Ask the AI about the game in the box under its name.

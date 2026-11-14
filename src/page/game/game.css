@@ -504,7 +504,7 @@
     font-weight: 600;
 }
 
-.moves li:nth-child(even) {
+.moves li:nth-child(even of :not(.line)) {
     background: var(--page);
 }
 
@@ -555,6 +555,97 @@
     box-shadow: 0 0 0 1.5px var(--card);
 }
 
+/* A variation in analysis (D-116): one row under the move it leaves from, indented, an accent edge on its left, its moves wrapping; the move it leaves
+   from underlined in the accent while the board shows the line */
+.moves li.line {
+    display: flex;
+    align-items: flex-start;
+    gap: 2px;
+    margin: 2px 0 2px 24px;
+    padding: 2px 2px 2px 8px;
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    background: color-mix(in oklab, var(--accent) 8%, var(--card));
+    font-size: 13px;
+}
+
+.line-moves {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px 2px;
+}
+
+.moves .line .ply {
+    margin-left: 0;
+    padding: 1px 4px;
+}
+
+.line-number {
+    color: var(--soft);
+    margin-right: 1px;
+}
+
+.moves .line .current .line-number {
+    color: #4d5866;
+}
+
+.moves .ply.fork {
+    box-shadow: inset 0 -2px 0 var(--accent);
+    border-radius: 5px 5px 0 0;
+}
+
+/* Back on the game the line fades, its moves still a click away */
+.moves li.line.faded {
+    opacity: 0.55;
+}
+
+.moves li.line.faded:hover,
+.moves li.line.faded:focus-within {
+    opacity: 0.85;
+}
+
+/* The cross that closes it, at the row's end; a finger's 32 pixels on a touch screen */
+.close-line {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--soft);
+    cursor: pointer;
+}
+
+.close-line:hover {
+    background: color-mix(in oklab, var(--ink) 9%, transparent);
+    color: var(--ink);
+}
+
+.close-line .icon {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2.2;
+}
+
+@media (pointer: coarse) {
+    .close-line {
+        width: 32px;
+        height: 32px;
+        margin-block: -4px;
+    }
+}
+
+@media (max-width: 479px) {
+    .moves li.line {
+        margin-left: 12px;
+        padding-left: 6px;
+    }
+}
+
 /* The buttons that step through the moves, under them as on Lichess and chess.com */
 .steps {
     display: flex;
@@ -589,6 +680,35 @@
     width: 20px;
     height: 20px;
     stroke-width: 2;
+}
+
+/* On a variation, the fork with the move it leaves from, in the accent: it takes the board back to the game */
+.steps .fork-back {
+    flex: 1.6;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 4px 6px;
+    border-color: var(--accent);
+    color: var(--accent);
+    font: inherit;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.steps .fork-back:hover {
+    border-color: var(--accent);
+}
+
+.steps .fork-back span {
+    color: var(--ink);
+}
+
+.steps .fork-icon {
+    width: 16px;
+    height: 16px;
+    flex: none;
 }
 
 /* A piece in a move: the set's small one, White's white and Black's black, edged so either shows on either theme */

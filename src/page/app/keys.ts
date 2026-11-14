@@ -1,5 +1,5 @@
 // The page's keys and wheel: [ and ] fold the side columns, M holds the helps' map (D-78), ? opens the legend (D-99), the arrows, Home and End step
-// through the moves and f and x turn the board, and the wheel over the board steps too.
+// through the moves and f and x turn the board, Esc closes a variation, and the wheel over the board steps too.
 import { useEffect, useRef } from "preact/hooks";
 import { flipKeys, type Step, stepKeys } from "../game/browse.ts";
 import { type Column, foldKeys, gameUnderBoard, oneColumn } from "../layout/folds.ts";
@@ -101,6 +101,25 @@ export function useBrowseKeys(step: (to: Step) => void, flip: () => void): void
                 flip();
             } else {
                 step(to);
+            }
+        };
+
+        window.addEventListener("keydown", press);
+        return () => window.removeEventListener("keydown", press);
+    });
+}
+
+/** Esc closes what `close` closes, a variation in analysis (D-116), when nothing else on the page takes it: none while it is undefined. */
+export function useEscapeKey(close: (() => void) | undefined): void
+{
+    useEffect(() => {
+        if (close === undefined) {
+            return;
+        }
+
+        const press = (event: KeyboardEvent): void => {
+            if (event.key === "Escape" && forThePage(event)) {
+                close();
             }
         };
 
