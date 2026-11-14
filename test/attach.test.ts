@@ -698,6 +698,13 @@ describe("a new game at the table that wants a clean chat", () => {
             expect(loadGame(gameFolder(home))?.started).toBe(played);
             expect(await gameShown(table.url)).not.toHaveProperty("table.waiting");
             expect(relaunched).toEqual([]);
+
+            // A position replayed from analysis is a new game like any other (D-57).
+            const replay = { ai_colour: "black", from: "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2" };
+            const replayed = await sent(new URL("/api/new", table.url), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(replay) });
+            expect(replayed.status).toBe(409);
+            expect(JSON.parse(replayed.text)).toMatchObject({ refusal: "clear-chat" });
+            expect(loadGame(gameFolder(home))?.started).toBe(played);
         } finally {
             restore("CHESSPAL_HOME", before);
         }

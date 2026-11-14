@@ -62,6 +62,9 @@ export interface Text
     readonly moves: string;
     /** The buttons that step through the moves. */
     readonly steps: Readonly<Record<Step, string>>;
+    /** In analysis, beside the steps, what opens the new game's dialog on the position shown, and its tooltip; the dialog's title then. */
+    readonly replay: string;
+    readonly replayHint: string;
     /**
      * A variation in analysis (D-116), named only in tooltips: the line, what closes it, and what takes the board back to the game at the move it leaves from;
      * the button that asks the AI to analyse it, the words it sends for the player, and the mark in the talk that puts it back on the board.
@@ -428,6 +431,9 @@ export interface StartText
     readonly noClock: string;
     /** Above the button, while a game goes on. */
     readonly abandons: string;
+    /** Under the colour the player takes in a game replayed from analysis: the move that led to the position, after these words, or the game's first. */
+    readonly fromAfter: string;
+    readonly fromFirst: string;
     readonly start: string;
 }
 
@@ -647,6 +653,8 @@ const english: Text = {
     game: "The game",
     moves: "Moves",
     steps: { first: "Start", back: "Previous move", forward: "Next move", last: "Back to the game" },
+    replay: "Replay from here",
+    replayHint: "Replay from here: a new game against the AI from the position on the board",
     variation: {
         line: "Variation",
         close: "Close the variation (Esc)",
@@ -882,6 +890,8 @@ const english: Text = {
         clockNote: "minutes each + seconds a move",
         noClock: "None",
         abandons: "The game going on goes to the archive unfinished.",
+        fromAfter: "from the position after",
+        fromFirst: "from the game's first position",
         start: "Start",
     },
     study: {
@@ -1103,6 +1113,8 @@ const italian: Text = {
     game: "La partita",
     moves: "Mosse",
     steps: { first: "Inizio", back: "Mossa precedente", forward: "Mossa successiva", last: "Torna alla partita" },
+    replay: "Rigioca da qui",
+    replayHint: "Rigioca da qui: una partita nuova contro l'AI dalla posizione sulla scacchiera",
     variation: {
         line: "Variante",
         close: "Chiudi la variante (Esc)",
@@ -1340,6 +1352,8 @@ const italian: Text = {
         clockNote: "minuti a testa + secondi a mossa",
         noClock: "Senza",
         abandons: "La partita in corso va nell'archivio, non finita.",
+        fromAfter: "dalla posizione dopo",
+        fromFirst: "dalla prima posizione della partita",
         start: "Inizia",
     },
     study: {

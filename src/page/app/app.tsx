@@ -33,7 +33,7 @@ import { Board, type BoardEnd, type Notice } from "../board/board.tsx";
 import { explain } from "../board/explain.ts";
 import { kingSigns } from "../board/signs.ts";
 import { piecesOf } from "../board/squares.ts";
-import { type NewGameChoice, NewGameDialog } from "../dialogs/new-game.tsx";
+import { type NewGameChoice, NewGameDialog, type StartingPosition } from "../dialogs/new-game.tsx";
 import { NameButton, ProfileDialog, ProfilesDialog, Wizard } from "../dialogs/profiles.tsx";
 import { SettingsPanel } from "../dialogs/settings.tsx";
 import { othersOf, playerIn, type StudiedSide, studiedSides } from "../dialogs/studied.ts";
@@ -116,12 +116,18 @@ export function App({ start }: { start: Settings; })
     // The chat's window opened for an analysis asks who reviews the game, not whom the player plays (Rosa, Zoe).
     const [chatToReview, setChatToReview] = useState(false);
 
-    const askNewGame = (): void => {
+    // The position a game replayed from analysis starts from, which the new game's window shows; none for a new game from the start.
+    const [replayFrom, setReplayFrom] = useState<StartingPosition | undefined>(undefined);
+
+    const openNewGame = (from: StartingPosition | undefined): void => {
         const first = chatMissing();
+        setReplayFrom(from);
         setChatFirst(first);
         setChatToReview(false);
         setDialog(first ? "chat" : "new-game");
     };
+
+    const askNewGame = (): void => openNewGame(undefined);
 
     // In analysis the chat is who answers on the game: its window asks who reviews it.
     const askChat = (): void => {
@@ -700,9 +706,23 @@ export function App({ start }: { start: Settings; })
     const lastClock = lastControl === undefined ? undefined : timeControlText(lastControl);
     const choice: NewGameChoice = { colour: player, level, ...(lastClock === undefined ? {} : { clock: lastClock }) };
 
+    // A game replayed from analysis starts from the position shown, the player with the side to move there: a game, no longer the analysis.
     const startNewGame = ({ colour, level: chosen, clock: control }: NewGameChoice): void => {
         setDialog(undefined);
-        act("/api/new", { ai_colour: colour === "random" ? "random" : colour === "white" ? "black" : "white", level: chosen, ...(control === undefined ? {} : { clock: control }) });
+        setReplayFrom(undefined);
+        act("/api/new", {
+            ai_colour: colour === "random" ? "random" : colour === "white" ? "black" : "white",
+            level: chosen,
+            ...(control === undefined ? {} : { clock: control }),
+            ...(replayFrom === undefined ? {} : { from: replayFrom.fen }),
+        });
+    };
+
+    // In analysis the + by the steps opens the new game's window on the position shown, of the game or of the variation (Stefano): never one already over.
+    const shownAfter = onTheLine ? lineNumbered?.[line.cursor - 1] : at === 0 ? undefined : plies[at - 1];
+    const replay = !analysing ? undefined : {
+        off: shown.outcome.over,
+        onReplay: () => openNewGame({ fen: shown.position.fen, turn: shown.position.turn, ...(shownAfter === undefined ? {} : { after: shownAfter }) }),
     };
 
     // In analysis a badge's count shows the side's next move with it, the first again after the last (Stefano).
@@ -787,7 +807,7 @@ export function App({ start }: { start: Settings; })
                     text={text}
                 />
                 {table === undefined ? null : <ChatDialog open={dialog === "chat"} review={chatToReview} table={table} settings={settings} onChange={change} name={name} onStarted={chatStarted} onClose={closeChat} text={text} />}
-                <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
+                <NewGameDialog open={dialog === "new-game"} choice={choice} from={replayFrom} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
                 {guide}
                 <StudyDialog
                     open={dialog === "study"}
@@ -1026,7 +1046,7 @@ export function App({ start }: { start: Settings; })
                     }
                     {studied === undefined ? null : (
                         <div class="board-steps">
-                            <Steps shown={at} total={total} {...stepsLine(lineView, plies)} onStep={step} text={text} />
+                            <Steps shown={at} total={total} {...stepsLine(lineView, plies)} replay={replay} onStep={step} text={text} />
                             {standings === undefined ? null : <LeadChart plies={plies} standings={standings} shown={at} onShow={goTo} text={text} />}
                         </div>
                     )}
@@ -1079,6 +1099,7 @@ export function App({ start }: { start: Settings; })
                         })}
                         shownPlies={at}
                         {...(lineView === undefined ? {} : { line: lineView })}
+                        {...(replay === undefined ? {} : { replay })}
                         onShow={goTo}
                         onStep={step}
                         {...(studied === undefined ? {} : { onDownload: () => download(studied.pgn, pgnName(live.record.tags, "analysis")) })}

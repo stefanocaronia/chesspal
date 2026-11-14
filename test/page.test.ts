@@ -634,6 +634,29 @@ describe("the player's moves on the page", () => {
         expect(await post(page, "/api/new", { clock: "forever" })).toMatchObject({ status: 409, body: expect.stringContaining("is not a time control") });
     });
 
+    it("replays a position of the game in analysis as a new game, the player with the side to move there: a game, no longer the analysis", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const after = "r1bqkbnr/pppp1ppp/2n5/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR w KQkq - 2 3";
+
+        await run(folder, "analyse_game", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0' });
+        expect(await post(page, "/api/new", { ai_colour: "black", level: "club", clock: "10+5", from: after })).toMatchObject({ status: 200, body: '{"started":true}' });
+        const served = JSON.parse((await get(page, "/api/game")).body);
+        expect(served.analysis).toBeUndefined();
+        expect(served.game).toMatchObject({ ai: "black", clock: { control: { base: 600_000, increment: 5_000 } } });
+        expect(served.game.pgn).toContain(`[FEN "${after}"]`);
+        expect(served.game.pgn).toContain('[AILevel "club"]');
+        expect(served.game.pgn).not.toContain("Qh5");
+        expect(served.game.pgn).not.toContain("Ann");
+
+        // A position already over, or no position at all, starts nothing; from must be a FEN or a PGN.
+        const mated = "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4";
+        expect(await post(page, "/api/new", { ai_colour: "white", from: mated })).toMatchObject({ status: 409, body: expect.stringContaining("already over") });
+        expect(await post(page, "/api/new", { ai_colour: "white", from: "not a position" })).toMatchObject({ status: 409, body: expect.stringContaining("from:") });
+        expect(await post(page, "/api/new", { ai_colour: "white", from: 42 })).toMatchObject({ status: 400, body: expect.stringContaining("no from for the standard position") });
+        expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain(after);
+    });
+
     it("offers a draw on the player's turn, answers the AI's, and resigns, ringing the chat (D-65)", async () => {
         const folder = playerFolder();
         const page = await open(folder);

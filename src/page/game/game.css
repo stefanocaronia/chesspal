@@ -740,6 +740,23 @@
     flex: none;
 }
 
+/* In analysis, last, the + that replays the position shown as a new game: in the accent, set apart from the steps by a line */
+.steps .replay {
+    flex: 0.8;
+    position: relative;
+    margin-left: 4px;
+    color: var(--accent);
+}
+
+.steps .replay::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: -5px;
+    border-left: 1px solid var(--line);
+}
+
 /* A piece in a move: the set's small one, White's white and Black's black, edged so either shows on either theme */
 .figurine {
     display: inline-block;

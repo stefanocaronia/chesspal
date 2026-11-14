@@ -1,7 +1,10 @@
-// The new game's dialog (D-48): the player's colour, the AI's level with what it sees there (D-61), and the clock.
+// The new game's dialog (D-48): the player's colour, the AI's level with what it sees there (D-61), and the clock; from a position of a game in analysis, the
+// colour to move there.
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { type AiLevel, aiLevels, type Side } from "../../core/index.ts";
+import { Figurines } from "../game/move-list.tsx";
+import { moveNumberOf } from "../game/variation.ts";
 import { Piece } from "../pieces/pieces.tsx";
 import type { Text } from "../text.ts";
 import { Dialog } from "./dialog.tsx";
@@ -14,13 +17,26 @@ export interface NewGameChoice
     readonly clock?: string;
 }
 
+/** The position a game replayed from analysis starts from: its FEN, the side to move there, which the player takes, and the move that led to it. */
+export interface StartingPosition
+{
+    readonly fen: string;
+    readonly turn: Side;
+    /** None at the game's first position. */
+    readonly after?: { readonly san: string; readonly side: Side; readonly number: number; };
+}
+
 /** The clocks offered: long enough for an AI that takes 10 to 30 seconds a move (D-13), with the seconds added at each move. */
 export const clocks: readonly string[] = ["10+5", "15+10", "30+20"];
 
-/** The dialog the + opens, with the choices of the game before; the game going on, if any, goes to the archive unfinished when the new one starts. */
-export function NewGameDialog({ open, choice, going, onStart, onClose, text }: {
+/**
+ * The dialog the + opens, with the choices of the game before; the game going on, if any, goes to the archive unfinished when the new one starts. From a
+ * position, the player plays the side to move there and chooses the rest.
+ */
+export function NewGameDialog({ open, choice, from, going, onStart, onClose, text }: {
     open: boolean;
     choice: NewGameChoice;
+    from?: StartingPosition | undefined;
     going: boolean;
     onStart: (choice: NewGameChoice) => void;
     onClose: () => void;
@@ -28,8 +44,8 @@ export function NewGameDialog({ open, choice, going, onStart, onClose, text }: {
 })
 {
     return (
-        <Dialog open={open} title={text.newGame} onClose={onClose} text={text}>
-            <NewGameForm choice={choice} going={going} onStart={onStart} text={text} />
+        <Dialog open={open} title={from === undefined ? text.newGame : text.replay} onClose={onClose} text={text}>
+            <NewGameForm choice={choice} from={from} going={going} onStart={onStart} text={text} />
         </Dialog>
     );
 }
@@ -63,7 +79,13 @@ function ClockIcon({ minutes }: { minutes?: number; })
 }
 
 /** The form, made again at each opening with the choices it starts from. */
-function NewGameForm({ choice, going, onStart, text }: { choice: NewGameChoice; going: boolean; onStart: (choice: NewGameChoice) => void; text: Text; })
+function NewGameForm({ choice, from, going, onStart, text }: {
+    choice: NewGameChoice;
+    from: StartingPosition | undefined;
+    going: boolean;
+    onStart: (choice: NewGameChoice) => void;
+    text: Text;
+})
 {
     const words = text.start;
     const [colour, setColour] = useState(choice.colour);
@@ -74,21 +96,25 @@ function NewGameForm({ choice, going, onStart, text }: { choice: NewGameChoice; 
 
     const start = (event: Event): void => {
         event.preventDefault();
-        onStart({ colour, level, ...(clock === undefined ? {} : { clock }) });
+        onStart({ colour: from?.turn ?? colour, level, ...(clock === undefined ? {} : { clock }) });
     };
 
     return (
         <form class="profile-form new-game" onSubmit={start}>
             <fieldset>
                 <legend>{words.colour}</legend>
-                <div class="row">
-                    {colours.map((id) => <Option key={id} group="colour" on={colour === id} onPick={() => setColour(id)} label={words.colours[id]} icon={colourIcons[id]} first={choice.colour === id} />)}
-                </div>
+                {from === undefined
+                    ? (
+                        <div class="row">
+                            {colours.map((id) => <Option key={id} group="colour" on={colour === id} onPick={() => setColour(id)} label={words.colours[id]} icon={colourIcons[id]} first={choice.colour === id} />)}
+                        </div>
+                    )
+                    : <FromPosition from={from} text={text} />}
             </fieldset>
             <fieldset>
                 <legend>{words.level}</legend>
                 <div class="levels">
-                    {aiLevels.map((id) => <Option key={id} group="level" on={level === id} onPick={() => setLevel(id)} label={words.levels[id][0]} note={words.levels[id][1]} />)}
+                    {aiLevels.map((id) => <Option key={id} group="level" on={level === id} onPick={() => setLevel(id)} label={words.levels[id][0]} note={words.levels[id][1]} first={from !== undefined && choice.level === id} />)}
                 </div>
                 <p class="sees" aria-live="polite">{words.levels[level][2]}</p>
             </fieldset>
@@ -104,6 +130,29 @@ function NewGameForm({ choice, going, onStart, text }: { choice: NewGameChoice; 
             {going ? <p class="note">{words.abandons}</p> : null}
             <button class="start" type="submit">{words.start}</button>
         </form>
+    );
+}
+
+/** The colour the player takes from the position, the side to move there, and the move that led to it: not a choice, so not a radio. */
+function FromPosition({ from: { turn, after }, text }: { from: StartingPosition; text: Text; })
+{
+    const words = text.start;
+
+    return (
+        <p class="from">
+            <Piece letter={turn === "white" ? "K" : "k"} small />
+            <span>
+                <b>{words.colours[turn]}</b>
+                <small>
+                    {after === undefined ? words.fromFirst : (
+                        <>
+                            {words.fromAfter} {moveNumberOf(after, true)}
+                            <Figurines san={after.san} side={after.side} />
+                        </>
+                    )}
+                </small>
+            </span>
+        </p>
     );
 }
 

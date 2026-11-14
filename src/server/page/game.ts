@@ -220,14 +220,14 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
 }
 
 /**
- * A new game from the page, with the sides, the level and the clock the player chose: the sides and the level they leave out are as in the game
- * before, and no clock means a game without one. One going on goes to the archive unfinished, and the doorbell tells the chat, unless the table starts
- * it again. A chat the table holds that must be clear for it, or that it started for the analysis, and is at work, has the game wait with the choices kept
+ * A new game from the page, with the sides, the level and the clock the player chose, and from the position of a game in analysis they replay: the
+ * sides and the level they leave out are as in the game before, and no clock means a game without one. One going on goes to the archive unfinished,
+ * and the doorbell tells the chat, unless the table starts it again. A chat the table holds that must be clear for it, or that it started for the analysis, and is at work, has the game wait with the choices kept
  * until it has ended its answer (D-107).
  */
 async function newGameFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
-    const asked = 'Send the new game as JSON: {"ai_colour": "black", "level": "club", "clock": "10+5"}, each one optional; no clock for a game without one.';
+    const asked = 'Send the new game as JSON: {"ai_colour": "black", "level": "club", "clock": "10+5", "from": "<FEN>"}, each one optional; no clock for a game without one, no from for the standard position.';
     const body = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;
     let relaunching = false;
     let chosen: NewGameChoices | undefined;
@@ -239,7 +239,7 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
 
     try {
         const before = loadGame(gameFolder(served.context.home()));
-        const input = newGame.input.safeParse({ ai_colour: body.ai_colour ?? before?.ai ?? "black", level: body.level, clock: body.clock, replace: true });
+        const input = newGame.input.safeParse({ ai_colour: body.ai_colour ?? before?.ai ?? "black", level: body.level, clock: body.clock, from: body.from, replace: true });
 
         if (!input.success) {
             send(response, 400, json, JSON.stringify({ error: asked }));

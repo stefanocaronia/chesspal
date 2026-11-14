@@ -114,14 +114,16 @@ export function MoveList({ plies, result, shown, line, onShow, tools, text }: {
 
 /**
  * The buttons that step through the moves: to the start, back, forward, and to the game as it is; each one off where it could not go. On a variation,
- * back and forward step through it, and the fork with the move it leaves from takes the board back to the game.
+ * back and forward step through it, and the fork with the move it leaves from takes the board back to the game. In analysis, last, the + that replays the
+ * position shown as a new game, off on a position already over.
  */
-export function Steps({ shown, total, line, fork, onStep, text }: {
+export function Steps({ shown, total, line, fork, replay, onStep, text }: {
     shown: number;
     total: number;
     line?: LineView;
     /** The game's move the variation leaves from, none from the start. */
     fork?: Ply;
+    replay?: Replay | undefined;
     onStep: (step: Step) => void;
     text: Text;
 })
@@ -143,8 +145,22 @@ export function Steps({ shown, total, line, fork, onStep, text }: {
             {button("forward", "M9.5 6L15.5 12L9.5 18", onTheLine ? line.cursor === line.plies.length : shown === total)}
             {button("last", "M17 6V18M7 6L13 12L7 18", !onTheLine && shown === total)}
             {onTheLine ? <ForkButton fork={fork} onBack={line.onBack} text={text} /> : null}
+            {replay === undefined ? null : (
+                <button type="button" class="replay" title={text.replayHint} aria-label={text.replay} disabled={replay.off} onClick={replay.onReplay}>
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 5V19M5 12H19" />
+                    </svg>
+                </button>
+            )}
         </nav>
     );
+}
+
+/** The new game from the position shown in analysis, beside the steps; off where that position is already over. */
+export interface Replay
+{
+    readonly off: boolean;
+    readonly onReplay: () => void;
 }
 
 /** The variation for the steps, with the game's move it leaves from. */

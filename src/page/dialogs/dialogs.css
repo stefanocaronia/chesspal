@@ -1411,6 +1411,36 @@ h3 + .switch {
     font-size: 13px;
 }
 
+/* From a position, the colour the player takes, as a chosen tile but no choice: the king, the colour, and the move that led there */
+.new-game .from {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 9px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: var(--page);
+}
+
+.new-game .from .piece {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    margin: -3px 0;
+}
+
+.new-game .from > span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.new-game .from small {
+    color: var(--soft);
+    font-size: 13px;
+}
+
 .new-game .levels {
     grid-auto-rows: 1fr;
 }
