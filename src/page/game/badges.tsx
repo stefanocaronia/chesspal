@@ -31,17 +31,26 @@ export function NoteIcon({ title }: { title?: string; })
     );
 }
 
-/** How many moves of one side carry each badge, from the best to the worst, those with none left out (D-69): the AI's badges counted, never judged. */
-export function BadgeCounts({ plies, side, names }: { plies: readonly Ply[]; side: Side; names: Readonly<Record<Badge, string>>; })
+/**
+ * How many moves of one side carry each badge, from the best to the worst, those with none left out (D-69): the AI's badges counted, never judged. Each
+ * count is a button that shows the side's next move with that badge, named by `go`'s label.
+ */
+export function BadgeCounts({ plies, side, names, go }: {
+    plies: readonly Ply[];
+    side: Side;
+    names: Readonly<Record<Badge, string>>;
+    go: { label: (name: string, count: number) => string; to: (badge: Badge) => void; };
+})
 {
     const counted = badges.map((badge) => [badge, plies.filter((ply) => ply.side === side && ply.review?.badge === badge).length] as const).filter(([, count]) => count > 0);
 
     return counted.length === 0 ? null : (
         <ul class="badge-counts">
             {counted.map(([badge, count]) => (
-                <li key={badge} title={names[badge]}>
-                    <BadgeIcon badge={badge} />
-                    <span class="visually-hidden">{names[badge]}:</span> {count}
+                <li key={badge}>
+                    <button type="button" title={go.label(names[badge], count)} aria-label={go.label(names[badge], count)} onClick={() => go.to(badge)}>
+                        <BadgeIcon badge={badge} /> {count}
+                    </button>
                 </li>
             ))}
         </ul>

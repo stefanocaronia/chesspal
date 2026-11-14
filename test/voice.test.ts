@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { hasVoice, hush, onReading, reading, skip, speak, spokenMoves } from "../src/page/talk/voice.ts";
+import { hasVoice, hush, onReading, reading, skip, speak, spokenMoves, talking } from "../src/page/talk/voice.ts";
 import { textFor } from "../src/page/text.ts";
 
 const italian = textFor(["it"]).saidMove;
@@ -121,10 +121,14 @@ describe("the bubble the voice reads", () => {
     });
 
     it("forgets what waits once hushed", () => {
+        expect(talking()).toBe(false);
         speak([{ key: "one", words: "One." }, { key: "two", words: "Two." }], voice);
+        expect(talking()).toBe(true);
         vi.advanceTimersByTime(150);
         start();
+        expect(talking()).toBe(true);
         hush();
+        expect(talking()).toBe(false);
         said[0]!.onend?.();
         vi.advanceTimersByTime(1000);
         expect(said).toHaveLength(1);

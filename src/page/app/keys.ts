@@ -1,8 +1,9 @@
 // The page's keys and wheel: [ and ] fold the side columns, M holds the helps' map (D-78), ? opens the legend (D-99), the arrows, Home and End step
-// through the moves and f and x turn the board, Esc closes a variation, and the wheel over the board steps too.
+// through the moves and f and x turn the board, Esc closes a variation, Esc and Space stop the voice, and the wheel over the board steps too.
 import { useEffect, useRef } from "preact/hooks";
 import { flipKeys, type Step, stepKeys } from "../game/browse.ts";
 import { type Column, foldKeys, gameUnderBoard, oneColumn } from "../layout/folds.ts";
+import { hush, talking } from "../talk/voice.ts";
 
 /**
  * `[` and `]` fold the talk and the game, as in editors with two side bars; never while the player types or drags a piece, nor in one column, nor the game
@@ -128,6 +129,40 @@ export function useEscapeKey(close: (() => void) | undefined): void
     });
 }
 
+/**
+ * Esc stops the voice reading the AI's words, with the bubbles waiting, and leaves the key to what else takes it, a dialog or a variation; Space too, while
+ * the voice reads, unless the player types or Space presses what has the focus.
+ */
+export function useHushKeys(): void
+{
+    useEffect(() => {
+        const press = (event: KeyboardEvent): void => {
+            if (!talking() || !hushes(event.key, focusOf(event))) {
+                return;
+            }
+
+            if (event.key === " ") {
+                event.preventDefault();
+            }
+
+            hush();
+        };
+
+        // Before the dialogs and the board see it, which may stop it going further.
+        window.addEventListener("keydown", press, true);
+        return () => window.removeEventListener("keydown", press, true);
+    }, []);
+}
+
+/** Where a key goes: a box the player types in, a control that Space presses, or the page. */
+export type KeyFocus = "typing" | "control" | "page";
+
+/** Whether a key stops the voice: Esc wherever it goes, Space only on the page itself. */
+export function hushes(key: string, focus: KeyFocus): boolean
+{
+    return key === "Escape" || (key === " " && focus === "page");
+}
+
 /** The mouse wheel over the board steps through the moves, as on Lichess: down forward, a step a notch, however finely a touchpad turns it. */
 export function useWheelSteps(step: (to: Step) => void): (event: WheelEvent) => void
 {
@@ -146,6 +181,21 @@ export function useWheelSteps(step: (to: Step) => void): (event: WheelEvent) => 
 
 // How far a wheel turns in one notch, in pixels.
 const notch = 100;
+
+/** Where a key goes: typed in a box, to a control or anything else with the focus, or to the page. */
+function focusOf(event: KeyboardEvent): KeyFocus
+{
+    const target = event.target as HTMLElement;
+
+    if (event.isComposing || target.closest("input, textarea, select, [contenteditable]") !== null) {
+        return "typing";
+    }
+
+    return target.matches(controls) ? "control" : "page";
+}
+
+// What Space presses, or scrolls, when it has the focus: buttons, links, the board's squares and anything else the focus reaches.
+const controls = "button, a[href], summary, label, [role], [tabindex]";
 
 /** Whether a key is the page's: not one the player types into a box or the settings, nor with a modifier, nor while a piece is in the air. */
 function forThePage(event: KeyboardEvent): boolean

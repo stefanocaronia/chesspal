@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isReviewed, readPgn } from "../src/core/index.ts";
 import { talkLimits } from "../src/games/index.ts";
-import { aiSpoke, aiWords, analysisTalk, judgmentsOf, playerWords, pliesOf, type Ply, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/game/plies.ts";
+import { aiSpoke, aiWords, analysisTalk, judgmentsOf, nextBadged, playerWords, pliesOf, type Ply, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/game/plies.ts";
 
 describe("the moves on the page", () => {
     it("number the moves of a game that starts with Black to move", () => {
@@ -102,6 +102,20 @@ describe("the moves on the page", () => {
         expect(analysisTalk(Array.from({ length: 12 }, (_, index) => on("study/a.pgn", `${index}`)), "study/a.pgn").map(({ text }) => text)).toEqual(
             ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
         );
+    });
+
+    it("go from a badge's count to the side's next move with it, the first again after the last", () => {
+        const [record] = readPgn("1. e4 {[%badge book]} e5 {[%badge mistake]} 2. Qh5 {[%badge mistake]} Nc6 {[%badge good]} 3. Bc4 {[%badge book]} Nf6 {[%badge blunder]} 4. Qxf7# *");
+        const plies = pliesOf(record!);
+
+        expect(nextBadged(plies, "white", "book", 0)).toBe(1);
+        expect(nextBadged(plies, "white", "book", 1)).toBe(5);
+        expect(nextBadged(plies, "white", "book", 5)).toBe(1);
+        expect(nextBadged(plies, "white", "book", 7)).toBe(1);
+        // A badge of the other side is not this one's.
+        expect(nextBadged(plies, "white", "mistake", 0)).toBe(3);
+        expect(nextBadged(plies, "black", "mistake", 2)).toBe(2);
+        expect(nextBadged(plies, "black", "brilliant", 0)).toBeUndefined();
     });
 
     it("hold the player's words to the server's limits", () => {

@@ -7,6 +7,7 @@ import {
     aiModelIn,
     aiNameOf,
     annotatorOf,
+    type Badge,
     closingOf,
     Game,
     gameReviewOf,
@@ -43,7 +44,7 @@ import { GameColumn } from "../game/column.tsx";
 import { howEnded, useDeclined, useJustEnded, useSawEnd } from "../game/ending.ts";
 import { type LineView, Steps, stepsLine } from "../game/move-list.tsx";
 import { useOpeningBook } from "../game/opening-book.ts";
-import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, type Ply, reviewCount, type SentVariation, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
+import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, nextBadged, playerSpent, playerWords, pliesOf, type Ply, reviewCount, type SentVariation, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
 import { afterMove, isJump, leaveLine, linePlies, lineRecord, onLine, type Place, stepLine, type Variation } from "../game/variation.ts";
 import { GuideDialog } from "../guide/guide.tsx";
 import { BareButton, HelpsCard, HintLine, MapButton } from "../helps/helps.tsx";
@@ -67,7 +68,7 @@ import { AiNameButton, ChatDialog, tableNote } from "../table/window.tsx";
 import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
 import { textFor } from "../text.ts";
 import { anchorName, type LinkIgnored, useAnchor } from "./anchor.ts";
-import { useBrowseKeys, useEscapeKey, useFoldKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
+import { useBrowseKeys, useEscapeKey, useFoldKeys, useHushKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
 import { helpsShown, phaseOf, verdictOf } from "./phase.ts";
 import { ask, type PageData, post, refusedText, sendMessage, sendMove, type Shown, useServed } from "./served.ts";
 import { tabTitle, useTabTitle } from "./title.ts";
@@ -223,7 +224,6 @@ export function App({ start }: { start: Settings; })
     const annotator = studied === undefined ? undefined : annotatorOf(live.record);
     const playedAs = studied === undefined ? name : aiNameOf(aiHostIn(live.record), aiModelIn(live.record)?.model) ?? text.ai;
     const analyst = annotator === undefined ? name : aiNameOf(annotator.annotator, annotator.annotator) ?? text.ai;
-    const material = useMemo(() => materialOf(live.position.fen), [live]);
     const piecesOnBoard = useMemo(() => piecesOf(live.position.fen), [live]);
     // How many of the game's first plies a line of the book reaches, as the server counts them (D-68).
     const bookPlies = studied !== undefined ? studied.book : game?.book ?? 0;
@@ -266,6 +266,8 @@ export function App({ start }: { start: Settings; })
     const past = useMemo(() => viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing) }), [live, viewing]);
     const lineGame = useMemo(() => onTheLine ? new Game(lineRecord(live.record, line)) : undefined, [live, onTheLine ? line : undefined]);
     const shown = useMemo(() => lineGame ?? past ?? (pending === undefined ? live : withMove(live, pending)), [live, pending, past, lineGame]);
+    // The pieces taken and the count of them are of the position on the board: a move looked back at, a variation, the move on its way (Stefano).
+    const material = useMemo(() => materialOf(shown.position.fen), [shown]);
     // The move after the position shown, which a step back slides home: the line's own on the line.
     const next = useMemo(
         () => onTheLine ? shown.legalMoves().find((move) => move.san === line.moves[line.cursor]) : viewing === undefined ? undefined : new Game({ tags: live.record.tags, moves: live.record.moves.slice(0, viewing + 1) }).lastMove,
@@ -356,6 +358,7 @@ export function App({ start }: { start: Settings; })
     };
 
     useBrowseKeys(step, () => setFlipped(!flipped));
+    useHushKeys();
 
     // A move of the variation shown: the board goes back on it, at the game's move it leaves from.
     const showLine = (cursor: number): void => {
@@ -702,6 +705,15 @@ export function App({ start }: { start: Settings; })
         act("/api/new", { ai_colour: colour === "random" ? "random" : colour === "white" ? "black" : "white", level: chosen, ...(control === undefined ? {} : { clock: control }) });
     };
 
+    // In analysis a badge's count shows the side's next move with it, the first again after the last (Stefano).
+    const goToBadged = (side: Side, badge: Badge): void => {
+        const to = nextBadged(plies, side, badge, at);
+
+        if (to !== undefined) {
+            goTo(to);
+        }
+    };
+
     // In analysis the AI's note goes with the other side's card and the talk with the player's, turned round with the board as in a game (D-101, Zoe).
     const studiedCard = (side: Side, place: "ai" | "you"): ComponentChildren =>
         sides === undefined ? null : (
@@ -713,7 +725,7 @@ export function App({ start }: { start: Settings; })
                 side={side}
                 taken={material.taken[side]}
                 ahead={ahead(side)}
-                badges={<BadgeCounts plies={plies} side={side} names={text.badges} />}
+                badges={<BadgeCounts plies={plies} side={side} names={text.badges} go={{ label: text.nextBadged, to: (badge) => goToBadged(side, badge) }} />}
                 text={text}
             />
         );

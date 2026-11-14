@@ -87,6 +87,8 @@ export interface Text
     /** A game the AI goes over with the player (D-69): what the header says, the badges it puts on the moves, and its word on the whole game. */
     readonly analysing: string;
     readonly badges: Readonly<Record<Badge, string>>;
+    /** A badge's count in a player's card, a button that shows the next of those moves. */
+    nextBadged(badge: string, count: number): string;
     reviewBy(name: string): string;
     /** What the colours the AI draws with a note mean (D-69). */
     readonly drawn: Readonly<Record<DrawColour, string>>;
@@ -673,6 +675,7 @@ const english: Text = {
         miss: "Miss",
         blunder: "Blunder",
     },
+    nextBadged: (badge, count) => `${badge}: ${count}. Show the next`,
     reviewBy: (name) => `${name}'s review`,
     drawn: { green: "better", red: "threat", yellow: "another way", blue: "plan" },
     lead: {
@@ -1128,6 +1131,7 @@ const italian: Text = {
         miss: "Occasione persa",
         blunder: "Errore grave",
     },
+    nextBadged: (badge, count) => `${badge}: ${count}. Mostra la prossima`,
     reviewBy: (name) => `Il giudizio di ${name}`,
     drawn: { green: "meglio", red: "minaccia", yellow: "altra via", blue: "piano" },
     lead: {

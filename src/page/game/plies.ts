@@ -186,3 +186,12 @@ export function reviewCount(plies: readonly Ply[]): ReviewCount
 {
     return { done: plies.filter((ply) => ply.lead !== undefined).length, total: plies.length };
 }
+
+/**
+ * How many moves show the next move of `side` with `badge` after the `at` shown: the first of them again after the last, none when no move carries it.
+ */
+export function nextBadged(plies: readonly Ply[], side: Side, badge: Badge, at: number): number | undefined
+{
+    const badged = plies.flatMap((ply, index) => ply.side === side && ply.review?.badge === badge ? [index + 1] : []);
+    return badged.find((shows) => shows > at) ?? badged[0];
+}

@@ -43,6 +43,12 @@ export function hush(): void
     }
 }
 
+/** Whether the voice reads a bubble or has some waiting. */
+export function talking(): boolean
+{
+    return current !== undefined || queue.length > 0;
+}
+
 /** The key of the bubble being read, from the moment the voice starts it to its end; none while nothing is read. */
 export function reading(): string | undefined
 {
