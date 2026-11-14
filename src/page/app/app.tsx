@@ -103,7 +103,7 @@ export function App({ start }: { start: Settings; })
 
     const [dialog, setDialog] = useState<"profile" | "profiles" | "new-game" | "chat" | "study" | "guide" | "update" | undefined>(undefined);
     const { data: served, problem, offline, reload } = useServed(() => setDialog("new-game"));
-    // Nuova partita with no chat at the table asks for one first (D-107): the chat's window, then the new game's, however the first closes.
+    // Nuova partita with no chat at the table asks for one first (D-107): the chat's window, then the new game's once a chat starts; closed without, neither.
     const [chatFirst, setChatFirst] = useState(false);
 
     // At the table with no chat, and none opening: what asks for the AI opens the chat's window first, to choose its host and model (D-107, D-109).
@@ -128,8 +128,13 @@ export function App({ start }: { start: Settings; })
         setDialog("chat");
     };
 
-    const closeChat = (): void => {
+    const chatStarted = (): void => {
         setDialog(chatFirst ? "new-game" : undefined);
+        setChatFirst(false);
+    };
+
+    const closeChat = (): void => {
+        setDialog(undefined);
         setChatFirst(false);
     };
 
@@ -767,7 +772,7 @@ export function App({ start }: { start: Settings; })
                     onClose={() => setDialog(undefined)}
                     text={text}
                 />
-                {table === undefined ? null : <ChatDialog open={dialog === "chat"} review={chatToReview} table={table} settings={settings} onChange={change} name={name} onClose={closeChat} text={text} />}
+                {table === undefined ? null : <ChatDialog open={dialog === "chat"} review={chatToReview} table={table} settings={settings} onChange={change} name={name} onStarted={chatStarted} onClose={closeChat} text={text} />}
                 <NewGameDialog open={dialog === "new-game"} choice={choice} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
                 {guide}
                 <StudyDialog

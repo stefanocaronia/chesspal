@@ -10,21 +10,25 @@ import type { Settings } from "../profile/settings.ts";
 import type { Text } from "../text.ts";
 import { canAct, chatAction, choiceKeys, chosen, effortsOf, firstHost, offeredHosts, startedWith } from "./action.ts";
 
-/** The chat's window: closed once a chat opens or starts again, the page then saying where it stands; `review` when it opened to have a game analysed. */
-export function ChatDialog({ open, review = false, table, settings, onChange, name, onClose, text }: {
+/**
+ * The chat's window: `onStarted` once a chat opens or starts again, the page then saying where it stands; `onClose` when the player closes it without;
+ * `review` when it opened to have a game analysed.
+ */
+export function ChatDialog({ open, review = false, table, settings, onChange, name, onStarted, onClose, text }: {
     open: boolean;
     review?: boolean;
     table: TableShown;
     settings: Settings;
     onChange: (settings: Settings) => void;
     name: string;
+    onStarted: () => void;
     onClose: () => void;
     text: Text;
 })
 {
     return (
         <Dialog open={open} title={review ? text.table.reviewTitle : text.table.title} onClose={onClose} text={text}>
-            <ChatForm review={review} table={table} settings={settings} onChange={onChange} name={name} onClose={onClose} text={text} />
+            <ChatForm review={review} table={table} settings={settings} onChange={onChange} name={name} onStarted={onStarted} text={text} />
         </Dialog>
     );
 }
@@ -112,13 +116,13 @@ const restartIcon = (
 );
 
 /** The window's form, made again at each opening with the host at the table selected, else the last the button used, else the first. */
-function ChatForm({ review, table, settings, onChange, name, onClose, text }: {
+function ChatForm({ review, table, settings, onChange, name, onStarted, text }: {
     review: boolean;
     table: TableShown;
     settings: Settings;
     onChange: (settings: Settings) => void;
     name: string;
-    onClose: () => void;
+    onStarted: () => void;
     text: Text;
 })
 {
@@ -153,7 +157,7 @@ function ChatForm({ review, table, settings, onChange, name, onClose, text }: {
 
         if (done) {
             onChange({ ...settings, chatHost: host.name });
-            onClose();
+            onStarted();
         } else {
             setFailed(true);
         }
