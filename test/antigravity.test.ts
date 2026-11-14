@@ -29,7 +29,7 @@ describe("Antigravity, the third host (D-115)", () => {
         const folder = scratch();
         const transcript = "C:/Users/ann/.gemini/antigravity-cli/brain/conv-1/.system_generated/logs/transcript_full.jsonl";
         const input = { conversationId: "conv-1", cwd: folder, hookEventName: "SessionStart", modelName: "gemini-3.8-flash-medium", transcriptPath: transcript };
-        await recordChatStart(Readable.from([JSON.stringify(input)]), join(folder, ".agents"), new Date("2026-11-14T10:00:00.000Z"));
+        await recordChatStart(Readable.from([JSON.stringify(input)]), join(folder, ".agents"), new Date("2026-11-14T10:00:00.000Z"), () => folder);
 
         expect(lastChatStart(folder)).toEqual({ source: "startup", at: "2026-11-14T10:00:00.000Z", session: "conv-1", transcript });
     });

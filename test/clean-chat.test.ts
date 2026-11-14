@@ -10,6 +10,8 @@ import { newGame } from "../src/commands/game/new.ts";
 import { status } from "../src/commands/game/status.ts";
 import type { Context } from "../src/commands/registry/context.ts";
 import { instructions } from "../src/commands/setup/instructions.ts";
+import { Game, readPgn } from "../src/core/index.ts";
+import { loadGame, saveGame } from "../src/games/index.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
 import { testContext } from "./commands.ts";
 
@@ -37,6 +39,18 @@ describe("a new game after one played in the chat (D-57)", () => {
 
         await chatStarted(context, "clear", after);
         expect(() => startAgain(context)).not.toThrow();
+    });
+
+    it("waits for the chat to be cleared again when it played the game at length after a /clear in the middle of it", async () => {
+        const context = chatWith("1. e4 e5 *");
+        await chatStarted(context, "clear", after);
+        playedOn(context, longGame);
+        expect(() => startAgain(context)).not.toThrow();
+
+        const again = chatWith("1. e4 e5 *");
+        await chatStarted(again, "clear", after);
+        playedOn(again, longGame.replace(" *", " 11. Nf1 Be6 *"));
+        expect(() => startAgain(again)).toThrow(/\/clear/);
     });
 
     it("waits for it in Codex too, whose hook notes how chats start", async () => {
@@ -79,10 +93,12 @@ describe("a new game after one played in the chat (D-57)", () => {
         expect(() => startAgain(context)).toThrow(/\/clear/);
     });
 
-    it("notes how the chat started from the hook's input, its session and its transcript", async () => {
+    it("notes how the chat started from the hook's input, its session and its transcript, and the game in progress then", async () => {
         const context = chatWith(longGame);
-        await recordChatStart(Readable.from([JSON.stringify({ source: "clear", session_id: "abc", transcript_path: "abc.jsonl", cwd: context.folder })]), context.folder, after);
-        expect(JSON.parse(readFileSync(join(context.folder, "chat.json"), "utf8"))).toEqual({ source: "clear", at: after.toISOString(), session: "abc", transcript: "abc.jsonl" });
+        const input = { source: "clear", session_id: "abc", transcript_path: "abc.jsonl", cwd: context.folder };
+        await recordChatStart(Readable.from([JSON.stringify(input)]), context.folder, after, context.home);
+        const game = { started: loadGame(gameFolder(context.home()))!.started, plies: 20 };
+        expect(JSON.parse(readFileSync(join(context.folder, "chat.json"), "utf8"))).toEqual({ source: "clear", at: after.toISOString(), session: "abc", transcript: "abc.jsonl", game });
     });
 });
 
@@ -190,7 +206,15 @@ function chatWith(pgn: string, host = "claude-code"): Context
 
 async function chatStarted(context: Context, source: string, at: Date): Promise<void>
 {
-    await recordChatStart(Readable.from([JSON.stringify({ source })]), context.folder, at);
+    await recordChatStart(Readable.from([JSON.stringify({ source })]), context.folder, at, context.home);
+}
+
+/** The game in progress goes on, in the chat, to the moves of a PGN that starts with its own. */
+function playedOn(context: Context, pgn: string): void
+{
+    const folder = gameFolder(context.home());
+    saveGame(folder, { ...loadGame(folder)!, game: new Game(readPgn(pgn)[0]) });
+    context.positionSeen = positionIn(folder);
 }
 
 function startAgain(context: Context): void

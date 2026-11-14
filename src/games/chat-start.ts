@@ -5,7 +5,8 @@ import { writeAtomically } from "./files.ts";
 
 /**
  * How a chat started, as the host's SessionStart hook says it: new, cleared, resumed or compacted; when, as an ISO date; its session, as the hooks have it;
- * and the file where the host writes the chat, where Claude Code tells which model made each tool call (D-81).
+ * the file where the host writes the chat, where Claude Code tells which model made each tool call (D-81); and the game in progress then, by its start,
+ * with the plies it had, which a chat cleared in the middle of it never saw.
  */
 export interface ChatStart
 {
@@ -13,6 +14,7 @@ export interface ChatStart
     readonly at: string;
     readonly session?: string;
     readonly transcript?: string;
+    readonly game?: { readonly started: string; readonly plies: number; };
 }
 
 /** Writes how the chat started, over the last one. */
@@ -36,6 +38,7 @@ export function lastChatStart(folder: string): ChatStart | undefined
             at: start.at,
             ...(typeof start.session === "string" ? { session: start.session } : {}),
             ...(typeof start.transcript === "string" ? { transcript: start.transcript } : {}),
+            ...(typeof start.game?.started === "string" && typeof start.game.plies === "number" ? { game: { started: start.game.started, plies: start.game.plies } } : {}),
         };
     } catch {
         return undefined;
@@ -46,6 +49,19 @@ export function lastChatStart(folder: string): ChatStart | undefined
 export function cleanSince(start: ChatStart | undefined, moment: string): boolean
 {
     return start !== undefined && (start.source === "startup" || start.source === "clear") && Date.parse(start.at) > Date.parse(moment);
+}
+
+/**
+ * How many plies of a game the chat holds: all of them, but in a chat started clean since the game began, those played after its start; none when the hook
+ * could not tell how many the game had then.
+ */
+export function pliesSinceClean(start: ChatStart | undefined, started: string, plies: number): number
+{
+    if (!cleanSince(start, started)) {
+        return plies;
+    }
+
+    return start?.game?.started === started ? Math.max(0, plies - start.game.plies) : 0;
 }
 
 const fileName = "chat.json";

@@ -2,7 +2,7 @@ import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../../core/index.ts";
-import { archivedName, archiveGame, archiveName, cleanSince, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, saveGame, startOfNewGame, withoutPlans } from "../../games/index.ts";
+import { archivedName, archiveGame, archiveName, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, pliesSinceClean, saveGame, startOfNewGame, withoutPlans } from "../../games/index.ts";
 import { hasDoorbell, hookedHosts } from "../../host-files/index.ts";
 import { gameFolder, gameFolders } from "../../profiles/index.ts";
 import { coachRuns, gameAt, type GameSummary, nextStep, openingTags, positionLines, refuseUnseenPosition, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "../answers/index.ts";
@@ -227,8 +227,9 @@ export const pliesBeforeClearing = 20;
 const fenPattern = /^[pnbrqkPNBRQK1-8]+(?:\/[pnbrqkPNBRQK1-8]+){7}(?:\s|$)/;
 
 /**
- * Whether the chat must be cleared first: the last game begun, in any profile, was played in it at some length, and the host says how chats start (the hook
- * of Claude Code, Codex and Antigravity). Another profile does not clear the chat (D-66), nor a game another chat played, which this one was never shown (D-71).
+ * Whether the chat must be cleared first: the last game begun, in any profile, was played in it at some length, since its last /clear too, and the host
+ * says how chats start (the hook of Claude Code, Codex and Antigravity). Another profile does not clear the chat (D-66), nor a game another chat played,
+ * which this one was never shown (D-71).
  */
 function chatToClear(context: Context): boolean
 {
@@ -239,7 +240,7 @@ function chatToClear(context: Context): boolean
     }
 
     const last = gameFolders(context.home()).flatMap((folder) => loadGame(folder) ?? []).sort((one, other) => Date.parse(other.started) - Date.parse(one.started))[0];
-    return last !== undefined && last.started === context.positionSeen?.started && last.game.record.moves.length >= pliesBeforeClearing && !cleanSince(start, last.started);
+    return last !== undefined && last.started === context.positionSeen?.started && pliesSinceClean(start, last.started, last.game.record.moves.length) >= pliesBeforeClearing;
 }
 
 /**
