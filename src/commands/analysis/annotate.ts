@@ -2,10 +2,10 @@
 // whole game, kept in the game's PGN for the board page. The judgment is the AI's alone: Chesspal gives no criteria (D-6, D-43).
 import { z } from "zod";
 import { annotatorOf, badges, figurinesOf, foreignMovesIn, Game, type GameRecord, gameReviewOf, type Lead, leadOf, reviewed, reviewOf, withAnnotator, withGameReview, withLead } from "../../core/index.ts";
-import { gameInAnalysis, rewriteGame, startAnalysis } from "../../games/index.ts";
+import { gameInAnalysis, rewriteGame, startAnalysis, stoppedAnalysis } from "../../games/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { analystOf, analystRuns, anotherAnalyst, arrowsInput, drawingsOf, leadFrom, moveIndex, moveNumbers, namedGame, noGameGoingOn, noteInput, squaresInput, type Studied } from "../answers/index.ts";
+import { analysisStopped, analystOf, analystRuns, anotherAnalyst, arrowsInput, drawingsOf, leadFrom, moveIndex, moveNumbers, namedGame, noGameGoingOn, noteInput, squaresInput, type Studied } from "../answers/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
 
 const summaryLimit = 1500;
@@ -84,6 +84,12 @@ export const annotateGame = defineCommand({
         }
 
         const folder = gameFolder(context.home());
+
+        // A review whose analysis the player stopped on the page is not written on, nor brought back to the page, by whoever was at it (Stefano).
+        if (stoppedAnalysis(folder)?.game === studied.name) {
+            throw new Error(analysisStopped(studied.name));
+        }
+
         const numbers = moveNumbers(studied.record);
         // Where the analyst reviews the games, the chat's notes are corrections it made with the player: the analyst, at work then or later, leaves those notes
         // and is told of them at each call, and the chat is not asked for the analyst's work (D-101, Priya). Only a call the host ties to the chat is its own.

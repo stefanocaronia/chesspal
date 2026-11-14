@@ -338,6 +338,7 @@
     color: var(--soft);
 }
 
+.review.waiting > p,
 .review.incomplete > p,
 .say.incomplete > p {
     display: flex;
@@ -629,8 +630,9 @@
     cursor: default;
 }
 
-/* The cross that closes it, at the row's end; a finger's 32 pixels on a touch screen */
-.close-line {
+/* The cross that closes it, at the row's end, as the one that stops the analysis asked; a finger's 32 pixels on a touch screen */
+.close-line,
+.stop-review {
     display: grid;
     place-items: center;
     width: 24px;
@@ -644,19 +646,22 @@
     cursor: pointer;
 }
 
-.close-line:hover {
+.close-line:hover,
+.stop-review:hover {
     background: color-mix(in oklab, var(--ink) 9%, transparent);
     color: var(--ink);
 }
 
-.close-line .icon {
+.close-line .icon,
+.stop-review .icon {
     width: 14px;
     height: 14px;
     stroke-width: 2.2;
 }
 
 @media (pointer: coarse) {
-    .close-line {
+    .close-line,
+    .stop-review {
         width: 32px;
         height: 32px;
         margin-block: -4px;

@@ -220,6 +220,60 @@ describe("the page's server", () => {
         expect(await statusOf(folder)).not.toContain("In analysis");
     });
 
+    it("cancels the analysis asked with nothing written: the page leaves it, the game stays listed, the chat is no longer asked to go over it", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const kept = "study/2026-11-02-153012.pgn";
+        const shown = async (): Promise<unknown> => JSON.parse((await get(page, "/api/game")).body).analysis;
+        await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' });
+        await page.chatCalls();
+        expect(await shown()).toMatchObject({ name: kept, reviewing: true });
+
+        expect(await post(page, "/api/stop-analysis", {})).toMatchObject({ status: 400 });
+        expect(await post(page, "/api/stop-analysis", { game: "study/2026-11-01-100000.pgn" })).toMatchObject({ status: 200, body: '{"stopped":false}' });
+        expect(await post(page, "/api/stop-analysis", { game: kept })).toMatchObject({ status: 200, body: '{"stopped":true}' });
+        expect(await shown()).toBeUndefined();
+        expect(gameInAnalysis(gameFolder(folder))).toBeUndefined();
+        expect(JSON.parse((await get(page, "/api/analyses")).body)).toEqual([expect.objectContaining({ name: kept, reviewed: false })]);
+        const told = await statusOf(folder);
+        expect(told).not.toContain(kept);
+        expect(told).not.toContain("analyse_game");
+
+        // «Analyse» again asks for it again.
+        await post(page, "/api/study", { game: kept });
+        expect(await statusOf(folder)).toContain(`The player brought ${kept} on the board page to analyse it.`);
+    });
+
+    it("cancels the analysis asked with part written: the review so far stays, and whoever was at it writes no more until it is asked again", async () => {
+        const folder = playerFolder();
+        const context = testContext(folder);
+        const page = await open(folder, undefined, context);
+        const kept = "study/2026-11-02-153012.pgn";
+        const analyst = { ...context, agent: "chesspal-analyst", agentRun: "analyst-1" };
+        await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' });
+        startAnalysis(gameFolder(context.home()), kept, context.now(), { brought: true, analyst: { game: kept, run: "analyst-1", since: context.now().toISOString() } });
+        await run(folder, "annotate_game", { game: kept, notes: [{ move: "2.", badge: "inaccuracy", note: "early queen" }] }, analyst);
+
+        expect(await post(page, "/api/stop-analysis", { game: kept })).toMatchObject({ body: '{"stopped":true}' });
+        expect(JSON.parse((await get(page, "/api/analyses")).body)).toEqual([expect.objectContaining({ name: kept, reviewed: false, begun: true })]);
+        expect(await statusOf(folder)).not.toContain(kept);
+
+        // The analyst at work, and the chat, are refused, and the page stays on the game over.
+        const stopped = `Stop now: the player stopped the analysis of ${kept} on the board page`;
+        await expect(run(folder, "annotate_game", { game: kept, summary: "A quiet start." }, analyst)).rejects.toThrow(stopped);
+        await expect(run(folder, "analyse_game", { game: kept }, analyst)).rejects.toThrow(stopped);
+        await expect(run(folder, "annotate_game", { game: kept, summary: "A quiet start." })).rejects.toThrow(stopped);
+        expect(gameInAnalysis(gameFolder(folder))).toBeUndefined();
+        expect(readFileSync(join(gameFolder(folder), kept), "utf8")).toContain("[%review early queen]");
+        expect(readFileSync(join(gameFolder(folder), kept), "utf8")).not.toContain("A quiet start.");
+
+        // Asked again, it is the review's again: the chat goes over it, and an analyst started for it writes.
+        await post(page, "/api/study", { game: kept });
+        await run(folder, "analyse_game", { game: kept }, { ...analyst, agentRun: "analyst-2" });
+        await run(folder, "annotate_game", { game: kept, summary: "A quiet start." }, { ...analyst, agentRun: "analyst-2" });
+        expect(readFileSync(join(gameFolder(folder), kept), "utf8")).toContain("A quiet start.");
+    });
+
     it("refuses a game to study by a name no game has as missing, and one there that cannot be read as unreadable", async () => {
         const folder = playerFolder();
         const page = await open(folder);

@@ -27,11 +27,12 @@ import {
     withGameReview,
     withLead,
 } from "../../core/index.ts";
-import { gameInAnalysis, isGameName, keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis } from "../../games/index.ts";
+import { gameInAnalysis, isGameName, keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis, stoppedAnalysis } from "../../games/index.ts";
 import { analystAgent, instructionsFile } from "../../host-files/index.ts";
 import { activeProfile, gameFolder, type PlayerProfile } from "../../profiles/index.ts";
 import { pointsAtSite, siteGameName, siteOfGameName } from "../../sites/index.ts";
 import {
+    analysisStopped,
     analystOf,
     anotherAnalyst,
     balanceText,
@@ -208,6 +209,12 @@ function oneAnalyst(context: Context, studied: Studied): void
 {
     const { name } = studied;
     const holder = name === undefined ? undefined : analystOf(context, name);
+    // The analyst that held the game when the player stopped its analysis is not let back in; one started later is, the player asking again.
+    const heldWhenStopped = name === undefined ? undefined : stoppedAnalysis(gameFolder(context.home()))?.analyst;
+
+    if (name !== undefined && heldWhenStopped?.game === name && heldWhenStopped.run === context.agentRun) {
+        throw new Error(analysisStopped(name));
+    }
 
     if (holder !== undefined && holder === context.agentRun) {
         return;

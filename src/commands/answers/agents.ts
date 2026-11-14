@@ -172,3 +172,10 @@ const analystQuiet = 30 * 60 * 1000;
 export const anotherAnalyst = "Stop now: another analyst is reviewing this game. End with one line for the AI that started you: its review is on its way to the "
     + "board page, and its end comes to you by itself; meanwhile talk the game over with the player whenever they ask. Should it never come, the player has "
     + "the game analysed again from the board page's list of analyses.";
+
+/** What refuses a review's writes once the player has stopped its analysis on the board page: the analyst that held it ends, the chat waits for the player. */
+export function analysisStopped(game: string): string
+{
+    return `Stop now: the player stopped the analysis of ${game} on the board page; what was written of its review stays. Nothing changed. An analyst agent ends `
+        + "with one line for the AI that started it: the player stopped the analysis. Go over the game again only when the player asks, with analyse_game first.";
+}

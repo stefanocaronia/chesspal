@@ -524,6 +524,8 @@ export function App({ start }: { start: Settings; })
     const reviewing = summary === undefined && studied?.reviewing === true && !offline;
     // With nobody at it, a review not finished says so, and the player brings the game back to the AI (D-109).
     const completeIt = summary === undefined && studied?.incomplete === true && !offline ? () => void studyGame({ game: studied.name }) : undefined;
+    // While it waits, the player may cancel the analysis asked, one click: what is written of the review stays, and the page goes back to the game.
+    const stopIt = reviewing ? () => act("/api/stop-analysis", { game: studied.name }) : undefined;
     const closing = studied === undefined ? undefined : closingOf(live.record);
     // How far the review has got, counted as status counts it for the AI: who is ahead after how many of the game's moves.
     const count = reviewing || completeIt !== undefined ? reviewCount(plies) : undefined;
@@ -1059,6 +1061,7 @@ export function App({ start }: { start: Settings; })
                                 ...(summary === undefined ? {} : { summary }),
                                 ...(reviewing ? { reviewing: true } : {}),
                                 ...(count === undefined ? {} : { count }),
+                                ...(stopIt === undefined ? {} : { onStop: stopIt }),
                                 ...(completeIt === undefined ? {} : { onComplete: completeIt }),
                             },
                         })}

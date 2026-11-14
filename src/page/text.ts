@@ -106,6 +106,8 @@ export interface Text
         mated(side: Side): string;
     };
     reviewing(name: string): string;
+    /** The cross on that line that stops the analysis asked, as its tooltip names it: what is written of the review stays. */
+    readonly stopReview: string;
     /** A game in analysis whose review nobody is finishing, and the button that brings it back to the AI, with its tooltip (D-109). */
     readonly incomplete: string;
     readonly complete: string;
@@ -686,6 +688,7 @@ const english: Text = {
         mated: (side) => `${side === "white" ? "White" : "Black"} is mated`,
     },
     reviewing: (name) => `${name} is going over the game…`,
+    stopReview: "Cancel the analysis",
     incomplete: "Analysis not complete",
     complete: "Complete it",
     completeHint: "Complete the analysis",
@@ -1140,6 +1143,7 @@ const italian: Text = {
         mated: (side) => `Matto al ${side === "white" ? "Bianco" : "Nero"}`,
     },
     reviewing: (name) => `${name} sta analizzando la partita…`,
+    stopReview: "Annulla l'analisi",
     incomplete: "Analisi non completa",
     complete: "Completa",
     completeHint: "Completa l'analisi",

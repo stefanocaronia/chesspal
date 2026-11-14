@@ -36,8 +36,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     legend?: ComponentChildren;
     /** Who the AI saw ahead after the moves, with the helps on in a game and in analysis (D-90): the bar shows it, and in analysis the chart. */
     standings?: readonly Standing[];
-    /** The game in analysis: who reviews it, their word on the whole game once written, whether an AI is going over it now, or else what completes it. */
-    analysis?: { by: string; summary?: string; reviewing?: true; count?: ReviewCount; onComplete?: () => void; };
+    /** The game in analysis: who reviews it, their word on the whole game once written, whether an AI is going over it now and what stops it, or else what completes it. */
+    analysis?: { by: string; summary?: string; reviewing?: true; count?: ReviewCount; onStop?: () => void; onComplete?: () => void; };
     shownPlies: number;
     /** The variation the player plays in analysis (D-116), under the move it leaves from. */
     line?: LineView;
@@ -72,7 +72,16 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
                             {/* Where the analysis stands, under the game's card, in sight above the fold (Zoe). */}
                             {analysis?.reviewing !== true ? null : (
                                 <div class="card review waiting">
-                                    <p role="status">{text.reviewing(analysis.by)}</p>
+                                    <p>
+                                        <span role="status">{text.reviewing(analysis.by)}</span>
+                                        {analysis.onStop === undefined ? null : (
+                                            <button type="button" class="stop-review" title={text.stopReview} aria-label={text.stopReview} onClick={analysis.onStop}>
+                                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="M7 7L17 17M17 7L7 17" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </p>
                                     {analysis.count === undefined ? null : <ReviewProgress count={analysis.count} label={text.reviewing(analysis.by)} />}
                                 </div>
                             )}

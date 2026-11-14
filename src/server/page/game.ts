@@ -42,6 +42,7 @@ import {
     rerunIfChanged,
     saveGame,
     startAnalysis,
+    stopAnalysis,
     talkLimits,
     thoughtKey,
     wakesTheChat,
@@ -116,6 +117,7 @@ const routes: Readonly<Record<string, Route>> = {
     "POST /api/resign": resignFromPage,
     "POST /api/start": startFromPage,
     "POST /api/study": studyFromPage,
+    "POST /api/stop-analysis": stopAnalysisFromPage,
 };
 
 /**
@@ -452,6 +454,22 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
     }
 
     send(response, 200, json, JSON.stringify({ kept: true, reviewed }));
+}
+
+/**
+ * The player stops the analysis they asked for, while the AI is at it or meant to be: the page goes back to the game over, with its review as far as it got,
+ * and the chat is no longer asked to go over it; nothing rings, as there is nothing for the chat to do. Only the game in analysis is stopped.
+ */
+async function stopAnalysisFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
+{
+    const game = isJson(request) ? textOf(jsonOf(await bodyOf(request))?.game) : undefined;
+
+    if (game === undefined) {
+        send(response, 400, json, JSON.stringify({ error: 'Send the game in analysis as JSON: {"game": "games/2026-11-02-153012.pgn"}.' }));
+        return;
+    }
+
+    send(response, 200, json, JSON.stringify({ stopped: stopAnalysis(gameFolder(served.context.home()), game) }));
 }
 
 /**

@@ -93,6 +93,34 @@ export function gameInAnalysis(folder: string): Analysis | undefined
     }
 }
 
+/**
+ * Stops the analysis of the game in analysis at the player's word on the board page: the page goes back to the game over, status no longer names it, and
+ * the review written so far stays on the game. analysis.json keeps the game stopped, with the analyst that held it, until the next analysis starts: their
+ * later writes are refused. False when another game, or none, is in analysis.
+ */
+export function stopAnalysis(folder: string, game: string): boolean
+{
+    const analysis = gameInAnalysis(folder);
+
+    if (analysis?.game !== game) {
+        return false;
+    }
+
+    writeAtomically(join(folder, fileName), `${JSON.stringify({ stopped: game, ...withAnalyst(analysis.analyst) }, null, 2)}\n`);
+    return true;
+}
+
+/** The game whose analysis the player stopped on the board page, with the analyst that held it then; none once another analysis starts. */
+export function stoppedAnalysis(folder: string): { game: string; analyst?: AnalystRun; } | undefined
+{
+    try {
+        const stopped = JSON.parse(readFileSync(join(folder, fileName), "utf8")) as { stopped?: unknown; analyst?: unknown; };
+        return typeof stopped.stopped === "string" ? { game: stopped.stopped, ...withAnalyst(isAnalystRun(stopped.analyst) ? stopped.analyst : undefined) } : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 /** Ends the analysis, when a new game starts or its review is deleted. */
 export function endAnalysis(folder: string): void
 {
