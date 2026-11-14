@@ -116,10 +116,15 @@ describe("Antigravity, the third host (D-115)", () => {
     });
 });
 
-/** A board page of the folder as the hook finds it: it says whose it is, and holds the hook's wait until it rings. */
+/**
+ * A board page of the folder as the hook finds it: it says whose it is, and holds the hook's wait until it rings. `waiting` waits for one more hook than
+ * it has seen: the close of a hook that has ended may come after its process's exit, and its wait is no new one.
+ */
 async function fakePage(folder: string): Promise<{ waiting: () => Promise<void>; ring: () => void; }>
 {
     let hook: ServerResponse | undefined;
+    let hooks = 0;
+    let seen = 0;
     let arrived = (): void => undefined;
     const server = createServer((request, response) => {
         if (request.url === "/api/bell?probe") {
@@ -128,11 +133,7 @@ async function fakePage(folder: string): Promise<{ waiting: () => Promise<void>;
         }
 
         hook = response;
-        request.on("close", () => {
-            if (hook === response) {
-                hook = undefined;
-            }
-        });
+        hooks += 1;
         arrived();
     });
     servers.push(server);
@@ -149,7 +150,13 @@ async function fakePage(folder: string): Promise<{ waiting: () => Promise<void>;
     }
 
     return {
-        waiting: () => (hook === undefined ? new Promise((done) => (arrived = done)) : Promise.resolve()),
+        waiting: async () => {
+            seen += 1;
+
+            if (hooks < seen) {
+                await new Promise<void>((done) => (arrived = () => hooks >= seen && done()));
+            }
+        },
         ring: () => hook?.end("ring"),
     };
 }

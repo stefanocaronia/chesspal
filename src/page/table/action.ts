@@ -4,7 +4,10 @@ import type { Settings } from "../profile/settings.ts";
 /** The button's action: a chat opened to play or to review a game, the chat held started again, or in another host. */
 export type ChatAction = "open" | "review" | "restart" | "switch";
 
-/** What the button reads of a host the table offers (`ChatHost` of the page): its name, whether it is installed, its models and efforts and the middle ones. */
+/**
+ * What the button reads of a host the table offers (`ChatHost` of the page): its name, whether it is installed, its models and efforts and the middle
+ * ones; where its models differ, the efforts of each, none for a model without.
+ */
 export interface HostChoices
 {
     readonly name: string;
@@ -13,6 +16,7 @@ export interface HostChoices
     readonly efforts: readonly string[];
     readonly model: string;
     readonly effort: string;
+    readonly modelEfforts?: Readonly<Record<string, readonly string[]>>;
 }
 
 /** What the button reads of the table (`TableShown` of the page), kept apart so that it is tested without the page around it. */
@@ -48,17 +52,26 @@ export function firstHost(table: ChatTable, settings: Settings): string | undefi
     return (atTable ?? offered.find((host) => host.name === settings.chatHost) ?? offered[0])?.name;
 }
 
-/** A host's model or effort as the settings keep it: the host's middle one for none, and for a choice it no longer offers. */
-export function chosen(host: HostChoices, kind: "model" | "effort", settings: Settings): string
+/** The efforts a host offers for one of its models: none for a model that has no effort to choose. */
+export function effortsOf(host: HostChoices, model: string): readonly string[]
 {
-    const key = choiceKeys[host.name as keyof typeof choiceKeys][kind];
-    return offeredOr(host, kind, settings[key]);
+    return host.modelEfforts?.[model] ?? host.efforts;
+}
+
+/**
+ * A host's model or effort as the settings keep it: the host's middle one for none, and for a choice it no longer offers; the effort among the chosen
+ * model's, none for a model without.
+ */
+export function chosen(host: HostChoices, kind: "model" | "effort", settings: Settings): string | undefined
+{
+    const keys = choiceKeys[host.name as keyof typeof choiceKeys];
+    return offered(host, settings[keys.model], settings[keys.effort])[kind];
 }
 
 /** What the chat held started with: the host's middle one where the table does not say, or says one it no longer offers. */
-export function startedWith(table: ChatTable, host: HostChoices, kind: "model" | "effort"): string
+export function startedWith(table: ChatTable, host: HostChoices, kind: "model" | "effort"): string | undefined
 {
-    return offeredOr(host, kind, table.started?.[kind]);
+    return offered(host, table.started?.model, table.started?.effort)[kind];
 }
 
 /** What the button does with the host selected, none without one: with no chat, open one, to review the game in `review`; else start the chat again, in another host when it is not the one at the table. */
@@ -81,8 +94,12 @@ export function canAct(table: ChatTable): boolean
     return table.opening === undefined && table.waiting === undefined && (!table.chat || table.held);
 }
 
-function offeredOr(host: HostChoices, kind: "model" | "effort", value: string | undefined): string
+// The choice kept to what the host offers, as the table keeps it when it starts the chat.
+function offered(host: HostChoices, model: string | undefined, effort: string | undefined): { model: string; effort?: string; }
 {
-    const offered = kind === "model" ? host.models : host.efforts;
-    return value !== undefined && offered.includes(value) ? value : host[kind];
+    const kept = model !== undefined && host.models.includes(model) ? model : host.model;
+    const efforts = effortsOf(host, kept);
+    const middle = efforts.includes(host.effort) ? host.effort : efforts[Math.floor((efforts.length - 1) / 2)];
+    const keptEffort = effort !== undefined && efforts.includes(effort) ? effort : middle;
+    return keptEffort === undefined ? { model: kept } : { model: kept, effort: keptEffort };
 }

@@ -11,7 +11,8 @@ export const hostPrograms: Readonly<Record<HostName, string>> = { claude: "claud
 
 /**
  * The models and efforts the player may choose for a host, as its command line names them: aliases, which follow the host's newest models; and the
- * `model` and `effort` a chat starts with until the player chooses, the middle ones.
+ * `model` and `effort` a chat starts with until the player chooses, the middle ones. `modelEfforts`, where the models differ, the efforts of each,
+ * none for a model without; else every model has `efforts`.
  */
 export interface HostChoices
 {
@@ -19,9 +20,10 @@ export interface HostChoices
     readonly efforts: readonly string[];
     readonly model: string;
     readonly effort: string;
+    readonly modelEfforts?: Readonly<Record<string, readonly string[]>>;
 }
 
-/** What the player chose for a host on the page: none of either, or one the host does not offer, is the host's middle one. */
+/** What the player chose for a host on the page: none of either, or one the host does not offer, is the host's middle one; no effort for a model without. */
 export interface HostChoice
 {
     readonly model?: string | undefined;
@@ -30,7 +32,8 @@ export interface HostChoice
 
 /**
  * Each host's choices, as tried in each (Priya): a value outside them would fail only at the chat's first turn. Claude Code's are its aliases; Codex's, the
- * models a ChatGPT account lists, which change with its releases; Antigravity's, the Gemini Flash its free plan gives, its effort apart (D-115).
+ * models a ChatGPT account lists, which change with its releases; Antigravity's, the Gemini Flash its free plan gives, its effort apart (D-115), until
+ * the table has read the models of the player's account.
  */
 export const hostChoices: Readonly<Record<HostName, HostChoices>> = {
     claude: { models: ["fable", "opus", "sonnet", "haiku"], efforts: ["low", "medium", "high", "xhigh", "max"], model: "sonnet", effort: "medium" },
@@ -42,6 +45,12 @@ export const hostChoices: Readonly<Record<HostName, HostChoices>> = {
 export function isHostName(name: unknown): name is HostName
 {
     return hostNames.includes(name as HostName);
+}
+
+/** The efforts a host offers for one of its models: none for a model that has no effort to choose. */
+export function effortsOf(choices: HostChoices, model: string): readonly string[]
+{
+    return choices.modelEfforts?.[model] ?? choices.efforts;
 }
 
 /**
@@ -61,11 +70,11 @@ export function startMessage(language: string | undefined, toAnalyse = false): s
  * The start message and the choices the host knows: first for Claude Code, whose options may take the word after; last for Codex, where "resume" is no
  * subcommand, kept from its update screen, which an Enter would accept; for Antigravity after -i, which keeps the chat open, with Chesspal's tools
  * allowed and the table's `folder` trusted for this chat alone, never saved in its settings: a folder trusted only at its first chat's dialog leaves that
- * chat without its hooks.
+ * chat without its hooks. A model with no effort to choose is given none. `choices` are those the host offers, as read for Antigravity.
  */
-export function hostArgs(host: HostName, message: string, choice: HostChoice = {}, folder?: string): string[]
+export function hostArgs(host: HostName, message: string, choice: HostChoice = {}, folder?: string, choices: HostChoices = hostChoices[host]): string[]
 {
-    const { model, effort } = offered(host, choice);
+    const { model, effort } = offered(choices, choice);
 
     if (host === "claude") {
         return [message, ...(model === undefined ? [] : ["--model", model]), ...(effort === undefined ? [] : ["--effort", effort])];
@@ -85,22 +94,24 @@ export function choiceKeys(host: HostName): { model: string; effort: string; }
     return { model: `${host}Model`, effort: `${host}Effort` };
 }
 
-/** A host's choice as the profile's settings keep it: the values the host offers alone, the rest is its middle one. */
-export function choiceIn(settings: Readonly<Record<string, unknown>> | undefined, host: HostName): HostChoice
+/** A host's choice as the profile's settings keep it: the values the host offers alone, among `choices`, the rest is its middle one. */
+export function choiceIn(settings: Readonly<Record<string, unknown>> | undefined, host: HostName, choices: HostChoices = hostChoices[host]): HostChoice
 {
     const keys = choiceKeys(host);
     const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
-    return offered(host, { model: text(settings?.[keys.model]), effort: text(settings?.[keys.effort]) });
+    return offered(choices, { model: text(settings?.[keys.model]), effort: text(settings?.[keys.effort]) });
 }
 
 // Antigravity's settings for one chat: Chesspal's tools allowed, which it would otherwise ask for at each first use.
 const antigravityAllowed = { permissions: { allow: ["mcp(chesspal/*)"] } };
 
-// The choice kept to the values the host offers: its middle model and effort where none is chosen, or one it does not offer.
-function offered(host: HostName, choice: HostChoice): HostChoice
+// The choice kept to the values the host offers: its middle model where none is chosen, or one it does not offer; the model's middle effort likewise,
+// none for a model without.
+function offered(choices: HostChoices, choice: HostChoice): HostChoice
 {
-    const choices = hostChoices[host];
     const model = choice.model !== undefined && choices.models.includes(choice.model) ? choice.model : choices.model;
-    const effort = choice.effort !== undefined && choices.efforts.includes(choice.effort) ? choice.effort : choices.effort;
-    return { model, effort };
+    const efforts = effortsOf(choices, model);
+    const middle = efforts.includes(choices.effort) ? choices.effort : efforts[Math.floor((efforts.length - 1) / 2)];
+    const effort = choice.effort !== undefined && efforts.includes(choice.effort) ? choice.effort : middle;
+    return effort === undefined ? { model } : { model, effort };
 }

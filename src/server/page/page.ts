@@ -117,6 +117,7 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
             const noted = offPorts ? notePort(served) : undefined;
             const stopWatchingGame = watchGame(served);
             const stopAskingNpm = watchForUpdates(served);
+            table?.chats?.watch?.(() => tellWatchers(watchers));
 
             // A chat's process ends without closing its page: the note goes with it.
             const forgetPort = (): void => {

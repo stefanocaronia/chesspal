@@ -142,6 +142,8 @@ export interface ChatHost
     /** The middle model and effort, which a chat starts with until the player chooses others. */
     readonly model: string;
     readonly effort: string;
+    /** Where the models differ, the efforts of each, none for a model without: Antigravity's, as read from the player's account. */
+    readonly modelEfforts?: Readonly<Record<string, readonly string[]>>;
     readonly command: string;
 }
 

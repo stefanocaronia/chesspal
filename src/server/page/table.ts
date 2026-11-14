@@ -32,6 +32,8 @@ export interface TableChats
     held(folder: string): HeldChat | undefined;
     /** Asks for the chat again: with another host, or `updated`, from the Chesspal just installed (D-108). */
     relaunch(folder: string, host?: string, updated?: boolean): boolean;
+    /** Tells `changed` when the hosts' choices change: Antigravity's models, read from the player's account. */
+    watch?(changed: () => void): void;
 }
 
 /** The chat `chesspal play` holds: the model and effort its host started with, none for the host's own, and the seat, the play's process. */

@@ -10,6 +10,7 @@ import { activeProfile, gameFolder, languageIn, profileSettings } from "../../..
 import { hostProgramPath } from "./find.ts";
 import { type HooksNews, setUpTable, takeHooksNews } from "./hooks.ts";
 import { choiceIn, hostArgs, type HostChoice, type HostName, isHostName, startMessage } from "./hosts.ts";
+import { tableChoices } from "./models.ts";
 import { askedAgain, leaveSeat, refreshSeat, seatTimes, takeSeat } from "./seat.ts";
 import { cmdQuoted } from "./terminal.ts";
 
@@ -163,8 +164,8 @@ export function runHost(launch: HostLaunch, again: () => boolean, platform: stri
 }
 
 /**
- * How the host starts for the profile in use: found on the PATH, or where its installer puts it, with its choice; it throws, saying how to install it, when
- * it is not there.
+ * How the host starts for the profile in use: found on the PATH, or where its installer puts it, with its choice among those the table offers; it throws,
+ * saying how to install it, when it is not there.
  */
 export function hostLaunch(context: Context, host: HostName, env: NodeJS.ProcessEnv = process.env, exists?: (path: string) => boolean): HostLaunch
 {
@@ -180,9 +181,10 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     // Codex's hooks written, by this play or by the table before it: the note is for Codex's chat, and waits for it.
     const news = host === "codex" ? takeHooksNews(folder) : undefined;
     const hooks = news === undefined ? {} : { hooks: news };
-    const choice = choiceIn(profileSettings(home, activeProfile(home).id), host);
+    const choices = tableChoices(folder, host);
+    const choice = choiceIn(profileSettings(home, activeProfile(home).id), host, choices);
     const games = gameFolder(home);
-    const args = hostArgs(host, startMessage(languageIn(games, context.language), analysisAsked(games)), choice, folder);
+    const args = hostArgs(host, startMessage(languageIn(games, context.language), analysisAsked(games)), choice, folder, choices);
     // An effort the player set for every chat would win over the one chosen on the page: spawn leaves out a variable that is undefined.
     const effort = host === "claude" && choice.effort !== undefined ? { CLAUDE_CODE_EFFORT_LEVEL: undefined } : {};
     // The seat this play holds, by which its chat's server tells the table it is the chat held, and not another opened in the same folder.

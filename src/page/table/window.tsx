@@ -8,7 +8,7 @@ import { Dialog } from "../dialogs/dialog.tsx";
 import { checkIcon } from "../dialogs/profiles.tsx";
 import type { Settings } from "../profile/settings.ts";
 import type { Text } from "../text.ts";
-import { canAct, chatAction, choiceKeys, chosen, firstHost, offeredHosts, startedWith } from "./action.ts";
+import { canAct, chatAction, choiceKeys, chosen, effortsOf, firstHost, offeredHosts, startedWith } from "./action.ts";
 
 /** The chat's window: closed once a chat opens or starts again, the page then saying where it stands; `review` when it opened to have a game analysed. */
 export function ChatDialog({ open, review = false, table, settings, onChange, name, onClose, text }: {
@@ -222,7 +222,8 @@ function Choices({ host, kind, settings, started, onChange, text }: {
 })
 {
     const key = choiceKeys[host.name as keyof typeof choiceKeys][kind];
-    const offered = kind === "model" ? host.models : host.efforts;
+    // The efforts of the model chosen: none, and no row, for a model without.
+    const offered = kind === "model" ? host.models : effortsOf(host, chosen(host, "model", settings) ?? host.model);
     const value = chosen(host, kind, settings);
 
     if (offered.length === 0) {
@@ -238,7 +239,7 @@ function Choices({ host, kind, settings, started, onChange, text }: {
                     return (
                         <label class={one === started ? "level started" : "level"} key={one} title={words}>
                             <input type="radio" name={`chat-${kind}`} checked={value === one} onChange={() => onChange({ ...settings, [key]: one })} aria-label={words} />
-                            <span>{shortName(one)}</span>
+                            <span>{host.name === "codex" ? shortName(one) : one}</span>
                         </label>
                     );
                 })}
@@ -247,7 +248,8 @@ function Choices({ host, kind, settings, started, onChange, text }: {
     );
 }
 
-// Codex's models without the "gpt-" they all start with, so the choice stays narrow; the title keeps the whole name.
+// Codex's models without the "gpt-" they all start with, so the choice stays narrow; the title keeps the whole name. Another host's keep it: Antigravity's
+// GPT-OSS would read as "oss".
 function shortName(value: string): string
 {
     return value.replace(/^gpt-/, "");
