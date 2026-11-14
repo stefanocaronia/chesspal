@@ -248,6 +248,11 @@ export async function listen(host: ListeningHost = "claude"): Promise<void>
         input += String(chunk);
     }
 
+    // Antigravity's hook leaves a line as it starts: a chat its bell never woke shows whether the hook ran at all.
+    if (host === "antigravity") {
+        noteHook(chatFolder(hookInput(input)), "waiting");
+    }
+
     const conversation = host === "antigravity" ? hookInput(input).session : undefined;
     const turn = conversation === undefined ? undefined : watchNewTurn(conversation);
     const waited = bellHeard(input).catch((error: unknown): BellHeard => ({ folder: chatFolder(hookInput(input)), rang: false, why: `failed: ${(error as Error).message}` }));
@@ -255,9 +260,12 @@ export async function listen(host: ListeningHost = "claude"): Promise<void>
     const heard = await (newTurn === undefined ? waited : Promise.race([waited, newTurn]));
     turn?.stop();
 
-    // Codex's turn ends with a hook that heard no bell, and the player's next move on the page wakes nobody: the log keeps why.
-    if (host === "codex" && !heard.rang) {
-        noteSilence(heard.folder, heard.why);
+    // Codex's turn ends with a hook that heard no bell, and the player's next move on the page wakes nobody: the log keeps why. Antigravity's keeps every
+    // end, the bell too, since its chat may not wake even then.
+    if (host === "antigravity") {
+        noteHook(heard.folder, heard.rang ? "rang" : heard.why);
+    } else if (host === "codex" && !heard.rang) {
+        noteHook(heard.folder, heard.why);
     }
 
     // It ends as soon as it knows: the chat hears the hook only once it ends.
@@ -339,18 +347,18 @@ async function forgetGonePages(home: string, folder: string, kept: number, wait:
     }));
 }
 
-// The log of Codex's hooks that heard no bell, in the chat's folder: its last lines only.
-const silenceLog = "listen.log";
-const silenceLines = 100;
+// The log of the doorbell's hooks, in the chat's folder: Codex's that heard no bell, Antigravity's as they start and end; its last lines only.
+const hookLog = "listen.log";
+const hookLines = 100;
 
-/** Adds a line to the log of the hooks that heard no bell, keeping its last lines; a log that cannot be written never stops the hook. */
-export function noteSilence(folder: string, why: string, now = new Date()): void
+/** Adds a line to the log of the doorbell's hooks, keeping its last lines; a log that cannot be written never stops the hook. */
+export function noteHook(folder: string, why: string, now = new Date()): void
 {
-    const path = join(folder, silenceLog);
+    const path = join(folder, hookLog);
 
     try {
         const before = existsSync(path) ? readFileSync(path, "utf8").split("\n").filter((line) => line !== "") : [];
-        writeAtomically(path, `${[...before, `${now.toISOString()} ${why}`].slice(-silenceLines).join("\n")}\n`);
+        writeAtomically(path, `${[...before, `${now.toISOString()} ${why}`].slice(-hookLines).join("\n")}\n`);
     } catch {
         // The log only explains; the hook ends the same.
     }

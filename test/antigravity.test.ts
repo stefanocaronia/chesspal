@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -89,6 +89,10 @@ describe("Antigravity, the third host (D-115)", () => {
         await page.waiting();
         page.ring();
         expect(await rung).toEqual({ code: 0, stdout: `${antigravityBellAnswer}\n` });
+
+        // The log keeps each hook's start and end, the bell too.
+        const logged = readFileSync(join(folder, "listen.log"), "utf8").trimEnd().split("\n").map((line) => line.slice(line.indexOf(" ") + 1));
+        expect(logged).toEqual(["waiting", "the player started a new turn", "waiting", "rang"]);
     }, 30_000);
 
     it("signs the AI's moves with the model and effort of the conversation's transcript, which the call names", async () => {

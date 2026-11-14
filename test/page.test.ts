@@ -11,7 +11,7 @@ import { type Context, withProfile } from "../src/commands/registry/context.ts";
 import { archivedGames, gameInAnalysis, keepThought, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
-import { Bell, bellHeard, bellLine, codexBellAnswer, notePagePort, noteSilence, stopCheck, waitForBell } from "../src/server/bell/bell.ts";
+import { Bell, bellHeard, bellLine, codexBellAnswer, noteHook, notePagePort, stopCheck, waitForBell } from "../src/server/bell/bell.ts";
 import { analysesOf } from "../src/server/page/analyses.ts";
 import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { profilesShown } from "../src/server/page/profiles.ts";
@@ -1484,11 +1484,11 @@ describe("the doorbell of the chat", () => {
         }
     });
 
-    it("logs the hooks that heard no bell in the chat's folder, keeping the last hundred", () => {
+    it("logs the doorbell's hooks in the chat's folder, keeping the last hundred", () => {
         const folder = playerFolder();
 
         for (let index = 0; index < 101; index++) {
-            noteSilence(folder, `silence ${index}`, new Date(Date.UTC(2026, 10, 5, 0, 0, index)));
+            noteHook(folder, `silence ${index}`, new Date(Date.UTC(2026, 10, 5, 0, 0, index)));
         }
 
         const lines = readFileSync(join(folder, "listen.log"), "utf8").trimEnd().split("\n");

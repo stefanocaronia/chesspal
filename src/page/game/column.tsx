@@ -52,7 +52,8 @@ export function GameColumn({ plies, result, how, lit, started, move, toMove, ope
     text: Text;
 })
 {
-    const bar = standings === undefined ? undefined : <LeadBar standing={standingAt(standings, shownPlies)} shown={shownPlies} text={text} />;
+    // In a game the bar waits for the coach's first estimate: a host that runs no coach gives none (Stefano).
+    const bar = standings === undefined || (analysis === undefined && standings.length === 0) ? undefined : <LeadBar standing={standingAt(standings, shownPlies)} shown={shownPlies} text={text} />;
 
     return (
         <aside class="side" id="game" aria-label={text.game}>
