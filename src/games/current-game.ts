@@ -39,11 +39,28 @@ export interface TalkLine
     readonly shown?: Shown;
 }
 
-/** A position of a game in analysis: the game's name, how many of its moves the page showed, and the last of them numbered, 52...Kf6; none at the start. */
+/**
+ * A position of a game in analysis: the game's name, how many of its moves the page showed, and the last of them numbered, 52...Kf6; none at the start. With
+ * the variation the player played there (D-116), on the board or set aside.
+ */
 export interface Shown
 {
     readonly game: string;
     readonly at: number;
+    readonly move?: string;
+    readonly variation?: ShownVariation;
+}
+
+/**
+ * A variation of the page's (D-116): how many of the game's moves come before it, its moves in SAN, how many of them the board showed (0 with the board back
+ * on the game), the line as PGN writes it, 12...Kf8 13.Nxe5 Bxe2, and the move shown numbered, 13.Nxe5.
+ */
+export interface ShownVariation
+{
+    readonly at: number;
+    readonly moves: readonly string[];
+    readonly cursor: number;
+    readonly text: string;
     readonly move?: string;
 }
 
@@ -171,7 +188,12 @@ export const savedLine = z.object({
     ply: z.int().min(0),
     at: z.iso.datetime(),
     agent: z.literal(true).optional(),
-    shown: z.object({ game: z.string(), at: z.int().min(0), move: z.string().optional() }).optional(),
+    shown: z.object({
+        game: z.string(),
+        at: z.int().min(0),
+        move: z.string().optional(),
+        variation: z.object({ at: z.int().min(0), moves: z.array(z.string()).min(1).readonly(), cursor: z.int().min(0), text: z.string(), move: z.string().optional() }).optional(),
+    }).optional(),
 });
 const savedClock = z.object({
     base: z.int().positive(),

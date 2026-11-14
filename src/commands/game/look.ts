@@ -3,7 +3,7 @@ import { boardText, type Chances, type Facts, materialOf, type Possibilities, se
 import { archivedName, endOf } from "../../games/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { analystOnView, fullView, gameAt, gameShown, type GameSummary, headLines, materialText, newWords, positionAfter, positionLine, studyInput, summaryOf, wordLines, type Written } from "../answers/index.ts";
+import { analystOnView, fullView, gameAt, gameShown, type GameSummary, headLines, materialText, newWords, positionAfter, positionAfterLine, positionLine, studyInput, summaryOf, wordLines, type Written } from "../answers/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
 import { refuseUnseen } from "./levels.ts";
 
@@ -34,15 +34,15 @@ export const look = defineCommand({
         + "moves of each piece. The views of player_move, status and new_game give attackers and defenders only for the pieces attacked: call look "
         + 'before you attack or capture a piece that is not attacked yet, or plan an exchange. With only: "board", the board as text for the player, to '
         + "copy into your message where they do not see it. With move, and game for a game of the archive, the same of any position of a game over, to "
-        + 'analyse it. Example: look {}, look {move: "12..."}.',
+        + 'analyse it; with line, of the position after a variation played from there on a scratch board. Example: look {}, look {move: "12..."}, look {line: "12...Kf8 13.Nxe5"}.',
     input: z.object({ only: z.enum(["board"]).optional().describe("board: only the board as text, for the player"), ...studyInput }),
     // Read only for the host: a flag that has fallen is written, as the time already decided.
     readOnly: true,
     idempotent: true,
     sharedWith: [analystAgent],
-    run: ({ only, game, move }, context): Look => {
-        if (game !== undefined || move !== undefined) {
-            return studyLook(context, only, game, move);
+    run: ({ only, game, move, line }, context): Look => {
+        if (game !== undefined || move !== undefined || line !== undefined) {
+            return studyLook(context, only, game, move, line);
         }
 
         const current = gameAt(gameFolder(context.home()), context.now());
@@ -73,11 +73,11 @@ export const look = defineCommand({
     },
 });
 
-/** A position of a game over, as the view of the game going on gives it. */
-function studyLook(context: Context, only: "board" | undefined, name: string | undefined, move: string | undefined): Look
+/** A position of a game over, or after a variation from it (D-116), as the view of the game going on gives it. */
+function studyLook(context: Context, only: "board" | undefined, name: string | undefined, move: string | undefined, line: string | undefined): Look
 {
     const studied = gameShown(context, name);
-    const at = positionAfter(studied.record, move);
+    const at = line === undefined ? positionAfter(studied.record, move) : positionAfterLine(studied.record, move, line);
     const { position } = at.game;
 
     if (only === "board") {

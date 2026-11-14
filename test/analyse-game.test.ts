@@ -157,6 +157,9 @@ describe("the analysis of a game (D-68)", () => {
         await expect(async () => analyse(context, { pgn })).rejects.toThrow(going);
         await expect(async () => lookAt(context, { move: "1..." })).rejects.toThrow(going);
         await expect(async () => position.run(position.input.parse({ move: "1." }), context)).rejects.toThrow(going);
+        // Nor a variation, from the game going on or a game over (D-116).
+        await expect(async () => lookAt(context, { line: "2.Nf3" })).rejects.toThrow(going);
+        await expect(async () => position.run(position.input.parse({ line: "2.Nf3" }), context)).rejects.toThrow(going);
 
         await endGame.run(endGame.input.parse({ result: "player_resigns" }), context);
         expect(await analyse(context, {})).toBe([
@@ -225,6 +228,35 @@ describe("look and position on a game over (D-68)", () => {
         expect(await lookAt(context, { move: "1..." })).toMatch(new RegExp(`^After 1\\.\\.\\.e5 in ${imported}:`));
         expect(position.format(await position.run(position.input.parse({ move: "1..." }), context))).toMatch(new RegExp(`^After 1\\.\\.\\.e5 in ${imported}:`));
         expect(await lookAt({ ...context, agent: "chesspal-analyst" }, { move: "1..." })).toMatch(/^After 1\.\.\.d5 in games\//);
+    });
+
+    it("give the position after a variation played on a scratch board, from the move given or the number of its first move, the game untouched (D-116)", async () => {
+        const context = playerFolder();
+        await analyse(context, { pgn });
+
+        const after = await lookAt(context, { game: imported, line: "2...Nf6 3.Qf3 Nc6" });
+        expect(after).toMatch(new RegExp(`^After the variation 2\\.\\.\\.Nf6 3\\.Qf3 Nc6 \\(the game: 2\\.\\.\\.Nc6\\) in ${imported}: White to move\\.\\nMaterial: even, nothing taken\\n`));
+        expect(after).toContain("FEN: r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4");
+        // The same from the move it leaves after, with figurines, numbers apart, or as squares.
+        expect(await lookAt(context, { game: imported, move: "2.", line: "Nf6 3. ♕f3 b8c6" })).toBe(after);
+        // The positional facts the same way.
+        const profile = position.format(await position.run(position.input.parse({ game: imported, line: "1...c5" }), context));
+        expect(profile).toMatch(new RegExp(`^After the variation 1\\.\\.\\.c5 \\(the game: 1\\.\\.\\.e5\\) in ${imported}: White to move\\.\\nPhase: opening\\n`));
+        // The game stays as it is.
+        expect(await lookAt(context, { game: imported })).toMatch(/^After 4\.Qxf7# in /);
+    });
+
+    it("refuse a variation at its first move that cannot be played, or with no place to start", async () => {
+        const context = playerFolder();
+        await analyse(context, { pgn });
+
+        await expect(async () => lookAt(context, { game: imported, line: "2...Nf6 3.Qxf7" })).rejects.toThrow(/^3\.Qxf7 cannot be played after 2\.\.\.Nf6: .* The game stays as it is\.$/);
+        await expect(async () => lookAt(context, { game: imported, line: "Nf6" })).rejects.toThrow("Say where the line starts: number its first move, 12...Kf8, or give move, the game's move it leaves from.");
+        await expect(async () => lookAt(context, { game: imported, move: "2.", line: "3.Nf3" })).rejects.toThrow(
+            "The line starts with 3., but the next move after 2. is 2...: number its first move so, or give move, the game's move it leaves from.",
+        );
+        await expect(async () => lookAt(context, { game: imported, line: "9.Nf3" })).rejects.toThrow("The game has no position before 9.: its moves go from 1.e4 to 4.Qxf7#.");
+        await expect(async () => lookAt(context, { game: imported, line: "4...Ke7 5.Qxe7" })).rejects.toThrow(/^4\.\.\.Ke7 cannot be played: The game is over by checkmate/);
     });
 
     it("refuse a move the game does not have", async () => {

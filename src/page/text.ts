@@ -62,8 +62,19 @@ export interface Text
     readonly moves: string;
     /** The buttons that step through the moves. */
     readonly steps: Readonly<Record<Step, string>>;
-    /** A variation in analysis (D-116), named only in tooltips: the line, what closes it, and what takes the board back to the game at the move it leaves from. */
-    readonly variation: { readonly line: string; readonly close: string; readonly back: (move: string | undefined) => string; };
+    /**
+     * A variation in analysis (D-116), named only in tooltips: the line, what closes it, and what takes the board back to the game at the move it leaves from;
+     * the button that asks the AI to analyse it, the words it sends for the player, and the mark in the talk that puts it back on the board.
+     */
+    readonly variation: {
+        readonly line: string;
+        readonly close: string;
+        readonly back: (move: string | undefined) => string;
+        readonly analyse: string;
+        readonly analyseHint: (name: string) => string;
+        readonly analyseWords: string;
+        readonly show: (line: string) => string;
+    };
     readonly noGame: string;
     /** The tooltips of a card's title in the game's column, which folds the card and opens it again (Stefano). */
     readonly foldCard: string;
@@ -632,7 +643,15 @@ const english: Text = {
     game: "The game",
     moves: "Moves",
     steps: { first: "Start", back: "Previous move", forward: "Next move", last: "Back to the game" },
-    variation: { line: "Variation", close: "Close the variation (Esc)", back: (move) => move === undefined ? "Back to the start of the game" : `Back to the game, at ${move}` },
+    variation: {
+        line: "Variation",
+        close: "Close the variation (Esc)",
+        back: (move) => move === undefined ? "Back to the start of the game" : `Back to the game, at ${move}`,
+        analyse: "Analyse",
+        analyseHint: (name) => `Ask ${name} to analyse this variation`,
+        analyseWords: "Analyse this variation",
+        show: (line) => `Show the variation ${line} on the board`,
+    },
     noGame: "No game yet: press + to start one, or ask for one in the chat.",
     foldCard: "Fold the card",
     openCard: "Open the card",
@@ -1078,7 +1097,15 @@ const italian: Text = {
     game: "La partita",
     moves: "Mosse",
     steps: { first: "Inizio", back: "Mossa precedente", forward: "Mossa successiva", last: "Torna alla partita" },
-    variation: { line: "Variante", close: "Chiudi la variante (Esc)", back: (move) => move === undefined ? "Torna all'inizio della partita" : `Torna alla partita, a ${move}` },
+    variation: {
+        line: "Variante",
+        close: "Chiudi la variante (Esc)",
+        back: (move) => move === undefined ? "Torna all'inizio della partita" : `Torna alla partita, a ${move}`,
+        analyse: "Analizza",
+        analyseHint: (name) => `Chiedi a ${name} di analizzare questa variante`,
+        analyseWords: "Analizza questa variante",
+        show: (line) => `Rimetti sulla scacchiera la variante ${line}`,
+    },
     noGame: "Nessuna partita: premi + per iniziarne una, o chiedila nella chat.",
     foldCard: "Chiudi la scheda",
     openCard: "Apri la scheda",

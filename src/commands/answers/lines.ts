@@ -117,8 +117,10 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
 
     // Words written on a game in analysis: the chat answers them there, and corrects the review where they show it wrong (D-101).
     if (words.some((word) => word.place !== undefined) && (game === undefined || game.end !== undefined)) {
+        const written = words.findLast((word) => word.variation !== undefined);
+        const variation = written?.variation === undefined ? undefined : `line: "${written.variation}"${written.variationGame === undefined ? "" : `, game: "${written.variationGame}"`}`;
         return "Next: answer the player with ai_say, about the move they were looking at. When they show you something the review missed, first correct that move's "
-            + "note with annotate_game, that move only.";
+            + `note with annotate_game, that move only.${variation === undefined ? "" : ` The facts after their variation: look {${variation}}.`}`;
     }
 
     if (game === undefined) {

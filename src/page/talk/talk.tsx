@@ -4,8 +4,8 @@ import { useContext, useEffect, useLayoutEffect, useRef, useState } from "preact
 import type { Mood, MoveReview, Opening, Side } from "../../core/index.ts";
 import { Torretta } from "../avatars/torretta.tsx";
 import { BadgeIcon, NoteIcon } from "../game/badges.tsx";
-import { Figurines } from "../game/move-list.tsx";
-import { type Ply, type ReviewCount, talkLimits, type TalkLine } from "../game/plies.ts";
+import { Figurines, ForkIcon } from "../game/move-list.tsx";
+import { type Ply, type ReviewCount, type SentVariation, talkLimits, type TalkLine } from "../game/plies.ts";
 import { ReviewProgress } from "../game/review-progress.tsx";
 import { signature } from "../players/model-name.ts";
 import type { Text } from "../text.ts";
@@ -189,11 +189,15 @@ export function Legend({ review, words }: { review: Pick<MoveReview, "arrows" | 
     );
 }
 
-/** In analysis (D-101): the move shown, which the words go with, none at the start; and going back to the move a line of the player's was written on. */
+/**
+ * In analysis (D-101): the move shown, which the words go with, none at the start; going back to the move a line of the player's was written on, and putting
+ * back on the board the variation it was written on (D-116).
+ */
 export interface About
 {
     readonly ply?: Ply;
     readonly onShow: (at: number) => void;
+    readonly onLine: (variation: SentVariation) => void;
 }
 
 /**
@@ -249,7 +253,7 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
                                 )
                                 : (
                                     <p class="said">
-                                        {about === undefined || line.shown?.move === undefined ? null : <ShownMove move={line.shown.move} onShow={() => about.onShow(line.shown!.at)} text={text} />}
+                                        {about === undefined ? null : <ShownPlace shown={line.shown} about={about} text={text} />}
                                         {line.text}
                                     </p>
                                 )}
@@ -325,6 +329,46 @@ export function TalkFaces({ name, aiPicture, you, picture, ai, player, aiMoves, 
             <RailPlayer place="ai" picture={aiPicture ?? <Torretta size={40} bust />} name={name} {...(ai === undefined ? {} : { side: text.sides[ai] })} moves={aiMoves} unread={unread} />
             <RailPlayer place="you" picture={picture} name={you} {...(player === undefined ? {} : { side: text.sides[player] })} moves={playerMoves} />
         </div>
+    );
+}
+
+/** Where a line of the player's was written: on a variation the board showed, its mark; else the game's move, none at the start. */
+function ShownPlace({ shown, about, text }: { shown: TalkLine["shown"]; about: About; text: Text; })
+{
+    const variation = shown?.variation;
+
+    if (variation?.move !== undefined) {
+        return <ShownLine variation={variation} onShow={() => about.onLine(variation)} text={text} />;
+    }
+
+    return (
+        <>
+            {shown?.move === undefined ? null : <ShownMove move={shown.move} onShow={() => about.onShow(shown.at)} text={text} />}
+            {variation === undefined ? null : <ShownLine variation={variation} onShow={() => about.onLine(variation)} text={text} />}
+        </>
+    );
+}
+
+/**
+ * The variation a line of the player's was written on, small at the line's head: the fork's sign in the accent and the move the board showed, none when
+ * it was set aside; a press puts the variation back on the board (D-116).
+ */
+function ShownLine({ variation, onShow, text }: { variation: SentVariation; onShow: () => void; text: Text; })
+{
+    const { move } = variation;
+    const label = text.variation.show(variation.text);
+    const [, number = "", san = ""] = /^(\d+\.+)(.+)$/.exec(move ?? "") ?? [];
+
+    return (
+        <button type="button" class="shown-move shown-line" title={label} aria-label={label} onClick={onShow}>
+            <ForkIcon />
+            {move === undefined ? null : (
+                <>
+                    <span class="move-number">{number}</span>
+                    <Figurines san={san} side={number.endsWith("...") ? "black" : "white"} />
+                </>
+            )}
+        </button>
     );
 }
 

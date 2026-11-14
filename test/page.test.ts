@@ -280,6 +280,41 @@ describe("the page's server", () => {
         expect(playing.game.talk.at(-1)?.shown).toBeUndefined();
     });
 
+    it("keeps the variation the player wrote on, played again by the server, and tells the chat where they stood on it; refuses one that cannot be played (D-116)", async () => {
+        const folder = playerFolder();
+        const context = testContext(folder);
+        const page = await open(folder, undefined, context);
+        const kept = "study/2026-11-02-153012.pgn";
+        await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 *' });
+        await run(folder, "analyse_game", { game: kept }, context);
+
+        // On the variation, at its second move; then set aside, the board back on the game; then the request of «Analyse».
+        await post(page, "/api/message", { text: "And this?", game: kept, at: 3, variation: { at: 3, moves: ["g6", "Qf3", "Nf6"], cursor: 2 } });
+        await post(page, "/api/message", { text: "Better?", game: kept, at: 5, variation: { at: 3, moves: ["g6", "f1c4"], cursor: 0 } });
+        await post(page, "/api/message", { text: "Analyse this variation", game: kept, at: 3, variation: { at: 3, moves: ["g6", "Qf3", "Nf6"], cursor: 3 } });
+
+        const { talk } = JSON.parse((await get(page, "/api/game")).body) as { talk: { text: string; shown?: object; }[]; };
+        expect(talk[0]!.shown).toEqual({ game: kept, at: 3, move: "2.Qh5", variation: { at: 3, moves: ["g6", "Qf3", "Nf6"], cursor: 2, text: "2...g6 3.Qf3 Nf6", move: "3.Qf3" } });
+        // The moves as chess.js writes them, whatever the page sent.
+        expect(talk[1]!.shown).toEqual({ game: kept, at: 5, move: "3.Bc4", variation: { at: 3, moves: ["g6", "Bc4"], cursor: 0, text: "2...g6 3.Bc4" } });
+        const status = await statusOf(folder);
+        expect(status).toContain(
+            [
+                "Player wrote on the board page, at 3.♛f3 of the variation 2...g6 3.♛f3 ♞f6: «And this?»",
+                "Player wrote on the board page, at 3.♝c4, the variation 2...g6 3.♝c4 set aside: «Better?»",
+                "Player wrote on the board page, at 3...♞f6 of the variation 2...g6 3.♛f3 ♞f6: «Analyse this variation»",
+            ].join("\n"),
+        );
+        expect(status).toContain('that move only. The facts after their variation: look {line: "2...g6 3.Qf3 Nf6"}.');
+
+        // A variation that cannot be played, or is not one, is refused, and nothing is said.
+        const illegal = await post(page, "/api/message", { text: "Hm?", game: kept, at: 3, variation: { at: 3, moves: ["g6", "Qxf8"], cursor: 2 } });
+        expect(illegal).toMatchObject({ status: 400, body: expect.stringContaining("3.Qxf8 cannot be played after 2...g6") });
+        expect(await post(page, "/api/message", { text: "Hm?", game: kept, at: 3, variation: { at: 3, moves: "g6" } })).toMatchObject({ status: 400 });
+        expect(await post(page, "/api/message", { text: "Hm?", game: kept, at: 3, variation: { at: 3, moves: ["g6"], cursor: 4 } })).toMatchObject({ status: 400 });
+        expect((JSON.parse((await get(page, "/api/game")).body) as { talk: unknown[]; }).talk).toHaveLength(3);
+    });
+
     it("lists the analyses, opens one again by its name, and takes back a review exported from the page ready, without waking the chat", async () => {
         const folder = playerFolder();
         const page = await open(folder);

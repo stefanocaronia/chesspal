@@ -112,7 +112,20 @@ export interface TalkLine
     readonly text: string;
     readonly ply: number;
     readonly heard?: "sent" | "read" | "answered";
-    readonly shown?: { readonly game: string; readonly at: number; readonly move?: string; };
+    readonly shown?: { readonly game: string; readonly at: number; readonly move?: string; readonly variation?: SentVariation; };
+}
+
+/**
+ * The variation a line of the player's was written on (D-116): where it leaves the game, its moves, how many the board showed, the line as PGN writes it and
+ * the move shown numbered.
+ */
+export interface SentVariation
+{
+    readonly at: number;
+    readonly moves: readonly string[];
+    readonly cursor: number;
+    readonly text: string;
+    readonly move?: string;
 }
 
 /**

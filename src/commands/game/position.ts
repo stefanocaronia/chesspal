@@ -3,7 +3,7 @@ import { type PieceLetter, type Profile, type Side, type SideProfile } from "../
 import { archivedName, endOf } from "../../games/index.ts";
 import { analystAgent } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { analystOnView, colourName, gameAt, gameShown, materialText, positionAfter, positionLine, studyInput } from "../answers/index.ts";
+import { analystOnView, colourName, gameAt, gameShown, materialText, positionAfter, positionAfterLine, positionLine, studyInput } from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
 import { refuseUnseen } from "./levels.ts";
 
@@ -18,15 +18,15 @@ export const position = defineCommand({
         + "outposts, centre, space, control, mobility, development and castling, king safety, the phase, the draw rules and, with only kings and pawns, "
         + "the rule of the square and the opposition. Facts only, never a score: weigh them yourself. Call it when you set or change your plan: out of "
         + "the opening, after a big exchange, in the endgame; not at every move. With move, and game for a game of the archive, the facts of any position of a "
-        + 'game over, to analyse it. Example: position {}, position {move: "24."}.',
+        + 'game over, to analyse it; with line, after a variation played from there on a scratch board. Example: position {}, position {move: "24."}.',
     input: z.object(studyInput),
     readOnly: true,
     idempotent: true,
     sharedWith: [analystAgent],
-    run: ({ game, move }, context): Described => {
-        if (game !== undefined || move !== undefined) {
+    run: ({ game, move, line }, context): Described => {
+        if (game !== undefined || move !== undefined || line !== undefined) {
             const studied = gameShown(context, game);
-            const at = positionAfter(studied.record, move);
+            const at = line === undefined ? positionAfter(studied.record, move) : positionAfterLine(studied.record, move, line);
             return withAnalystLine({ ...at.game.profile, where: positionLine(at, studied.name) }, analystOnView(context, studied.name));
         }
 

@@ -189,9 +189,17 @@ export function sendMove(move: string, words: string, text: Text, name: string):
 }
 
 /** Sends the player's words alone: the reason they were refused, or undefined. */
-export function sendMessage(words: string, text: Text, name: string, shown?: { game: string; at: number; }): Promise<Refused | undefined>
+export function sendMessage(words: string, text: Text, name: string, shown?: Shown): Promise<Refused | undefined>
 {
     return post("/api/message", { text: words.trim(), ...shown }, text, name);
+}
+
+/** Where the words were written in analysis (D-101): the game, how many of its moves the board showed, and the variation played there (D-116). */
+export interface Shown
+{
+    readonly game: string;
+    readonly at: number;
+    readonly variation?: { readonly at: number; readonly moves: readonly string[]; readonly cursor: number; };
 }
 
 /** A request the server refused: why, and whether the player's words were the cause, which the talk says rather than the board. */

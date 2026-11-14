@@ -106,3 +106,11 @@
     opacity: 1;
     background: color-mix(in oklab, currentColor 15%, transparent);
 }
+
+/* On a variation, the fork's sign under the moves before the move the board showed, in the bubble's colour (D-116) */
+.shown-line .fork-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 3px;
+    stroke-width: 2.2;
+}

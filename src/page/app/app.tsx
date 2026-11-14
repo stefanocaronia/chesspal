@@ -43,7 +43,7 @@ import { GameColumn } from "../game/column.tsx";
 import { howEnded, useDeclined, useJustEnded, useSawEnd } from "../game/ending.ts";
 import { type LineView, Steps, stepsLine } from "../game/move-list.tsx";
 import { useOpeningBook } from "../game/opening-book.ts";
-import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, type Ply, reviewCount, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
+import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, playerSpent, playerWords, pliesOf, type Ply, reviewCount, type SentVariation, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
 import { afterMove, isJump, leaveLine, linePlies, lineRecord, onLine, type Place, stepLine, type Variation } from "../game/variation.ts";
 import { GuideDialog } from "../guide/guide.tsx";
 import { BareButton, HelpsCard, HintLine, MapButton } from "../helps/helps.tsx";
@@ -69,7 +69,7 @@ import { textFor } from "../text.ts";
 import { anchorName, type LinkIgnored, useAnchor } from "./anchor.ts";
 import { useBrowseKeys, useEscapeKey, useFoldKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
 import { helpsShown, phaseOf, verdictOf } from "./phase.ts";
-import { ask, type PageData, post, refusedText, sendMessage, sendMove, useServed } from "./served.ts";
+import { ask, type PageData, post, refusedText, sendMessage, sendMove, type Shown, useServed } from "./served.ts";
 import { tabTitle, useTabTitle } from "./title.ts";
 
 /**
@@ -359,6 +359,13 @@ export function App({ start }: { start: Settings; })
             setLine({ ...line, cursor });
             setViewing(line.at >= total ? undefined : line.at);
         }
+    };
+
+    // A variation a line of the talk was written on goes back on the board, at the move it showed, or at its end when it was set aside (D-116).
+    const putLineBack = (sent: SentVariation): void => {
+        setSelected(undefined);
+        setLine({ at: sent.at, moves: sent.moves, cursor: sent.cursor > 0 ? sent.cursor : sent.moves.length });
+        setViewing(sent.at >= total ? undefined : sent.at);
     };
 
     // The cross and Esc close the variation: the board shows the game where it left it.
@@ -660,8 +667,8 @@ export function App({ start }: { start: Settings; })
         }
     };
 
-    // In analysis the words go with the game and the move shown (D-101).
-    const sendWords = (position?: { game: string; at: number; }): void => {
+    // In analysis the words go with the game and the move shown (D-101), and the variation played there, on the board or set aside (D-116).
+    const sendWords = (position?: Shown): void => {
         const words = draft;
 
         // /clear and the other commands are for Claude's app: written here they would reach the AI as words (Sebastiano's playtest).
@@ -704,10 +711,31 @@ export function App({ start }: { start: Settings; })
             />
         );
 
+    // Where the words go in analysis: the game, the move shown, and the variation, on the board or set aside (D-116).
+    const shownIn = (game: string): Shown => line === undefined ? { game, at } : { game, at, variation: line };
+
+    // «Analyse» on the variation sends the player's request, as their words would (D-116).
+    const analyseLine = (): void => {
+        if (studied !== undefined) {
+            setUnsent(undefined);
+            void sendMessage(text.variation.analyseWords, text, name, shownIn(studied.name)).then((refused) => setUnsent(refused?.text));
+        }
+    };
+
     // The variation as the column and the steps show it.
     const lineView: LineView | undefined = !analysing || line === undefined || lineNumbered === undefined
         ? undefined
-        : { plies: lineNumbered, at: line.at, cursor: line.cursor, onShow: showLine, onClose: closeLine, onBack: () => goTo(line.at) };
+        : {
+            plies: lineNumbered,
+            at: line.at,
+            cursor: line.cursor,
+            onShow: showLine,
+            onClose: closeLine,
+            onBack: () => goTo(line.at),
+            onAnalyse: analyseLine,
+            canAnalyse: !asleep && !offline,
+            analyst: name,
+        };
 
     // A game brought to analyse: the page shows it once the server has it in analysis; a refusal stays in the dialog. One the AI has to go over, with no
     // chat at the table, opens the chat's window: the analyst works with the chat's model (D-109).
@@ -849,11 +877,11 @@ export function App({ start }: { start: Settings; })
                                                     setDraft(words);
                                                     setUnsent(undefined);
                                                 }}
-                                                onSend={() => sendWords({ game: studied.name, at })}
+                                                onSend={() => sendWords(shownIn(studied.name))}
                                                 canMove={false}
                                                 name={name}
                                                 problem={unsent}
-                                                about={{ ...(at === 0 ? {} : { ply: plies[at - 1]! }), onShow: goTo }}
+                                                about={{ ...(at === 0 ? {} : { ply: plies[at - 1]! }), onShow: goTo, onLine: putLineBack }}
                                                 {...(chatName === undefined ? {} : { to: chatName })}
                                                 text={text}
                                             />

@@ -20,6 +20,7 @@ import {
     type SeenPosition,
     shownPosition,
     startNewGame,
+    type VariationInput,
 } from "../../commands/index.ts";
 import { clockStarted, type GameRecord, isReviewed, writePgn } from "../../core/index.ts";
 import {
@@ -169,7 +170,7 @@ async function moveFromPage(request: IncomingMessage, response: ServerResponse, 
 
 /**
  * The player's words from the page, without a move: saved with the game as player_say saves them, refused in the player's words, the doorbell rung for the
- * first; in analysis with the position the page shows, and the doorbell rung for each (D-101).
+ * first; in analysis with the position the page shows and the variation played there (D-116), and the doorbell rung for each (D-101).
  */
 async function messageFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
@@ -180,10 +181,19 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
 
     const body = jsonOf(await bodyOf(request));
     const text = textOf(body?.text);
-    const shown = typeof body?.game === "string" && typeof body.at === "number" ? shownPosition(served.context, body.game, body.at) : undefined;
+    const variation = variationOf(body?.variation);
 
-    if (text === undefined) {
+    if (text === undefined || variation === null) {
         send(response, 400, json, JSON.stringify({ error: `Send the message as JSON, ${talkLimits.player} characters at most: {"text": "…"}.` }));
+        return;
+    }
+
+    let shown;
+
+    try {
+        shown = typeof body?.game === "string" && typeof body.at === "number" ? shownPosition(served.context, body.game, body.at, variation) : undefined;
+    } catch (error) {
+        send(response, 400, json, JSON.stringify({ error: (error as Error).message }));
         return;
     }
 
@@ -687,4 +697,16 @@ function gameNow(served: Served): CurrentGame | undefined
 function aiHeld(served: Served, current: CurrentGame): boolean
 {
     return !served.bell.listening && current.clock !== undefined && endOf(current.game) === undefined && current.game.position.turn === current.ai;
+}
+
+/** The variation sent with the player's words (D-116): none when there is none, null when it is not one. */
+function variationOf(value: unknown): VariationInput | undefined | null
+{
+    if (value === undefined) {
+        return undefined;
+    }
+
+    const { at, moves, cursor } = (typeof value === "object" && value !== null ? value : {}) as Record<string, unknown>;
+    const sans = Array.isArray(moves) && moves.every((move) => typeof move === "string") ? moves as string[] : undefined;
+    return typeof at === "number" && typeof cursor === "number" && sans !== undefined ? { at, moves: sans, cursor } : null;
 }

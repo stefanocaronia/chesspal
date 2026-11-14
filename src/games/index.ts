@@ -30,7 +30,7 @@ export {
 } from "./archive.ts";
 export { type ChatStart, cleanSince, lastChatStart, saveChatStart } from "./chat-start.ts";
 export { type CoachHint, type CoachJudgment, type CoachLead, coachShown, coachStarted, coachWaitingSince, type CoachWords, coachWords, forgetCoach, keepHint, keepJudgment, keepLead, startCoach, withCoach } from "./coach.ts";
-export { bothSidesMoved, type CurrentGame, drawOfferOf, endOf, GameChanged, type GameEnd, gameStamp, loadGame, removeGame, rerunIfChanged, saveGame, type Shown, type Speaker, type TalkLine } from "./current-game.ts";
+export { bothSidesMoved, type CurrentGame, drawOfferOf, endOf, GameChanged, type GameEnd, gameStamp, loadGame, removeGame, rerunIfChanged, saveGame, type Shown, type ShownVariation, type Speaker, type TalkLine } from "./current-game.ts";
 export { makeFolder, renameOver, writeAtomically } from "./files.ts";
 export { commentWithPlan, currentPlan, planOf, withoutPlans } from "./plans.ts";
 export { forgetPositionShown, hostProcess, notePositionShown, type PositionShown, positionShownNote } from "./position-shown.ts";

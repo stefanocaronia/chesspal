@@ -605,6 +605,30 @@
     opacity: 0.85;
 }
 
+/* The button that asks the AI to analyse it, small in the accent beside the cross; off while no chat hears the player */
+.analyse-line {
+    flex: none;
+    min-height: 24px;
+    padding: 1px 8px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.analyse-line:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+.analyse-line:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
 /* The cross that closes it, at the row's end; a finger's 32 pixels on a touch screen */
 .close-line {
     display: grid;

@@ -4,7 +4,7 @@ import { archiveEnded, endOf, gameInAnalysis, loadGame, loadTableTalk, saveGame,
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
 import type { Context } from "../registry/index.ts";
 import { gameAt } from "./clock.ts";
-import { shownMove } from "./lines.ts";
+import { shownMove, shownMoves } from "./lines.ts";
 import { openingTags } from "./opening-tags.ts";
 
 /**
@@ -41,11 +41,17 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
     return current;
 }
 
-/** Words of the player's as the AI is given them: their text, and in analysis the move the board page showed as they wrote, 52...♚f6 (D-101). */
+/**
+ * Words of the player's as the AI is given them: their text, and in analysis the move the board page showed as they wrote, 52...♚f6 (D-101), with the
+ * variation they played there as PGN writes it (D-116).
+ */
 export interface Written
 {
     readonly text: string;
     readonly place?: string;
+    readonly variation?: string;
+    /** The game of the variation, when it is not the one in analysis. */
+    readonly variationGame?: string;
 }
 
 /** What the player wrote on the board page that the AI has not been given in this chat, given now: each game tool gives it once; never to an agent (D-89). */
@@ -86,13 +92,36 @@ export function give(context: Context, words: readonly Words[]): Written[]
     }
 
     const analysed = words.some((word) => word.shown !== undefined) ? gameInAnalysis(gameFolder(context.home()))?.game : undefined;
-    return words.map(({ text, shown }) => shown === undefined ? { text } : { text, place: placeOf(shown, analysed) });
+    return words.map(({ text, shown }) => {
+        if (shown === undefined) {
+            return { text };
+        }
+
+        const place = placeOf(shown, analysed);
+
+        if (shown.variation === undefined) {
+            return { text, place };
+        }
+
+        return shown.game === analysed ? { text, place, variation: shown.variation.text } : { text, place, variation: shown.variation.text, variationGame: shown.game };
+    });
 }
 
-/** Where the page stood: the move shown, as the player saw it, or the start; with the game's name when the page shows another now. */
-function placeOf({ game, move }: Shown, analysed: string | undefined): string
+/**
+ * Where the page stood: the move shown, as the player saw it, or the start; on a variation, its move shown and the whole variation, or the game's move with
+ * the variation set aside (D-116); with the game's name when the page shows another now.
+ */
+function placeOf({ game, move, variation }: Shown, analysed: string | undefined): string
 {
-    return `${move === undefined ? "the start" : shownMove(move)}${game === analysed ? "" : ` of ${game}`}`;
+    const there = move === undefined ? "the start" : shownMove(move);
+    const other = game === analysed ? "" : variation === undefined ? ` of ${game}` : ` in ${game}`;
+
+    if (variation === undefined) {
+        return `${there}${other}`;
+    }
+
+    const line = `the variation ${shownMoves(variation.text)}`;
+    return `${variation.move === undefined ? `${there}, ${line} set aside` : `${shownMove(variation.move)} of ${line}`}${other}`;
 }
 
 /** The most a line of the AI's may hold in the games of `folder`: an analyst's note with the helps on (D-78), or with no game going on (D-101); a longer one is refused. */

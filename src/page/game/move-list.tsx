@@ -22,6 +22,11 @@ export interface LineView
     readonly onClose: () => void;
     /** Takes the board back to the game, where the line leaves it. */
     readonly onBack: () => void;
+    /** Asks the AI to analyse the line, as the player's words would; off while no chat hears the player. */
+    readonly onAnalyse: () => void;
+    readonly canAnalyse: boolean;
+    /** Who analyses it, for the button's tooltip. */
+    readonly analyst: string;
 }
 
 /**
@@ -183,8 +188,8 @@ function Move({ ply, current, fork, onShow, text }: { ply: Ply | undefined; curr
 }
 
 /**
- * The variation's row: its moves numbered as a PGN writes them, the one shown in the gold of the moves, and a cross that closes it; faded while the board
- * shows the game, its moves still a click away.
+ * The variation's row: its moves numbered as a PGN writes them, the one shown in the gold of the moves, the button that asks the AI to analyse it, and a
+ * cross that closes it; faded while the board shows the game, its moves still a click away.
  */
 function LineRow({ line, text }: { line: LineView; text: Text; })
 {
@@ -206,6 +211,15 @@ function LineRow({ line, text }: { line: LineView; text: Text; })
                     );
                 })}
             </span>
+            <button
+                type="button"
+                class="analyse-line"
+                title={line.canAnalyse ? text.variation.analyseHint(line.analyst) : text.asleepInAnalysis(line.analyst)}
+                disabled={!line.canAnalyse}
+                onClick={line.onAnalyse}
+            >
+                {text.variation.analyse}
+            </button>
             <button type="button" class="close-line" title={text.variation.close} aria-label={text.variation.close} onClick={line.onClose}>
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M7 7L17 17M17 7L7 17" />
