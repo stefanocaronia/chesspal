@@ -49,7 +49,7 @@ In the steps below, copy each command, paste it in the terminal (Ctrl+V or right
   ```
 
   Choose **Sign in with ChatGPT** and sign in in your browser.
-- **Antigravity**, Google's, with a Google account (the free plan is enough: Chesspal plays with Gemini Flash). On Windows, in Command Prompt:
+- **Antigravity**, Google's, with a Google account (the free plan is enough: Chesspal plays with Gemini Flash). Still experimental: now and then it may miss your move on the board, and then a message in its window wakes it. On Windows, in Command Prompt:
 
   ```bash
   curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd
@@ -105,10 +105,10 @@ Coming later: an AI coach that helps you grow, exercises chosen on your weak poi
 ## What you need
 
 - **Node.js 22.13** or newer, with **npm 10.9.2** or newer, which comes with it.
-- **An AI agent** with your own subscription: [Claude Code](https://code.claude.com/docs/en/setup), with a paid Claude plan, [Codex](https://developers.openai.com/codex), with a ChatGPT account, or [Antigravity](https://antigravity.google/docs/getting-started), with a Google account.
+- **An AI agent** with your own subscription: [Claude Code](https://code.claude.com/docs/en/setup), with a paid Claude plan, [Codex](https://developers.openai.com/codex), with a ChatGPT account, or [Antigravity](https://antigravity.google/docs/getting-started), with a Google account, still experimental.
 - **A web browser**, for the board page.
 
-Chesspal works with any agent that can use Chesspal's tools (MCP) and the files on your computer: we develop it with Claude Code, and Codex and Antigravity are connected too.
+Chesspal works with any agent that can use Chesspal's tools (MCP) and the files on your computer: we develop it with Claude Code, Codex is connected too, and Antigravity is supported but still experimental.
 
 ## Good to know
 
