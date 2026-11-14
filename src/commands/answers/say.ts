@@ -1,6 +1,6 @@
 // The talk on the board page (D-51): a line of the player's or the AI's, saved with the game, and the player's words the AI has not been given yet.
 import { endWithMood, type Mood } from "../../core/index.ts";
-import { archiveEnded, endOf, gameInAnalysis, loadGame, loadTableTalk, saveGame, saveTableTalk, type Sayer, type Shown, type TableTalk, type Talk, talkLimits, talkLine, unheardWords, type Words } from "../../games/index.ts";
+import { archiveMood, endOf, gameInAnalysis, loadGame, loadTableTalk, saveGame, saveTableTalk, type Sayer, type Shown, type TableTalk, type Talk, talkLimits, talkLine, unheardWords, type Words } from "../../games/index.ts";
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
 import type { Context } from "../registry/index.ts";
 import { gameAt } from "./clock.ts";
@@ -35,7 +35,7 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
     saveGame(folder, current);
 
     if (mood !== undefined) {
-        archiveEnded(folder, current, openingTags(current.game.record));
+        archiveMood(folder, current, mood, openingTags(current.game.record));
     }
 
     return current;

@@ -11,6 +11,7 @@ export {
     archivedWhen,
     archiveEnded,
     archiveGame,
+    archiveMood,
     archiveName,
     deleteGame,
     GameMissing,

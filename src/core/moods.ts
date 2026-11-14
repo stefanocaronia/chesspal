@@ -36,11 +36,17 @@ export function moodOf(comment: string | undefined): Mood | undefined
 export function endWithMood(game: Game, mood: Mood): void
 {
     const plies = game.record.moves.length;
-    const comment = game.record.moves[plies - 1]?.comment?.replace(moodPattern, "");
 
     if (plies > 0) {
-        game.annotate(plies, { comment: comment === undefined || comment === "" ? moodTag(mood) : `${comment} ${moodTag(mood)}` });
+        game.annotate(plies, { comment: withMood(game.record.moves[plies - 1]?.comment, mood) });
     }
+}
+
+/** A game's record with the mood it ends with on its last move, in place of the one it had, as endWithMood gives it: the rest of the record as it is. */
+export function recordWithMood(record: GameRecord, mood: Mood): GameRecord
+{
+    const last = record.moves.length - 1;
+    return { ...record, moves: record.moves.map((move, index) => index === last ? { ...move, comment: withMood(move.comment, mood) } : move) };
 }
 
 /** The AI's mood after the first `plies` moves of a record: the last it gave, while it lasts, else neutral. A mood on the player's move is the one the game ended with. */
@@ -75,3 +81,10 @@ export function withoutMoods(record: GameRecord): GameRecord
 
 const neutral: MoodNow = { mood: "neutral", left: 0 };
 const moodPattern = /\s*\[%mood ([a-z]+)\]/;
+
+// A move's comment with the mood in place of the one it had.
+function withMood(comment: string | undefined, mood: Mood): string
+{
+    const kept = comment?.replace(moodPattern, "");
+    return kept === undefined || kept === "" ? moodTag(mood) : `${kept} ${moodTag(mood)}`;
+}

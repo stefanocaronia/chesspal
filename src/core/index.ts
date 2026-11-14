@@ -12,7 +12,7 @@ export { aiLevels, layersOf, levelForPlayer, levelOf, levelTag, sees, suggestedL
 export type { AiLevel, Layer } from "./levels.ts";
 export { materialOf } from "./material.ts";
 export type { Material } from "./material.ts";
-export { endWithMood, type Mood, moodAt, type MoodNow, moodOf, moods, moodTag, withoutMoods } from "./moods.ts";
+export { endWithMood, type Mood, moodAt, type MoodNow, moodOf, moods, moodTag, recordWithMood, withoutMoods } from "./moods.ts";
 export { bookMoves, bookPlaceOf, indexBook, indexOpenings, openingOf, outOfBookMove, positionKeysOf } from "./openings.ts";
 export type { BookPlace, Opening, OpeningBook, OpeningIndex } from "./openings.ts";
 export { pgnDate, readPgn, readPgnTags, readPgnUnplayed, writePgn } from "./pgn.ts";

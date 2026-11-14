@@ -1,7 +1,7 @@
 // The finished games, as PGN in games/ (D-9, D-41), with the AI's plans for the analyst (D-21); and the games played elsewhere, kept to study in study/ (D-68).
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { type GameRecord, movesOnly, pgnDate, readPgn, readPgnTags, readPgnUnplayed, unsigned, withAiHost, withAiModel, writePgn } from "../core/index.ts";
+import { type GameRecord, type Mood, movesOnly, pgnDate, readPgn, readPgnTags, readPgnUnplayed, recordWithMood, unsigned, withAiHost, withAiModel, writePgn } from "../core/index.ts";
 import { aiHostOf, aiModelOf } from "./ai-model.ts";
 import { coachWords, withCoach } from "./coach.ts";
 import { type CurrentGame, endOf, loadGame } from "./current-game.ts";
@@ -75,6 +75,26 @@ export function archiveEnded(folder: string, current: CurrentGame, opening: Open
         return archive === undefined ? {} : { archive };
     } catch (error) {
         return { warning: `${(error as Error).message} The game is saved in game.json: it goes to the archive when a new game starts.` };
+    }
+}
+
+/**
+ * Gives the mood the AI ends with to a game over already in the archive, on its last move, beside the review the analyst and Chesspal may have written there
+ * since; archives the game when it is not there.
+ */
+export function archiveMood(folder: string, current: CurrentGame, mood: Mood, opening: OpeningTags): { archive?: string; warning?: string; }
+{
+    const name = archivedName(folder, current);
+
+    if (name === undefined) {
+        return archiveEnded(folder, current, opening);
+    }
+
+    try {
+        writeAtomically(join(folder, name), writePgn(recordWithMood(archivedGame(folder, name), mood)));
+        return { archive: name };
+    } catch (error) {
+        return { warning: `Chesspal could not write the mood into ${name}: ${(error as Error).message}` };
     }
 }
 

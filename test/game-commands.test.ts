@@ -232,6 +232,22 @@ describe("a game in chat", () => {
         expect(readArchive(resigned).replace(/\s+/g, " ")).toContain("1. e4 e5 {[%plan p] [%mood happy]} 2. Nf3 {[%mood worried]} 1-0");
     });
 
+    it("gives the mood of a game over to its archive beside the review written there since, the book's badges too", async () => {
+        const context = playerFolder();
+        await run(context, "new_game", { ai_colour: "black" });
+        await run(context, "player_move", { move: "e4" });
+        await run(context, "ai_move", { move: "e5", plan: "p" });
+        await run(context, "player_move", { move: "Nf3" });
+        await run(context, "end_game", { result: "ai_resigns" });
+        await run(context, "analyse_game", { game: archive });
+
+        await run(context, "ai_say", { text: "Well played.", mood: "sad" });
+
+        const archived = readArchive(context).replace(/\s+/g, " ");
+        expect(archived).toContain("1. e4 {[%badge book]}");
+        expect(archived).toContain("[%mood sad]} 1-0");
+    });
+
     it("keeps a game going on: new_game refuses it, or archives it unfinished with replace", async () => {
         const context = playerFolder();
         await run(context, "new_game", { ai_colour: "white" });
