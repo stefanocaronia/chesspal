@@ -1142,6 +1142,57 @@ describe("the doorbell of the chat", () => {
         expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ listening: false });
     });
 
+    it("tells the page nobody hears the player when Claude Code says the chat is idle, stopped before the AI wrote a word", async () => {
+        const folder = playerFolder();
+        const context = testContext(folder);
+        const page = await open(folder, undefined, context);
+        // Claude Code's folder: the transcript under projects/, its record of each running chat under sessions/.
+        const claude = join(folder, "claude");
+        const transcript = join(claude, "projects", "the-folder", "a-chat.jsonl");
+        const record = (status: string): void => writeFileSync(join(claude, "sessions", "4242.json"), JSON.stringify({ pid: 4242, sessionId: "a-chat", status }));
+        mkdirSync(dirname(transcript), { recursive: true });
+        mkdirSync(join(claude, "sessions"));
+        writeFileSync(join(claude, "sessions", "77.json"), JSON.stringify({ pid: 77, sessionId: "another-chat", status: "idle" }));
+        writeFileSync(transcript, `${JSON.stringify({ type: "user", message: { role: "user", content: "What plan do you suggest?" } })}\n`);
+        saveChatStart(folder, { source: "startup", at: context.now().toISOString(), session: "a-chat", transcript });
+
+        // The new game wakes the chat, which answers and waits for the bell; then the player writes in the chat, and the AI is at work on it.
+        expect(await post(page, "/api/new", { ai_colour: "black" })).toMatchObject({ status: 200 });
+        expect(await (await hookWaits(page, { cwd: folder })).heard).toBe(true);
+        const hook = await hookWaits(page, { cwd: folder });
+        expect((await get(page, "/api/bell/prompt")).body).toBe("at work");
+        expect(await hook.heard).toBe(false);
+        record("busy");
+        expect(await post(page, "/api/move", { move: "e4" })).toMatchObject({ status: 200 });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ listening: true });
+
+        // Esc before the AI's first word: no line in the transcript, but Claude Code says the chat is idle, and the doorbell, looking again, finds it.
+        record("idle");
+        await vi.waitFor(async () => expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ listening: false }), { timeout: 2 * stopCheck, interval: 100 });
+    });
+
+    it("tells the page nobody hears the player when Codex's transcript ends with the turn aborted, not when another turn started after it", async () => {
+        const folder = playerFolder();
+        const context = testContext(folder);
+        const page = await open(folder, undefined, context);
+        const transcript = join(folder, "codex", "sessions", "2026", "11", "15", "rollout-a-chat.jsonl");
+        const event = (payload: object): string => `${JSON.stringify({ type: "event_msg", payload })}\n`;
+        mkdirSync(dirname(transcript), { recursive: true });
+        // The turn the Stop hook held was aborted by the player's message, which started a turn of its own.
+        writeFileSync(transcript, event({ type: "task_started" }) + event({ type: "turn_aborted", reason: "interrupted" }) + event({ type: "task_started" }));
+        saveChatStart(folder, { source: "startup", at: context.now().toISOString(), session: "a-chat", transcript });
+
+        // The new game wakes the chat, which is at work on it when the player writes on the page.
+        expect(await post(page, "/api/new", { ai_colour: "black" })).toMatchObject({ status: 200 });
+        expect(await (await hookWaits(page, { cwd: folder })).heard).toBe(true);
+        expect(await post(page, "/api/message", { text: "Take your time." })).toMatchObject({ status: 200 });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ listening: true });
+
+        // Esc in the middle of the answer: Codex writes the turn's abort, and the doorbell, looking again, finds it.
+        writeFileSync(transcript, `${JSON.stringify({ type: "response_item", payload: { type: "message" } })}\n${event({ type: "turn_aborted", reason: "interrupted" })}`, { flag: "a" });
+        await vi.waitFor(async () => expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ listening: false }), { timeout: 2 * stopCheck, interval: 100 });
+    });
+
     it("knows whether the doorbell woke the chat in the turn it is in, and tells when it wakes it or the turn ends", () => {
         let told = 0;
         const bell = new Bell(() => true, () => told++);
