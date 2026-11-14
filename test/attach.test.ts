@@ -136,7 +136,7 @@ describe("a chat at the table", () => {
         expect(await attachTable(chatOn(home), () => undefined)).toBeDefined();
     });
 
-    it("loses a table that takes it and then stops answering, within seconds, and its tool goes on", async () => {
+    it("stays at a table that leaves one request unanswered, loses one that stops answering after a few in a row, and its tools go on", async () => {
         const { home, fake: frozen } = await fakeTableOn(version, "frozen");
         let lost = 0;
 
@@ -146,13 +146,19 @@ describe("a chat at the table", () => {
             const started = Date.now();
             await page!.chatCalls();
 
-            expect(lost).toBe(1);
+            // A table busy for a moment, as a computer that wakes from sleep, keeps the chat.
+            expect(lost).toBe(0);
             expect(Date.now() - started).toBeLessThan(3_000);
+
+            await page!.chatCalls();
+            await page!.chatCalls();
+            expect(lost).toBe(1);
+            expect(Date.now() - started).toBeLessThan(7_000);
         } finally {
             frozen.server.close();
             frozen.server.closeAllConnections();
         }
-    }, 10_000);
+    }, 15_000);
 
     it("stays at a table that failed one request, and loses one that no longer knows it", async () => {
         const { home, fake: failing } = await fakeTableOn(version, "fails");

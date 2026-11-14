@@ -55,6 +55,9 @@ async function tableOf(context: Context): ReturnType<typeof tableAt>
 // How long the table may take to answer the chat: it answers in a millisecond, so one that takes more than a second is stuck (Federico).
 const answerWait = 1_500;
 
+// How many requests in a row the table may leave unanswered before the chat takes it as lost.
+const missesToLose = 3;
+
 /** What the table answered a request: its words; "lost" when it is gone or no longer knows the chat; none when only this request failed. */
 type Answer = Record<string, unknown> | "lost" | undefined;
 
@@ -85,6 +88,7 @@ class TableLink
     private news = false;
     private copying = false;
     private left = false;
+    private misses = 0;
     private readonly port: number;
     private readonly context: Context;
     private readonly lost: () => void;
@@ -210,22 +214,38 @@ class TableLink
         return new Promise((done) => {
             const asked = request({ ...this.address(path), agent: this.agent }, (response) => {
                 const chunks: Buffer[] = [];
+                let ended = false;
                 response.on("data", (chunk: Buffer) => chunks.push(chunk));
-                response.on("end", () => done(answerOf(response.statusCode, Buffer.concat(chunks).toString("utf8"))));
-                response.on("close", () => done("lost"));
+                response.on("end", () => {
+                    ended = true;
+                    this.misses = 0;
+                    done(answerOf(response.statusCode, Buffer.concat(chunks).toString("utf8")));
+                });
+                response.on("close", () => {
+                    if (!ended) {
+                        done(this.missed());
+                    }
+                });
             });
-            // A table that stops answering would hold every tool of the chat's: it is lost, and the chat serves its own page (Priya).
             asked.setTimeout(answerWait, () => asked.destroy(new Error("The table did not answer.")));
             asked.on("error", (error: NodeJS.ErrnoException) => {
                 // The table closes a connection idle for 5 s as Node reuses it: the request never reached it (Federico).
                 if (retry && asked.reusedSocket && error.code === "ECONNRESET") {
                     void this.post(path, body, false).then(done);
                 } else {
-                    done("lost");
+                    done(error.code === "ECONNREFUSED" ? "lost" : this.missed());
                 }
             });
             asked.end(JSON.stringify({ ...body, token: this.token }));
         });
+    }
+
+    // A request the table did not answer: one is a table busy for a moment, as a computer that wakes from sleep; a table that stops answering would hold
+    // every tool of the chat's, so after a few in a row it is lost, and the chat serves its own page (Priya).
+    private missed(): Answer
+    {
+        this.misses += 1;
+        return this.misses >= missesToLose ? "lost" : undefined;
     }
 
     private address(path: string): RequestOptions
