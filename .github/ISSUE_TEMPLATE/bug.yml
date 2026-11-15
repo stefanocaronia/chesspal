@@ -1,0 +1,50 @@
+name: Something does not work
+description: Chesspal broke, did something wrong or confused you.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying Chesspal. It is a personal project in early development: I read every issue, but may answer late.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Chesspal's version
+      description: The output of `chesspal --version`.
+      placeholder: "0.8.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: The AI you play with
+      options:
+        - Claude Code
+        - Claude desktop app
+        - Codex
+        - Antigravity
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: Your system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: A screenshot of the board page, the error in the terminal, the moves of the game. Never paste passwords or keys.
