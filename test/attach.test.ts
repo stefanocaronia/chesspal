@@ -499,12 +499,11 @@ describe("a new game at the table that wants a clean chat", () => {
             startAnalysis(gameFolder(home), name, new Date(), { analyst: { game: name, run: "analyst-1", since: new Date().toISOString() } });
             await annotateGame.run(annotateGame.input.parse({ game: name, summary: "A long fight." }), analyst);
 
-            // The chat's turn ends, and its hook waits for the bell.
+            // New game, asked as the chat's turn ends and its hook waits for the bell: it starts, now or once the turn has ended, and the chat again.
             const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
-            await until(async () => (await gameShown(table.url)).thinking === undefined);
 
-            const answered = await newGameWith(table.url);
-            expect(answered.status).toBe(200);
+            expect((await newGameWith(table.url)).status).toBe(200);
+            await until(() => Promise.resolve(relaunched.length > 0));
             expect(relaunched).toEqual([chat.folder]);
             await page.close();
             expect(await hook).toMatchObject({ rang: false });
