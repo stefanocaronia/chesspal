@@ -134,12 +134,24 @@ export interface SentVariation
  */
 export function analysisTalk(talk: readonly TalkLine[], game: string): TalkLine[]
 {
+    return talkOn(talk, game).slice(-10);
+}
+
+/** The AI's answers over a game in analysis, all of them in the order said: the voice reads those added while the page is open. */
+export function analysisAnswers(talk: readonly TalkLine[], game: string): string[]
+{
+    return talkOn(talk, game).filter((line) => line.who === "ai").map((line) => line.text);
+}
+
+// The lines of the talk over a game in analysis, a line without a position belonging to the game of the line before it.
+function talkOn(talk: readonly TalkLine[], game: string): TalkLine[]
+{
     let on: string | undefined;
 
     return talk.filter((line) => {
         on = line.shown?.game ?? on;
         return on === game;
-    }).slice(-10);
+    });
 }
 
 /** How many times the AI has spoken in the game, its comments on its moves and its lines on the page: the page sees it speak when the count grows. */

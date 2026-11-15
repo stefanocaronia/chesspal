@@ -203,10 +203,15 @@ export interface About
 /**
  * The player's words of the game, the newest by the box they write in with how far it got, and the box: Enter or the button sends the words alone, the next
  * move takes them with it. 200 characters from one move of the AI's to the next: once they are written, the box goes until its move (D-54). In analysis the
- * AI's answers are in the same thread, each by a small Torretta, and each line of the player's names the move it was written on (D-101).
+ * AI's answers are in the same thread, each by a small Torretta, read aloud as they come when the player wants it, and each line of the player's names the
+ * move it was written on (D-101).
  */
-export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, canMove, name, problem, about, to, text }: {
+export function Compose({ lines, answers = [], voice, newestFirst, spent, draft, onDraft, onSend, canMove, name, problem, about, to, text }: {
     lines: readonly TalkLine[];
+    /** In analysis, all the AI's answers over the game, of which the voice reads those added while the page is open. */
+    answers?: readonly string[];
+    /** The voice that reads the answers aloud, when the player wants it. */
+    voice?: Voice;
     /** On a board turned round the box is above the words, and the newest come first. */
     newestFirst: boolean;
     spent: number;
@@ -224,6 +229,7 @@ export function Compose({ lines, newestFirst, spent, draft, onDraft, onSend, can
 {
     const list = useRef<HTMLOListElement>(null);
     useOnlyWhole(list, lines.map((line) => line.text));
+    useSpokenNews(answers, voice);
     const left = talkLimits.line - spent;
     const blank = draft.trim() === "";
     const lastWritten = lines.findLastIndex((line) => line.who === "player");

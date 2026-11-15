@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isReviewed, readPgn } from "../src/core/index.ts";
 import { talkLimits } from "../src/games/index.ts";
-import { aiSpoke, aiWords, analysisTalk, judgmentsOf, nextBadged, playerWords, pliesOf, type Ply, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/game/plies.ts";
+import { aiSpoke, aiWords, analysisAnswers, analysisTalk, judgmentsOf, nextBadged, playerWords, pliesOf, type Ply, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/game/plies.ts";
 
 describe("the moves on the page", () => {
     it("number the moves of a game that starts with Black to move", () => {
@@ -102,6 +102,16 @@ describe("the moves on the page", () => {
         expect(analysisTalk(Array.from({ length: 12 }, (_, index) => on("study/a.pgn", `${index}`)), "study/a.pgn").map(({ text }) => text)).toEqual(
             ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
         );
+    });
+
+    it("give all the AI's answers over a game in analysis, past the ten shown, for the voice to read the new ones", () => {
+        const asked = (game: string) => ({ who: "player", text: "Why?", ply: 0, shown: { game, at: 3 } }) as const;
+        const said = (text: string) => ({ who: "ai", text, ply: 0 }) as const;
+        const talk = [asked("study/a.pgn"), ...Array.from({ length: 11 }, (_, index) => said(`${index}`)), asked("study/b.pgn"), said("On b.")];
+
+        expect(analysisAnswers(talk, "study/a.pgn")).toEqual(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]);
+        expect(analysisAnswers(talk, "study/b.pgn")).toEqual(["On b."]);
+        expect(analysisAnswers([said("Good game.")], "study/a.pgn")).toEqual([]);
     });
 
     it("go from a badge's count to the side's next move with it, the first again after the last", () => {

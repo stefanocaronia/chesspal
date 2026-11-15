@@ -44,7 +44,24 @@ import { GameColumn } from "../game/column.tsx";
 import { howEnded, useDeclined, useJustEnded, useSawEnd } from "../game/ending.ts";
 import { type LineView, Steps, stepsLine } from "../game/move-list.tsx";
 import { useOpeningBook } from "../game/opening-book.ts";
-import { aiSpoke, aiWords, analysisTalk, type CoachShown, judgmentsOf, nextBadged, playerSpent, playerWords, pliesOf, type Ply, reviewCount, type SentVariation, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
+import {
+    aiSpoke,
+    aiWords,
+    analysisAnswers,
+    analysisTalk,
+    type CoachShown,
+    judgmentsOf,
+    nextBadged,
+    playerSpent,
+    playerWords,
+    pliesOf,
+    type Ply,
+    reviewCount,
+    type SentVariation,
+    withBook,
+    withJudgments,
+    withoutReviews,
+} from "../game/plies.ts";
 import { afterMove, isJump, leaveLine, linePlies, lineRecord, onLine, type Place, stepLine, type Variation } from "../game/variation.ts";
 import { GuideDialog } from "../guide/guide.tsx";
 import { BareButton, HelpsCard, HintLine, MapButton } from "../helps/helps.tsx";
@@ -908,7 +925,11 @@ export function App({ start }: { start: Settings; })
                                     <section class="you-block" aria-label={sides[player].name}>
                                         <div class="chat">
                                             <Compose
+                                                // Another game in analysis starts the thread afresh: the voice reads only the answers that come after.
+                                                key={studied.name}
                                                 lines={analysisTalk(talk, studied.name)}
+                                                answers={analysisAnswers(talk, studied.name)}
+                                                {...(voiced ? { voice: text } : {})}
                                                 newestFirst={false}
                                                 spent={0}
                                                 draft={draft}
