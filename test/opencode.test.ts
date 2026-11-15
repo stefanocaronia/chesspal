@@ -220,6 +220,13 @@ describe("Chesspal's plugin for OpenCode", () => {
         await opencode.send("session.inbox.enqueued", { sessionID: "ses_2", item: { type: "user", payload: { text: "Ciao" } } });
         expect(opencode.hooks().at(-1)).toEqual({ command: "chesspal chat", input: { cwd: folder, session_id: "ses_2", source: "clear" }, cwd: folder, shell: true });
 
+        // A subagent's session, born with its parent's, is no chat: no start noted, nobody waits after its turn.
+        const before = opencode.hooks().length;
+        await opencode.send("session.created", { sessionID: "ses_agent", parentID: "ses_2" });
+        await opencode.send("session.inbox.enqueued", { sessionID: "ses_agent", item: { type: "user", payload: { text: "what is 2+2" } } });
+        await opencode.send("session.execution.succeeded", { sessionID: "ses_agent" });
+        expect(opencode.hooks()).toHaveLength(before);
+
         // OpenCode letting the plugin go ends the waits still on.
         await opencode.send("session.execution.succeeded", { sessionID: "ses_2" });
         const third = opencode.children.at(-1)!;

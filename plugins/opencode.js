@@ -38,6 +38,7 @@ function chesspalChats(context, run)
 {
     const folder = context.location.directory;
     const seen = new Set();
+    const agents = new Set();
     const listeners = new Map();
     const prompted = new Map();
     let modelNoted = "";
@@ -135,6 +136,15 @@ function chesspalChats(context, run)
             const session = event?.data?.sessionID;
 
             if (typeof session !== "string") {
+                return;
+            }
+
+            // A subagent's session is born with its parent's: it is no chat, and nobody waits for the player after its turns.
+            if (event.type === "session.created" && typeof event.data.parentID === "string") {
+                agents.add(session);
+            }
+
+            if (agents.has(session)) {
                 return;
             }
 
