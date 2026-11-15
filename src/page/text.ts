@@ -185,6 +185,8 @@ export interface Text
         readonly noChat: string;
         readonly change: string;
         install(name: string): string;
+        /** A host with no model to offer, as OpenCode before the table finds one the player can use: it starts with its own. */
+        noModels(host: string): string;
         /** The titles of the hosts' cards and of the selected one's choices, and the tick's on the one at the table. */
         readonly chat: string;
         readonly model: string;
@@ -764,7 +766,8 @@ const english: Text = {
         byHand: (name) => `You opened this chat yourself: change ${name}'s model with /model in its window, or close it and open one from here, with the choices below.`,
         noChat: "No chat at the table: choose one",
         change: "Change the chat or its model",
-        install: (name) => `To play with ${name}, install Claude Code, Codex or Antigravity, then open this page again.`,
+        install: (name) => `To play with ${name}, install Claude Code, Codex, Antigravity or OpenCode, then open this page again.`,
+        noModels: (host) => `No ${host} model found on this computer yet: it starts with its own. To play for free, install Ollama and a model that can use tools.`,
         chat: "Chat",
         model: "Model",
         effort: "Effort",
@@ -1225,7 +1228,8 @@ const italian: Text = {
         byHand: (name) => `Questa chat l'hai aperta tu: cambia il modello di ${name} con /model nella sua finestra, oppure chiudila e aprine una da qui, con le scelte qui sotto.`,
         noChat: "Nessuna chat al tavolo: scegline una",
         change: "Cambia la chat o il modello",
-        install: (name) => `Per giocare con ${name}, installa Claude Code, Codex o Antigravity, poi apri di nuovo questa pagina.`,
+        install: (name) => `Per giocare con ${name}, installa Claude Code, Codex, Antigravity o OpenCode, poi apri di nuovo questa pagina.`,
+        noModels: (host) => `Nessun modello di ${host} ancora trovato su questo computer: parte con il suo. Per giocare gratis, installa Ollama e un modello che sappia usare gli strumenti.`,
         chat: "Chat",
         model: "Modello",
         effort: "Ragionamento",

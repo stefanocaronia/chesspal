@@ -14,7 +14,7 @@ const { version } = JSON.parse(readFileSync(join(repository, "package.json"), "u
 // that starts several times slower, such as one that loads at once what it should load late, not a runner's noise.
 const initializeBudget = 1_000;
 const toolsNeeded = ["status", "new_game", "player_move", "ai_move", "look", "analyse_game"];
-const shipped = /^(?:dist\/|instructions\/|package\.json$|README\.md$|LICENSE$)/;
+const shipped = /^(?:dist\/|instructions\/|plugins\/|package\.json$|README\.md$|LICENSE$)/;
 
 const temporary = mkdtempSync(join(tmpdir(), "chesspal-smoke-"));
 const installed = join(temporary, "install");
@@ -52,8 +52,9 @@ function packed(): string
     const files = pack.files.map(({ path }) => path.replaceAll("\\", "/"));
     check(`npm pack: ${pack.filename}, ${files.length} files`, files.length > 0);
     check("the package holds the command line and the opponent's instructions", files.includes("dist/cli/cli.js") && files.includes("instructions/opponent.md") && files.includes("instructions/start.md"));
+    check("the package holds OpenCode's plugin", files.includes("plugins/opencode.js"));
     const strays = files.filter((path) => !shipped.test(path));
-    check(`the package holds nothing but dist/, instructions/ and its own files${strays.length === 0 ? "" : `: not ${strays.join(", ")}`}`, strays.length === 0);
+    check(`the package holds nothing but dist/, instructions/, plugins/ and its own files${strays.length === 0 ? "" : `: not ${strays.join(", ")}`}`, strays.length === 0);
     return join(temporary, pack.filename);
 }
 
@@ -78,6 +79,8 @@ function initialised(): { command: string; args: string[]; }
     check("chesspal init writes the lines that start a chat in AGENTS.md", readFileSync(join(player, "AGENTS.md"), "utf8").includes(start));
     check("chesspal init sets Claude Code's hook for a move written alone in the chat", readFileSync(join(player, ".claude", "settings.json"), "utf8").includes('"chesspal prompt"'));
     check("chesspal init sets Antigravity's doorbell", readFileSync(join(player, ".agents", "hooks.json"), "utf8").includes('"chesspal listen --antigravity"'));
+    check("chesspal init writes the chesspal server in opencode.json", readFileSync(join(player, "opencode.json"), "utf8").includes('"chesspal"'));
+    check("chesspal init installs OpenCode's plugin", readFileSync(join(player, ".opencode", "plugins", "chesspal.js"), "utf8").includes("listen --opencode"));
     const input = JSON.stringify({ session_id: "smoke", cwd: player, hook_event_name: "UserPromptSubmit", prompt: "Hello, shall we play?" });
     const prompted = spawnSync("chesspal prompt", { cwd: player, env: environment, shell: true, encoding: "utf8", input });
     check("chesspal prompt lets a message that is no move go to the AI, saying nothing", prompted.status === 0 && prompted.stdout === "" && prompted.stderr === "");

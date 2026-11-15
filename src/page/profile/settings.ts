@@ -43,6 +43,8 @@ export interface Settings
     readonly codexEffort: string;
     readonly antigravityModel: string;
     readonly antigravityEffort: string;
+    readonly opencodeModel: string;
+    readonly opencodeEffort: string;
 }
 
 /** The settings this browser remembers, each one it does not know taking its default; the theme and the sounds chosen before the panel come along. */
@@ -79,6 +81,8 @@ export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | 
         codexEffort: word(stored.codexEffort),
         antigravityModel: word(stored.antigravityModel),
         antigravityEffort: word(stored.antigravityEffort),
+        opencodeModel: modelName(stored.opencodeModel),
+        opencodeEffort: word(stored.opencodeEffort),
     };
 }
 
@@ -139,4 +143,10 @@ function oneOf<Choice extends string>(value: unknown, choices: readonly Choice[]
 function word(value: unknown): string
 {
     return typeof value === "string" && /^[\w.-]{1,40}$/.test(value) ? value : "";
+}
+
+// An OpenCode model, its provider before it and at times a tag after it (ollama/gemma4:12b), as long as the profile keeps a word; empty when it is none.
+function modelName(value: unknown): string
+{
+    return typeof value === "string" && /^[\w.:/-]{1,64}$/.test(value) ? value : "";
 }

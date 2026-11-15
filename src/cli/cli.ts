@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 const args = process.argv.slice(2);
+// The doorbell's flags, by the host whose hook passes each: Claude Code passes none.
+const listenFlags = new Map<string, "codex" | "antigravity" | "opencode">([["--codex", "codex"], ["--antigravity", "antigravity"], ["--opencode", "opencode"]]);
 
 // The table's own words (D-104): alone or open, its page; table, icon (--remove), play <host>. The host's: mcp, its server; listen, its doorbell; chat, how the chat
 // started; prompt, the move the player wrote alone. Everything else is a command. Each loads only what it needs: prompt runs on every message of the chat.
@@ -26,9 +28,9 @@ if (args.length === 0) {
     // The server and its SDK load only here: every other command starts faster without them.
     const { startMcpServer } = await import("../server/mcp/index.ts");
     await startMcpServer();
-} else if (args[0] === "listen" && (args.length === 1 || (args.length === 2 && (args[1] === "--codex" || args[1] === "--antigravity")))) {
+} else if (args[0] === "listen" && (args.length === 1 || (args.length === 2 && listenFlags.has(args[1]!)))) {
     const { listen } = await import("../server/bell/index.ts");
-    await listen(args[1] === "--codex" ? "codex" : args[1] === "--antigravity" ? "antigravity" : "claude");
+    await listen(listenFlags.get(args[1] ?? "") ?? "claude");
 } else if (args.length === 1 && args[0] === "chat") {
     const { recordChatStart } = await import("./chat-hook.ts");
     await recordChatStart();
@@ -95,7 +97,7 @@ async function playHere(host: string): Promise<void>
     const [{ isHostName, playHost }, { defaultContext }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts")]);
 
     if (!isHostName(host)) {
-        console.error(`chesspal play takes claude, codex or antigravity, not ${host}.`);
+        console.error(`chesspal play takes claude, codex, antigravity or opencode, not ${host}.`);
         process.exitCode = 1;
         return;
     }
@@ -122,4 +124,7 @@ async function serveTable(): Promise<void>
         console.error((error as Error).message);
         process.exitCode = 1;
     }
+
+    // Closed, the table waits for no host's models still being read: `opencode models` may take seconds while OpenCode starts its service.
+    process.stdout.write("", () => process.exit());
 }

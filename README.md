@@ -31,7 +31,7 @@ Five steps, done once, in about 15 minutes. You need a paid Claude plan, a ChatG
 
 In the steps below, copy each command, paste it in the terminal (Ctrl+V or right-click; on macOS ⌘V) and press Enter. Wait for the terminal to finish before the next one. Lines with "WARN" are normal: go on.
 
-**3. Install the AI and sign in.** Choose one of the three. You need your own subscription: Chesspal never uses an API key, which is paid by the call.
+**3. Install the AI and sign in.** Choose one of the four. The first three need your own subscription: Chesspal never uses an API key, which is paid by the call. OpenCode with Ollama needs no account at all.
 
 - **Claude Code**, with a paid Claude plan (Pro or higher; the free plan does not include it):
 
@@ -62,6 +62,19 @@ In the steps below, copy each command, paste it in the terminal (Ctrl+V or right
   ```
 
   Then close the terminal, open a new one, run `agy` and sign in with your Google account.
+- **OpenCode**, free and with no account, with an AI that runs on your computer through [Ollama](https://ollama.com/download). A model on your own computer plays more slowly and more weakly than the others, and the faster your computer, the better. Install Ollama from its site, then get a model that can use tools, such as:
+
+  ```bash
+  ollama pull gpt-oss:20b
+  ```
+
+  Then install OpenCode:
+
+  ```bash
+  npm install -g @opencode/cli
+  ```
+
+  The board page offers the Ollama models that can use tools, and the models you used in OpenCode: no sign-in is needed for Ollama's.
 
 Once you are signed in, close that terminal window with its × and open a new one, as in step 2.
 
@@ -74,7 +87,7 @@ chesspal
 
 The board page opens in your browser, and you can close this terminal. The first time, Chesspal offers an icon on your desktop and in your menu of programs: accept it, and from then on you open the board with a double click on it, with no terminal.
 
-**5. Start the AI.** The first time, the board page asks who you are: fill it in and press **Start playing**. Then press **Claude Code**, **Codex** or **Antigravity**: the AI opens in a terminal of its own. Keep that window open while you play. The first time it asks some questions:
+**5. Start the AI.** The first time, the board page asks who you are: fill it in and press **Start playing**. Then press **Claude Code**, **Codex**, **Antigravity** or **OpenCode**: the AI opens in a terminal of its own. Keep that window open while you play. The first time it asks some questions:
 
 - whether you trust the folder: choose **Yes** with the arrow keys and press Enter;
 - with Codex, about Chesspal's two hooks, the small programs that tell the AI when you move on the board: choose **Trust all and continue**;
@@ -100,15 +113,15 @@ An AI in a plain chat forgets the position, plays illegal moves and sees no boar
 - **Go over a game** with the AI when it is over: its notes show on the board page, in Analyses. Games from other sites come in as PGN files.
 - **Keep a profile** for each player at the same computer, with their games.
 
-Coming later: an AI coach that helps you grow, exercises chosen on your weak points, a rating worked out from your games, an opponent with a character and moods of its own, and local models.
+Coming later: an AI coach that helps you grow, exercises chosen on your weak points, a rating worked out from your games, and an opponent with a character and moods of its own.
 
 ## What you need
 
 - **Node.js 22.13** or newer, with **npm 10.9.2** or newer, which comes with it.
-- **An AI agent** with your own subscription: [Claude Code](https://code.claude.com/docs/en/setup), with a paid Claude plan, [Codex](https://developers.openai.com/codex), with a ChatGPT account, or [Antigravity](https://antigravity.google/docs/getting-started), with a Google account, still experimental.
+- **An AI agent**: [Claude Code](https://code.claude.com/docs/en/setup), with a paid Claude plan, [Codex](https://developers.openai.com/codex), with a ChatGPT account, [Antigravity](https://antigravity.google/docs/getting-started), with a Google account, still experimental, or [OpenCode](https://opencode.ai) with [Ollama](https://ollama.com), free and with no account, also experimental.
 - **A web browser**, for the board page.
 
-Chesspal works with any agent that can use Chesspal's tools (MCP) and the files on your computer: we develop it with Claude Code, Codex is connected too, and Antigravity is supported but still experimental.
+Chesspal works with any agent that can use Chesspal's tools (MCP) and the files on your computer: we develop it with Claude Code, Codex is connected too, and Antigravity and OpenCode are supported but still experimental.
 
 ## Good to know
 

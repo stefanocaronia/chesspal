@@ -37,7 +37,7 @@ afterEach(() => {
 });
 
 describe("chesspal init", () => {
-    it("sets up a folder for Claude Code, Codex and Antigravity, with the opponent's instructions, and says how to go into it", async () => {
+    it("sets up a folder for Claude Code, Codex, Antigravity and OpenCode, with the opponent's instructions, and says how to go into it", async () => {
         const folder = playerFolder();
         const { output, exitCode } = await runCommandLine(["init", "chess"], testContext(folder));
         const chess = join(folder, "chess");
@@ -46,14 +46,15 @@ describe("chesspal init", () => {
         expect(output).toBe(
             `♜ Chesspal is ready in ${chess}\n\n  To play:\n`
                 + "  1. Go into the folder: cd chess\n"
-                + "     then open Claude Code (claude), Codex (codex) or Antigravity (agy).\n"
+                + "     then open Claude Code (claude), Codex (codex),\n"
+                + "     Antigravity (agy) or OpenCode (opencode).\n"
                 + "  2. The first time, it asks whether to trust the folder: say yes.\n"
                 + "     Codex also asks about Chesspal's two hooks: choose Trust all.\n"
                 + "     They are small helpers that let it notice your moves on the board.\n"
                 + "     Antigravity asks about each of Chesspal's tools the first time:\n"
                 + "     choose to always allow it (Persist to settings.json).\n"
                 + "  3. Say hello: the AI gives you the link to the board.\n\n"
-                + "  Updated 15 files.",
+                + "  Updated 17 files.",
         );
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${startInstructions()}\n<!-- chesspal: end -->\n`);
@@ -66,6 +67,8 @@ describe("chesspal init", () => {
         expect(text(chess, ".codex/config.toml")).toBe('[mcp_servers.chesspal]\ncommand = "chesspal"\nargs = ["mcp"]\ndefault_tools_approval_mode = "approve"\nenv_vars = ["CHESSPAL_HOME", "CHESSPAL_SEAT"]\n');
         expect(json(chess, ".codex/hooks.json")).toEqual({ hooks: { Stop: [{ hooks: [codexBellHook] }], SessionStart: [{ hooks: [codexChatHook] }] } });
         expect(json(chess, ".agents/hooks.json")).toEqual({ chesspal: antigravityHooks });
+        expect(json(chess, "opencode.json")).toEqual({ mcp: { servers: { chesspal: { type: "local", command: ["chesspal", "mcp"] } } } });
+        expect(text(chess, ".opencode/plugins/chesspal.js")).toBe(readFileSync(new URL("../plugins/opencode.js", import.meta.url), "utf8"));
         expect(startInstructions()).toContain("even to a greeting, call `instructions` and `status`");
         expect(text(chess, ".claude/agents/chesspal-ponder-quick.md")).toMatch(
             /^---\nname: chesspal-ponder-quick\n.*\ntools: mcp__chesspal__ponder\nmodel: haiku\n---\n\nYou are the player's chess opponent/s,
@@ -98,6 +101,7 @@ describe("chesspal init", () => {
 
         expect(json(folder, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "cmd", args: ["/c", "chesspal", "mcp"] } } });
         expect(text(folder, ".codex/config.toml")).toContain('command = "cmd"\nargs = ["/c", "chesspal", "mcp"]\n');
+        expect(json(folder, "opencode.json")).toEqual({ mcp: { servers: { chesspal: { type: "local", command: ["cmd", "/c", "chesspal", "mcp"] } } } });
     });
 
     it("keeps what the player wrote, the server's environment too (D-71), with a byte order mark too, rewrites only Chesspal's lines, and changes nothing the second time", async () => {
@@ -113,13 +117,15 @@ describe("chesspal init", () => {
         const ownAntigravity = { Stop: [{ type: "command", command: "say done" }] };
         mkdirSync(join(folder, ".agents"));
         writeFileSync(join(folder, ".agents", "hooks.json"), JSON.stringify({ mine: ownAntigravity, chesspal: { Stop: [] } }));
+        const ownServer = { type: "remote", url: "https://example.com/mcp" };
+        writeFileSync(join(folder, "opencode.json"), JSON.stringify({ model: "ollama/gpt-oss:20b", mcp: { servers: { other: ownServer, chesspal: { command: ["old"], environment: { CHESSPAL_HOME: "D:/runs" } } } } }));
         writeFileSync(
             join(folder, ".codex", "config.toml"),
             'model = "gpt-5"\n\n[mcp_servers.chesspal] # old\ncommand = "old"\nenv = { CHESSPAL_HOME = "D:/runs" }\nenv_vars = ["HOME", "CHESSPAL_HOME"]\n\n[profiles.fast]\nmodel = "gpt-5-mini"\n',
         );
         // Codex runs hooks that changed only once the player trusts them again.
         expect((await runCommandLine(["init"], testContext(folder))).output).toContain(
-            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 15 files.",
+            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 17 files.",
         );
 
         expect(json(folder, ".mcp.json")).toEqual({ mcpServers: { other: { command: "other" }, chesspal: { command: "chesspal", args: ["mcp"], env: { CHESSPAL_HOME: "D:/runs" } } } });
@@ -137,6 +143,10 @@ describe("chesspal init", () => {
         );
         expect(json(folder, ".codex/hooks.json")).toEqual({ hooks: { Stop: [ownStop, { hooks: [codexBellHook] }], SessionStart: [{ hooks: [codexChatHook] }] } });
         expect(json(folder, ".agents/hooks.json")).toEqual({ mine: ownAntigravity, chesspal: antigravityHooks });
+        expect(json(folder, "opencode.json")).toEqual({
+            model: "ollama/gpt-oss:20b",
+            mcp: { servers: { other: ownServer, chesspal: { type: "local", command: ["chesspal", "mcp"], environment: { CHESSPAL_HOME: "D:/runs" } } } },
+        });
         expect((await runCommandLine(["init"], testContext(folder))).output).toMatch(/^♜ Chesspal is ready in .*: nothing to change\n/);
     });
 
@@ -144,11 +154,11 @@ describe("chesspal init", () => {
         const folder = playerFolder();
         const output = (await runCommandLine(["init"], { ...testContext(folder), language: "it-IT" })).output;
 
-        expect(output).toMatch(/^♜ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code, Codex o Antigravity in questa cartella\.\n/);
-        expect(output).toMatch(/\n\n {2}Aggiornati 15 file\.$/);
+        expect(output).toMatch(/^♜ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code, Codex, Antigravity o OpenCode in questa cartella\.\n/);
+        expect(output).toMatch(/\n\n {2}Aggiornati 17 file\.$/);
         expect(output).not.toContain("consentili di nuovo");
         expect((await runCommandLine(["init", "la mia scacchiera"], { ...testContext(folder), language: "it-IT" })).output).toContain(
-            '  1. Entra nella cartella: cd "la mia scacchiera"\n     poi apri Claude Code (claude), Codex (codex) o Antigravity (agy).\n',
+            '  1. Entra nella cartella: cd "la mia scacchiera"\n     poi apri Claude Code (claude), Codex (codex),\n     Antigravity (agy) o OpenCode (opencode).\n',
         );
         expect((await runCommandLine(["init"], { ...testContext(folder), language: "fr-FR" })).output).toMatch(/^♜ Chesspal is ready in .*: nothing to change\n/);
     });

@@ -18,13 +18,13 @@ interface FolderSetUp
 }
 
 /**
- * Makes a folder the player's chess table: the files through which Claude Code, Codex and Antigravity find Chesspal and the opponent's instructions
- * (D-31, D-115), and Antigravity's settings for every folder, where it is installed.
+ * Makes a folder the player's chess table: the files through which Claude Code, Codex, Antigravity and OpenCode find Chesspal and the opponent's
+ * instructions (D-31, D-115, D-117), and Antigravity's settings for every folder, where it is installed.
  */
 export const init = defineCommand({
     name: "init",
-    description: "Sets up a folder to play chess with an AI: the .mcp.json, AGENTS.md, CLAUDE.md and the settings through which Claude Code, Codex and "
-        + "Antigravity find Chesspal. Run it again to update Chesspal's lines; what you wrote there stays. Example: chesspal init chess.",
+    description: "Sets up a folder to play chess with an AI: the .mcp.json, AGENTS.md, CLAUDE.md and the settings through which Claude Code, Codex, "
+        + "Antigravity and OpenCode find Chesspal. Run it again to update Chesspal's lines; what you wrote there stays. Example: chesspal init chess.",
     input: z.object({ folder: z.string().optional().describe("the folder to set up; the current folder if left out") }),
     cliOnly: true,
     idempotent: true,
@@ -74,7 +74,10 @@ const english: InitWords = {
     set: (folder) => `Chesspal is ready in ${folder}`,
     ready: (folder) => `Chesspal is ready in ${folder}: nothing to change`,
     toPlay: "To play:",
-    open: (enter) => enter === undefined ? ["Open Claude Code, Codex or Antigravity in this folder."] : [`Go into the folder: cd ${enter}`, "then open Claude Code (claude), Codex (codex) or Antigravity (agy)."],
+    open: (enter) =>
+        enter === undefined
+            ? ["Open Claude Code, Codex, Antigravity or OpenCode in this folder."]
+            : [`Go into the folder: cd ${enter}`, "then open Claude Code (claude), Codex (codex),", "Antigravity (agy) or OpenCode (opencode)."],
     steps: [
         [
             "The first time, it asks whether to trust the folder: say yes.",
@@ -93,7 +96,10 @@ const italian: InitWords = {
     set: (folder) => `Chesspal è pronto in ${folder}`,
     ready: (folder) => `Chesspal è già pronto in ${folder}: niente da cambiare`,
     toPlay: "Per giocare:",
-    open: (enter) => enter === undefined ? ["Apri Claude Code, Codex o Antigravity in questa cartella."] : [`Entra nella cartella: cd ${enter}`, "poi apri Claude Code (claude), Codex (codex) o Antigravity (agy)."],
+    open: (enter) =>
+        enter === undefined
+            ? ["Apri Claude Code, Codex, Antigravity o OpenCode in questa cartella."]
+            : [`Entra nella cartella: cd ${enter}`, "poi apri Claude Code (claude), Codex (codex),", "Antigravity (agy) o OpenCode (opencode)."],
     steps: [
         [
             "La prima volta ti chiede se fidarti della cartella: rispondi sì.",

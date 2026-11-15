@@ -14,15 +14,16 @@ export interface CommandLineResult
 // The commands that exist only on the command line: cli.ts starts the table, opens its page, puts its icon, starts the server, the doorbell, the chat's
 // note or the move written alone, when one comes alone.
 const mcpDescription = "Start the MCP server for an AI host. Through it the host uses these commands as tools; the host starts it, with no options.";
-const listenDescription = "Wait for the player's move on the board page and wake the chat. Claude Code starts it at the end of each turn, Codex with --codex and Antigravity with --antigravity, as init sets them up.";
-const chatDescription = "Note how the chat started: new, cleared, resumed or compacted. Claude Code, Codex and Antigravity run it when a chat starts, as init sets them up.";
+const listenDescription =
+    "Wait for the player's move on the board page and wake the chat. Claude Code starts it at the end of each turn, Codex with --codex, Antigravity with --antigravity and OpenCode's plugin with --opencode, as init sets them up.";
+const chatDescription = "Note how the chat started: new, cleared, resumed or compacted. Claude Code, Codex, Antigravity and OpenCode run it when a chat starts, as init sets them up.";
 const promptDescription = "Play the move the player wrote alone in the chat, before the AI reads it, and tell the AI the position. Claude Code runs it on each message, as init sets it up.";
 const tableDescription = "Serve the board page with no chat, until no browser has had it open for five minutes. `chesspal` alone starts it apart and opens the page.";
 const openDescription = "Open the board page as `chesspal` alone does, without asking about the icon: what the icon runs.";
 const iconDescription = "Put Chesspal's icon on the desktop and in the menu: it opens the board page as `chesspal` alone does, with no terminal. `chesspal icon --remove` takes it away.";
-const playDescription = "Start the AI in this terminal, in Claude Code, Codex or Antigravity, as the page's buttons do. It plays with the model and effort chosen on the page; New game there starts the chat again, clean.";
+const playDescription = "Start the AI in this terminal, in Claude Code, Codex, Antigravity or OpenCode, as the page's buttons do. It plays with the model and effort chosen on the page; New game there starts the chat again, clean.";
 // What init and the icon's removal are to a player, in the general help: the command's own help says the files.
-const initForPlayer = "Set up a folder of your own to play in, from Claude Code, Codex, Antigravity or the Claude desktop app.";
+const initForPlayer = "Set up a folder of your own to play in, from Claude Code, Codex, Antigravity, OpenCode or the Claude desktop app.";
 const iconRemoveForPlayer = "Take Chesspal's icon away, before you uninstall it.";
 // Those of them that take no options, by name.
 const plainCommands = new Map([["mcp", mcpDescription], ["chat", chatDescription], ["prompt", promptDescription], ["table", tableDescription], ["open", openDescription], ["icon", iconDescription]]);
@@ -49,15 +50,15 @@ export async function runCommandLine(argv: string[], context: Context = defaultC
     }
 
     if (commandName === "listen") {
-        const help = `chesspal listen [--codex|--antigravity]\n\n${listenDescription}`;
-        const known = args.every((arg) => ["--codex", "--antigravity", "--help", "-h"].includes(arg));
-        return known ? success(help) : failure(`chesspal listen takes only --codex or --antigravity: ${args.join(" ")}.\n\n${help}`);
+        const help = `chesspal listen [--codex|--antigravity|--opencode]\n\n${listenDescription}`;
+        const known = args.every((arg) => ["--codex", "--antigravity", "--opencode", "--help", "-h"].includes(arg));
+        return known ? success(help) : failure(`chesspal listen takes only --codex, --antigravity or --opencode: ${args.join(" ")}.\n\n${help}`);
     }
 
     if (commandName === "play") {
         // cli.ts runs `chesspal play <host>`; here come the help and what it refuses.
-        const help = `chesspal play <claude|codex|antigravity>\n\n${playDescription}`;
-        return args.includes("--help") || args.includes("-h") ? success(help) : failure(`chesspal play takes one host, claude, codex or antigravity: ${args.join(" ") || "none given"}.\n\n${help}`);
+        const help = `chesspal play <claude|codex|antigravity|opencode>\n\n${playDescription}`;
+        return args.includes("--help") || args.includes("-h") ? success(help) : failure(`chesspal play takes one host, claude, codex, antigravity or opencode: ${args.join(" ") || "none given"}.\n\n${help}`);
     }
 
     const command = list.find((candidate) => candidate.name === commandName);

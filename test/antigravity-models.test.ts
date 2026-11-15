@@ -79,7 +79,7 @@ describe("Antigravity's models, read from the player's account", () => {
         const context = homeContext();
         const { env, program } = agyInstalled();
         const reading = answering();
-        const chats = terminalChats(context, ["node", "cli.js"], env, reading.run);
+        const chats = terminalChats(context, ["node", "cli.js"], env, { run: reading.run });
         let told = 0;
         chats.watch?.(() => told++);
 
@@ -105,7 +105,7 @@ describe("Antigravity's models, read from the player's account", () => {
         const context = homeContext();
         const { env } = agyInstalled();
         const reading = answering();
-        const chats = terminalChats(context, ["node", "cli.js"], env, reading.run);
+        const chats = terminalChats(context, ["node", "cli.js"], env, { run: reading.run });
 
         reading.fail(new Error("agy models timed out"));
         await settled();
@@ -125,7 +125,7 @@ describe("Antigravity's models, read from the player's account", () => {
 
     it("never runs agy models when Antigravity is not installed", () => {
         const reading = answering();
-        const chats = terminalChats(homeContext(), ["node", "cli.js"], { PATH: temporary(), PATHEXT: ".EXE", HOME: temporary(), LOCALAPPDATA: temporary() }, reading.run);
+        const chats = terminalChats(homeContext(), ["node", "cli.js"], { PATH: temporary(), PATHEXT: ".EXE", HOME: temporary(), LOCALAPPDATA: temporary() }, { run: reading.run });
 
         expect(antigravity(chats.hosts())).toMatchObject({ installed: false, models: ["gemini-3.8-flash"] });
         expect(reading.asked).toEqual([]);

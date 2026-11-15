@@ -9,7 +9,7 @@ import { tableFolder } from "../../../home/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
 import { hostProgramPath } from "./find.ts";
 import { type HooksNews, setUpTable, takeHooksNews } from "./hooks.ts";
-import { choiceIn, hostArgs, type HostChoice, type HostName, isHostName, startMessage } from "./hosts.ts";
+import { choiceIn, hostArgs, type HostChoice, hostEnvironment, type HostName, isHostName, startMessage } from "./hosts.ts";
 import { tableChoices } from "./models.ts";
 import { askedAgain, leaveSeat, refreshSeat, seatTimes, takeSeat } from "./seat.ts";
 import { cmdQuoted } from "./terminal.ts";
@@ -188,10 +188,9 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     const games = gameFolder(home);
     const analysis = analysisAsked(games);
     const args = hostArgs(host, startMessage(languageIn(games, context.language), analysis), choice, folder, choices);
-    // An effort the player set for every chat would win over the one chosen on the page: spawn leaves out a variable that is undefined.
-    const effort = host === "claude" && choice.effort !== undefined ? { CLAUDE_CODE_EFFORT_LEVEL: undefined } : {};
-    // The seat this play holds, by which its chat's server tells the table it is the chat held, and not another opened in the same folder.
-    const childEnv = { ...env, ...Object.fromEntries(sessionMarks.map((name) => [name, undefined])), ...effort, CHESSPAL_SEAT: String(process.pid) };
+    // The seat this play holds, by which its chat's server tells the table it is the chat held, and not another opened in the same folder; spawn leaves out
+    // a variable that is undefined.
+    const childEnv = { ...env, ...Object.fromEntries(sessionMarks.map((name) => [name, undefined])), ...hostEnvironment(host, choice), CHESSPAL_SEAT: String(process.pid) };
     const script = npmScript(host, found, context.platform, exists ?? existsSync);
 
     if (script !== undefined) {
@@ -213,7 +212,7 @@ function analysisAsked(folder: string): boolean
     }
 }
 
-const hostTitle: Record<HostName, string> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity" };
+const hostTitle: Record<HostName, string> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity", opencode: "OpenCode" };
 
 // What the player is told before Codex asks about the hooks Chesspal wrote: the first time, and when they changed.
 const hooksWords: Record<HooksNews, { english: string; italian: string; }> = {
@@ -330,6 +329,7 @@ const installHint: Record<HostName, string> = {
     claude: "https://claude.com/claude-code",
     codex: "npm install -g @openai/codex",
     antigravity: "https://antigravity.google/docs/getting-started",
+    opencode: "npm install -g @opencode/cli",
 };
 
 /**

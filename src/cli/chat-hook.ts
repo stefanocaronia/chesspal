@@ -1,5 +1,5 @@
-// `chesspal chat`, the SessionStart hook of Claude Code, Codex and Antigravity (D-57): it writes how the chat started, new, cleared, resumed or compacted,
-// for new_game to read.
+// `chesspal chat`, the SessionStart hook of Claude Code, Codex and Antigravity, which OpenCode's plugin runs too (D-57): it writes how the chat started,
+// new, cleared, resumed or compacted, for new_game to read.
 import { type ChatStart, loadGame, saveChatStart } from "../games/index.ts";
 import { dataFolder } from "../home/index.ts";
 import { gameFolder } from "../profiles/index.ts";

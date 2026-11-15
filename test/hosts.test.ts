@@ -193,6 +193,7 @@ describe("a chat the table opens", () => {
             expect.objectContaining({ name: "claude", installed: true, models: ["fable", "opus", "sonnet", "haiku"], command: "chesspal play claude" }),
             expect.objectContaining({ name: "codex", installed: false }),
             expect.objectContaining({ name: "antigravity", installed: false, models: ["gemini-3.8-flash"], efforts: ["low", "medium", "high"], command: "chesspal play antigravity" }),
+            expect.objectContaining({ name: "opencode", installed: false, models: [], efforts: [], command: "chesspal play opencode" }),
         ]);
         expect(await chats.open("gemini")).toBe(false);
 
@@ -228,8 +229,11 @@ describe("a chat the table opens", () => {
     });
 
     it("is chesspal play <host>, whose help the command line gives", async () => {
-        expect((await runCommandLine(["play", "--help"], testContext())).output).toContain("chesspal play <claude|codex|antigravity>");
-        expect(await runCommandLine(["play"], testContext())).toMatchObject({ exitCode: 1, output: expect.stringContaining("chesspal play takes one host, claude, codex or antigravity: none given.") });
+        expect((await runCommandLine(["play", "--help"], testContext())).output).toContain("chesspal play <claude|codex|antigravity|opencode>");
+        expect(await runCommandLine(["play"], testContext())).toMatchObject({
+            exitCode: 1,
+            output: expect.stringContaining("chesspal play takes one host, claude, codex, antigravity or opencode: none given."),
+        });
     });
 });
 

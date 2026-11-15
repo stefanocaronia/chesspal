@@ -5,10 +5,10 @@ import { makeFolder, writeAtomically } from "../games/index.ts";
 import { agentFiles, agentHosts, instructionsFile } from "./agents.ts";
 
 /**
- * Sets up the player's folder for Claude Code, Codex and Antigravity (D-31, D-115): .mcp.json with the chesspal server, AGENTS.md with the lines that start
- * a chat between Chesspal's marks (D-102), CLAUDE.md importing it, the hosts' settings with the server approved, and their hooks. With the user's home
- * given, where Antigravity is installed, the chesspal server in its settings for every folder too, which alone give the first chat its tools. What the
- * player wrote there stays; it returns the files written.
+ * Sets up the player's folder for Claude Code, Codex, Antigravity and OpenCode (D-31, D-115, D-117): .mcp.json with the chesspal server, AGENTS.md with
+ * the lines that start a chat between Chesspal's marks (D-102), CLAUDE.md importing it, the hosts' settings with the server approved, their hooks, and
+ * OpenCode's plugin, which runs them for it. With the user's home given, where Antigravity is installed, the chesspal server in its settings for every
+ * folder too, which alone give the first chat its tools. What the player wrote there stays; it returns the files written.
  */
 export function setUpHosts(folder: string, platform: string, userHome?: string): string[]
 {
@@ -43,8 +43,8 @@ export function codexHooksPath(folder: string): string
 }
 
 /**
- * Whether the host runs the hooks init writes, the doorbell and the note of how each chat starts: Claude Code, Codex and Antigravity by the names they give
- * the server, so the player's act on the page wakes the chat; the command line, which names no host, is taken as one. Elsewhere the player tells the
+ * Whether the host runs the hooks init writes, the doorbell and the note of how each chat starts: Claude Code, Codex, Antigravity and OpenCode by the names
+ * they give the server, so the player's act on the page wakes the chat; the command line, which names no host, is taken as one. Elsewhere the player tells the
  * chat in its window.
  */
 export function hasDoorbell(host: string | undefined): boolean
@@ -52,8 +52,8 @@ export function hasDoorbell(host: string | undefined): boolean
     return host === undefined || hookedHosts.includes(host);
 }
 
-/** The hosts that run the hooks init writes, by the names they give the server: Antigravity's too (D-115). */
-export const hookedHosts: readonly string[] = [...agentHosts, "antigravity-client"];
+/** The hosts that run the hooks init writes, by the names they give the server: Antigravity's too (D-115), and OpenCode's, through its plugin (D-117). */
+export const hookedHosts: readonly string[] = [...agentHosts, "antigravity-client", "opencode"];
 
 /** The instructions of the AI opponent, read from the package wherever it is installed: the MCP server's `instructions` tool gives them (D-102). */
 export function opponentInstructions(): string
@@ -90,6 +90,8 @@ function hostChanges(folder: string, platform: string): FileChange[]
         codexConfigFile(folder, platform),
         codexHooksFile(folder),
         antigravityHooksFile(folder),
+        openCodeConfigFile(folder, platform),
+        openCodePluginFile(folder),
     ];
     return changes.filter((change) => change !== undefined);
 }
@@ -269,6 +271,35 @@ function antigravityServerFile(userHome: string, platform: string): FileChange |
     const before = isObject(servers.chesspal) ? servers.chesspal : {};
     return changed(path, { ...config, mcpServers: { ...servers, chesspal: { ...chesspalServer(platform), ...(isObject(before.env) ? { env: before.env } : {}) } } });
 }
+
+/**
+ * OpenCode's settings for the folder (D-117): the chesspal server beside the player's, keeping the environment they gave it. Chesspal's tools need no
+ * permission: OpenCode's agent allows every tool unless told otherwise.
+ */
+function openCodeConfigFile(folder: string, platform: string): FileChange | undefined
+{
+    const path = join(folder, "opencode.json");
+    const config = jsonOf(path);
+    const mcp = isObject(config.mcp) ? config.mcp : {};
+    const servers = isObject(mcp.servers) ? mcp.servers : {};
+    const before = isObject(servers.chesspal) ? servers.chesspal : {};
+    const { command, args } = chesspalServer(platform);
+    const chesspal = { type: "local", command: [command, ...args], ...(isObject(before.environment) ? { environment: before.environment } : {}) };
+    return changed(path, { ...config, mcp: { ...mcp, servers: { ...servers, chesspal } } });
+}
+
+/**
+ * Chesspal's plugin for OpenCode, which has no hooks of its own: it runs Chesspal's, how each chat starts and the doorbell, on OpenCode's events, and
+ * notes the model of each step for the moves' signature (D-117). Its source is in the package, under a name no host reads in this repository.
+ */
+function openCodePluginFile(folder: string): FileChange | undefined
+{
+    const path = join(folder, ".opencode", "plugins", "chesspal.js");
+    openCodePlugin ??= readFileSync(new URL("../../plugins/opencode.js", import.meta.url), "utf8");
+    return textOf(path) === openCodePlugin ? undefined : { path, text: openCodePlugin };
+}
+
+let openCodePlugin: string | undefined;
 
 /** Whether Antigravity's command line is on this computer: its own folder in the user's home, made at its first start, or its program where its installer puts it. */
 function antigravityInstalled(userHome: string, platform: string): boolean

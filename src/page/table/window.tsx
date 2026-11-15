@@ -106,7 +106,7 @@ export function chatState(table: TableShown, name: string, text: Text): string |
     return table.opening === "chat" ? words.opening : table.opening === "again" ? words.again(name) : table.opening === "restart" ? words.restart : undefined;
 }
 
-const hostTitles: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity" };
+const hostTitles: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity", opencode: "OpenCode" };
 
 /** The ↻ of a chat that starts again. */
 const restartIcon = (
@@ -189,6 +189,7 @@ function ChatForm({ review, table, settings, onChange, name, onStarted, text }: 
                 <>
                     <Choices host={host} kind="model" settings={settings} started={started("model")} onChange={onChange} text={text} />
                     <Choices host={host} kind="effort" settings={settings} started={started("effort")} onChange={onChange} text={text} />
+                    {host.models.length === 0 ? <p class="note">{words.noModels(hostTitles[host.name] ?? host.name)}</p> : null}
                 </>
             )}
             <p class="problem chat-state" role="status">{failed ? (table.chat ? words.notRestarted : words.failed) : null}</p>

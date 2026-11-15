@@ -1,6 +1,7 @@
 // Who makes a tool call (D-81): only what the host ties to that call, never what the AI says of itself nor a setting the chat may have changed.
 // Codex sends the model and the effort with each call; Claude Code writes them into the chat's transcript, on the line of the call; Antigravity sends the
-// conversation, whose transcript names the model with its effort on each of the AI's steps (D-115).
+// conversation, whose transcript names the model with its effort on each of the AI's steps (D-115); OpenCode sends the session, whose step Chesspal's
+// plugin notes with its model in the chat's folder (D-117).
 import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -38,6 +39,16 @@ export async function callerOf(meta: Record<string, unknown> | undefined, client
 
     if (typeof conversation === "string" && conversation !== "") {
         const found = await antigravityModel(join(conversation, ".system_generated", "logs", "transcript_full.jsonl"), wait);
+
+        if (found !== undefined) {
+            return found;
+        }
+    }
+
+    const session = meta?.["ai.opencode/sessionID"];
+
+    if (typeof session === "string" && session !== "") {
+        const found = await openCodeModel(join(folder, "opencode-model.json"), session, wait);
 
         if (found !== undefined) {
             return found;
@@ -158,6 +169,27 @@ async function antigravityModel(transcript: string, wait: number): Promise<Calle
         if (typeof model === "string") {
             const [, name, effort] = /^(.+)-(low|medium|high|xhigh|max)$/.exec(model) ?? [];
             return name === undefined ? { annotator: model } : withEffort(name, effort);
+        }
+
+        if (attempt < attempts - 1) {
+            await new Promise((done) => setTimeout(done, wait));
+        }
+    }
+
+    return undefined;
+}
+
+/**
+ * The model of the OpenCode session's step, as OpenCode names it (ollama/gemma4:12b), from the note Chesspal's plugin writes at each step: the step of the
+ * call starts just before it. None when no note of the session comes in time.
+ */
+async function openCodeModel(note: string, session: string, wait: number): Promise<Caller | undefined>
+{
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        const noted = objectOf(textOf(note));
+
+        if (noted?.session === session && typeof noted.model === "string" && noted.model !== "") {
+            return { annotator: noted.model };
         }
 
         if (attempt < attempts - 1) {
