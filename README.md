@@ -129,7 +129,7 @@ The board page shows where, and its **Open the folder** button opens it. To back
 
 ## Try it, and tell us
 
-Chesspal is in early development: the version on npm is a first one to try, and it may change from one release to the next. When something breaks, confuses you or could work better, open an [issue on GitHub](https://github.com/stefanocaronia/chesspal/issues): what you did, what you expected, what happened.
+Chesspal is in early development: the version on npm is a first one to try, and it may change from one release to the next. When something breaks or confuses you, open an [issue on GitHub](https://github.com/stefanocaronia/chesspal/issues): what you did, what you expected, what happened. Questions, ideas and your games go in the [discussions](https://github.com/stefanocaronia/chesspal/discussions).
 
 ## Development
 
