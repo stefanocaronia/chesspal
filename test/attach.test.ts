@@ -1,6 +1,6 @@
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, get, type Server } from "node:http";
 import type { Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -8,6 +8,8 @@ import { join, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { answerPrompt } from "../src/cli/prompt-hook.ts";
+import { annotateGame } from "../src/commands/analysis/annotate.ts";
+import { endGame } from "../src/commands/game/end.ts";
 import { newGame, startNewGame } from "../src/commands/game/new.ts";
 import { status } from "../src/commands/game/status.ts";
 import type { Context } from "../src/commands/index.ts";
@@ -474,6 +476,38 @@ describe("a new game at the table that wants a clean chat", () => {
             const shown = await gameShown(table.url);
             expect(shown).toMatchObject({ table: { chat: false, opening: "again" } });
             expect(shown.table).not.toHaveProperty("waiting");
+        } finally {
+            restore("CHESSPAL_HOME", before);
+        }
+    });
+
+    it("starts again the chat chesspal play holds once its analyst has reviewed the game: no /clear is asked", async () => {
+        const { chats, relaunched } = playChats();
+        const { home, table } = await tableOn(undefined, chats);
+        const chat = { ...chatOn(home), host: () => "codex-mcp-client" };
+        const page = await attached(chat);
+        const before = process.env.CHESSPAL_HOME;
+        process.env.CHESSPAL_HOME = home;
+
+        try {
+            await longGameInTurn(home, chat, page, table.url);
+            await endGame.run(endGame.input.parse({ result: "player_resigns" }), homeContext(home));
+            const name = `games/${readdirSync(join(gameFolder(home), "games"))[0]!}`;
+
+            // The chat's analyst takes the game and writes its whole review, then stops writing.
+            const analyst = { ...homeContext(home), agent: "chesspal-analyst", agentRun: "analyst-1" };
+            startAnalysis(gameFolder(home), name, new Date(), { analyst: { game: name, run: "analyst-1", since: new Date().toISOString() } });
+            await annotateGame.run(annotateGame.input.parse({ game: name, summary: "A long fight." }), analyst);
+
+            // The chat's turn ends, and its hook waits for the bell.
+            const hook = bellHeard(JSON.stringify({ cwd: chat.folder }));
+            await until(async () => (await gameShown(table.url)).thinking === undefined);
+
+            const answered = await newGameWith(table.url);
+            expect(answered.status).toBe(200);
+            expect(relaunched).toEqual([chat.folder]);
+            await page.close();
+            expect(await hook).toMatchObject({ rang: false });
         } finally {
             restore("CHESSPAL_HOME", before);
         }

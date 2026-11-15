@@ -3,7 +3,8 @@
 // says so (D-107); it installs a newer Chesspal between games (D-108). A page a chat serves itself has none of these routes.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
-import { analystOf, gameAt, pliesBeforeClearing, samePosition } from "../../commands/index.ts";
+import { analystOf, gameAt, namedGame, pliesBeforeClearing, samePosition } from "../../commands/index.ts";
+import { isReviewed } from "../../core/index.ts";
 import { endOf, gameInAnalysis } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { tellWatchers } from "./events.ts";
@@ -444,12 +445,23 @@ function chatAtRest(served: Served): boolean
 
 /**
  * Whether the chat's analyst is at work, on `game` when named: one whose chat started again since it took its game, or that has written nothing for half an
- * hour, is gone (D-109). The chat's starts are in its own folder: on the table, the attached chat's.
+ * hour, is gone (D-109), and one that has written the game's review has done, though a host that lists no agents keeps it holding the game. The chat's
+ * starts are in its own folder: on the table, the attached chat's.
  */
 export function analystAtWork(served: Served, game = gameInAnalysis(gameFolder(served.context.home()))?.analyst?.game): boolean
 {
     const chat = { ...served.context, folder: served.attached?.chat.folder ?? served.folder };
-    return game !== undefined && analystOf(chat, game) !== undefined;
+    return game !== undefined && analystOf(chat, game) !== undefined && !reviewedGame(served, game);
+}
+
+// Whether the game has the analyst's review; one gone from the games has none.
+function reviewedGame(served: Served, game: string): boolean
+{
+    try {
+        return isReviewed(namedGame(served.context, game).record);
+    } catch {
+        return false;
+    }
 }
 
 // The pages show a chat opening from now until it attaches; one that has not by then lets them open another. The opening noted.
