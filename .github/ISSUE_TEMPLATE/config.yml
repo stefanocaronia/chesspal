@@ -4,11 +4,11 @@ contact_links:
     url: https://github.com/stefanocaronia/chesspal#get-started
     about: The README's five steps, from Node.js to the first game.
   - name: Ask a question
-    url: https://github.com/stefanocaronia/chesspal/discussions/categories/q-a
+    url: https://github.com/stefanocaronia/chesspal/discussions/categories/help
     about: How to install, set up or play; whatever is not a bug.
   - name: Share an idea
     url: https://github.com/stefanocaronia/chesspal/discussions/categories/ideas
     about: Something Chesspal could do, or do better. Chesspal never uses a chess engine, so ideas that need one will not be taken.
   - name: Show a game
-    url: https://github.com/stefanocaronia/chesspal/discussions/categories/show-and-tell
+    url: https://github.com/stefanocaronia/chesspal/discussions/categories/tales-from-the-board
     about: A game you played or analysed with Chesspal.
