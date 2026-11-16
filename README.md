@@ -62,7 +62,7 @@ In the steps below, copy each command, paste it in the terminal (Ctrl+V or right
   ```
 
   Then close the terminal, open a new one, run `agy` and sign in with your Google account.
-- **OpenCode**, free and with no account, with an AI that runs on your computer through [Ollama](https://ollama.com/download). Your computer needs at least 16 GB of memory, and better a graphics card with 16 GB of its own. Install Ollama from its site, then download a model that can use tools, that is one that can work Chesspal's board through its tools (not every model can), such as:
+- **OpenCode**, free and with no account, with an AI that runs on your computer through [Ollama](https://ollama.com/download). Your computer needs at least 16 GB of memory, and better a graphics card with 16 GB of its own. Install Ollama from its site, then download a model that can use tools, that is one that can work Chesspal's board through its tools (not every model can). We recommend this one, which played best in our tests:
 
   ```bash
   ollama pull gpt-oss:20b
@@ -74,7 +74,7 @@ In the steps below, copy each command, paste it in the terminal (Ctrl+V or right
   npm install -g @opencode/cli
   ```
 
-  Open Ollama's settings and raise **Context length** to at least 64k: Chesspal's instructions do not fit in its smaller default, and the AI would lose them. Ollama must be running while you play: on Windows and macOS its llama icon shows by the clock. The board page offers the Ollama models that can use tools; if you already use OpenCode with other models, those you used recently are offered too. A model on your computer plays more slowly and makes more mistakes than the others: it may take a minute or more for a move, and at times it stops without moving. Then write to it in its window.
+  Open Ollama's settings and raise **Context length** to at least 64k: with its smaller default the AI cannot see Chesspal's tools and never moves. Ollama must be running while you play: on Windows and macOS its llama icon shows by the clock. The board page offers the Ollama models that can use tools; if you already use OpenCode with other models, those you used recently are offered too. A model on your computer plays more slowly and makes more mistakes than the others. Most moves take a few seconds, some take a minute or more. About one turn in eight the AI stops without moving: write "your move" in its window.
 
 Once you are signed in, close that terminal window with its × and open a new one, as in step 2.
 
