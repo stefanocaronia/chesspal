@@ -1,5 +1,6 @@
 // The agents that work in the background in Claude Code and Codex (D-98): those that think for the opponent on the player's time (D-72), one on the host's
 // quick model for the lower levels, one on the AI's own for the higher; the coach, with the helps on (D-88), and the analyst of a game over (D-89), on the AI's own.
+// In OpenCode, Chesspal's plugin starts the one that thinks on the AI's own model, at every level.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AiLevel } from "../core/index.ts";
@@ -7,9 +8,13 @@ import type { AiLevel } from "../core/index.ts";
 const quickAgent = "chesspal-ponder-quick";
 const ownAgent = "chesspal-ponder";
 const codexHost = "codex-mcp-client";
+const openCodeHost = "opencode";
 
 /** The hosts whose chat starts Chesspal's agents, by the names they give the server (D-98). */
 export const agentHosts: readonly string[] = ["claude-code", codexHost];
+
+/** The hosts the ponder tool is offered to: OpenCode's too, whose agent Chesspal's plugin starts. */
+export const ponderHosts: readonly string[] = [...agentHosts, openCodeHost];
 
 /** Whether the host is Codex, which runs each agent in a process of its own and gives it every tool (D-98). */
 export function isCodex(host: string | undefined): boolean
@@ -32,15 +37,19 @@ export function ponderAgentFor(level: AiLevel): string
     return onQuickModel(level) ? quickAgent : ownAgent;
 }
 
-/** Whether the AI's thoughts on the player's time come from a quicker model than its own at a level. */
-export function onQuickModel(level: AiLevel): boolean
+/** Whether the AI's thoughts on the player's time come from a quicker model than its own at a level: never in OpenCode, which thinks on the chat's model. */
+export function onQuickModel(level: AiLevel, host?: string): boolean
 {
-    return level === "beginner" || level === "club";
+    return host !== openCodeHost && (level === "beginner" || level === "club");
 }
 
 /** Whether the player's folder has the agent for the host, as init writes it: a folder set up before it has none, and the AI then plays as before. */
 export function hasAgent(folder: string, agent: string, host: string | undefined): boolean
 {
+    if (host === openCodeHost) {
+        return existsSync(openCodeAgentPath(folder, agent));
+    }
+
     return existsSync(isCodex(host) ? codexAgentPath(folder, agent) : claudeAgentPath(folder, agent));
 }
 
@@ -50,11 +59,14 @@ export function agentTools(agent: string): readonly string[] | undefined
     return toolsOf[agent];
 }
 
-/** The agents' files, as Claude Code reads them from .claude/agents and Codex from .codex/agents: Chesspal's whole, rewritten by init, for both hosts. */
+/**
+ * The agents' files, as Claude Code reads them from .claude/agents, Codex from .codex/agents and OpenCode from .opencode/agents: Chesspal's whole, rewritten
+ * by init, for every host; OpenCode's only the one that thinks on the AI's own model.
+ */
 export function agentFiles(folder: string): { path: string; text: string; }[]
 {
     const agents = agentSpecs();
-    return [...agents.map((agent) => claudeAgentFile(folder, agent)), ...agents.map((agent) => codexAgentFile(folder, agent))];
+    return [...agents.map((agent) => claudeAgentFile(folder, agent)), ...agents.map((agent) => codexAgentFile(folder, agent)), openCodeAgentFile(folder)];
 }
 
 /** Instructions for the AI, by their file's name in the package's instructions folder: read once, as the version installed has them. */
@@ -82,9 +94,11 @@ interface AgentSpec
     text: string;
 }
 
+const ponderTools: readonly string[] = ["ponder"];
+
 const toolsOf: Readonly<Record<string, readonly string[]>> = {
-    [quickAgent]: ["ponder"],
-    [ownAgent]: ["ponder"],
+    [quickAgent]: ponderTools,
+    [ownAgent]: ponderTools,
     [coachAgent]: ["coach"],
     [analystAgent]: ["analyse_game", "annotate_game", "look", "position"],
 };
@@ -139,6 +153,28 @@ function codexAgentFile(folder: string, { agent, codexModel, description, text }
     return { path: codexAgentPath(folder, agent), text: lines.join("\n") };
 }
 
+/**
+ * OpenCode's agent, which Chesspal's plugin starts in a session of its own after the AI's move, on the chat's model: hidden from the player's list, and
+ * kept to its one tool, which OpenCode's agents call through execute.
+ */
+function openCodeAgentFile(folder: string): { path: string; text: string; }
+{
+    const description = "Chesspal's opponent thinking on the player's time. Started by Chesspal's plugin after the AI's move, never by the chat.";
+    // Every action denied but execute and the agent's tool, as OpenCode names an MCP server's tool: chesspal_ponder.
+    const allowed = ["execute", ...ponderTools.map((tool) => `chesspal_${tool}`)];
+    const permissions = [rule("*", "deny"), ...allowed.map((action) => rule(action, "allow"))];
+    const tools = ponderTools.map((tool) => `tools.chesspal.${tool}`).join(", ");
+    const head = ["---", `description: ${description}`, "mode: subagent", "hidden: true", "permissions:", ...permissions.flat(), "---", ""];
+    const lines = [...head, instructionsFile("ponder"), "", `Your tool: ${tools}, called through execute, as await tools.chesspal.ponder({}).`, ""];
+    return { path: openCodeAgentPath(folder, ownAgent), text: lines.join("\n") };
+}
+
+/** A rule of OpenCode's permissions, as YAML lines. */
+function rule(action: string, effect: "allow" | "deny"): string[]
+{
+    return [`  - action: "${action}"`, '    resource: "*"', `    effect: ${effect}`];
+}
+
 function claudeAgentPath(folder: string, agent: string): string
 {
     return join(folder, ".claude", "agents", `${agent}.md`);
@@ -147,4 +183,9 @@ function claudeAgentPath(folder: string, agent: string): string
 function codexAgentPath(folder: string, agent: string): string
 {
     return join(folder, ".codex", "agents", `${agent}.toml`);
+}
+
+function openCodeAgentPath(folder: string, agent: string): string
+{
+    return join(folder, ".opencode", "agents", `${agent}.md`);
 }

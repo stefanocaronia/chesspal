@@ -1,7 +1,6 @@
 // The lines an AI reads in a tool's answer about the current game: where it stands, the move just played, the player's words and what to do next.
-import { type AiLevel, type Facts, figurinesOf, materialOf, sees, type Side } from "../../core/index.ts";
-import { talkLimits, type Thought } from "../../games/index.ts";
-import { onQuickModel } from "../../host-files/index.ts";
+import { type Facts, figurinesOf, materialOf, sees, type Side } from "../../core/index.ts";
+import { talkLimits } from "../../games/index.ts";
 import { analystLine, reviewedLine } from "./agents.ts";
 import { clockLine } from "./clock.ts";
 import type { Written } from "./say.ts";
@@ -20,7 +19,7 @@ export function positionLines(game: GameSummary, withLastMove = true): string[]
         ...(game.facts === undefined ? [] : viewLines(game.facts, game)),
         ...(game.book === undefined ? [] : [`Book moves, most named lines first: ${game.book.join(", ")}`]),
         ...(game.plan === undefined ? [] : [`Plan: ${game.plan}`]),
-        ...(game.thought === undefined ? [] : [thoughtLine(game.thought, game.level)]),
+        ...(game.thought === undefined ? [] : [thoughtLine(game.thought)]),
         ...moodLines(game),
         ...(game.helps === "coached" ? [`${helpsLine} ${coachLine}`] : game.helps === "on" ? [helpsLine] : game.helps === "off now" ? [helpsOffLine] : []),
     ];
@@ -200,9 +199,9 @@ function offerLines({ drawOffer, turn, ai }: GameSummary): string[]
 }
 
 /** What the AI thought on the player's time, saying by which model and that Chesspal checked only that it is legal: the facts do not cover every blunder (Anatolij). */
-function thoughtLine({ move, why }: Thought, level: AiLevel): string
+function thoughtLine({ move, why, quick }: NonNullable<GameSummary["thought"]>): string
 {
-    return `Thought on their time ${onQuickModel(level) ? "by a quicker model" : "by your model"} (legal, not checked): ${move}, ${why}`;
+    return `Thought on their time ${quick === true ? "by a quicker model" : "by your model"} (legal, not checked): ${move}, ${why}`;
 }
 
 /** The AI's mood while it lasts, and how long its face shows it (D-70). */

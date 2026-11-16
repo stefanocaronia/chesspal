@@ -1,6 +1,7 @@
 // The current game as the commands give it: plain data for the command line's JSON, from which lines.ts writes the lines an AI reads.
 import { type AiLevel, type Chances, type Facts, type GameRecord, levelOf, moodAt, type MoodNow, type Possibilities, sees, type Side, type Square } from "../../core/index.ts";
 import { type CurrentGame, currentPlan, drawOfferOf, endOf, type Speaker, type Thought, thoughtForLastMove } from "../../games/index.ts";
+import { onQuickModel } from "../../host-files/index.ts";
 import { helpsIn } from "../../profiles/index.ts";
 import { type ClockSummary, clockSummaryOf, gameAt } from "./clock.ts";
 import { knownMoves, openingLine } from "./opening-book.ts";
@@ -31,8 +32,8 @@ export interface GameSummary
     book?: readonly string[];
     /** When the AI is to move: the plan it wrote last. */
     plan?: string;
-    /** When the AI is to move: what it thought of the player's move on their time (D-72). */
-    thought?: Thought;
+    /** When the AI is to move: what it thought of the player's move on their time (D-72), and whether a quicker model than its own thought it. */
+    thought?: Thought & { quick?: true; };
     /** When the AI is to move: the helps on, so it may teach (D-78), with a coach that judges the player's moves (D-88), or turned off since it drew on a move. */
     helps?: "on" | "coached" | "off now";
     /** In a game with a time control: the time each side had left when the command ran (D-13). */
@@ -115,18 +116,19 @@ export function summaryOf(current: CurrentGame, now: Date, archive?: string): Ga
 }
 
 /**
- * The summary with what the AI reads when it is to move: what it thought of the player's last move on their time (D-72), and whether the helps are on (D-78),
- * with a coach when `coached`.
+ * The summary with what the AI reads when it is to move: what it thought of the player's last move on their time (D-72), on which model in the chat's host,
+ * and whether the helps are on (D-78), with a coach when `coached`.
  */
-export function withThought(summary: GameSummary, folder: string, current: CurrentGame, coached: boolean): GameSummary
+export function withThought(summary: GameSummary, folder: string, current: CurrentGame, coached: boolean, host: string | undefined): GameSummary
 {
     if (summary.turn !== summary.ai || summary.end !== undefined) {
         return summary;
     }
 
     const thought = thoughtForLastMove(folder, current);
+    const quick = onQuickModel(summary.level, host) ? { quick: true as const } : {};
     const helps = helpsIn(folder) ? (coached ? "coached" : "on") : judgedBefore(current) ? "off now" : undefined;
-    return { ...summary, ...(thought === undefined ? {} : { thought }), ...(helps === undefined ? {} : { helps }) };
+    return { ...summary, ...(thought === undefined ? {} : { thought: { ...thought, ...quick } }), ...(helps === undefined ? {} : { helps }) };
 }
 
 /** The current game `now`, refused when there is none or when it is over, on time too. */

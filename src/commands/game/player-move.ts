@@ -89,7 +89,7 @@ function playersMove({ move, offer_draw: offerDraw = false }: { move: string; of
     const read = withSanPieces(move);
     const readAs = read === move ? "" : `${move.trim()} is read as ${read.trim()}. `;
     const started = context.positionSeen === null ? positionIn(folder).started : context.positionSeen?.started;
-    const played = playMove(folder, context.now(), "player", read, (message) => `${readAs}${message} Ask the player again. Nothing changed.`, { allowance, offerDraw, coached: coachRuns(context) });
+    const played = playMove(folder, context.now(), "player", read, (message) => `${readAs}${message} Ask the player again. Nothing changed.`, { allowance, offerDraw, coached: coachRuns(context), host: context.host?.() });
     // A game over by this move has no more moves to play there: the next game's window gives the address (Federico, round of D-85).
     const invite = played.game.end === undefined ? pageInvite(context, started) : undefined;
     const ended = played.game.end === undefined ? undefined : loadGame(folder);

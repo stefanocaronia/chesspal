@@ -54,7 +54,7 @@ describe("chesspal init", () => {
                 + "     Antigravity asks about each of Chesspal's tools the first time:\n"
                 + "     choose to always allow it (Persist to settings.json).\n"
                 + "  3. Say hello: the AI gives you the link to the board.\n\n"
-                + "  Updated 17 files.",
+                + "  Updated 18 files.",
         );
         expect(json(chess, ".mcp.json")).toEqual({ mcpServers: { chesspal: { command: "chesspal", args: ["mcp"] } } });
         expect(text(chess, "AGENTS.md")).toBe(`<!-- chesspal: these lines up to the end mark are Chesspal's, and chesspal init rewrites them; write your own after it. -->\n${startInstructions()}\n<!-- chesspal: end -->\n`);
@@ -93,6 +93,11 @@ describe("chesspal init", () => {
         expect(text(chess, ".codex/agents/chesspal-analyst.toml")).toContain("\n- Each line of the analysis is a move");
         // Codex gives an agent every tool: its own are named, which spares it a search (Priya).
         expect(text(chess, ".codex/agents/chesspal-coach.toml")).toMatch(/\n\nYour tools: tools\.mcp__chesspal__coach\.\n'''\n$/);
+        // OpenCode's plugin starts the one that thinks on the AI's own model, hidden from the player and kept to its tool.
+        expect(text(chess, ".opencode/agents/chesspal-ponder.md")).toMatch(
+            /^---\ndescription: .*\nmode: subagent\nhidden: true\npermissions:\n {2}- action: "\*"\n {4}resource: "\*"\n {4}effect: deny\n(?:.*\n)* {2}- action: "chesspal_ponder"\n {4}resource: "\*"\n {4}effect: allow\n---\n\nYou are the player's chess opponent[\s\S]*\n\nYour tool: tools\.chesspal\.ponder, called through execute, as await tools\.chesspal\.ponder\(\{\}\)\.\n$/,
+        );
+        expect(existsSync(join(chess, ".opencode", "agents", "chesspal-ponder-quick.md"))).toBe(false);
     });
 
     it("starts the server through cmd on Windows", async () => {
@@ -125,7 +130,7 @@ describe("chesspal init", () => {
         );
         // Codex runs hooks that changed only once the player trusts them again.
         expect((await runCommandLine(["init"], testContext(folder))).output).toContain(
-            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 17 files.",
+            "\n\n  Chesspal's hooks for Codex have changed: when Codex asks about them, choose Trust all again.\n\n  Updated 18 files.",
         );
 
         expect(json(folder, ".mcp.json")).toEqual({ mcpServers: { other: { command: "other" }, chesspal: { command: "chesspal", args: ["mcp"], env: { CHESSPAL_HOME: "D:/runs" } } } });
@@ -155,7 +160,7 @@ describe("chesspal init", () => {
         const output = (await runCommandLine(["init"], { ...testContext(folder), language: "it-IT" })).output;
 
         expect(output).toMatch(/^♜ Chesspal è pronto in .*\n\n {2}Per giocare:\n {2}1\. Apri Claude Code, Codex, Antigravity o OpenCode in questa cartella\.\n/);
-        expect(output).toMatch(/\n\n {2}Aggiornati 17 file\.$/);
+        expect(output).toMatch(/\n\n {2}Aggiornati 18 file\.$/);
         expect(output).not.toContain("consentili di nuovo");
         expect((await runCommandLine(["init", "la mia scacchiera"], { ...testContext(folder), language: "it-IT" })).output).toContain(
             '  1. Entra nella cartella: cd "la mia scacchiera"\n     poi apri Claude Code (claude), Codex (codex),\n     Antigravity (agy) o OpenCode (opencode).\n',
@@ -171,8 +176,12 @@ describe("chesspal init", () => {
         const coach = join(".claude", "agents", "chesspal-coach.md");
         writeFileSync(join(folder, coach), "an older coach\n");
         expect(outdatedHostFiles(folder, "linux")).toEqual([coach]);
+        // A folder set up before OpenCode's agent was written lacks it.
+        const thinker = join(".opencode", "agents", "chesspal-ponder.md");
+        rmSync(join(folder, thinker));
+        expect(outdatedHostFiles(folder, "linux")).toEqual([coach, thinker]);
         const { output } = await runCommandLine(["status"], testContext(folder));
-        expect(output).toContain(`This folder was set up by an older Chesspal (${coach}): tell the player, in their language, to close this chat, run "chesspal init" in this folder`);
+        expect(output).toContain(`This folder was set up by an older Chesspal (${coach}, ${thinker}): tell the player, in their language, to close this chat, run "chesspal init" in this folder`);
 
         // In a chat, at its first status only: reading the files is the slowest part of a status.
         const chat: Context = { ...testContext(folder), told: new Set() };

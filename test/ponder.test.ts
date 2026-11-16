@@ -153,6 +153,16 @@ describe("the AI thinking on the player's time (D-72)", () => {
 
         expect(await run({ ...codex, host: () => "codex-mcp-client" }, "ai_move", { move: "e4", plan: "Centre." })).toContain("start the chesspal-ponder-quick agent");
 
+        // In OpenCode the plugin starts the agent on the chat's own model, at every level, and the chat is told to start nothing.
+        const openCode = { ...playerFolder(), host: () => "opencode" };
+        setUpHosts(openCode.folder, "linux");
+        await run(openCode, "new_game", { ai_colour: "white", level: "club" });
+
+        expect(await run(openCode, "ai_move", { move: "e4", plan: "Centre." })).not.toContain("agent");
+        await run(openCode, "ponder", { position: 1, reply: "e5", move: "Nf3", why: "Development." });
+        expect(await run(openCode, "player_move", { move: "e5" })).toContain("\nThought on their time by your model (legal, not checked): Nf3, Development.\n");
+        expect(await run(openCode, "status")).toContain("\nThought on their time by your model (legal, not checked): Nf3,");
+
         const mated = playerFolder();
         setUpHosts(mated.folder, "linux");
         await run(mated, "new_game", { ai_colour: "black" });
@@ -169,7 +179,7 @@ describe("the AI thinking on the player's time (D-72)", () => {
         await run(context, "new_game", { ai_colour: "black" });
 
         expect(command?.byAgents).toEqual(["chesspal-ponder-quick", "chesspal-ponder"]);
-        expect(command?.hosts).toEqual(["claude-code", "codex-mcp-client"]);
+        expect(command?.hosts).toEqual(["claude-code", "codex-mcp-client", "opencode"]);
         await expect(run(context, "ponder", { position: 0, reply: "e4", say: "Hello." })).rejects.toThrow("One thing a call");
         await expect(run(context, "ponder", { position: 0, done: true, reply: "e4" })).rejects.toThrow("One thing a call");
         await expect(run(context, "ponder", { position: 0, reply: "e4", why: "No move." })).rejects.toThrow("Give your move with its why");

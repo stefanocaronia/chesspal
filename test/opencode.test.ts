@@ -319,6 +319,7 @@ describe("Chesspal's plugin for OpenCode", () => {
         const first = opencode.children.at(-1)!;
         expect(opencode.hooks().at(-1)).toMatchObject({ command: "chesspal listen --opencode", input: { cwd: folder, session_id: "ses_1", hook_event_name: "Stop" } });
         first.ends(0, `${bellLine}\n`);
+        await settled();
         expect(opencode.prompts).toEqual([{ sessionID: "ses_1", text: bellLine }]);
 
         // Its own message starts the next turn; the turn after waits again, and a message of the player's lets that wait go, with no message sent.
@@ -407,6 +408,132 @@ describe("Chesspal's plugin for OpenCode", () => {
         expect(readFileSync(join(folder, "listen.log"), "utf8")).toMatch(/plugin opencode chesspal chat did not start: no shell\n.*plugin opencode chesspal listen --opencode did not start: no shell\n$/);
     });
 
+    it("thinks on the player's time after the AI's move, in a session of its own on the chat's model, and stops it before the doorbell wakes the chat", async () => {
+        const folder = temporary();
+        const opencode = fakeOpenCode(folder);
+        const notes: unknown[] = [];
+
+        // The note the server reads, as it is when the thinker is prompted.
+        const prompt = (message: { sessionID: string; text: string; }): Promise<unknown> => {
+            notes.push(agentsNote(folder));
+            return opencode.context.session.prompt(message);
+        };
+
+        await (await plugin()).setup({ ...opencode.context, session: { ...opencode.context.session, prompt } }, opencode.run);
+        await opencode.send("session.inbox.enqueued", { sessionID: "ses_1", item: { type: "user", payload: { text: "Giochiamo!" } } });
+
+        // A folder set up before the agent starts nothing.
+        await aiTurn(opencode, "Played 1...e5.\nPlayer (White) to move, move 2.");
+        expect(opencode.created).toEqual([]);
+
+        // A turn with no move of the AI's starts nothing either.
+        writeAgent(folder);
+        await aiTurn(opencode, null);
+        expect(opencode.created).toEqual([]);
+        await aiTurn(opencode, "Played 2...Nc6.\nPlayer (White) to move, move 3.");
+        expect(opencode.created).toEqual([{ title: "Chesspal thinking", agent: "chesspal-ponder", model: { id: "gpt-oss:20b", providerID: "ollama" } }]);
+        expect(opencode.prompts.at(-1)).toEqual({ sessionID: "ses_think_1", text: "Ponder." });
+        expect(notes.at(-1)).toEqual({ ses_think_1: "chesspal-ponder" });
+
+        // Its session is no chat: no start noted, nobody waits for the player after its turn.
+        const hooks = opencode.hooks().length;
+        await opencode.send("session.created", { sessionID: "ses_think_1", agent: "chesspal-ponder" });
+        await opencode.send("session.execution.started", { sessionID: "ses_think_1" });
+        await opencode.send("session.execution.succeeded", { sessionID: "ses_think_1" });
+        expect(opencode.hooks()).toHaveLength(hooks);
+
+        // The player moves on the page: the thinker, ended by itself or not, is interrupted and removed before the chat hears the doorbell's line.
+        opencode.children.at(-1)!.ends(0, `${bellLine}\n`);
+        await settled();
+        expect(opencode.asked.slice(-3)).toEqual(["interrupt ses_think_1", "remove ses_think_1", "prompt ses_1"]);
+        expect(agentsNote(folder)).toEqual({});
+        expect(readFileSync(join(folder, "listen.log"), "utf8")).toMatch(/plugin opencode started the thinker ses_think_1 in \d+ ms\n.*plugin opencode stopped the thinker ses_think_1 in \d+ ms\n$/);
+    });
+
+    it("stops the thinker when the player writes, and starts none after a move that ends the game", async () => {
+        const folder = temporary();
+        writeAgent(folder);
+        const opencode = fakeOpenCode(folder);
+        await (await plugin()).setup(opencode.context, opencode.run);
+        await opencode.send("session.inbox.enqueued", { sessionID: "ses_1", item: { type: "user", payload: { text: "Giochiamo!" } } });
+
+        await aiTurn(opencode, "Played 1...e5.\nPlayer (White) to move, move 2.");
+        await opencode.send("session.inbox.enqueued", { sessionID: "ses_1", item: { type: "user", payload: { text: "Why e5?" } } });
+        expect(opencode.asked).toEqual(["create ses_think_1", "prompt ses_think_1", "interrupt ses_think_1", "remove ses_think_1"]);
+
+        // An event that leaves the answer out starts it all the same; an answer that says the game is over starts none.
+        await aiTurn(opencode);
+        expect(opencode.created).toHaveLength(2);
+        await aiTurn(opencode, "Played 30...Qh4#.\nGame over: 0-1, Black (you) checkmates White (the player).");
+        expect(opencode.created).toHaveLength(2);
+        expect(opencode.asked.slice(-2)).toEqual(["interrupt ses_think_2", "remove ses_think_2"]);
+    });
+
+    it("wakes the chat all the same when OpenCode cannot stop the thinker, and notes it", async () => {
+        const folder = temporary();
+        writeAgent(folder);
+        const opencode = fakeOpenCode(folder);
+        const failing = { ...opencode.context.session, interrupt: () => Promise.reject(new Error("busy")), remove: () => Promise.reject(new Error("gone")) };
+        await (await plugin()).setup({ ...opencode.context, session: failing }, opencode.run);
+        await opencode.send("session.inbox.enqueued", { sessionID: "ses_1", item: { type: "user", payload: { text: "Giochiamo!" } } });
+        await aiTurn(opencode, "Played 1...e5.\nPlayer (White) to move, move 2.");
+
+        opencode.children.at(-1)!.ends(0, `${bellLine}\n`);
+        await settled();
+        expect(opencode.prompts.at(-1)).toEqual({ sessionID: "ses_1", text: bellLine });
+        expect(agentsNote(folder)).toEqual({});
+        expect(readFileSync(join(folder, "listen.log"), "utf8")).toMatch(/could not interrupt the thinker ses_think_1: busy\n.*could not remove the thinker ses_think_1: gone\n/s);
+    });
+
+    it("removes as it starts the thinkers the note still names, left when OpenCode closed over them, and takes none of them for a chat", async () => {
+        const folder = temporary();
+        writeFileSync(join(folder, "opencode-agents.json"), JSON.stringify({ ses_left: "chesspal-ponder" }));
+        const opencode = fakeOpenCode(folder);
+        await (await plugin()).setup(opencode.context, opencode.run);
+        await settled();
+
+        expect(opencode.asked).toEqual(["remove ses_left"]);
+        expect(agentsNote(folder)).toEqual({});
+        expect(readFileSync(join(folder, "listen.log"), "utf8")).toMatch(/plugin opencode removed 1 thinker left by the chat before\n$/);
+
+        // OpenCode tells of its removal: no chat starts for it.
+        await opencode.send("session.deleted", { sessionID: "ses_left" });
+        await opencode.send("session.execution.succeeded", { sessionID: "ses_left" });
+        expect(opencode.hooks()).toEqual([]);
+    });
+
+    it("asks OpenCode nothing as it starts when there is no note, or one that does not read", async () => {
+        const fresh = temporary();
+        const first = fakeOpenCode(fresh);
+        await (await plugin()).setup(first.context, first.run);
+        await settled();
+        expect(first.asked).toEqual([]);
+        expect(existsSync(join(fresh, "opencode-agents.json"))).toBe(false);
+
+        const broken = temporary();
+        writeFileSync(join(broken, "opencode-agents.json"), "{ half");
+        const second = fakeOpenCode(broken);
+        await (await plugin()).setup(second.context, second.run);
+        await settled();
+        expect(second.asked).toEqual([]);
+        expect(readFileSync(join(broken, "opencode-agents.json"), "utf8")).toBe("{ half");
+    });
+
+    it("stops the thinker of the chat before when a new chat starts, as after /new", async () => {
+        const folder = temporary();
+        writeAgent(folder);
+        const opencode = fakeOpenCode(folder);
+        await (await plugin()).setup(opencode.context, opencode.run);
+        await opencode.send("session.inbox.enqueued", { sessionID: "ses_1", item: { type: "user", payload: { text: "Giochiamo!" } } });
+        await aiTurn(opencode, "Played 1...e5.\nPlayer (White) to move, move 2.");
+        expect(opencode.asked).toEqual(["create ses_think_1", "prompt ses_think_1"]);
+
+        await opencode.send("session.inbox.enqueued", { sessionID: "ses_2", item: { type: "user", payload: { text: "Giochiamo!" } } });
+        expect(opencode.asked.slice(-2)).toEqual(["interrupt ses_think_1", "remove ses_think_1"]);
+        expect(agentsNote(folder)).toEqual({});
+        expect(opencode.hooks().at(-1)).toMatchObject({ command: "chesspal chat", input: { session_id: "ses_2", source: "clear" } });
+    });
+
     it("notes in listen.log when OpenCode's events end without OpenCode letting it go", async () => {
         const folder = temporary();
         const opencode = fakeOpenCode(folder);
@@ -430,7 +557,15 @@ interface PluginContext
 {
     location: { directory: string; };
     event: { subscribe(options: { signal: AbortSignal; }): AsyncIterable<unknown>; };
-    session: { prompt(message: { sessionID: string; text: string; }): Promise<unknown>; };
+    session: PluginSessions;
+}
+
+interface PluginSessions
+{
+    prompt(message: { sessionID: string; text: string; }): Promise<unknown>;
+    create?(options: { title: string; agent: string; model?: object; }): Promise<{ id: string; }>;
+    interrupt?(options: { sessionID: string; resume: boolean; }): Promise<unknown>;
+    remove?(options: { sessionID: string; }): Promise<unknown>;
 }
 
 type Run = (command: string, options: { cwd: string; shell: boolean; }) => FakeChild;
@@ -473,13 +608,18 @@ class FakeChild extends EventEmitter
     }
 }
 
-/** OpenCode as the plugin sees it: the folder, its events as the test sends them, the messages the plugin sends, and the hooks it starts. */
+/**
+ * OpenCode as the plugin sees it: the folder, its events as the test sends them, the messages the plugin sends, the hooks it starts, and what it asks of
+ * the sessions, in order: each session created, prompted, interrupted and removed.
+ */
 function fakeOpenCode(folder: string, start?: () => void): {
     context: PluginContext;
     run: Run;
     send(type: string, data: object, directory?: string): Promise<void>;
     children: FakeChild[];
     prompts: object[];
+    created: object[];
+    asked: string[];
     hooks(): object[];
 }
 {
@@ -487,6 +627,22 @@ function fakeOpenCode(folder: string, start?: () => void): {
     let wake = (): void => undefined;
     const children: FakeChild[] = [];
     const prompts: object[] = [];
+    const created: object[] = [];
+    const asked: string[] = [];
+
+    const session: PluginSessions = {
+        prompt: (message) => {
+            asked.push(`prompt ${message.sessionID}`);
+            return Promise.resolve(prompts.push(message));
+        },
+        create: (options) => {
+            created.push(options);
+            asked.push(`create ses_think_${created.length}`);
+            return Promise.resolve({ id: `ses_think_${created.length}` });
+        },
+        interrupt: ({ sessionID }) => Promise.resolve(asked.push(`interrupt ${sessionID}`)),
+        remove: ({ sessionID }) => Promise.resolve(asked.push(`remove ${sessionID}`)),
+    };
 
     const subscribe = ({ signal }: { signal: AbortSignal; }): AsyncIterable<unknown> => ({
         async *[Symbol.asyncIterator]()
@@ -507,7 +663,7 @@ function fakeOpenCode(folder: string, start?: () => void): {
     });
 
     return {
-        context: { location: { directory: folder }, event: { subscribe }, session: { prompt: (message) => Promise.resolve(prompts.push(message)) } },
+        context: { location: { directory: folder }, event: { subscribe }, session },
         run: (command, options) => {
             start?.();
             const child = new FakeChild(command, options);
@@ -523,8 +679,37 @@ function fakeOpenCode(folder: string, start?: () => void): {
         },
         children,
         prompts,
+        created,
+        asked,
         hooks: () => children.map((child) => ({ command: child.command, input: child.input, cwd: child.options.cwd, shell: child.options.shell })),
     };
+}
+
+/** A turn of the chat that plays the AI's move, with the answer the tool's success carries, none when undefined; with null, a turn with no move. */
+async function aiTurn(opencode: ReturnType<typeof fakeOpenCode>, answer?: string | null): Promise<void>
+{
+    await opencode.send("session.execution.started", { sessionID: "ses_1" });
+    await opencode.send("session.step.started", { sessionID: "ses_1", agent: "build", model: { id: "gpt-oss:20b", providerID: "ollama" } });
+
+    if (answer !== null) {
+        const content = answer === undefined ? {} : { content: [{ type: "text", text: answer }] };
+        await opencode.send("session.tool.success", { sessionID: "ses_1", ...content, metadata: { toolCalls: [{ tool: "chesspal.ai_move", status: "completed" }] } });
+    }
+
+    await opencode.send("session.execution.succeeded", { sessionID: "ses_1" });
+}
+
+/** The agent that thinks on the player's time, as init writes it in the folder. */
+function writeAgent(folder: string): void
+{
+    mkdirSync(join(folder, ".opencode", "agents"), { recursive: true });
+    writeFileSync(join(folder, ".opencode", "agents", "chesspal-ponder.md"), "---\nmode: subagent\n---\n");
+}
+
+/** The thinkers' sessions as the plugin notes them for the MCP server. */
+function agentsNote(folder: string): unknown
+{
+    return JSON.parse(readFileSync(join(folder, "opencode-agents.json"), "utf8"));
 }
 
 /** The sources of OpenCode's models as the test gives them: Ollama's answers, `opencode models`, a home of its own; the addresses asked. */

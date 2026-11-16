@@ -12,7 +12,7 @@ import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
 import { chatHasRead, type Page, startPage } from "../page/index.ts";
 import { attachTable, tableToJoin } from "../table/index.ts";
-import { allowedCaller, callerOf, type CallingAgent, callingAgent, fromCodexAgent } from "./caller.ts";
+import { allowedCaller, callerOf, type CallingAgent, callingAgent, fromCodexAgent, fromOpenCode } from "./caller.ts";
 
 /**
  * What the host reads as the server starts, before any tool: the lines that start a chat, `instructions` then `status`, and the rule of every move (D-27,
@@ -203,7 +203,9 @@ async function callTool(
 {
     await beforeCall?.(meta);
     const codexAgent = fromCodexAgent(meta);
-    const calling = command.byAgents !== undefined || codexAgent ? await callingAgent(meta, context.folder) : undefined;
+    const openCode = fromOpenCode(meta);
+    // In OpenCode a call of the agent the plugin starts is told from the chat's by a note the plugin writes: a small file, read once a call.
+    const calling = command.byAgents !== undefined || codexAgent || openCode ? await callingAgent(meta, context.folder) : undefined;
 
     // An agent's tool called by the chat, or by another agent, would give what only that agent may see (Priya).
     if (command.byAgents !== undefined && !allowedCaller(calling, command.byAgents)) {
@@ -211,10 +213,10 @@ async function callTool(
         return { content: [{ type: "text", text: `${command.name} is not yours to call: the player reads what it gives on the board page. Nothing changed.` }], isError: true };
     }
 
-    // Codex gives its agents every tool: one of Chesspal's keeps to its own, and never plays or talks for the opponent (D-98, Federico).
+    // Codex and OpenCode give their agents every tool: one of Chesspal's keeps to its own, and never plays or talks for the opponent (D-98, Federico).
     const own = calling !== undefined && "agent" in calling ? agentTools(calling.agent) : undefined;
 
-    if (codexAgent && own !== undefined && !own.includes(command.name)) {
+    if ((codexAgent || openCode) && own !== undefined && !own.includes(command.name)) {
         return { content: [{ type: "text", text: `${command.name} is not yours to call: you work only with ${own.join(", ")}. Nothing changed.` }], isError: true };
     }
 

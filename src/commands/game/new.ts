@@ -127,7 +127,7 @@ export function startNewGame({ ai_colour: colour, from, clock, level: chosen, re
     }
 
     return {
-        game: withThought(summaryOf(current, now), folder, current, coachRuns(context)),
+        game: withThought(summaryOf(current, now), folder, current, coachRuns(context), context.host?.()),
         ...(archived === undefined ? {} : { archived: { name: archived, finished: going === undefined } }),
         past,
         ...(player === undefined ? {} : { player }),

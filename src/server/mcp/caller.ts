@@ -58,13 +58,13 @@ export async function callerOf(meta: Record<string, unknown> | undefined, client
     return client === undefined ? undefined : { annotator: client.title ?? client.name, hostOnly: true };
 }
 
-/** Who in Claude Code or Codex made a tool call: the chat itself, or one of its agents by its type, with the run it is, when the host tells it. */
+/** Who in Claude Code, Codex or OpenCode made a tool call: the chat itself, or one of its agents by its type, with the run it is, when the host tells it. */
 export type CallingAgent = { chat: true; } | { agent: string; run?: string; };
 
 /**
  * Who in Claude Code or Codex made a tool call: the chat, when its line is in the chat's transcript, or the agent whose file has it, by the type Claude Code
- * notes beside that file (Priya); in Codex, as the call's metadata and the agent's own session say (D-98). Undefined when it cannot be told: another host,
- * no chat noted, no line, or no type.
+ * notes beside that file (Priya); in Codex, as the call's metadata and the agent's own session say (D-98); in OpenCode, as Chesspal's plugin notes the
+ * sessions of the agents it starts. Undefined when it cannot be told: another host, no chat noted, no line, or no type.
  */
 export async function callingAgent(meta: Record<string, unknown> | undefined, folder: string, wait = 50): Promise<CallingAgent | undefined>
 {
@@ -72,6 +72,12 @@ export async function callingAgent(meta: Record<string, unknown> | undefined, fo
 
     if (turn !== undefined) {
         return await codexCaller(turn, wait);
+    }
+
+    const session = meta?.["ai.opencode/sessionID"];
+
+    if (typeof session === "string" && session !== "") {
+        return openCodeCaller(join(folder, "opencode-agents.json"), session);
     }
 
     const call = meta?.["claudecode/toolUseId"];
@@ -89,6 +95,22 @@ export async function callingAgent(meta: Record<string, unknown> | undefined, fo
     // Each agent Claude Code starts writes a file of its own: its name tells two runs of the same agent apart.
     const type = objectOf(textOf(found.file.replace(/\.jsonl$/, ".meta.json")))?.agentType;
     return typeof type === "string" ? { agent: type, run: basename(found.file, ".jsonl") } : undefined;
+}
+
+/**
+ * Who in OpenCode makes a call: one of Chesspal's agents when the plugin noted its session before it started it, else the chat. Read once, with no wait: the
+ * note comes before the agent's first call.
+ */
+function openCodeCaller(note: string, session: string): CallingAgent
+{
+    const agent = objectOf(textOf(note))?.[session];
+    return typeof agent === "string" && agent.startsWith("chesspal-") ? { agent, run: session } : { chat: true };
+}
+
+/** Whether a call comes from OpenCode, as its metadata say. */
+export function fromOpenCode(meta: Record<string, unknown> | undefined): boolean
+{
+    return typeof meta?.["ai.opencode/sessionID"] === "string";
 }
 
 /** Whether a call comes from one of Codex's agents, as its metadata say: its own process starts no board page (D-98). */

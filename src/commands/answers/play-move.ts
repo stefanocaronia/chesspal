@@ -20,6 +20,8 @@ export interface WithMove
     allowance?: number;
     /** A coach judges the player's moves with the helps on (D-88): the AI reads it after the player's move. */
     coached?: boolean;
+    /** The chat's host, which says on which model the AI thought on the player's time. */
+    host?: string;
     /** The chat's host runs the doorbell: the AI refused a move hears the page will wake it, else that the player tells it. */
     doorbell?: boolean;
 }
@@ -34,7 +36,7 @@ export function playMove(
     mover: Mover,
     text: string,
     refused: (message: string, legal: readonly string[]) => string,
-    { comment, said, offerDraw = false, allowance = 0, coached = false, doorbell = true }: WithMove = {},
+    { comment, said, offerDraw = false, allowance = 0, coached = false, host, doorbell = true }: WithMove = {},
 ): MovePlayed
 {
     // A flag falls only past the allowance.
@@ -77,7 +79,7 @@ export function playMove(
     saveGame(folder, current);
 
     const { archive, warning } = endOf(game) === undefined ? {} : archiveEnded(folder, current, openingTags(game.record));
-    const result: MovePlayed = { move: `${position.moveNumber}${position.turn === "white" ? "." : "..."}${played.move.san}`, game: withThought(summaryOf(current, now, archive), folder, current, coached) };
+    const result: MovePlayed = { move: `${position.moveNumber}${position.turn === "white" ? "." : "..."}${played.move.san}`, game: withThought(summaryOf(current, now, archive), folder, current, coached, host) };
 
     if (played.note !== undefined) {
         result.note = played.note;

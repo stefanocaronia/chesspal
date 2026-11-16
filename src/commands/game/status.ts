@@ -109,7 +109,7 @@ export const status = defineCommand({
             }
 
             if (current !== undefined) {
-                status.game = withAnalyst(withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current, coachRuns(context)), context, current);
+                status.game = withAnalyst(withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current, coachRuns(context), context.host?.()), context, current);
 
                 if (status.pageClosed === true) {
                     pageGiven(context, current.started);

@@ -74,7 +74,7 @@ In the steps below, copy each command, paste it in the terminal (Ctrl+V or right
   npm install -g @opencode/cli
   ```
 
-  Open Ollama's settings and raise **Context length** to at least 64k: with its smaller default the AI cannot see Chesspal's tools and never moves. Ollama must be running while you play: on Windows and macOS its llama icon shows by the clock. The board page offers the Ollama models that can use tools; if you already use OpenCode with other models, those you used recently are offered too. A model on your computer plays more slowly and makes more mistakes than the others. Most moves take a few seconds, some take a minute or more. About one turn in eight the AI stops without moving: write "your move" in its window.
+  Open Ollama's settings and raise **Context length** to at least 64k: with its smaller default the AI cannot see Chesspal's tools and never moves. Ollama must be running while you play: on Windows and macOS its llama icon shows by the clock. The board page offers the Ollama models that can use tools; if you already use OpenCode with other models, those you used recently are offered too. A model on your computer plays more slowly and makes more mistakes than the others. Most moves take a few seconds, some take a minute or more. About one turn in eight the AI stops without moving: write "your move" in its window. Experimental: while you choose your move, the AI also thinks on your time, with the same model. A model on your computer rarely finishes a thought before you move, so for now this seldom helps.
 
 Once you are signed in, close that terminal window with its × and open a new one, as in step 2.
 

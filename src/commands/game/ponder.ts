@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Game, levelOf, moodAt, sees, timeLeft } from "../../core/index.ts";
 import { type CurrentGame, currentPlan, endOf, keepThought, loadGame, notePondering, talkLimits, type Thought, thoughtKey, waitingSince } from "../../games/index.ts";
-import { agentHosts, isCodex, ponderAgents } from "../../host-files/index.ts";
+import { isCodex, ponderAgents, ponderHosts } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { boardView, colourName, compactView, type GameSummary, positionLines, say as sayWords, summaryOf } from "../answers/index.ts";
 import { defineCommand, sentence } from "../registry/index.ts";
@@ -29,7 +29,8 @@ interface Start
 
 /**
  * The AI's thinking on the player's time (D-72), for the agent that does it: the position, the view after a reply, its answer kept for its move, and its
- * words on the board page. Its calls are not the chat's: the doorbell still wakes the chat for the player's move. Offered to the hosts that run the agent (D-98).
+ * words on the board page. Its calls are not the chat's: the doorbell still wakes the chat for the player's move. Offered to the hosts that run the agent (D-98):
+ * in Claude Code and Codex the chat starts it, in OpenCode Chesspal's plugin.
  */
 export const ponder = defineCommand({
     name: "ponder",
@@ -48,7 +49,7 @@ export const ponder = defineCommand({
         done: z.boolean().optional().describe("true when you have no more replies to think on: it waits for the player's move"),
     }),
     byAgents: ponderAgents,
-    hosts: agentHosts,
+    hosts: ponderHosts,
     run: async (input, context): Promise<Pondered> => {
         const { reply, move, why, say, done = false } = input;
         // A quick model writes ponder {} as ponder {position: 0}, and was told to stop: alone, it asks for the position too (Priya).

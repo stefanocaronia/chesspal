@@ -254,6 +254,35 @@ describe("the MCP server", () => {
         }
     });
 
+    it("offers ponder in OpenCode to the thinker its plugin notes alone, which keeps to it: never to the chat", async () => {
+        const folder = mkdtempSync(join(tmpdir(), "chesspal-opencode-"));
+        writeFileSync(join(folder, "opencode-agents.json"), `${JSON.stringify({ ses_think: "chesspal-ponder" })}\n`);
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await createMcpServer(testContext(folder)).connect(serverTransport);
+        client = new Client({ name: "opencode", version: "2.3.0" });
+        await client.connect(clientTransport);
+        const thinker = { "ai.opencode/sessionID": "ses_think" };
+        const chat = { "ai.opencode/sessionID": "ses_chat" };
+        const text = async (name: string, meta: Record<string, unknown>, args: Record<string, unknown> = {}): Promise<string> =>
+            ((await client!.callTool({ name, arguments: args, _meta: meta })).content as { text: string; }[])[0]?.text ?? "";
+
+        try {
+            expect((await client.listTools()).tools.map((tool) => tool.name)).toContain("ponder");
+            await text("new_game", chat, { ai_colour: "black" });
+
+            expect(await text("ponder", thinker)).toMatch(/^Position 0: the player \(White\) to move/);
+            expect(await text("ai_move", thinker, { move: "e5" })).toBe("ai_move is not yours to call: you work only with ponder. Nothing changed.");
+            expect(await text("ponder", chat)).toBe("ponder is not yours to call: the player reads what it gives on the board page. Nothing changed.");
+            // A session the plugin never noted is the chat's, and so is every call before the note exists.
+            expect(await text("status", chat)).toContain("Player (White) to move, move 1.");
+            rmSync(join(folder, "opencode-agents.json"));
+            expect(await text("ponder", thinker)).toBe("ponder is not yours to call: the player reads what it gives on the board page. Nothing changed.");
+        } finally {
+            await client.close();
+            rmSync(folder, { recursive: true, force: true });
+        }
+    });
+
     it("starts the page once, before the chat's first call, and never for a Codex agent's (D-98)", async () => {
         let started = 0;
         const pageFirst = lazyPage(async () => {
