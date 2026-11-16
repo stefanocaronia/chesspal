@@ -5,12 +5,13 @@ import { type AnyCommand, commands, version } from "chesspal";
 import { spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/commands/registry/context.ts";
 import { aiHostIn, aiModelIn, aiNameOf, readPgn } from "../src/core/index.ts";
 import { aiModelOf, saveChatStart } from "../src/games/index.ts";
+import { analystAgent, hasAgent } from "../src/host-files/index.ts";
 import { gameFolder, profileFolder } from "../src/profiles/index.ts";
 import { createMcpServer, lazyPage, opponentOf, serverInstructions } from "../src/server/mcp/mcp.ts";
 import { play, testContext } from "./commands.ts";
@@ -279,6 +280,23 @@ describe("the MCP server", () => {
             expect(await text("ponder", thinker)).toBe("ponder is not yours to call: the player reads what it gives on the board page. Nothing changed.");
         } finally {
             await client.close();
+            rmSync(folder, { recursive: true, force: true });
+        }
+    });
+
+    it("looks for an agent in OpenCode in its own folder of agents, where init writes only the one that thinks, never in Claude Code's", () => {
+        const folder = mkdtempSync(join(tmpdir(), "chesspal-opencode-"));
+
+        try {
+            for (const file of [".claude/agents/chesspal-analyst.md", ".claude/agents/chesspal-ponder.md", ".opencode/agents/chesspal-ponder.md"]) {
+                mkdirSync(dirname(join(folder, file)), { recursive: true });
+                writeFileSync(join(folder, file), "---\n---\n");
+            }
+
+            expect(hasAgent(folder, "chesspal-ponder", "opencode")).toBe(true);
+            expect(hasAgent(folder, analystAgent, "opencode")).toBe(false);
+            expect(hasAgent(folder, analystAgent, "claude-code")).toBe(true);
+        } finally {
             rmSync(folder, { recursive: true, force: true });
         }
     });

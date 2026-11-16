@@ -110,7 +110,8 @@ function openCodeCaller(note: string, session: string): CallingAgent
 /** Whether a call comes from OpenCode, as its metadata say. */
 export function fromOpenCode(meta: Record<string, unknown> | undefined): boolean
 {
-    return typeof meta?.["ai.opencode/sessionID"] === "string";
+    const session = meta?.["ai.opencode/sessionID"];
+    return typeof session === "string" && session !== "";
 }
 
 /** Whether a call comes from one of Codex's agents, as its metadata say: its own process starts no board page (D-98). */

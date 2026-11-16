@@ -213,7 +213,8 @@ async function callTool(
         return { content: [{ type: "text", text: `${command.name} is not yours to call: the player reads what it gives on the board page. Nothing changed.` }], isError: true };
     }
 
-    // Codex and OpenCode give their agents every tool: one of Chesspal's keeps to its own, and never plays or talks for the opponent (D-98, Federico).
+    // Codex gives its agents every tool, and in OpenCode only the agent's file keeps them from it: here too one of Chesspal's keeps to its own, and never
+    // plays or talks for the opponent (D-98, Federico).
     const own = calling !== undefined && "agent" in calling ? agentTools(calling.agent) : undefined;
 
     if ((codexAgent || openCode) && own !== undefined && !own.includes(command.name)) {

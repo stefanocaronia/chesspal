@@ -176,6 +176,13 @@ function chesspalChats(context, run)
         note(folder, `stopped the thinker ${id} in ${Date.now() - from} ms`);
     };
 
+    // Every thinker stopped, those whose session is still being made too: a chat whose move is forgotten starts none.
+    const stopThinkers = () => {
+        for (const chat of new Set([...moved, ...thinkers.keys()])) {
+            void stopThinker(chat);
+        }
+    };
+
     // A thinker's session removed, so that the player's list of sessions does not fill with one a move.
     const removeThinker = async (id) => {
         try {
@@ -185,7 +192,8 @@ function chesspalChats(context, run)
         }
     };
 
-    // The thinkers' sessions, which the MCP server reads by the session of each call: written whole, the chats' never.
+    // The thinkers' sessions, which the MCP server reads by the session of each call: written whole, the chats' never. Two OpenCodes in one folder would
+    // each write its own and remove the other's as it starts: that is not held.
     const noteThinkers = () => {
         try {
             const path = join(folder, "opencode-agents.json");
@@ -213,8 +221,12 @@ function chesspalChats(context, run)
             return;
         }
 
+        // All marked before the first is removed: an event of one of them meanwhile is no chat's.
         for (const id of left) {
             agents.add(id);
+        }
+
+        for (const id of left) {
             await removeThinker(id);
         }
 
@@ -285,10 +297,7 @@ function chesspalChats(context, run)
                     letGo(other);
                 }
 
-                for (const chat of [...thinkers.keys()]) {
-                    void stopThinker(chat);
-                }
-
+                stopThinkers();
                 hook("chat", { cwd: folder, session_id: session, source: seen.size === 0 ? "startup" : "clear" });
                 seen.add(session);
             }
@@ -323,9 +332,7 @@ function chesspalChats(context, run)
                 letGo(session);
             }
 
-            for (const chat of [...thinkers.keys()]) {
-                void stopThinker(chat);
-            }
+            stopThinkers();
         },
     };
 }
