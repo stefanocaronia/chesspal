@@ -33,6 +33,7 @@ export interface TableFound
     readonly url: string;
     readonly port: number;
     readonly version: string | undefined;
+    readonly build: string | undefined;
     readonly chat: string | undefined;
 }
 
@@ -96,7 +97,7 @@ export async function tableAt(folder: string): Promise<TableFound | undefined>
     const said = await Promise.all(ports.map(pageAt));
     const index = said.findIndex((one) => one?.table === true && samePath(one.folder, folder));
     const port = ports[index];
-    return port === undefined ? undefined : { url: `http://127.0.0.1:${port}/`, port, version: said[index]?.version, chat: said[index]?.chat };
+    return port === undefined ? undefined : { url: `http://127.0.0.1:${port}/`, port, version: said[index]?.version, build: said[index]?.build, chat: said[index]?.chat };
 }
 
 /** Asks the table at a port to quit; it answers before it goes, and a table that cannot be reached, or does not answer within a second or so, is let be. */

@@ -5,7 +5,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { type ClientRequest, get } from "node:http";
 import { join, resolve } from "node:path";
 import { dataFolder, realPath, samePath, tableFolder } from "../../home/index.ts";
-import { version } from "../../version.ts";
+import { build, version } from "../../version.ts";
 
 /**
  * Whose page answers at a port, for the hook to find its own: the chat's session, the player's folder, whether a browser has the page open, Chesspal's
@@ -14,7 +14,7 @@ import { version } from "../../version.ts";
 export function bellProbe(folder: string, open = false, table?: TableChat): BellProbe
 {
     const session = table === undefined ? process.env.CLAUDE_CODE_SESSION_ID ?? null : table.session;
-    return { session, folder: resolve(folder), open, version, ...(table === undefined ? {} : { table: true, ...(table.chat === undefined ? {} : { chat: table.chat }) }) };
+    return { session, folder: resolve(folder), open, version, build, ...(table === undefined ? {} : { table: true, ...(table.chat === undefined ? {} : { chat: table.chat }) }) };
 }
 
 /** The chat attached to the table, as its probe says it: its session, null for none or for Codex, and its folder; neither while no chat is attached. */
@@ -31,6 +31,7 @@ export interface BellProbe
     folder: string;
     open: boolean;
     version?: string;
+    build?: string;
     table?: true;
     /** The folder of the chat attached to the table. */
     chat?: string;
@@ -181,12 +182,13 @@ export function askPage(port: number, path: string, wait?: number): Promise<Page
 export function probeOf(said: string | undefined): BellProbe | undefined
 {
     try {
-        const parsed = said === undefined ? undefined : JSON.parse(said) as { session?: unknown; folder?: unknown; open?: unknown; version?: unknown; table?: unknown; chat?: unknown; };
+        const parsed = said === undefined ? undefined : JSON.parse(said) as { session?: unknown; folder?: unknown; open?: unknown; version?: unknown; build?: unknown; table?: unknown; chat?: unknown; };
         return parsed === undefined || typeof parsed.folder !== "string" ? undefined : {
             session: typeof parsed.session === "string" ? parsed.session : null,
             folder: parsed.folder,
             open: parsed.open === true,
             ...(typeof parsed.version === "string" ? { version: parsed.version } : {}),
+            ...(typeof parsed.build === "string" ? { build: parsed.build } : {}),
             ...(parsed.table === true ? { table: true as const } : {}),
             ...(typeof parsed.chat === "string" ? { chat: parsed.chat } : {}),
         };

@@ -151,19 +151,22 @@ describe("chesspal alone", () => {
         }
     });
 
-    it("asks a table of another version to quit, and starts its own in its place", async () => {
+    it.each([
+        ["another version", { version: "0.0.1" }],
+        ["another build of this version", { version, build: "0" }],
+    ])("asks a table of %s to quit, and starts its own in its place", async (_, older) => {
         const context = homeContext();
         const folder = tableFolder(context.home());
         let quitAsked = false;
-        const older = createServer((asked, answer) => {
+        const server = createServer((asked, answer) => {
             // It quits only when asked as chesspal asks: a POST of JSON to its quit route.
             const quit = asked.method === "POST" && asked.url === "/api/table/quit" && asked.headers["content-type"] === "application/json";
-            answer.end(quit ? "{}" : JSON.stringify({ session: null, folder, open: false, version: "0.0.1", table: true }));
+            answer.end(quit ? "{}" : JSON.stringify({ session: null, folder, open: false, ...older, table: true }));
 
             if (quit) {
                 quitAsked = true;
-                older.close();
-                older.closeAllConnections();
+                server.close();
+                server.closeAllConnections();
             }
         });
         // The first of the table's ports that no other page of this computer holds.
@@ -171,7 +174,7 @@ describe("chesspal alone", () => {
 
         for (const port of pagePorts(folder)) {
             if (!free) {
-                free = await listenedOn(older, port);
+                free = await listenedOn(server, port);
             }
         }
 

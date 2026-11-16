@@ -1,7 +1,10 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 
 /** The version of the package that runs, read from its package.json: one folder above both src/ and dist/, so this module stays at their root. */
 export const version: string = installedVersion();
+
+/** When the code that runs was built: a table of the same version and another build, as after `npm run build`, is another Chesspal. */
+export const build: string = String(statSync(new URL(import.meta.url)).mtimeMs);
 
 /** The version of the package on disk now, which an update installs under the one that runs (D-108). */
 export function installedVersion(): string

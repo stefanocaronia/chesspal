@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { styleText } from "node:util";
 import { type Context, speaksItalian } from "../../commands/index.ts";
 import { tableFolder } from "../../home/index.ts";
-import { version } from "../../version.ts";
+import { build, version } from "../../version.ts";
 import { type Opened, openInBrowser } from "./browser.ts";
 import { askToOpen, askToQuit, askToRelease, tableAt } from "./table.ts";
 
@@ -20,7 +20,7 @@ export interface TableLauncher
 }
 
 /**
- * Opens the table's page in the browser, the table started first when none answers, or when the one that does is of another version, which is asked to
+ * Opens the table's page in the browser, the table started first when none answers, or when the one that does is of another version or build, which is asked to
  * quit; a table of this version another `chesspal` started meanwhile is as good. The window opened last stays, the table's older ones close, and none opens
  * while another is opening (D-104). What to tell the player, in their language; a table that does not start within ten seconds throws.
  */
@@ -36,7 +36,7 @@ export async function openTable(context: Context, launcher: TableLauncher = proc
     for (;;) {
         const table = await tableAt(folder);
 
-        if (table?.version === version) {
+        if (table?.version === version && table.build === build) {
             return styleText(["bold", "green"], `♜ ${(await openWindow(table.url, table.port, launcher)) ? words.opened(table.url) : words.notOpened(table.url)}`);
         }
 
