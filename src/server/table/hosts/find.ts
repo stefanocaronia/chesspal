@@ -6,11 +6,16 @@ import { type HostName, hostPrograms } from "./hosts.ts";
 
 /**
  * The host's program: on the PATH of `env`, else where its installer puts it, as Antigravity's, which a terminal opened before it was installed does not
- * find; none when it is not installed.
+ * find; none when it is not installed. On Windows, OpenCode's own program behind npm's shim, which then starts without cmd.
  */
 export function hostProgramPath(host: HostName, platform: string, env: NodeJS.ProcessEnv, exists: (path: string) => boolean = present): string | undefined
 {
     const found = programPath(hostPrograms[host], platform, env, exists);
+
+    if (found !== undefined && host === "opencode" && platform === "win32" && /\.cmd$/i.test(found)) {
+        const program = win32.join(win32.dirname(found), "node_modules", "@opencode", "cli", "bin", "opencode.exe");
+        return exists(program) ? program : found;
+    }
 
     if (found !== undefined || host !== "antigravity") {
         return found;

@@ -7,6 +7,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { writeAtomically } from "../../../games/index.ts";
 import type { Fetch } from "../../../sites/index.ts";
+import { antigravityChoices, antigravityList } from "./antigravity.ts";
 import { type HostChoices, hostChoices, type HostName } from "./hosts.ts";
 import { isOllamaModel, openCodeChoices, openCodeList } from "./opencode.ts";
 
@@ -92,41 +93,6 @@ export function hostModels(folder: string, host: ReadHost, now: () => Date, sour
     };
 }
 
-/**
- * The choices in what `agy models` lists, an id and a name on each line: an id ending in an effort is that model with that effort, one without a model with
- * no effort to choose. A Gemini Flash is the middle model where there is one, else the first; none when no line names a model.
- */
-export function antigravityChoices(listed: string): HostChoices | undefined
-{
-    const modelEfforts: Record<string, string[]> = {};
-
-    for (const line of listed.split(/\r?\n/)) {
-        const id = line.split("\t")[0]!.trim();
-
-        if (!modelId.test(id)) {
-            continue;
-        }
-
-        const [, model = id, effort] = effortEnd.exec(id) ?? [];
-        const efforts = (modelEfforts[model] ??= []);
-
-        if (effort !== undefined && !efforts.includes(effort)) {
-            efforts.push(effort);
-            efforts.sort((one, other) => effortScale.indexOf(one) - effortScale.indexOf(other));
-        }
-    }
-
-    const models = Object.keys(modelEfforts);
-
-    if (models.length === 0) {
-        return undefined;
-    }
-
-    const efforts = effortScale.filter((effort) => models.some((model) => modelEfforts[model]!.includes(effort)));
-    const model = models.find((one) => /^gemini-.*flash/.test(one)) ?? models[0]!;
-    return { models, efforts, model, effort: "medium", modelEfforts };
-}
-
 /** The choices a host offers at the table in `folder`: Antigravity's and OpenCode's as the table last read them, the others' always the same. */
 export function tableChoices(folder: string, host: HostName): HostChoices
 {
@@ -143,15 +109,8 @@ export function tableChoices(folder: string, host: HostName): HostChoices
     }
 }
 
-// `agy models` asks Google's servers for the account's models: about a second, at times more.
-const readTime = 15_000;
 // A reading that found too little is made again no sooner: each runs the host's program, and the page asks every few seconds.
 const readAgainAfter = 5 * 60_000;
-// The efforts Antigravity's ids end in, from the least.
-const effortScale = ["low", "medium", "high", "xhigh", "max"];
-const effortEnd = new RegExp(`^(.+)-(${effortScale.join("|")})$`);
-// An id as Antigravity writes them, which a header or a message never is.
-const modelId = /^[a-z0-9][a-z0-9._-]*$/;
 
 // How each host's models are read, the list kept in the table's folder, the choices in it, and whether they are all the table waits for.
 const readings: Readonly<
@@ -162,24 +121,16 @@ const readings: Readonly<
         complete(choices: HostChoices): boolean;
     }>
 > = {
-    antigravity: { file: "antigravity-models.txt", list: (program, { run }) => run(program, ["models"], readTime), choicesIn: antigravityChoices, complete: () => true },
+    antigravity: { file: "antigravity-models.txt", list: antigravityList, choicesIn: antigravityChoices, complete: () => true },
     opencode: { file: "opencode-models.json", list: openCodeList, choicesIn: openCodeChoices, complete: (choices) => choices.models.some(isOllamaModel) },
 };
 
-// npm's Windows shims, as OpenCode's, run only through cmd, given one line: the arguments are the host's own words. In the user's home, since
-// `opencode models` starts a service of OpenCode's that outlives it, which on Windows would hold the folder it started in.
+// The host's own program, never through a shell: the table finds OpenCode's behind npm's shim. In the user's home, since `opencode models` starts a
+// service of OpenCode's that outlives it, which on Windows would hold the folder it started in.
 function runProgram(program: string, args: readonly string[], timeout: number, userHome: string): Promise<string>
 {
-    const shell = process.platform === "win32" && /\.(cmd|bat)$/i.test(program);
-    const options = { timeout, windowsHide: true, encoding: "utf8", cwd: userHome } as const;
     return new Promise((done, failed) => {
-        const ended = (error: Error | null, stdout: string): void => (error === null ? done(stdout) : failed(error));
-
-        if (shell) {
-            execFile([`"${program}"`, ...args].join(" "), { ...options, shell: true }, ended);
-        } else {
-            execFile(program, args, options, ended);
-        }
+        execFile(program, args, { timeout, windowsHide: true, encoding: "utf8", cwd: userHome }, (error, stdout) => (error === null ? done(stdout) : failed(error)));
     });
 }
 

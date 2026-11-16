@@ -10,6 +10,7 @@ import { settingsFrom } from "../src/page/profile/settings.ts";
 import { activeProfile, gameFolder, saveProfileSettings } from "../src/profiles/index.ts";
 import type { TableChats } from "../src/server/page/table.ts";
 import { playCommand } from "../src/server/table/hosts/chats.ts";
+import { hostProgramPath } from "../src/server/table/hosts/find.ts";
 import { hostArgs, startMessage } from "../src/server/table/hosts/hosts.ts";
 import { setUpTable } from "../src/server/table/hosts/index.ts";
 import { type HostLaunch, playHost, runHost } from "../src/server/table/hosts/play.ts";
@@ -106,6 +107,15 @@ describe("a chat the table opens", () => {
         expect(hostLaunch(context, "codex", env, (path) => path === "C:\\npm\\codex.cmd").args[0]).toBe("-c");
         expect(hostLaunch(context, "codex", env, (path) => path === "C:\\npm\\codex.cmd")).toMatchObject({ program: "C:\\npm\\codex.cmd", shell: true });
         expect(() => hostLaunch(context, "codex", env, () => false)).toThrow("Codex is not installed on this computer, or not on its PATH: install it (npm install -g @openai/codex), then try again.");
+    });
+
+    it("finds OpenCode's own program behind npm's shim on Windows, which starts without cmd, and the shim only when the program is not beside it", () => {
+        const env = { PATH: "C:\\npm", PATHEXT: ".EXE;.CMD" };
+        const program = "C:\\npm\\node_modules\\@opencode\\cli\\bin\\opencode.exe";
+
+        expect(hostProgramPath("opencode", "win32", env, (path) => path === "C:\\npm\\opencode.cmd" || path === program)).toBe(program);
+        expect(hostProgramPath("opencode", "win32", env, (path) => path === "C:\\npm\\opencode.cmd")).toBe("C:\\npm\\opencode.cmd");
+        expect(hostProgramPath("opencode", "linux", { PATH: "/usr/bin" }, (path) => path === "/usr/bin/opencode")).toBe("/usr/bin/opencode");
     });
 
     it("says when it wrote Codex's hooks, the first time or again over older ones, which Codex then asks the player to trust", () => {
