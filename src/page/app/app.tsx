@@ -80,6 +80,7 @@ import { signature } from "../players/model-name.ts";
 import { keepSettings, type ProfileShown } from "../profile/profile.ts";
 import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "../profile/settings.ts";
 import { endSoundOf, playSound, soundOf, wakeSounds } from "../sounds/sounds.ts";
+import { holdsChoice, withStartedChoice } from "../table/action.ts";
 import { UpdateDialog, UpdateNotice } from "../table/update.tsx";
 import { AiNameButton, ChatDialog, tableNote } from "../table/window.tsx";
 import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
@@ -124,7 +125,8 @@ export function App({ start }: { start: Settings; })
     // Nuova partita with no chat at the table asks for one first (D-107): the chat's window, then the new game's once a chat starts; closed without, neither.
     const [chatFirst, setChatFirst] = useState(false);
 
-    // At the table with no chat, and none opening: what asks for the AI opens the chat's window first, to choose its host and model (D-107, D-109).
+    // At the table with no chat, and none opening: what asks for the AI opens the chat's window first, to choose its host and model (D-107, D-109); an
+    // analysis opens it with a chat held too, to keep that chat or choose another.
     const chatMissing = (): boolean => {
         const table = offline ? undefined : served?.table;
         return table !== undefined && !table.chat && table.opening === undefined;
@@ -132,6 +134,8 @@ export function App({ start }: { start: Settings; })
 
     // The chat's window opened for an analysis asks who reviews the game, not whom the player plays (Rosa, Zoe).
     const [chatToReview, setChatToReview] = useState(false);
+    // The game brought to analyse that the chat held has not heard of yet, while its window asks whether that chat reviews it: the request to send again.
+    const [heldStudy, setHeldStudy] = useState<Studied | undefined>(undefined);
 
     // The position a game replayed from analysis starts from, which the new game's window shows; none for a new game from the start.
     const [replayFrom, setReplayFrom] = useState<StartingPosition | undefined>(undefined);
@@ -155,11 +159,13 @@ export function App({ start }: { start: Settings; })
     const chatStarted = (): void => {
         setDialog(chatFirst ? "new-game" : undefined);
         setChatFirst(false);
+        setHeldStudy(undefined);
     };
 
     const closeChat = (): void => {
         setDialog(undefined);
         setChatFirst(false);
+        setHeldStudy(undefined);
     };
 
     const [selected, setSelected] = useState<string | undefined>(undefined);
@@ -793,20 +799,30 @@ export function App({ start }: { start: Settings; })
             analyst: name,
         };
 
-    // A game brought to analyse: the page shows it once the server has it in analysis; a refusal stays in the dialog. One the AI has to go over, with no
-    // chat at the table, opens the chat's window: the analyst works with the chat's model (D-109).
+    // A game brought to analyse: the page shows it once the server has it in analysis; a refusal stays in the dialog. One the AI has to go over opens the
+    // chat's window with no chat at the table, or one held, which hears of it only once kept: the analyst works with the chat's model (D-109).
     const studyGame = async (studied: Studied): Promise<string | undefined> => {
-        const sent = await ask("/api/study", studied, text, name);
+        const held = table !== undefined && holdsChoice(table);
+        const sent = await ask("/api/study", held ? { ...studied, hold: true } : studied, text, name);
 
         if ("refused" in sent) {
             return sent.refused.text;
         }
 
-        const toReview = sent.answer.reviewed === false && chatMissing();
+        const toReview = sent.answer.reviewed === false && (chatMissing() || held);
+
+        if (toReview && held && typeof sent.answer.game === "string") {
+            setHeldStudy({ game: sent.answer.game, ...("redo" in studied && studied.redo === true ? { redo: true } : {}) });
+            change(withStartedChoice(table, settings));
+        }
+
         setChatToReview(toReview);
         setDialog(toReview ? "chat" : undefined);
         return undefined;
     };
+
+    // The chat held reviews the game as it is: the game sent again without holding it, which rings the chat.
+    const keepChat = async (): Promise<boolean> => heldStudy !== undefined && !("refused" in await ask("/api/study", heldStudy, text, name));
 
     return (
         <ChosenSet.Provider value={settings.set}>
@@ -823,7 +839,20 @@ export function App({ start }: { start: Settings; })
                     onClose={() => setDialog(undefined)}
                     text={text}
                 />
-                {table === undefined ? null : <ChatDialog open={dialog === "chat"} review={chatToReview} table={table} settings={settings} onChange={change} name={name} onStarted={chatStarted} onClose={closeChat} text={text} />}
+                {table === undefined ? null : (
+                    <ChatDialog
+                        open={dialog === "chat"}
+                        review={chatToReview}
+                        {...(chatToReview && heldStudy !== undefined ? { onKeep: keepChat } : {})}
+                        table={table}
+                        settings={settings}
+                        onChange={change}
+                        name={name}
+                        onStarted={chatStarted}
+                        onClose={closeChat}
+                        text={text}
+                    />
+                )}
                 <NewGameDialog open={dialog === "new-game"} choice={choice} from={replayFrom} going={going} onStart={startNewGame} onClose={() => setDialog(undefined)} text={text} />
                 {guide}
                 <StudyDialog

@@ -179,6 +179,7 @@ export interface Text
         /** The same, opened to have a game analysed (D-109). */
         readonly reviewTitle: string;
         readonly reviewChoose: string;
+        reviewKeep(name: string): string;
         readonly restartHint: string;
         byHand(name: string): string;
         /** The title of the AI's name, which opens the window: with no chat at the table, and with one. */
@@ -197,7 +198,7 @@ export interface Text
         readonly effort: string;
         readonly atTable: string;
         /** The window's button, by what it does with the host selected: open a chat to play or review the game, start the one held again, or in this host. */
-        readonly act: { open(host: string): string; review(host: string): string; restart(host: string): string; switch(host: string): string; };
+        readonly act: { open(host: string): string; review(host: string): string; keep(host: string): string; restart(host: string): string; switch(host: string): string; };
         /** Where the asleep note stands: a chat opening, starting again for a new game, or with another model or host, and waiting to. */
         readonly opening: string;
         again(name: string): string;
@@ -766,6 +767,7 @@ const english: Text = {
         choose: "Choose the chat to play with: it opens in a window of its own, to keep open.",
         reviewTitle: "Who reviews the game?",
         reviewChoose: "Choose the chat that reviews the game: it opens in a window of its own, to keep open.",
+        reviewKeep: (name) => `${name} is already at the table and can review it as it is. If you choose another chat or model, the chat starts again, clean, with those and reviews it.`,
         restartHint: "The chat starts again, clean, in the same window, once it has ended its answer, with the chat, model and effort chosen here. The game stays as it is.",
         byHand: (name) => `You opened this chat yourself: change ${name}'s model with /model in its window, or close it and open one from here, with the choices below.`,
         noChat: "No chat at the table: choose one",
@@ -779,7 +781,7 @@ const english: Text = {
         model: "Model",
         effort: "Effort",
         atTable: "At the table",
-        act: { open: (host) => `Start ${host}`, review: (host) => `Review with ${host}`, restart: (host) => `Restart ${host}`, switch: (host) => `Switch to ${host}` },
+        act: { open: (host) => `Start ${host}`, review: (host) => `Review with ${host}`, keep: (host) => `Review with ${host}`, restart: (host) => `Restart ${host}`, switch: (host) => `Switch to ${host}` },
         opening: "Opening the chat… In the terminal, if it asks whether you trust the folder, say yes (in Claude Code, go down to Yes with the arrow keys) and press Enter; with Codex, on the hooks, choose Trust all and continue.",
         again: (name) => `${name} starts again with a clean chat for the new game…`,
         restart: "The chat starts again, clean…",
@@ -1231,6 +1233,7 @@ const italian: Text = {
         choose: "Scegli la chat con cui giocare: parte in una finestra a parte, da tenere aperta.",
         reviewTitle: "Chi analizza la partita?",
         reviewChoose: "Scegli la chat che analizza la partita: parte in una finestra a parte, da tenere aperta.",
+        reviewKeep: (name) => `${name} è già al tavolo e può analizzarla com'è. Se scegli un'altra chat o un altro modello, la chat riparte pulita con quelli e la analizza.`,
         restartHint: "La chat riparte pulita nella stessa finestra, appena ha finito di rispondere, con la chat, il modello e il ragionamento scelti qui. La partita resta com'è.",
         byHand: (name) => `Questa chat l'hai aperta tu: cambia il modello di ${name} con /model nella sua finestra, oppure chiudila e aprine una da qui, con le scelte qui sotto.`,
         noChat: "Nessuna chat al tavolo: scegline una",
@@ -1245,7 +1248,7 @@ const italian: Text = {
         model: "Modello",
         effort: "Ragionamento",
         atTable: "Al tavolo",
-        act: { open: (host) => `Avvia ${host}`, review: (host) => `Analizza con ${host}`, restart: (host) => `Riavvia ${host}`, switch: (host) => `Passa a ${host}` },
+        act: { open: (host) => `Avvia ${host}`, review: (host) => `Analizza con ${host}`, keep: (host) => `Analizza con ${host}`, restart: (host) => `Riavvia ${host}`, switch: (host) => `Passa a ${host}` },
         opening: "Apro la chat… Nel terminale, se ti chiede se ti fidi della cartella, rispondi sì (in Claude Code scendi su Yes con le frecce) e premi Invio; con Codex, sugli «hook», scegli Trust all and continue.",
         again: (name) => `${name} riparte con una chat pulita per la nuova partita…`,
         restart: "La chat riparte pulita…",

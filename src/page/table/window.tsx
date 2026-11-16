@@ -12,11 +12,12 @@ import { canAct, chatAction, choiceKeys, chosen, effortsOf, firstHost, offeredHo
 
 /**
  * The chat's window: `onStarted` once a chat opens or starts again, the page then saying where it stands; `onClose` when the player closes it without;
- * `review` when it opened to have a game analysed.
+ * `review` when it opened to have a game analysed, `onKeep` to have the chat held review it as it is: whether the table took the request.
  */
-export function ChatDialog({ open, review = false, table, settings, onChange, name, onStarted, onClose, text }: {
+export function ChatDialog({ open, review = false, onKeep, table, settings, onChange, name, onStarted, onClose, text }: {
     open: boolean;
     review?: boolean;
+    onKeep?: () => Promise<boolean>;
     table: TableShown;
     settings: Settings;
     onChange: (settings: Settings) => void;
@@ -28,7 +29,7 @@ export function ChatDialog({ open, review = false, table, settings, onChange, na
 {
     return (
         <Dialog open={open} title={review ? text.table.reviewTitle : text.table.title} onClose={onClose} text={text}>
-            <ChatForm review={review} table={table} settings={settings} onChange={onChange} name={name} onStarted={onStarted} text={text} />
+            <ChatForm review={review} {...(onKeep === undefined ? {} : { onKeep })} table={table} settings={settings} onChange={onChange} name={name} onStarted={onStarted} text={text} />
         </Dialog>
     );
 }
@@ -128,8 +129,9 @@ const restartIcon = (
 );
 
 /** The window's form, made again at each opening with the host at the table selected, else the last the button used, else the first. */
-function ChatForm({ review, table, settings, onChange, name, onStarted, text }: {
+function ChatForm({ review, onKeep, table, settings, onChange, name, onStarted, text }: {
     review: boolean;
+    onKeep?: () => Promise<boolean>;
     table: TableShown;
     settings: Settings;
     onChange: (settings: Settings) => void;
@@ -146,12 +148,16 @@ function ChatForm({ review, table, settings, onChange, name, onStarted, text }: 
     // The host at the table may come or go while the window is open: the selection follows it only if it was on none offered.
     const host = installed.find((one) => one.name === selected) ?? installed.find((one) => one.name === firstHost(table, settings));
     useEffect(() => setFailed(false), [selected]);
-    const action = chatAction(table, host, review);
+    // The window asks whether the chat held reviews a game only when the page gave it the way to keep that chat: else it starts it again, as ever.
+    const choosing = review && onKeep !== undefined;
+    const chosenAction = chatAction(table, host, review, settings);
+    const action = chosenAction === "keep" && !choosing ? "restart" : chosenAction;
     // A chat opened by hand is the player's: Chesspal cannot start it again, so the button keeps its word, disabled, and the note says why.
     const byHand = table.chat && !table.held;
     const busy = table.opening !== undefined || table.waiting !== undefined;
     const chooseNote = review ? words.reviewChoose : words.choose;
-    const note = installed.length === 0 ? words.install(name) : busy ? chatState(table, name, text) ?? chooseNote : byHand ? words.byHand(name) : table.chat ? words.restartHint : chooseNote;
+    const chatNote = choosing ? words.reviewKeep(name) : words.restartHint;
+    const note = installed.length === 0 ? words.install(name) : busy ? chatState(table, name, text) ?? chooseNote : byHand ? words.byHand(name) : table.chat ? chatNote : chooseNote;
     // What the chat held started with, marked among the choices of its host.
     const started = (kind: "model" | "effort"): string | undefined => (host !== undefined && table.held && table.host === host.name ? startedWith(table, host, kind) : undefined);
     // OpenCode with a model of Ollama's says what would stop it before the chat starts (D-117).
@@ -166,6 +172,20 @@ function ChatForm({ review, table, settings, onChange, name, onStarted, text }: 
 
         setSending(true);
         setFailed(false);
+
+        if (action === "keep") {
+            const kept = await onKeep?.() ?? false;
+            setSending(false);
+
+            if (kept) {
+                onStarted();
+            } else {
+                setFailed(true);
+            }
+
+            return;
+        }
+
         const done = table.chat ? await restartChat(host.name) : await openChat(host.name);
         setSending(false);
 
@@ -207,10 +227,10 @@ function ChatForm({ review, table, settings, onChange, name, onStarted, text }: 
                     {trouble === undefined ? null : <p class="problem">{trouble}</p>}
                 </>
             )}
-            <p class="problem chat-state" role="status">{failed ? (table.chat ? words.notRestarted : words.failed) : null}</p>
+            <p class="problem chat-state" role="status">{failed ? (table.chat && action !== "keep" ? words.notRestarted : words.failed) : null}</p>
             {action === undefined || host === undefined ? null : (
                 <button class="start" type="submit" disabled={sending || !canAct(table)} aria-busy={sending}>
-                    {text.table.act[action](hostTitles[host.name] ?? host.name)}
+                    {text.table.act[choosing ? "review" : action](hostTitles[host.name] ?? host.name)}
                 </button>
             )}
             {table.chat || action === undefined || host === undefined ? null : (

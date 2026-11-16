@@ -403,7 +403,7 @@ function resignFromPage(request: IncomingMessage, response: ServerResponse, serv
 
 /**
  * A game the player brings from elsewhere to analyse: kept to study and put in analysis as analyse_game does with a PGN, the page showing it at once,
- * and the doorbell rung for the chat to go over it. Never while a game goes on.
+ * and the doorbell rung for the chat to go over it, unless the page holds it to ask first who reviews it. Never while a game goes on.
  */
 async function studyFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
@@ -423,6 +423,8 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
     const look = body?.look === true;
     // «Analyse again», the review just deleted: the chat starts the analyst without asking, even after one was stopped (Priya).
     const redo = body?.redo === true;
+    // The page asks who reviews the game before the chat held hears of it: it sends the game again, without `hold`, to have that chat go over it.
+    const hold = body?.hold === true;
 
     if (pgn === undefined && game === undefined && !last) {
         send(response, 400, json, JSON.stringify({ error: asked, refusal: "pgn-unreadable" }));
@@ -436,11 +438,13 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
 
     let reviewed: boolean;
     let brought: boolean;
+    let name: string;
 
     try {
         // Without what the chat was told: the analyst's instructions stay for the AI's own analyse_game.
         const opened = last ? lastPlayed(served.context) : game === undefined ? await kept(served, pgn!) : namedGame(served.context, game);
         reviewed = isReviewed(opened.record);
+        name = opened.name;
         brought = !reviewed && !look;
         // A game not yet reviewed is marked as brought, for status to ask the AI to go over it; one reviewed is ready, and the chat sleeps on.
         startAnalysis(gameFolder(served.context.home()), opened.name, served.context.now(), { brought, redo });
@@ -449,11 +453,11 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
         return;
     }
 
-    if (brought) {
+    if (brought && !hold) {
         served.bell.ring();
     }
 
-    send(response, 200, json, JSON.stringify({ kept: true, reviewed }));
+    send(response, 200, json, JSON.stringify({ kept: true, reviewed, game: name }));
 }
 
 /**

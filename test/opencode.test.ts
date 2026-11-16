@@ -172,9 +172,9 @@ describe("OpenCode, the fourth host (D-117)", () => {
         expect(chosen(found, "effort", settings)).toBeUndefined();
         expect(effortsOf(found, "ollama/gemma4:12b")).toEqual([]);
         expect(chosen(none, "model", settings)).toBe("");
-        expect(chatAction({ chat: false, held: false, hosts: [none] }, none, false)).toBeUndefined();
-        expect(chatAction({ chat: true, host: "claude", held: true, hosts: [none] }, none, false)).toBeUndefined();
-        expect(chatAction({ chat: false, held: false, hosts: [found] }, found, false)).toBe("open");
+        expect(chatAction({ chat: false, held: false, hosts: [none] }, none, false, settingsFrom({}))).toBeUndefined();
+        expect(chatAction({ chat: true, host: "claude", held: true, hosts: [none] }, none, false, settingsFrom({}))).toBeUndefined();
+        expect(chatAction({ chat: false, held: false, hosts: [found] }, found, false, settingsFrom({}))).toBe("open");
     });
 
     it("reads OpenCode's models again at most every five minutes while it finds none of Ollama's, and never once it has", async () => {

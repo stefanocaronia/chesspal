@@ -205,7 +205,7 @@ describe("the page's server", () => {
 
         expect(await post(page, "/api/study", { pgn: "1. e4 e5 2. Ke3 Ke6 3. Kxe5 *" })).toMatchObject({ status: 400, body: expect.stringContaining('"refusal":"pgn-unreadable"') });
         expect(await post(page, "/api/study", { pgn: " " })).toMatchObject({ status: 400 });
-        expect(await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
+        expect(await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' })).toMatchObject({ status: 200, body: `{"kept":true,"reviewed":false,"game":"${kept}"}` });
         expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ game: null, analysis: { name: kept } });
         expect(await statusOf(folder)).toMatch(new RegExp(`\\nNo game\\.\\nThe player brought ${kept} on the board page to analyse it\\. Next: call analyse_game \\{"game": "${kept}"\\}`));
 
@@ -218,6 +218,23 @@ describe("the page's server", () => {
         await run(folder, "new_game", { ai_colour: "black" });
         expect(await post(page, "/api/study", { pgn: "1. e4 *" })).toMatchObject({ status: 409, body: expect.stringContaining('"refusal":"game-going"') });
         expect(await statusOf(folder)).not.toContain("In analysis");
+    });
+
+    it("brings a game without ringing the chat while the page holds it to ask who reviews it, and rings once it is sent again without", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+        const kept = "study/2026-11-02-153012.pgn";
+        const { heard } = await hookWaits(page, { cwd: folder });
+
+        expect(await post(page, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *', hold: true })).toMatchObject({
+            status: 200,
+            body: `{"kept":true,"reviewed":false,"game":"${kept}"}`,
+        });
+        expect(await shortly(heard)).toBe("waiting");
+        expect(await statusOf(folder)).toContain(`The player brought ${kept} on the board page to analyse it.`);
+
+        await post(page, "/api/study", { game: kept });
+        expect(await heard).toBe(true);
     });
 
     it("cancels the analysis asked with nothing written: the page leaves it, the game stays listed, the chat is no longer asked to go over it", async () => {
@@ -385,7 +402,7 @@ describe("the page's server", () => {
         // In another folder, the exported game comes in with its review, ready: the chat is not asked to go over it.
         const other = playerFolder();
         const elsewhere = await open(other);
-        expect(await post(elsewhere, "/api/study", { pgn: exported })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":true}' });
+        expect(await post(elsewhere, "/api/study", { pgn: exported })).toMatchObject({ status: 200, body: expect.stringContaining('{"kept":true,"reviewed":true,"game":') });
         const ready = JSON.parse((await get(elsewhere, "/api/game")).body).analysis.pgn as string;
         expect(ready.replace(/\s+/g, " ")).toContain("{[%review A quiet start.]}");
         expect(ready.replace(/\s+/g, " ")).toContain("2. Qh5?! {[%badge inaccuracy] [%review early queen] [%cal Rh5f7]}");
@@ -393,7 +410,7 @@ describe("the page's server", () => {
         expect(await statusOf(other)).not.toContain("brought");
 
         // Opened again by its name, a reviewed game stays quiet too; a name that is not there is refused.
-        expect(await post(page, "/api/study", { game: kept })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":true}' });
+        expect(await post(page, "/api/study", { game: kept })).toMatchObject({ status: 200, body: expect.stringContaining('{"kept":true,"reviewed":true,"game":') });
         expect(await post(page, "/api/study", { game: "study/2026-01-01-000000.pgn" })).toMatchObject({ status: 400 });
     });
 
@@ -492,10 +509,10 @@ describe("the page's server", () => {
         // A link of the page opens it to look at, the chat not asked to go over it; the game named as the archive keeps it.
         const { game } = JSON.parse((await get(page, "/api/game")).body) as { game: { name: string; }; };
         expect(archivedGames(gameFolder(folder))[0]).toBe(game.name);
-        expect(await post(page, "/api/study", { game: anchorName(game.name), look: true })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
+        expect(await post(page, "/api/study", { game: anchorName(game.name), look: true })).toMatchObject({ status: 200, body: expect.stringContaining('{"kept":true,"reviewed":false,"game":') });
         expect(await statusOf(folder)).not.toContain("call analyse_game");
 
-        expect(await post(page, "/api/study", { last: true })).toMatchObject({ status: 200, body: '{"kept":true,"reviewed":false}' });
+        expect(await post(page, "/api/study", { last: true })).toMatchObject({ status: 200, body: expect.stringContaining('{"kept":true,"reviewed":false,"game":') });
         expect(await statusOf(folder)).toContain("call analyse_game");
     });
 

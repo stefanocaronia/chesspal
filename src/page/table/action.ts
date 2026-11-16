@@ -1,4 +1,5 @@
-// What the chat's window does with its one button: open a chat, start the one held again, or switch its host, by the table and the choices.
+// What the chat's window does with its one button: open a chat, keep the one held to review a game, start it again, or switch its host, by the table and the
+// choices.
 import type { Settings } from "../profile/settings.ts";
 
 /** Ollama as the table tells it, where OpenCode is installed: whether it answers, and the context of each model it has loaded, by Ollama's name. */
@@ -8,8 +9,8 @@ export interface OllamaShown
     readonly contexts: Readonly<Record<string, number>>;
 }
 
-/** The button's action: a chat opened to play or to review a game, the chat held started again, or in another host. */
-export type ChatAction = "open" | "review" | "restart" | "switch";
+/** The button's action: a chat opened to play or to review a game, the chat held kept as it is to review it, started again, or in another host. */
+export type ChatAction = "open" | "review" | "keep" | "restart" | "switch";
 
 /**
  * What the button reads of a host the table offers (`ChatHost` of the page): its name, whether it is installed, its models and efforts and the middle
@@ -84,9 +85,10 @@ export function startedWith(table: ChatTable, host: HostChoices, kind: "model" |
 
 /**
  * What the button does with the host selected, none without one, or for one that offers no model, as OpenCode before the table finds one: with no chat,
- * open one, to review the game in `review`; else start the chat again, in another host when it is not the one at the table.
+ * open one, to review the game in `review`; in `review`, keep the chat held when its host, model and effort are chosen as it started; else start the chat
+ * again, in another host when it is not the one at the table.
  */
-export function chatAction(table: ChatTable, host: HostChoices | undefined, review: boolean): ChatAction | undefined
+export function chatAction(table: ChatTable, host: HostChoices | undefined, review: boolean, settings: Settings): ChatAction | undefined
 {
     if (host === undefined || host.models.length === 0) {
         return undefined;
@@ -96,7 +98,32 @@ export function chatAction(table: ChatTable, host: HostChoices | undefined, revi
         return review ? "review" : "open";
     }
 
-    return table.host === host.name ? "restart" : "switch";
+    if (table.host !== host.name) {
+        return "switch";
+    }
+
+    const asStarted = (kind: "model" | "effort"): boolean => chosen(host, kind, settings) === startedWith(table, host, kind);
+    return review && table.held && asStarted("model") && asStarted("effort") ? "keep" : "restart";
+}
+
+/** Whether the table holds a chat it can start again now: not one opened by hand, nor while a chat opens or waits. */
+export function holdsChoice(table: ChatTable): boolean
+{
+    return table.chat && table.held && table.opening === undefined && table.waiting === undefined;
+}
+
+/** The settings with the held chat's host selected and its model and effort as the chat started with, so that the window opens on the chat as it is. */
+export function withStartedChoice(table: ChatTable, settings: Settings): Settings
+{
+    const host = offeredHosts(table).find((one) => table.chat && table.held && one.name === table.host);
+
+    if (host === undefined) {
+        return settings;
+    }
+
+    const keys = choiceKeys[host.name as keyof typeof choiceKeys];
+    const effort = startedWith(table, host, "effort");
+    return { ...settings, chatHost: host.name, [keys.model]: startedWith(table, host, "model"), ...(effort === undefined ? {} : { [keys.effort]: effort }) };
 }
 
 /** Whether the button can do its action now: not while a chat opens or waits, nor on a chat opened by hand, which is the player's. */
