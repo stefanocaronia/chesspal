@@ -14,7 +14,8 @@ import { openTerminal } from "./terminal.ts";
  * The chats of a real table: the hosts installed, looked for again once a while has passed, since the player may install one with the page open; a
  * terminal opened with `chesspal play`, run by `chesspal`, the same Node and script as the table's. Antigravity's and OpenCode's models are read with
  * the context's network and user's home, and `sources` where given, as soon as the host is found, and again when it is looked for after a reading that
- * failed, or a few minutes after one that found too little; Ollama is asked whether it answers every few seconds, where OpenCode is installed, once the page has asked.
+ * failed, or a few minutes after one that found too little; Ollama is asked whether it answers, and OpenCode's models looked at, every few seconds, where
+ * OpenCode is installed, once the page has asked.
  */
 export function terminalChats(
     context: Context,
@@ -33,6 +34,8 @@ export function terminalChats(
     };
     const models = Object.fromEntries(readHosts.map((host) => [host, hostModels(table, host, () => context.now(), given)])) as Record<ReadHost, HostModels>;
     const ollama = ollamaWatch(given.fetch ?? fetch, env);
+    // The player may choose a model in OpenCode with the page open and still, which asks only when the game changes.
+    let modelsTimer: NodeJS.Timeout | undefined;
 
     const programs = (): Readonly<Record<HostName, string | undefined>> => {
         const now = context.now().getTime();
@@ -50,6 +53,15 @@ export function terminalChats(
         }
 
         return found.programs;
+    };
+
+    // OpenCode's models read again when the player's own there changed: `read` does nothing otherwise.
+    const readOpenCode = (): void => {
+        const program = programs().opencode;
+
+        if (program !== undefined) {
+            models.opencode.read(program);
+        }
     };
 
     programs();
@@ -70,6 +82,7 @@ export function terminalChats(
             }
 
             ollama.look();
+            modelsTimer ??= setInterval(readOpenCode, lookAgain).unref();
             return ollama.state();
         },
         open: async (host) => isHostName(host) && await openTerminal(tableFolder(context.home()), playCommand(chesspal, host, env), context.platform, env),

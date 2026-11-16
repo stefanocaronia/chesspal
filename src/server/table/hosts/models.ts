@@ -1,6 +1,7 @@
 // The models of the hosts whose choices the table reads from the computer: Antigravity's, as `agy models` lists them for the account signed in, Gemini
-// Flash on a free plan, more with a subscription; OpenCode's, those the player can use in it (D-117). The table reads them once, without waiting for them,
-// and keeps the list in its folder for `chesspal play`; until it comes, or when it cannot be read, the host's own choices: Gemini Flash, no OpenCode model.
+// Flash on a free plan, more with a subscription; OpenCode's, those the player can use in it (D-117). The table reads them once, OpenCode's again when the
+// player's recent and favourite models there change, without waiting for them, and keeps the list in its folder for `chesspal play`; until it comes, or
+// when it cannot be read, the host's own choices: Gemini Flash, no OpenCode model.
 import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -10,7 +11,7 @@ import type { Fetch } from "../../../sites/index.ts";
 import { antigravityChoices, antigravityList } from "./antigravity.ts";
 import { runsInShell } from "./find.ts";
 import { type HostChoices, hostChoices, type HostName } from "./hosts.ts";
-import { isOllamaModel, openCodeChoices, openCodeList } from "./opencode.ts";
+import { isOllamaModel, openCodeChoices, openCodeList, openCodeStamp } from "./opencode.ts";
 
 /** Runs a program with its arguments: what it wrote on stdout; it fails when the program fails, or has not ended within `timeout` milliseconds. */
 export type RunProgram = (program: string, args: readonly string[], timeout: number) => Promise<string>;
@@ -34,7 +35,7 @@ export interface HostModels
     choices(): HostChoices;
     /**
      * Reads the models with the host's program, once: again after a reading that failed; at most every few minutes after one that found none, or, for
-     * OpenCode, none of Ollama's, which may start after the table.
+     * OpenCode, none of Ollama's, which may start after the table; for OpenCode, again when the player's recent and favourite models there change.
      */
     read(program: string): void;
     watch(changed: () => void): void;
@@ -54,26 +55,31 @@ export function hostModels(folder: string, host: ReadHost, now: () => Date, sour
 {
     const userHome = sources.userHome ?? homedir();
     const given: ModelSources = { run: (program, args, timeout) => runProgram(program, args, timeout, userHome), fetch, userHome, env: process.env, ...sources };
-    const { file, list, choicesIn, complete } = readings[host];
+    const { file, list, choicesIn, complete, stamp } = readings[host];
     let read: HostChoices | undefined;
     let listedLast: string | undefined;
     let reading = false;
     // When the last reading found too little to stop at: the next one waits a while.
     let incompleteAt: number | undefined;
+    // The stamp of the last reading that ended well.
+    let stampRead: string | undefined;
     const watchers: Array<() => void> = [];
 
     return {
         choices: () => read ?? hostChoices[host],
         read: (program) => {
             const at = now().getTime();
+            const stampNow = stamp(given);
+            const settled = (read !== undefined && complete(read)) || (incompleteAt !== undefined && at - incompleteAt < readAgainAfter);
 
-            if (reading || (read !== undefined && complete(read)) || (incompleteAt !== undefined && at - incompleteAt < readAgainAfter)) {
+            if (reading || (settled && stampNow === stampRead)) {
                 return;
             }
 
             reading = true;
             list(program, given).then((listed) => {
                 reading = false;
+                stampRead = stampNow;
                 const found = choicesIn(listed);
                 incompleteAt = found !== undefined && complete(found) ? undefined : at;
 
@@ -113,17 +119,25 @@ export function tableChoices(folder: string, host: HostName): HostChoices
 // A reading that found too little is made again no sooner: each runs the host's program, and the page asks every few seconds.
 const readAgainAfter = 5 * 60_000;
 
-// How each host's models are read, the list kept in the table's folder, the choices in it, and whether they are all the table waits for.
+// How each host's models are read, the list kept in the table's folder, the choices in it, whether they are all the table waits for, and what changes
+// when they should be read again.
 const readings: Readonly<
     Record<ReadHost, {
         file: string;
         list(program: string, sources: ModelSources): Promise<string>;
         choicesIn(listed: string): HostChoices | undefined;
         complete(choices: HostChoices): boolean;
+        stamp(sources: ModelSources): string;
     }>
 > = {
-    antigravity: { file: "antigravity-models.txt", list: antigravityList, choicesIn: antigravityChoices, complete: () => true },
-    opencode: { file: "opencode-models.json", list: openCodeList, choicesIn: openCodeChoices, complete: (choices) => choices.models.some(isOllamaModel) },
+    antigravity: { file: "antigravity-models.txt", list: antigravityList, choicesIn: antigravityChoices, complete: () => true, stamp: () => "" },
+    opencode: {
+        file: "opencode-models.json",
+        list: openCodeList,
+        choicesIn: openCodeChoices,
+        complete: (choices) => choices.models.some(isOllamaModel),
+        stamp: openCodeStamp,
+    },
 };
 
 // The host's program, as the table finds it: OpenCode's own behind npm's shim, else a shim, which runs only through cmd, given one line of the host's own

@@ -1,7 +1,7 @@
 // OpenCode's models (D-117): of the hundreds `opencode models` lists, every provider whose key is in the environment, only those the player can use. First
 // the models installed in Ollama that can use tools, which play for free on this computer, then the player's recent and favourite models in OpenCode;
 // each only when `opencode models` lists it too, so that OpenCode can start with it.
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { HostChoices } from "./hosts.ts";
 import type { ModelSources } from "./models.ts";
@@ -44,21 +44,36 @@ export function openCodeChoices(kept: string): HostChoices | undefined
     }
 }
 
+/** What changes when the player's recent and favourite models in OpenCode do: the time and size of the file that keeps them; empty when there is none. */
+export function openCodeStamp(sources: ModelSources): string
+{
+    try {
+        const { mtimeMs, size } = statSync(stateFile(sources));
+        return `${mtimeMs} ${size}`;
+    } catch {
+        return "";
+    }
+}
+
 // `opencode models` reads OpenCode's catalogue with a server of its own, which ends with it: never OpenCode's background service, which would outlive
 // the table with its environment. About a second.
 const listTime = 15_000;
 
-// The player's recent and favourite models in OpenCode, as `provider/model`, from the state it keeps in the user's home on every system.
-function playerModels({ userHome, env }: ModelSources): { recent: string[]; favorite: string[]; }
+// The player's recent and favourite models in OpenCode, as `provider/model`.
+function playerModels(sources: ModelSources): { recent: string[]; favorite: string[]; }
 {
-    const state = env.XDG_STATE_HOME?.trim() || join(userHome, ".local", "state");
-
     try {
-        const kept = JSON.parse(readFileSync(join(state, "opencode", "model.json"), "utf8")) as { recent?: unknown; favorite?: unknown; };
+        const kept = JSON.parse(readFileSync(stateFile(sources), "utf8")) as { recent?: unknown; favorite?: unknown; };
         return { recent: modelNames(kept.recent), favorite: modelNames(kept.favorite) };
     } catch {
         return { recent: [], favorite: [] };
     }
+}
+
+// Where OpenCode keeps the player's recent and favourite models, in the user's home on every system.
+function stateFile({ userHome, env }: ModelSources): string
+{
+    return join(env.XDG_STATE_HOME?.trim() || join(userHome, ".local", "state"), "opencode", "model.json");
 }
 
 function modelNames(list: unknown): string[]

@@ -5,7 +5,7 @@ import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/commands/index.ts";
 import { aiNameOf } from "../src/core/index.ts";
 import { tableFolder } from "../src/home/index.ts";
@@ -177,7 +177,7 @@ describe("OpenCode, the fourth host (D-117)", () => {
         expect(chatAction({ chat: false, held: false, hosts: [found] }, found, false, settingsFrom({}))).toBe("open");
     });
 
-    it("reads OpenCode's models again at most every five minutes while it finds none of Ollama's, and never once it has", async () => {
+    it("reads OpenCode's models again at most every five minutes while it finds none of Ollama's, and once it has only when the player's models in OpenCode change", async () => {
         const context = homeContext();
         let now = Date.UTC(2026, 10, 16, 12);
         context.now = () => new Date(now);
@@ -226,7 +226,42 @@ describe("OpenCode, the fourth host (D-117)", () => {
         expect(openCode(chats.hosts()).models).toEqual(["ollama/gpt-oss:20b", "ollama/gemma4:12b", "openai/gpt-6"]);
         await pageAsks(20);
         expect(runs).toBe(5);
+
+        // The player chooses another model in OpenCode: read again at once, then no more.
+        writeState(sources.userHome, { recent: [{ providerID: "openai", modelID: "gpt-6" }], favorite: [{ providerID: "anthropic", modelID: "claude-sonnet-5" }] });
+        await pageAsks(1);
+        expect(runs).toBe(6);
+        expect(openCode(chats.hosts()).models).toContain("anthropic/claude-sonnet-5");
+        await pageAsks(20);
+        expect(runs).toBe(6);
     }, 30_000);
+
+    it("looks at OpenCode's models every ten seconds once the page has asked, with the page still", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const context = homeContext();
+            const bin = temporary();
+            writeFileSync(join(bin, process.platform === "win32" ? "opencode.exe" : "opencode"), "");
+            const sources = modelSources();
+            writeState(sources.userHome, { recent: [{ providerID: "openai", modelID: "gpt-6" }], favorite: [] });
+            mkdirSync(tableFolder(context.home()), { recursive: true });
+            const chats = terminalChats(context, ["node", "cli.js"], { PATH: bin, PATHEXT: ".EXE" }, sources);
+            let told = 0;
+            chats.watch?.(() => told++);
+            chats.ollama?.();
+            await vi.advanceTimersByTimeAsync(0);
+            const toldBefore = told;
+
+            // The player chooses another model in OpenCode, and the page asks nothing.
+            writeState(sources.userHome, { recent: [{ providerID: "openai", modelID: "gpt-6" }], favorite: [{ providerID: "anthropic", modelID: "claude-sonnet-5" }] });
+            await vi.advanceTimersByTimeAsync(10_100);
+            expect(told).toBeGreaterThan(toldBefore);
+            expect(openCode(chats.hosts()).models).toContain("anthropic/claude-sonnet-5");
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 
     it("reads OpenCode's models with the network and the user's home of the table's context", async () => {
         const sources = modelSources();
