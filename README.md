@@ -31,7 +31,7 @@ Five steps, done once, in about 15 minutes. You need a paid Claude plan, a ChatG
 
 In the steps below, copy each command, paste it in the terminal (Ctrl+V or right-click; on macOS ⌘V) and press Enter. Wait for the terminal to finish before the next one. Lines with "WARN" are normal: go on.
 
-**3. Install the AI and sign in.** Choose one of the four. The first three need your own subscription: Chesspal never uses an API key, which is paid by the call. OpenCode with Ollama needs no account at all.
+**3. Install the AI and sign in.** Choose one of the four. The first three need your own subscription, never an API key, which is paid by the call. OpenCode with Ollama needs no account at all; with a provider you connect in it, such as DeepSeek, it uses your own API key.
 
 - **Claude Code**, with a paid Claude plan (Pro or higher; the free plan does not include it):
 
@@ -74,7 +74,11 @@ In the steps below, copy each command, paste it in the terminal (Ctrl+V or right
   npm install -g @opencode/cli
   ```
 
-  Open Ollama's settings and raise **Context length** to at least 64k: with its smaller default the AI cannot see Chesspal's tools and never moves. Ollama must be running while you play: on Windows and macOS its llama icon shows by the clock. The board page offers the Ollama models that can use tools; if you already use OpenCode with other models, those you used recently are offered too. A model on your computer plays more slowly and makes more mistakes than the others. Most moves take a few seconds, some take a minute or more. About one turn in eight the AI stops without moving: write "your move" in its window. Experimental: while you choose your move, the AI also thinks on your time, with the same model. A model on your computer rarely finishes a thought before you move, so for now this seldom helps.
+  Open Ollama's settings and raise **Context length** to at least 64k: with its smaller default the AI cannot see Chesspal's tools and never moves. Ollama must be running while you play: on Windows and macOS its llama icon shows by the clock. The board page offers the Ollama models that can use tools; if you already use OpenCode with other models, those you used recently are offered too. A model on your computer plays more slowly and makes more mistakes than the others. Most moves take a few seconds, some take a minute or more. About one turn in eight the AI stops without moving: write "your move" in its window.
+
+  OpenCode also plays with the models of a provider you connect in it with your own API key, which is paid by the call. We tried [DeepSeek](https://platform.deepseek.com): create a key on its platform, run `opencode auth login deepseek` and paste it, then open OpenCode, write `/models` and choose the model, before you open the board: its page offers the models you used recently, and reads them as it starts. In our trial it moved in about three seconds, and six moves cost about one US cent, more than half of it for thinking on your time.
+
+  Experimental: while you choose your move, the AI also thinks on your time, with the same model. A model on your computer rarely finishes a thought before you move, so for now this seldom helps. With DeepSeek the thought was ready each time; this thinking is always on, and with a model paid by the call you pay for it.
 
 Once you are signed in, close that terminal window with its × and open a new one, as in step 2.
 
@@ -118,7 +122,7 @@ Coming later: an AI coach that helps you grow, exercises chosen on your weak poi
 ## What you need
 
 - **Node.js 22.13** or newer, with **npm 10.9.2** or newer, which comes with it.
-- **An AI agent**: [Claude Code](https://code.claude.com/docs/en/setup), with a paid Claude plan, [Codex](https://developers.openai.com/codex), with a ChatGPT account, [Antigravity](https://antigravity.google/docs/getting-started), with a Google account, still experimental, or [OpenCode](https://opencode.ai) with [Ollama](https://ollama.com), free and with no account, also experimental.
+- **An AI agent**: [Claude Code](https://code.claude.com/docs/en/setup), with a paid Claude plan, [Codex](https://developers.openai.com/codex), with a ChatGPT account, [Antigravity](https://antigravity.google/docs/getting-started), with a Google account, still experimental, or [OpenCode](https://opencode.ai), also experimental, with [Ollama](https://ollama.com), free and with no account, or with a provider's API key.
 - **A web browser**, for the board page.
 
 Chesspal works with any agent that can use Chesspal's tools (MCP) and the files on your computer: we develop it with Claude Code, Codex is connected too, and Antigravity and OpenCode are supported but still experimental.
