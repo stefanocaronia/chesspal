@@ -8,7 +8,7 @@ import type { ModelSources } from "./models.ts";
 
 /**
  * The models the player can use in OpenCode, as the table keeps them: JSON with the `models` in order and the `model` a chat starts with until the player
- * chooses, the first recent one, else the first. It fails when `opencode models` fails.
+ * chooses: the first of Ollama's, which plays for free, else the first recent one, else the first. It fails when `opencode models` fails.
  */
 export async function openCodeList(program: string, sources: ModelSources): Promise<string>
 {
@@ -16,8 +16,14 @@ export async function openCodeList(program: string, sources: ModelSources): Prom
     const known = new Set(listed.split(/\r?\n/).map((line) => line.trim()));
     const { recent, favorite } = playerModels(sources);
     const models = [...new Set([...ollama.map((name) => `ollama/${name}`), ...recent, ...favorite])].filter((model) => known.has(model));
-    const model = recent.find((one) => models.includes(one)) ?? models[0] ?? "";
+    const model = models.find(isOllamaModel) ?? recent.find((one) => models.includes(one)) ?? models[0] ?? "";
     return `${JSON.stringify({ models, model })}\n`;
+}
+
+/** Whether a model of OpenCode's is one of Ollama's, on this computer. */
+export function isOllamaModel(model: string): boolean
+{
+    return model.startsWith("ollama/");
 }
 
 /** The choices in OpenCode's models as the table keeps them, with no effort; none when there is no model. */
@@ -60,7 +66,8 @@ export function ollamaAddress(host: string | undefined): string
     }
 }
 
-// `opencode models` reads OpenCode's catalogue on this computer: a fifth of a second. Ollama answers at once, or is not running.
+// `opencode models` reads OpenCode's catalogue on this computer: quick once OpenCode's background service runs, seconds when it must start it. Ollama
+// answers at once, or is not running.
 const listTime = 15_000;
 const askTime = 5_000;
 

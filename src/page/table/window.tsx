@@ -198,7 +198,7 @@ function ChatForm({ review, table, settings, onChange, name, onStarted, text }: 
                     {text.table.act[action](hostTitles[host.name] ?? host.name)}
                 </button>
             )}
-            {table.chat || host === undefined ? null : (
+            {table.chat || action === undefined || host === undefined ? null : (
                 <p class="chat-command">
                     {words.typeIt} <code>{host.command}</code>
                 </p>

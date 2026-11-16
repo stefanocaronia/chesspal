@@ -12,7 +12,8 @@ import { openTerminal } from "./terminal.ts";
 /**
  * The chats of a real table: the hosts installed, looked for again once a while has passed, since the player may install one with the page open; a
  * terminal opened with `chesspal play`, run by `chesspal`, the same Node and script as the table's. Antigravity's and OpenCode's models are read with
- * `sources` as soon as the host is found, and again when it is looked for after a reading that failed.
+ * the context's network and user's home, and `sources` where given, as soon as the host is found, and again when it is looked for after a reading that
+ * failed, or a few minutes after one that found too little.
  */
 export function terminalChats(
     context: Context,
@@ -23,7 +24,13 @@ export function terminalChats(
 {
     let found: { programs: Readonly<Record<HostName, string | undefined>>; at: number; } | undefined;
     const table = tableFolder(context.home());
-    const models = Object.fromEntries(readHosts.map((host) => [host, hostModels(table, host, { env, ...sources })])) as Record<ReadHost, HostModels>;
+    const given: Partial<ModelSources> = {
+        env,
+        ...(context.fetch === undefined ? {} : { fetch: context.fetch }),
+        ...(context.userHome === undefined ? {} : { userHome: context.userHome() }),
+        ...sources,
+    };
+    const models = Object.fromEntries(readHosts.map((host) => [host, hostModels(table, host, () => context.now(), given)])) as Record<ReadHost, HostModels>;
 
     const programs = (): Readonly<Record<HostName, string | undefined>> => {
         const now = context.now().getTime();

@@ -167,7 +167,7 @@ export function runHost(launch: HostLaunch, again: () => boolean, platform: stri
 
 /**
  * How the host starts for the profile in use: found on the PATH, or where its installer puts it, with its choice among those the table offers; it throws,
- * saying how to install it, when it is not there.
+ * saying how to install it, when it is not there, and for OpenCode, what it needs, when it offers no model.
  */
 export function hostLaunch(context: Context, host: HostName, env: NodeJS.ProcessEnv = process.env, exists?: (path: string) => boolean): HostLaunch
 {
@@ -179,11 +179,17 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
         throw new Error(`${hostTitle[host]} is not installed on this computer, or not on its PATH: install it (${installHint[host]}), then try again.`);
     }
 
+    const choices = tableChoices(folder, host);
+
+    // OpenCode with no model chosen may fall back to a paid key in the environment: it does not start.
+    if (host === "opencode" && choices.models.length === 0) {
+        throw new Error(noOpenCodeModel);
+    }
+
     setUpTable(folder, context.platform, context.userHome?.());
     // Codex's hooks written, by this play or by the table before it: the note is for Codex's chat, and waits for it.
     const news = host === "codex" ? takeHooksNews(folder) : undefined;
     const hooks = news === undefined ? {} : { hooks: news };
-    const choices = tableChoices(folder, host);
     const choice = choiceIn(profileSettings(home, activeProfile(home).id), host, choices);
     const games = gameFolder(home);
     const analysis = analysisAsked(games);
@@ -325,6 +331,9 @@ function savedTerminal(platform: string): { restore(): void; }
 
 // What marks a chat's own session, which a table started from inside a chat would hand down, and the host take for its own (Priya).
 const sessionMarks = ["CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ATTENDED", "CLAUDE_PID", "CLAUDE_EFFORT", "AI_AGENT", "TRACEPARENT"];
+// What `chesspal play opencode` says when the table found no model to give OpenCode.
+const noOpenCodeModel =
+    "OpenCode has no model to play with on this computer yet, and Chesspal does not start it without one: install Ollama (https://ollama.com/download) and download a model that can use tools, such as with ollama pull gpt-oss:20b; then open the board page with chesspal, so that it finds the model, and try again.";
 const installHint: Record<HostName, string> = {
     claude: "https://claude.com/claude-code",
     codex: "npm install -g @openai/codex",

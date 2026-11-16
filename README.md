@@ -6,7 +6,7 @@ Play chess against an AI on a real board, or learn with one.
 
 ## Get started
 
-Five steps, done once, in about 15 minutes. You need a paid Claude plan, a ChatGPT account or a Google account. After these steps you open the board with a double click.
+Five steps, done once, in about 15 minutes. You need a paid Claude plan, a ChatGPT account or a Google account; OpenCode with Ollama needs none, only a computer strong enough to run the AI itself, and its download takes longer than 15 minutes. After these steps you open the board with a double click.
 
 **1. Install Node.js.** Chesspal needs **Node.js 22.13 or newer**, which comes with **npm 10.9.2 or newer**.
 
@@ -62,19 +62,19 @@ In the steps below, copy each command, paste it in the terminal (Ctrl+V or right
   ```
 
   Then close the terminal, open a new one, run `agy` and sign in with your Google account.
-- **OpenCode**, free and with no account, with an AI that runs on your computer through [Ollama](https://ollama.com/download). A model on your own computer plays more slowly and more weakly than the others, and the faster your computer, the better. Install Ollama from its site, then get a model that can use tools, such as:
+- **OpenCode**, free and with no account, with an AI that runs on your computer through [Ollama](https://ollama.com/download). Your computer needs at least 16 GB of memory, and better a graphics card with 16 GB of its own. Install Ollama from its site, then download a model that can use tools, that is one that can work Chesspal's board through its tools (not every model can), such as:
 
   ```bash
   ollama pull gpt-oss:20b
   ```
 
-  Then install OpenCode:
+  This model is 13 GB: the download takes a while. Leave the terminal open until it writes "success". Then install OpenCode:
 
   ```bash
   npm install -g @opencode/cli
   ```
 
-  The board page offers the Ollama models that can use tools, and the models you used in OpenCode: no sign-in is needed for Ollama's.
+  Open Ollama's settings and raise **Context length** to at least 64k: Chesspal's instructions do not fit in its smaller default, and the AI would lose them. Ollama must be running while you play: on Windows and macOS its llama icon shows by the clock. The board page offers the Ollama models that can use tools; if you already use OpenCode with other models, those you used recently are offered too. A model on your computer plays more slowly and makes more mistakes than the others: it may take a minute or more for a move, and at times it stops without moving. Then write to it in its window.
 
 Once you are signed in, close that terminal window with its × and open a new one, as in step 2.
 

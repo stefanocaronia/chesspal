@@ -6,14 +6,12 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { writeAtomically } from "../../../games/index.ts";
+import type { Fetch } from "../../../sites/index.ts";
 import { type HostChoices, hostChoices, type HostName } from "./hosts.ts";
-import { openCodeChoices, openCodeList } from "./opencode.ts";
+import { isOllamaModel, openCodeChoices, openCodeList } from "./opencode.ts";
 
 /** Runs a program with its arguments: what it wrote on stdout; it fails when the program fails, or has not ended within `timeout` milliseconds. */
 export type RunProgram = (program: string, args: readonly string[], timeout: number) => Promise<string>;
-
-/** Asks an address on the network, as fetch does. */
-export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 /** What the models are read with: programs, the network, for Ollama on this computer, the user's home and environment, where OpenCode keeps its state. */
 export interface ModelSources
@@ -32,7 +30,10 @@ export type ReadHost = typeof readHosts[number];
 export interface HostModels
 {
     choices(): HostChoices;
-    /** Reads the models with the host's program, once: again only after a reading that failed or found none. */
+    /**
+     * Reads the models with the host's program, once: again after a reading that failed; at most every few minutes after one that found none, or, for
+     * OpenCode, none of Ollama's, which may start after the table.
+     */
     read(program: string): void;
     watch(changed: () => void): void;
 }
@@ -43,33 +44,46 @@ export function isReadHost(host: HostName): host is ReadHost
     return readHosts.includes(host as ReadHost);
 }
 
-/** The host's models read with `sources`, the computer's where none is given, for the table in `folder`, which keeps the list read for `chesspal play`. */
-export function hostModels(folder: string, host: ReadHost, sources: Partial<ModelSources> = {}): HostModels
+/**
+ * The host's models read with `sources`, the computer's where none is given, for the table in `folder`, which keeps the list read for `chesspal play`;
+ * `now` tells when a reading may be made again.
+ */
+export function hostModels(folder: string, host: ReadHost, now: () => Date, sources: Partial<ModelSources> = {}): HostModels
 {
-    const given: ModelSources = { run: runProgram, fetch, userHome: homedir(), env: process.env, ...sources };
-    const { file, list, choicesIn } = readings[host];
+    const userHome = sources.userHome ?? homedir();
+    const given: ModelSources = { run: (program, args, timeout) => runProgram(program, args, timeout, userHome), fetch, userHome, env: process.env, ...sources };
+    const { file, list, choicesIn, complete } = readings[host];
     let read: HostChoices | undefined;
+    let listedLast: string | undefined;
     let reading = false;
+    // When the last reading found too little to stop at: the next one waits a while.
+    let incompleteAt: number | undefined;
     const watchers: Array<() => void> = [];
 
     return {
         choices: () => read ?? hostChoices[host],
         read: (program) => {
-            if (read !== undefined || reading) {
+            const at = now().getTime();
+
+            if (reading || (read !== undefined && complete(read)) || (incompleteAt !== undefined && at - incompleteAt < readAgainAfter)) {
                 return;
             }
 
             reading = true;
             list(program, given).then((listed) => {
                 reading = false;
-                read = choicesIn(listed);
+                const found = choicesIn(listed);
+                incompleteAt = found !== undefined && complete(found) ? undefined : at;
 
-                if (read !== undefined) {
+                if (found !== undefined && listed !== listedLast) {
+                    read = found;
+                    listedLast = listed;
                     keepList(join(folder, file), listed);
                     watchers.forEach((changed) => changed());
                 }
             }, () => {
                 reading = false;
+                incompleteAt = undefined;
             });
         },
         watch: (changed) => {
@@ -131,24 +145,33 @@ export function tableChoices(folder: string, host: HostName): HostChoices
 
 // `agy models` asks Google's servers for the account's models: about a second, at times more.
 const readTime = 15_000;
+// A reading that found too little is made again no sooner: each runs the host's program, and the page asks every few seconds.
+const readAgainAfter = 5 * 60_000;
 // The efforts Antigravity's ids end in, from the least.
 const effortScale = ["low", "medium", "high", "xhigh", "max"];
 const effortEnd = new RegExp(`^(.+)-(${effortScale.join("|")})$`);
 // An id as Antigravity writes them, which a header or a message never is.
 const modelId = /^[a-z0-9][a-z0-9._-]*$/;
 
-// How each host's models are read, the list kept in the table's folder, and the choices in it.
-const readings: Readonly<Record<ReadHost, { file: string; list(program: string, sources: ModelSources): Promise<string>; choicesIn(listed: string): HostChoices | undefined; }>> = {
-    antigravity: { file: "antigravity-models.txt", list: (program, { run }) => run(program, ["models"], readTime), choicesIn: antigravityChoices },
-    opencode: { file: "opencode-models.json", list: openCodeList, choicesIn: openCodeChoices },
+// How each host's models are read, the list kept in the table's folder, the choices in it, and whether they are all the table waits for.
+const readings: Readonly<
+    Record<ReadHost, {
+        file: string;
+        list(program: string, sources: ModelSources): Promise<string>;
+        choicesIn(listed: string): HostChoices | undefined;
+        complete(choices: HostChoices): boolean;
+    }>
+> = {
+    antigravity: { file: "antigravity-models.txt", list: (program, { run }) => run(program, ["models"], readTime), choicesIn: antigravityChoices, complete: () => true },
+    opencode: { file: "opencode-models.json", list: openCodeList, choicesIn: openCodeChoices, complete: (choices) => choices.models.some(isOllamaModel) },
 };
 
 // npm's Windows shims, as OpenCode's, run only through cmd, given one line: the arguments are the host's own words. In the user's home, since
 // `opencode models` starts a service of OpenCode's that outlives it, which on Windows would hold the folder it started in.
-function runProgram(program: string, args: readonly string[], timeout: number): Promise<string>
+function runProgram(program: string, args: readonly string[], timeout: number, userHome: string): Promise<string>
 {
     const shell = process.platform === "win32" && /\.(cmd|bat)$/i.test(program);
-    const options = { timeout, windowsHide: true, encoding: "utf8", cwd: homedir() } as const;
+    const options = { timeout, windowsHide: true, encoding: "utf8", cwd: userHome } as const;
     return new Promise((done, failed) => {
         const ended = (error: Error | null, stdout: string): void => (error === null ? done(stdout) : failed(error));
 

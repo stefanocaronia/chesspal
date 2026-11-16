@@ -11,16 +11,17 @@ import { aiNameOf } from "../src/core/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { hasDoorbell } from "../src/host-files/index.ts";
 import { settingsFrom } from "../src/page/profile/settings.ts";
-import { chosen, effortsOf, type HostChoices } from "../src/page/table/action.ts";
+import { chatAction, chosen, effortsOf, type HostChoices } from "../src/page/table/action.ts";
 import { activeProfile, saveProfileSettings } from "../src/profiles/index.ts";
 import { bellLine, hookAnswer } from "../src/server/bell/bell.ts";
 import { callerOf } from "../src/server/mcp/caller.ts";
 import { pagePorts } from "../src/server/ports/index.ts";
 import { terminalChats } from "../src/server/table/hosts/chats.ts";
 import { hostArgs, hostEnvironment } from "../src/server/table/hosts/hosts.ts";
-import { type Fetch, type ModelSources, type RunProgram, tableChoices } from "../src/server/table/hosts/models.ts";
+import { type ModelSources, type RunProgram, tableChoices } from "../src/server/table/hosts/models.ts";
 import { ollamaAddress, openCodeChoices, openCodeList } from "../src/server/table/hosts/opencode.ts";
 import { hostLaunch } from "../src/server/table/index.ts";
+import type { Fetch } from "../src/sites/index.ts";
 import { version } from "../src/version.ts";
 import { testContext } from "./commands.ts";
 import { removeFolder } from "./folders.ts";
@@ -50,24 +51,31 @@ const state = {
 };
 
 describe("OpenCode, the fourth host (D-117)", () => {
-    it("offers Ollama's models that use tools, then the player's recent and favourite ones, only those OpenCode lists, a recent one first chosen", async () => {
+    it("offers Ollama's models that use tools, then the player's recent and favourite ones, only those OpenCode lists, Ollama's first one chosen", async () => {
         const sources = modelSources();
         writeState(sources.userHome, state);
 
         expect(JSON.parse(await openCodeList("opencode", sources))).toEqual({
             models: ["ollama/gpt-oss:20b", "ollama/gemma4:12b", "google/gemini-4-hydrogen", "anthropic/claude-sonnet-5"],
-            model: "google/gemini-4-hydrogen",
+            model: "ollama/gpt-oss:20b",
         });
         expect(sources.asked).toContain("http://127.0.0.1:11434/api/tags");
     });
 
-    it("starts with the first Ollama model when no recent one is listed, and with the player's own when Ollama is not running", async () => {
+    it("starts with the first Ollama model offered, else the player's first recent one, else the first", async () => {
         const fresh = modelSources();
         expect(JSON.parse(await openCodeList("opencode", fresh))).toEqual({ models: ["ollama/gpt-oss:20b", "ollama/gemma4:12b"], model: "ollama/gpt-oss:20b" });
 
+        // Ollama not running: an Ollama model the player used recently comes first all the same.
         const offline = modelSources({ fetch: () => Promise.reject(new Error("connection refused")) });
         writeState(offline.userHome, state);
-        expect(JSON.parse(await openCodeList("opencode", offline))).toEqual({ models: ["google/gemini-4-hydrogen", "ollama/gpt-oss:20b", "anthropic/claude-sonnet-5"], model: "google/gemini-4-hydrogen" });
+        expect(JSON.parse(await openCodeList("opencode", offline))).toEqual({ models: ["google/gemini-4-hydrogen", "ollama/gpt-oss:20b", "anthropic/claude-sonnet-5"], model: "ollama/gpt-oss:20b" });
+
+        const noOllama = modelSources({ fetch: () => Promise.reject(new Error("connection refused")) });
+        writeState(noOllama.userHome, { ...state, recent: state.recent.filter((one) => one.providerID !== "ollama") });
+        expect(JSON.parse(await openCodeList("opencode", noOllama)).model).toBe("google/gemini-4-hydrogen");
+        writeState(noOllama.userHome, { recent: [], favorite: state.favorite });
+        expect(JSON.parse(await openCodeList("opencode", noOllama)).model).toBe("anthropic/claude-sonnet-5");
 
         // Nothing found is no list, and a list OpenCode cannot give fails the reading.
         const nothing = await openCodeList("opencode", modelSources({ fetch: () => Promise.reject(new Error("refused")) }));
@@ -87,7 +95,7 @@ describe("OpenCode, the fourth host (D-117)", () => {
         mkdirSync(join(stateHome, "opencode"), { recursive: true });
         writeFileSync(join(stateHome, "opencode", "model.json"), JSON.stringify({ recent: [{ providerID: "openai", modelID: "gpt-6" }], favorite: [] }));
 
-        expect(JSON.parse(await openCodeList("opencode", sources)).model).toBe("openai/gpt-6");
+        expect(JSON.parse(await openCodeList("opencode", sources)).models).toContain("openai/gpt-6");
         expect(sources.asked[0]).toBe("http://127.0.0.1:11500/api/tags");
     });
 
@@ -112,43 +120,125 @@ describe("OpenCode, the fourth host (D-117)", () => {
         expect(tableChoices(table, "opencode")).toEqual({ models: ["ollama/gpt-oss:20b", "ollama/gemma4:12b"], efforts: [], model: "ollama/gpt-oss:20b", effort: "" });
     });
 
-    it("starts OpenCode with its own server, the start message, and the model chosen in its configuration; with none while it offers none", () => {
+    it("starts OpenCode with its own server, the start message, and the model chosen in its configuration; never while it offers none", () => {
         const context = homeContext("linux");
         const home = context.home();
         const table = tableFolder(home);
         const env = { PATH: "/usr/bin" };
         const launch = (): ReturnType<typeof hostLaunch> => hostLaunch(context, "opencode", env, (path) => path === "/usr/bin/opencode");
+        const models = JSON.stringify({ models: ["ollama/gpt-oss:20b", "ollama/gemma4:12b"], model: "ollama/gpt-oss:20b" });
+
+        // With no model OpenCode may fall back to a paid key in the environment.
+        expect(launch).toThrow("OpenCode has no model to play with on this computer yet, and Chesspal does not start it without one: install Ollama");
+        mkdirSync(table, { recursive: true });
+        writeFileSync(join(table, "opencode-models.json"), JSON.stringify({ models: [], model: "" }));
+        expect(launch).toThrow("ollama pull gpt-oss:20b");
 
         expect(hostArgs("opencode", "Giochiamo!")).toEqual(["--standalone", "--prompt", "Giochiamo!"]);
-        expect(launch()).toMatchObject({ program: "/usr/bin/opencode", args: ["--standalone", "--prompt", "Let's play!"], choice: {}, shell: false });
-        expect(launch().env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
-
-        writeFileSync(join(table, "opencode-models.json"), JSON.stringify({ models: ["ollama/gpt-oss:20b", "ollama/gemma4:12b"], model: "ollama/gpt-oss:20b" }));
+        writeFileSync(join(table, "opencode-models.json"), models);
+        expect(launch()).toMatchObject({ program: "/usr/bin/opencode", args: ["--standalone", "--prompt", "Let's play!"], choice: { model: "ollama/gpt-oss:20b" }, shell: false });
         expect(launch().env.OPENCODE_CONFIG_CONTENT).toBe('{"model":"ollama/gpt-oss:20b"}');
         saveProfileSettings(home, activeProfile(home).id, { opencodeModel: "ollama/gemma4:12b", opencodeEffort: "high" });
         expect(launch()).toMatchObject({ choice: { model: "ollama/gemma4:12b" } });
         expect(JSON.parse(launch().env.OPENCODE_CONFIG_CONTENT ?? "")).toEqual({ model: "ollama/gemma4:12b" });
 
         // npm's Windows shim runs through cmd.
-        const windows = hostLaunch(homeContext("win32"), "opencode", { PATH: "C:\\npm", PATHEXT: ".EXE;.CMD" }, (path) => path === "C:\\npm\\opencode.cmd");
+        const windowsContext = homeContext("win32");
+        mkdirSync(tableFolder(windowsContext.home()), { recursive: true });
+        writeFileSync(join(tableFolder(windowsContext.home()), "opencode-models.json"), models);
+        const windows = hostLaunch(windowsContext, "opencode", { PATH: "C:\\npm", PATHEXT: ".EXE;.CMD" }, (path) => path === "C:\\npm\\opencode.cmd");
         expect(windows).toMatchObject({ program: "C:\\npm\\opencode.cmd", shell: true });
         expect(() => hostLaunch(context, "opencode", env, () => false)).toThrow("OpenCode is not installed on this computer, or not on its PATH: install it (npm install -g @opencode/cli), then try again.");
         expect(hostEnvironment("opencode", {})).toEqual({});
         expect(hostEnvironment("claude", { model: "opus", effort: "high" })).toEqual({ CLAUDE_CODE_EFFORT_LEVEL: undefined });
     });
 
-    it("shows on the page OpenCode's models as it names them, with no effort, and keeps the one chosen", () => {
+    it("shows on the page OpenCode's models as it names them, with no effort, keeps the one chosen, and offers no start while it has none", () => {
         const none: HostChoices = { name: "opencode", installed: true, models: [], efforts: [], model: "", effort: "" };
         const found: HostChoices = { ...none, models: ["ollama/gpt-oss:20b", "ollama/gemma4:12b"], model: "ollama/gpt-oss:20b" };
         const settings = settingsFrom({ opencodeModel: "ollama/gemma4:12b" });
 
         expect(settings.opencodeModel).toBe("ollama/gemma4:12b");
         expect(settingsFrom({ opencodeModel: "ollama/gemma4 12b" }).opencodeModel).toBe("");
+        expect(settingsFrom({ opencodeModel: "x".repeat(201) }).opencodeModel).toBe("");
+
+        for (const name of ["ollama/hf.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:UD-Q4_K_XL", "cloudflare-workers-ai/@cf/meta/llama-3.1-8b-instruct"]) {
+            expect(settingsFrom({ opencodeModel: name }).opencodeModel).toBe(name);
+        }
+
         expect(chosen(found, "model", settings)).toBe("ollama/gemma4:12b");
         expect(chosen(found, "model", settingsFrom({}))).toBe("ollama/gpt-oss:20b");
         expect(chosen(found, "effort", settings)).toBeUndefined();
         expect(effortsOf(found, "ollama/gemma4:12b")).toEqual([]);
         expect(chosen(none, "model", settings)).toBe("");
+        expect(chatAction({ chat: false, held: false, hosts: [none] }, none, false)).toBeUndefined();
+        expect(chatAction({ chat: true, host: "claude", held: true, hosts: [none] }, none, false)).toBeUndefined();
+        expect(chatAction({ chat: false, held: false, hosts: [found] }, found, false)).toBe("open");
+    });
+
+    it("reads OpenCode's models again at most every five minutes while it finds none of Ollama's, and never once it has", async () => {
+        const context = homeContext();
+        let now = Date.UTC(2026, 10, 16, 12);
+        context.now = () => new Date(now);
+        const bin = temporary();
+        writeFileSync(join(bin, process.platform === "win32" ? "opencode.exe" : "opencode"), "");
+        let ollamaRunning = false;
+        const ollamaOff: Fetch = () => Promise.reject(new Error("connection refused"));
+        const sources = modelSources({ fetch: (url, init) => (ollamaRunning ? modelSources().fetch(url, init) : ollamaOff(url, init)) });
+        let runs = 0;
+
+        const run: RunProgram = (...args) => {
+            runs++;
+            return sources.run(...args);
+        };
+
+        const chats = terminalChats(context, ["node", "cli.js"], { PATH: bin, PATHEXT: ".EXE" }, { ...sources, run });
+        mkdirSync(tableFolder(context.home()), { recursive: true });
+
+        // The page asks every few seconds for ten minutes, the hosts looked for again every ten: nothing found, read again only every five minutes.
+        const pageAsks = async (minutes: number): Promise<void> => {
+            for (let second = 0; second < minutes * 60; second += 5) {
+                const before = runs;
+                now += 5_000;
+                chats.hosts();
+
+                if (runs !== before) {
+                    await settled();
+                }
+            }
+        };
+
+        await settled();
+        await pageAsks(10);
+        expect(runs).toBe(3);
+        expect(openCode(chats.hosts()).models).toEqual([]);
+
+        // The player's recent model, not Ollama's: offered, and read again all the same, since Ollama may start later.
+        writeState(sources.userHome, { recent: [{ providerID: "openai", modelID: "gpt-6" }], favorite: [] });
+        await pageAsks(5);
+        expect(runs).toBe(4);
+        expect(openCode(chats.hosts()).models).toEqual(["openai/gpt-6"]);
+
+        ollamaRunning = true;
+        await pageAsks(5);
+        expect(runs).toBe(5);
+        expect(openCode(chats.hosts()).models).toEqual(["ollama/gpt-oss:20b", "ollama/gemma4:12b", "openai/gpt-6"]);
+        await pageAsks(20);
+        expect(runs).toBe(5);
+    }, 30_000);
+
+    it("reads OpenCode's models with the network and the user's home of the table's context", async () => {
+        const sources = modelSources();
+        writeState(sources.userHome, { recent: [{ providerID: "openai", modelID: "gpt-6" }], favorite: [] });
+        const context = { ...homeContext(), fetch: sources.fetch, userHome: () => sources.userHome };
+        const bin = temporary();
+        writeFileSync(join(bin, process.platform === "win32" ? "opencode.exe" : "opencode"), "");
+        const chats = terminalChats(context, ["node", "cli.js"], { PATH: bin, PATHEXT: ".EXE" }, { run: sources.run });
+        mkdirSync(tableFolder(context.home()), { recursive: true });
+        await settled();
+
+        expect(openCode(chats.hosts()).models).toEqual(["ollama/gpt-oss:20b", "ollama/gemma4:12b", "openai/gpt-6"]);
+        expect(sources.asked[0]).toBe("http://127.0.0.1:11434/api/tags");
     });
 
     it("rings its doorbell with the line alone, which the plugin sends to the chat; nothing when it does not ring", async () => {
@@ -203,6 +293,7 @@ describe("Chesspal's plugin for OpenCode", () => {
 
         // Its own message starts the next turn; the turn after waits again, and a message of the player's lets that wait go, with no message sent.
         await opencode.send("session.inbox.enqueued", { sessionID: "ses_1", item: { type: "user", payload: { text: bellLine } } });
+        expect(first.killed).toBe(false);
         await opencode.send("session.execution.started", { sessionID: "ses_1" });
         await opencode.send("session.execution.succeeded", { sessionID: "ses_1" });
         const second = opencode.children.at(-1)!;
@@ -213,11 +304,21 @@ describe("Chesspal's plugin for OpenCode", () => {
         second.ends(null, "");
         expect(opencode.prompts).toHaveLength(1);
 
-        // A turn that fails or is stopped waits for nobody; /new starts a session never seen, a chat cleared.
+        // A turn stopped by the player waits for nobody.
         await opencode.send("session.execution.started", { sessionID: "ses_1" });
-        await opencode.send("session.execution.failed", { sessionID: "ses_1" });
+        await opencode.send("session.execution.interrupted", { sessionID: "ses_1" });
         expect(opencode.children.at(-1)).toBe(second);
+
+        // A turn that fails is noted, and still waits for the player's move.
+        await opencode.send("session.execution.started", { sessionID: "ses_1" });
+        await opencode.send("session.execution.failed", { sessionID: "ses_1", error: { name: "APIError", data: { message: "model not found" } } });
+        const failed = opencode.children.at(-1)!;
+        expect(opencode.hooks().at(-1)).toMatchObject({ command: "chesspal listen --opencode", input: { session_id: "ses_1" } });
+        expect(readFileSync(join(folder, "listen.log"), "utf8")).toMatch(/plugin opencode the chat ses_1 failed its turn: model not found\n$/);
+
+        // /new starts a session never seen, a chat cleared: the wait of the chat before goes, so that a move cannot wake it.
         await opencode.send("session.inbox.enqueued", { sessionID: "ses_2", item: { type: "user", payload: { text: "Ciao" } } });
+        expect(failed.killed).toBe(true);
         expect(opencode.hooks().at(-1)).toEqual({ command: "chesspal chat", input: { cwd: folder, session_id: "ses_2", source: "clear" }, cwd: folder, shell: true });
 
         // A subagent's session, born with its parent's, is no chat: no start noted, nobody waits after its turn.
@@ -243,6 +344,24 @@ describe("Chesspal's plugin for OpenCode", () => {
 
         await opencode.send("session.execution.succeeded", { sessionID: "ses_1" });
         expect(readFileSync(join(folder, "listen.log"), "utf8")).toMatch(/plugin opencode chesspal chat did not start: no shell\n.*plugin opencode chesspal listen --opencode did not start: no shell\n$/);
+    });
+
+    it("notes in listen.log when OpenCode's events end without OpenCode letting it go", async () => {
+        const folder = temporary();
+        const opencode = fakeOpenCode(folder);
+        const ended = {
+            ...opencode.context,
+            event: {
+                subscribe: () => ({
+                    async *[Symbol.asyncIterator]()
+                    {},
+                }),
+            },
+        };
+        await (await plugin()).setup(ended, opencode.run);
+        await settled();
+
+        expect(readFileSync(join(folder, "listen.log"), "utf8")).toMatch(/plugin opencode stopped hearing OpenCode's events\n$/);
     });
 });
 
@@ -351,7 +470,8 @@ function modelSources(given: Partial<ModelSources> = {}): ModelSources & { asked
     const asked: string[] = [];
     const run: RunProgram = (_program, args) => Promise.resolve(args[0] === "models" ? listed : "");
 
-    const fetch: Fetch = (url, init) => {
+    const fetch: Fetch = (address, init) => {
+        const url = String(address);
         asked.push(url);
 
         if (url.endsWith("/api/tags")) {

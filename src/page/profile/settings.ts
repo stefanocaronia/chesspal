@@ -145,8 +145,9 @@ function word(value: unknown): string
     return typeof value === "string" && /^[\w.-]{1,40}$/.test(value) ? value : "";
 }
 
-// An OpenCode model, its provider before it and at times a tag after it (ollama/gemma4:12b), as long as the profile keeps a word; empty when it is none.
+// An OpenCode model as OpenCode names it, its provider before it, with any characters but spaces (ollama/hf.co/unsloth/...:UD-Q4_K_XL): the table's
+// list says which are offered. Empty when it is none.
 function modelName(value: unknown): string
 {
-    return typeof value === "string" && /^[\w.:/-]{1,64}$/.test(value) ? value : "";
+    return typeof value === "string" && /^\S{1,200}$/.test(value) ? value : "";
 }

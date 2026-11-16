@@ -1,6 +1,6 @@
 // The AI hosts the table opens a chat in (D-104, D-115, D-117): Claude Code, Codex, Antigravity and OpenCode, each with the start message, and the model and
 // effort the player chose on the page for the profile in use, or each host's middle ones until they choose: the chat never starts with whatever the host
-// was left at, unless it offers no model to choose.
+// was left at; OpenCode, which may fall back to a paid key, does not start while it offers no model.
 import { speaksItalian } from "../../../commands/index.ts";
 
 /** The hosts the page offers, by the name `chesspal play` takes. */
@@ -130,7 +130,7 @@ export function choiceIn(settings: Readonly<Record<string, unknown>> | undefined
 const antigravityAllowed = { permissions: { allow: ["mcp(chesspal/*)"] } };
 
 // The choice kept to the values the host offers: its middle model where none is chosen, or one it does not offer; the model's middle effort likewise,
-// none for a model without. None at all where the host offers no model: it starts with its own.
+// none for a model without. None at all where the host offers no model, which chesspal play then does not start.
 function offered(choices: HostChoices, choice: HostChoice): HostChoice
 {
     if (choices.models.length === 0) {

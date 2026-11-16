@@ -19,6 +19,10 @@ export default {
                 for await (const event of context.event.subscribe({ signal: controller.signal })) {
                     chats.heard(event);
                 }
+
+                if (!controller.signal.aborted) {
+                    note(chats.folder, "stopped hearing OpenCode's events");
+                }
             } catch (error) {
                 if (!controller.signal.aborted) {
                     note(chats.folder, `stopped hearing OpenCode's events: ${messageOf(error)}`);
@@ -33,14 +37,13 @@ export default {
     },
 };
 
-/** What the plugin does with OpenCode's events in the folder: the chats it has seen, the doorbell of each, the prompts it sent. */
+/** What the plugin does with OpenCode's events in the folder: the chats it has seen, and the doorbell of each. */
 function chesspalChats(context, run)
 {
     const folder = context.location.directory;
     const seen = new Set();
     const agents = new Set();
     const listeners = new Map();
-    const prompted = new Map();
     let modelNoted = "";
 
     // A Chesspal hook in the folder, with its input on stdin, as a host runs it: `ended` hears its exit code and what it wrote.
@@ -84,9 +87,7 @@ function chesspalChats(context, run)
             const line = output.trim();
 
             if (code === 0 && line !== "") {
-                prompted.set(session, line);
                 Promise.resolve(context.session.prompt({ sessionID: session, text: line })).catch((error) => {
-                    prompted.delete(session);
                     note(folder, `could not wake the chat ${session}: ${messageOf(error)}`);
                 });
             }
@@ -148,25 +149,28 @@ function chesspalChats(context, run)
                 return;
             }
 
-            // OpenCode tells no chat's start: a session never seen is one, the first since OpenCode started, the others after /new.
+            // OpenCode tells no chat's start: a session never seen is one, the first since OpenCode started, the others after /new. A session resumed is
+            // noted as cleared too: OpenCode's events do not say it was resumed. The chat before is gone from the window: a move must not wake it.
             if (!seen.has(session)) {
+                for (const other of [...listeners.keys()]) {
+                    letGo(other);
+                }
+
                 hook("chat", { cwd: folder, session_id: session, source: seen.size === 0 ? "startup" : "clear" });
                 seen.add(session);
             }
 
-            if (event.type === "session.inbox.enqueued" && event.data.item?.type === "user") {
-                const text = event.data.item.payload?.text;
-
-                // The doorbell's own line starts no turn of the player's.
-                if (prompted.has(session) && prompted.get(session) === text) {
-                    prompted.delete(session);
-                } else {
-                    letGo(session);
-                }
-            } else if (event.type === "session.execution.started") {
+            // A message of the player's, or the doorbell's own, which comes once its wait has ended, lets the wait go.
+            if ((event.type === "session.inbox.enqueued" && event.data.item?.type === "user") || event.type === "session.execution.started") {
                 letGo(session);
             } else if (event.type === "session.execution.succeeded") {
                 listen(session);
+            } else if (event.type === "session.execution.failed") {
+                // A turn that failed still waits for the player: their next move on the page wakes the chat.
+                note(folder, `the chat ${session} failed its turn${errorOf(event.data.error)}`);
+                listen(session);
+            } else if (event.type === "session.execution.interrupted") {
+                // The player stopped the turn, as with Esc elsewhere: nobody waits for a move until they write.
             } else if (event.type === "session.step.started") {
                 noteModel(session, event.data.model);
             }
@@ -203,6 +207,17 @@ function note(folder, line)
     } catch {
         // The log only explains.
     }
+}
+
+// What OpenCode says of a turn that failed, after a colon; nothing when it says nothing.
+function errorOf(error)
+{
+    if (error === undefined || error === null) {
+        return "";
+    }
+
+    const said = typeof error === "string" ? error : error.data?.message ?? error.message ?? JSON.stringify(error);
+    return `: ${said}`;
 }
 
 function messageOf(error)

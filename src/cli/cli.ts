@@ -125,6 +125,6 @@ async function serveTable(): Promise<void>
         process.exitCode = 1;
     }
 
-    // Closed, the table waits for no host's models still being read: `opencode models` may take seconds while OpenCode starts its service.
+    // Closed, the table waits for no host's models still being read: `opencode models` takes seconds when it must start OpenCode's background service, less once it runs.
     process.stdout.write("", () => process.exit());
 }

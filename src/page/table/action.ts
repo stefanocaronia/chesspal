@@ -75,10 +75,13 @@ export function startedWith(table: ChatTable, host: HostChoices, kind: "model" |
     return offered(host, table.started?.model, table.started?.effort)[kind];
 }
 
-/** What the button does with the host selected, none without one: with no chat, open one, to review the game in `review`; else start the chat again, in another host when it is not the one at the table. */
+/**
+ * What the button does with the host selected, none without one, or for one that offers no model, as OpenCode before the table finds one: with no chat,
+ * open one, to review the game in `review`; else start the chat again, in another host when it is not the one at the table.
+ */
 export function chatAction(table: ChatTable, host: HostChoices | undefined, review: boolean): ChatAction | undefined
 {
-    if (host === undefined) {
+    if (host === undefined || host.models.length === 0) {
         return undefined;
     }
 

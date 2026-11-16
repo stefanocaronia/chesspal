@@ -185,7 +185,7 @@ export interface Text
         readonly noChat: string;
         readonly change: string;
         install(name: string): string;
-        /** A host with no model to offer, as OpenCode before the table finds one the player can use: it starts with its own. */
+        /** A host with no model to offer, as OpenCode before the table finds one the player can use: it does not start. */
         noModels(host: string): string;
         /** The titles of the hosts' cards and of the selected one's choices, and the tick's on the one at the table. */
         readonly chat: string;
@@ -767,7 +767,7 @@ const english: Text = {
         noChat: "No chat at the table: choose one",
         change: "Change the chat or its model",
         install: (name) => `To play with ${name}, install Claude Code, Codex, Antigravity or OpenCode, then open this page again.`,
-        noModels: (host) => `No ${host} model found on this computer yet: it starts with its own. To play for free, install Ollama and a model that can use tools.`,
+        noModels: (host) => `I cannot find any model for ${host} on this computer yet. To play for free, install Ollama and download a model, as Chesspal's README explains: it shows up here within a few minutes.`,
         chat: "Chat",
         model: "Model",
         effort: "Effort",
@@ -1229,7 +1229,7 @@ const italian: Text = {
         noChat: "Nessuna chat al tavolo: scegline una",
         change: "Cambia la chat o il modello",
         install: (name) => `Per giocare con ${name}, installa Claude Code, Codex, Antigravity o OpenCode, poi apri di nuovo questa pagina.`,
-        noModels: (host) => `Nessun modello di ${host} ancora trovato su questo computer: parte con il suo. Per giocare gratis, installa Ollama e un modello che sappia usare gli strumenti.`,
+        noModels: (host) => `Non trovo ancora nessun modello per ${host} su questo computer. Per giocare gratis installa Ollama e scarica un modello, come spiega il README di Chesspal: comparirà qui entro qualche minuto.`,
         chat: "Chat",
         model: "Modello",
         effort: "Ragionamento",
