@@ -773,7 +773,7 @@ const english: Text = {
         install: (name) => `To play with ${name}, install Claude Code, Codex, Antigravity or OpenCode, then open this page again.`,
         noModels: (host) => `I cannot find any model for ${host} on this computer yet. To play for free, install Ollama and download a model, as Chesspal's README explains: it shows up here within a few minutes.`,
         ollamaOffToStart: "Ollama is not answering: open it before you start, or this model cannot play.",
-        ollamaOff: (name) => `Ollama is not answering, and ${name} plays with one of its models: open Ollama, then write here, for example "try again".`,
+        ollamaOff: (name) => `Ollama is not answering, and ${name} plays with one of its models: open Ollama, and ${name} goes on by itself; if it does not, write here, for example "try again".`,
         ollamaContext: (thousands) => `Ollama runs this model with a context of ${thousands}k tokens, too small for Chesspal's instructions: in Ollama's settings raise Context length to 64k, as Chesspal's README explains.`,
         chat: "Chat",
         model: "Model",
@@ -1238,7 +1238,7 @@ const italian: Text = {
         install: (name) => `Per giocare con ${name}, installa Claude Code, Codex, Antigravity o OpenCode, poi apri di nuovo questa pagina.`,
         noModels: (host) => `Non trovo ancora nessun modello per ${host} su questo computer. Per giocare gratis installa Ollama e scarica un modello, come spiega il README di Chesspal: comparirà qui entro qualche minuto.`,
         ollamaOffToStart: "Ollama non risponde: aprilo prima di iniziare, o questo modello non può giocare.",
-        ollamaOff: (name) => `Ollama non risponde, e ${name} gioca con un suo modello: apri Ollama, poi scrivi qui, per esempio «riprova».`,
+        ollamaOff: (name) => `Ollama non risponde, e ${name} gioca con un suo modello: apri Ollama e ${name} riprende da solo; se non riprende, scrivi qui, per esempio «riprova».`,
         ollamaContext: (thousands) =>
             `Ollama fa girare questo modello con un contesto di ${thousands}k token, troppo piccolo per le istruzioni di Chesspal: nelle impostazioni di Ollama porta Context length a 64k, come spiega il README di Chesspal.`,
         chat: "Chat",

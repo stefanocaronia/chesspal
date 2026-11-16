@@ -125,8 +125,8 @@ const readings: Readonly<
     opencode: { file: "opencode-models.json", list: openCodeList, choicesIn: openCodeChoices, complete: (choices) => choices.models.some(isOllamaModel) },
 };
 
-// The host's own program, never through a shell: the table finds OpenCode's behind npm's shim. In the user's home, since `opencode models` starts a
-// service of OpenCode's that outlives it, which on Windows would hold the folder it started in.
+// The host's own program, never through a shell: the table finds OpenCode's behind npm's shim. In the user's home, which a program that leaves a
+// process behind does not hold on Windows.
 function runProgram(program: string, args: readonly string[], timeout: number, userHome: string): Promise<string>
 {
     return new Promise((done, failed) => {

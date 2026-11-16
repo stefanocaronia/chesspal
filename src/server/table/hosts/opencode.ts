@@ -13,7 +13,7 @@ import { ollamaToolModels } from "./ollama.ts";
  */
 export async function openCodeList(program: string, sources: ModelSources): Promise<string>
 {
-    const [listed, ollama] = await Promise.all([sources.run(program, ["models"], listTime), ollamaToolModels(sources.fetch, sources.env)]);
+    const [listed, ollama] = await Promise.all([sources.run(program, ["models", "--standalone"], listTime), ollamaToolModels(sources.fetch, sources.env)]);
     const known = new Set(listed.split(/\r?\n/).map((line) => line.trim()));
     const { recent, favorite } = playerModels(sources);
     const models = [...new Set([...ollama.map((name) => `ollama/${name}`), ...recent, ...favorite])].filter((model) => known.has(model));
@@ -44,7 +44,8 @@ export function openCodeChoices(kept: string): HostChoices | undefined
     }
 }
 
-// `opencode models` reads OpenCode's catalogue on this computer: quick once OpenCode's background service runs, seconds when it must start it.
+// `opencode models` reads OpenCode's catalogue with a server of its own, which ends with it: never OpenCode's background service, which would outlive
+// the table with its environment. About a second.
 const listTime = 15_000;
 
 // The player's recent and favourite models in OpenCode, as `provider/model`, from the state it keeps in the user's home on every system.
