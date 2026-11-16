@@ -98,6 +98,27 @@ export function canAct(table: ChatTable): boolean
     return table.opening === undefined && table.waiting === undefined && (!table.chat || table.held);
 }
 
+/**
+ * What stops a model of OpenCode's that Ollama plays (D-117): `off` when Ollama does not answer, else the context it runs the model with when too small for
+ * Chesspal's instructions, in tokens; nothing for a model of another provider's, or with no word from Ollama.
+ */
+export function ollamaTroubleOf(ollama: { readonly answering: boolean; readonly contexts: Readonly<Record<string, number>>; } | undefined, model: string | undefined): "off" | number | undefined
+{
+    if (ollama === undefined || model?.startsWith("ollama/") !== true) {
+        return undefined;
+    }
+
+    if (!ollama.answering) {
+        return "off";
+    }
+
+    const context = ollama.contexts[model.slice("ollama/".length)];
+    return context !== undefined && context < smallestContext ? context : undefined;
+}
+
+// A chat's first request is about 10k tokens: under 32k the model loses Chesspal's instructions as the game goes on.
+const smallestContext = 32_768;
+
 // The choice kept to what the host offers, as the table keeps it when it starts the chat.
 function offered(host: HostChoices, model: string | undefined, effort: string | undefined): { model: string; effort?: string; }
 {

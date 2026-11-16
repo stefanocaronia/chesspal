@@ -33,8 +33,17 @@ export interface TableChats
     held(folder: string): HeldChat | undefined;
     /** Asks for the chat again: with another host, or `updated`, from the Chesspal just installed (D-108). */
     relaunch(folder: string, host?: string, updated?: boolean): boolean;
-    /** Tells `changed` when the hosts' choices change: Antigravity's models, read from the player's account. */
+    /** Tells `changed` when the hosts' choices change: Antigravity's models, read from the player's account; and when what Ollama says changes. */
     watch?(changed: () => void): void;
+    /** Ollama on this computer, as last seen, asked again now and then: only where OpenCode is installed, which plays its models (D-117). */
+    ollama?(): OllamaState | undefined;
+}
+
+/** What the table tells of Ollama: whether it answers, and the context each model it has loaded runs with, by Ollama's name. */
+export interface OllamaState
+{
+    readonly answering: boolean;
+    readonly contexts: Readonly<Record<string, number>>;
 }
 
 /**
@@ -74,6 +83,8 @@ export interface TableShown
     readonly waiting?: ChatWait["for"];
     /** Why the last new game that waited for the chat could not start, numbered so that each page says it once. */
     readonly refused?: WaitRefused;
+    /** Ollama, which plays OpenCode's free models, where OpenCode is installed. */
+    readonly ollama?: OllamaState;
 }
 
 /** A new game that waited for the chat and could not start: why, and its number, larger for each. */
@@ -91,6 +102,7 @@ export function tableShown(served: Served): { table?: TableShown; }
     const host = hostAtTable(served);
     const held = heldChat(served);
     const now = opening(served);
+    const ollama = table.chats?.ollama?.();
     return {
         table: {
             chat: attached !== undefined,
@@ -101,6 +113,7 @@ export function tableShown(served: Served): { table?: TableShown; }
             ...(now === undefined ? {} : { opening: now }),
             ...(served.chatWait === undefined ? {} : { waiting: served.chatWait.for }),
             ...(served.waitRefused === undefined ? {} : { refused: served.waitRefused }),
+            ...(ollama === undefined ? {} : { ollama }),
         },
     };
 }

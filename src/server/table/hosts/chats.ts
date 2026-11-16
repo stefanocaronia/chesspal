@@ -6,6 +6,7 @@ import type { ChatHost, TableChats } from "../../page/index.ts";
 import { hostProgramPath } from "./find.ts";
 import { type HostChoices, hostChoices, type HostName, hostNames, isHostName } from "./hosts.ts";
 import { type HostModels, hostModels, isReadHost, type ModelSources, type ReadHost, readHosts } from "./models.ts";
+import { ollamaWatch } from "./ollama.ts";
 import { askAgain, seatHeld } from "./seat.ts";
 import { openTerminal } from "./terminal.ts";
 
@@ -13,7 +14,7 @@ import { openTerminal } from "./terminal.ts";
  * The chats of a real table: the hosts installed, looked for again once a while has passed, since the player may install one with the page open; a
  * terminal opened with `chesspal play`, run by `chesspal`, the same Node and script as the table's. Antigravity's and OpenCode's models are read with
  * the context's network and user's home, and `sources` where given, as soon as the host is found, and again when it is looked for after a reading that
- * failed, or a few minutes after one that found too little.
+ * failed, or a few minutes after one that found too little; Ollama is asked whether it answers every few seconds at most, where OpenCode is installed.
  */
 export function terminalChats(
     context: Context,
@@ -31,6 +32,7 @@ export function terminalChats(
         ...sources,
     };
     const models = Object.fromEntries(readHosts.map((host) => [host, hostModels(table, host, () => context.now(), given)])) as Record<ReadHost, HostModels>;
+    const ollama = ollamaWatch(given.fetch ?? fetch, env, () => context.now());
 
     const programs = (): Readonly<Record<HostName, string | undefined>> => {
         const now = context.now().getTime();
@@ -57,7 +59,19 @@ export function terminalChats(
             const found = programs();
             return hostNames.map((name) => chatHost(name, found[name] !== undefined, isReadHost(name) ? models[name].choices() : hostChoices[name]));
         },
-        watch: (changed) => readHosts.forEach((host) => models[host].watch(changed)),
+        watch: (changed) => {
+            readHosts.forEach((host) => models[host].watch(changed));
+            ollama.watch(changed);
+        },
+        // Asked only where OpenCode is installed: the page warns of Ollama only for a chat of OpenCode's.
+        ollama: () => {
+            if (programs().opencode === undefined) {
+                return undefined;
+            }
+
+            ollama.look();
+            return ollama.state();
+        },
         open: async (host) => isHostName(host) && await openTerminal(tableFolder(context.home()), playCommand(chesspal, host, env), context.platform, env),
         // Only a chat in the table's folder can be the one chesspal play holds.
         held: (folder) => {

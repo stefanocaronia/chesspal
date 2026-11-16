@@ -8,7 +8,7 @@ import { Dialog } from "../dialogs/dialog.tsx";
 import { checkIcon } from "../dialogs/profiles.tsx";
 import type { Settings } from "../profile/settings.ts";
 import type { Text } from "../text.ts";
-import { canAct, chatAction, choiceKeys, chosen, effortsOf, firstHost, offeredHosts, startedWith } from "./action.ts";
+import { canAct, chatAction, choiceKeys, chosen, effortsOf, firstHost, offeredHosts, ollamaTroubleOf, startedWith } from "./action.ts";
 
 /**
  * The chat's window: `onStarted` once a chat opens or starts again, the page then saying where it stands; `onClose` when the player closes it without;
@@ -74,6 +74,13 @@ export function tableNote({ table, name, inGame, onOpen, text }: { table: TableS
                 </button>
             </p>
         );
+    }
+
+    // A chat of OpenCode's that plays with a model of Ollama's is told what stops it, before what it is doing (D-117).
+    const ollama = table.chat && table.host === "opencode" ? ollamaTrouble(table, table.started?.model, words.ollamaOff(name), text) : undefined;
+
+    if (ollama !== undefined) {
+        return <p class="asleep" role="status">{ollama}</p>;
     }
 
     if (state !== undefined) {
@@ -142,6 +149,8 @@ function ChatForm({ review, table, settings, onChange, name, onStarted, text }: 
     const note = installed.length === 0 ? words.install(name) : busy ? chatState(table, name, text) ?? chooseNote : byHand ? words.byHand(name) : table.chat ? words.restartHint : chooseNote;
     // What the chat held started with, marked among the choices of its host.
     const started = (kind: "model" | "effort"): string | undefined => (host !== undefined && table.held && table.host === host.name ? startedWith(table, host, kind) : undefined);
+    // OpenCode with a model of Ollama's says what would stop it before the chat starts (D-117).
+    const trouble = host?.name === "opencode" ? ollamaTrouble(table, chosen(host, "model", settings), words.ollamaOffToStart, text) : undefined;
 
     const submit = async (event: Event): Promise<void> => {
         event.preventDefault();
@@ -190,6 +199,7 @@ function ChatForm({ review, table, settings, onChange, name, onStarted, text }: 
                     <Choices host={host} kind="model" settings={settings} started={started("model")} onChange={onChange} text={text} />
                     <Choices host={host} kind="effort" settings={settings} started={started("effort")} onChange={onChange} text={text} />
                     {host.models.length === 0 ? <p class="note">{words.noModels(hostTitles[host.name] ?? host.name)}</p> : null}
+                    {trouble === undefined ? null : <p class="problem">{trouble}</p>}
                 </>
             )}
             <p class="problem chat-state" role="status">{failed ? (table.chat ? words.notRestarted : words.failed) : null}</p>
@@ -286,4 +296,11 @@ async function asked(path: string, body: object, done: (answer: Record<string, u
     } catch {
         return false;
     }
+}
+
+// What stops a model of Ollama's from playing, in words: `off` when Ollama does not answer.
+function ollamaTrouble(table: TableShown, model: string | undefined, off: string, text: Text): string | undefined
+{
+    const trouble = ollamaTroubleOf(table.ollama, model);
+    return trouble === undefined ? undefined : trouble === "off" ? off : text.table.ollamaContext(Math.round(trouble / 1024));
 }

@@ -122,6 +122,8 @@ export interface TableShown
     readonly waiting?: "restart" | "new-game";
     /** Why the last new game that waited for the chat could not start, numbered so that the page says it once. */
     readonly refused?: ServerRefused & { readonly number: number; };
+    /** Ollama, which plays OpenCode's free models, where OpenCode is installed: whether it answers, and the context of each model it has loaded. */
+    readonly ollama?: { readonly answering: boolean; readonly contexts: Readonly<Record<string, number>>; };
 }
 
 /** A refusal as the server sends it: its words, and the code of one the page says in the player's language, with the characters left for words too long. */

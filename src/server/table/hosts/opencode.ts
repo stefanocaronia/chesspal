@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { HostChoices } from "./hosts.ts";
 import type { ModelSources } from "./models.ts";
+import { ollamaToolModels } from "./ollama.ts";
 
 /**
  * The models the player can use in OpenCode, as the table keeps them: JSON with the `models` in order and the `model` a chat starts with until the player
@@ -12,7 +13,7 @@ import type { ModelSources } from "./models.ts";
  */
 export async function openCodeList(program: string, sources: ModelSources): Promise<string>
 {
-    const [listed, ollama] = await Promise.all([sources.run(program, ["models"], listTime), ollamaToolModels(sources)]);
+    const [listed, ollama] = await Promise.all([sources.run(program, ["models"], listTime), ollamaToolModels(sources.fetch, sources.env)]);
     const known = new Set(listed.split(/\r?\n/).map((line) => line.trim()));
     const { recent, favorite } = playerModels(sources);
     const models = [...new Set([...ollama.map((name) => `ollama/${name}`), ...recent, ...favorite])].filter((model) => known.has(model));
@@ -43,58 +44,8 @@ export function openCodeChoices(kept: string): HostChoices | undefined
     }
 }
 
-/** Where Ollama answers, as OLLAMA_HOST names it, the way Ollama reads it: the port 11434 for an address without a scheme, this computer for every address. */
-export function ollamaAddress(host: string | undefined): string
-{
-    const given = host?.trim() || "127.0.0.1:11434";
-    const schemed = /^[a-z]+:\/\//i.test(given);
-
-    try {
-        const address = new URL(schemed ? given : `http://${given}`);
-
-        if (!schemed && address.port === "") {
-            address.port = "11434";
-        }
-
-        if (address.hostname === "0.0.0.0" || address.hostname === "[::]") {
-            address.hostname = "127.0.0.1";
-        }
-
-        return address.origin;
-    } catch {
-        return "http://127.0.0.1:11434";
-    }
-}
-
-// `opencode models` reads OpenCode's catalogue on this computer: quick once OpenCode's background service runs, seconds when it must start it. Ollama
-// answers at once, or is not running.
+// `opencode models` reads OpenCode's catalogue on this computer: quick once OpenCode's background service runs, seconds when it must start it.
 const listTime = 15_000;
-const askTime = 5_000;
-
-// The models installed in Ollama that can use tools, as Ollama names them; none when Ollama does not answer.
-async function ollamaToolModels({ fetch, env }: ModelSources): Promise<string[]>
-{
-    const address = ollamaAddress(env.OLLAMA_HOST);
-
-    try {
-        const tags = await (await fetch(`${address}/api/tags`, { signal: AbortSignal.timeout(askTime) })).json() as { models?: unknown; };
-        const names = (Array.isArray(tags.models) ? tags.models as { name?: unknown; }[] : []).map((one) => one.name).filter((name): name is string => typeof name === "string");
-        const able = await Promise.all(names.map((name) => usesTools(fetch, address, name)));
-        return names.filter((_, index) => able[index]);
-    } catch {
-        return [];
-    }
-}
-
-async function usesTools(fetch: ModelSources["fetch"], address: string, model: string): Promise<boolean>
-{
-    try {
-        const shown = await (await fetch(`${address}/api/show`, { method: "POST", body: JSON.stringify({ model }), signal: AbortSignal.timeout(askTime) })).json() as { capabilities?: unknown; };
-        return Array.isArray(shown.capabilities) && shown.capabilities.includes("tools");
-    } catch {
-        return false;
-    }
-}
 
 // The player's recent and favourite models in OpenCode, as `provider/model`, from the state it keeps in the user's home on every system.
 function playerModels({ userHome, env }: ModelSources): { recent: string[]; favorite: string[]; }
