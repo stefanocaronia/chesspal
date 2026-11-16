@@ -278,6 +278,8 @@ describe("OpenCode, the fourth host (D-117)", () => {
         expect(await callerOf({ "ai.opencode/sessionID": "ses_2" }, client, folder, 0)).toEqual({ annotator: "OpenCode", hostOnly: true });
         expect(aiNameOf("opencode")).toBe("OpenCode");
         expect(aiNameOf("opencode", "ollama/gemma4:12b")).toBe("OpenCode");
+        expect(aiNameOf("opencode", "anthropic/claude-sonnet-5-5")).toBe("Claude");
+        expect(aiNameOf("opencode", "openrouter/google/gemini-3-pro")).toBe("Gemini");
     });
 });
 

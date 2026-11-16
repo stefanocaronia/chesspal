@@ -184,7 +184,7 @@ export function aiHostIn(record: GameRecord): string | undefined
 
 /**
  * The AI's name from its host: Claude Code and the desktop app are Claude, Codex is Codex, Antigravity is Gemini, unless its model is known to be another
- * (D-97, D-115), OpenCode is OpenCode, whatever model it runs (D-117); without a host it names, from the model, a Claude model is Claude. Undefined
+ * (D-97, D-115), OpenCode the same by its provider's model, else OpenCode (D-118); without a host it names, from the model, a Claude model is Claude. Undefined
  * otherwise.
  */
 export function aiNameOf(host: string | undefined, model?: string): string | undefined
@@ -204,7 +204,8 @@ export function aiNameOf(host: string | undefined, model?: string): string | und
     }
 
     if (/^opencode/i.test(host ?? "")) {
-        return "OpenCode";
+        const model = named.split("/").pop() ?? "";
+        return /^gemini/i.test(model) ? "Gemini" : /^claude/i.test(model) ? "Claude" : "OpenCode";
     }
 
     return /^claude/i.test(named) ? "Claude" : undefined;
