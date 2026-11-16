@@ -4,7 +4,7 @@
 // which signs the moves (D-81). Nothing here ever stops OpenCode: what fails is noted in the folder's listen.log.
 import { spawn } from "node:child_process";
 import { appendFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 export default {
     id: "chesspal",
@@ -42,6 +42,7 @@ function chesspalChats(context, run)
 {
     const folder = context.location.directory;
     const seen = new Set();
+    const ours = new Set();
     const agents = new Set();
     const listeners = new Map();
     let modelNoted = "";
@@ -140,6 +141,18 @@ function chesspalChats(context, run)
                 return;
             }
 
+            // OpenCode's background service runs this plugin for every folder and tells it the events of all: only the chats of this folder are its own.
+            // The turn's start and end say no folder: the session's earlier events, its creation or its messages, have said it.
+            const place = event.location?.directory ?? event.data.location?.directory;
+
+            if (typeof place === "string" && sameFolder(place, folder)) {
+                ours.add(session);
+            }
+
+            if (!ours.has(session)) {
+                return;
+            }
+
             // A subagent's session is born with its parent's: it is no chat, and nobody waits for the player after its turns.
             if (event.type === "session.created" && typeof event.data.parentID === "string") {
                 agents.add(session);
@@ -197,6 +210,14 @@ function end(child, run)
     } catch {
         child.kill();
     }
+}
+
+/** Whether OpenCode's folder of a session is this one, as the system compares paths: on Windows and macOS without the case. */
+function sameFolder(place, folder)
+{
+    const caseless = process.platform === "win32" || process.platform === "darwin";
+    const plain = (path) => (caseless ? resolve(path).toLowerCase() : resolve(path));
+    return plain(place) === plain(folder);
 }
 
 /** Adds a line to the doorbell's log in the folder, as Chesspal's hooks do; a log that cannot be written changes nothing. */

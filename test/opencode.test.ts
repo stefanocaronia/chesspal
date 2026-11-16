@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Context } from "../src/commands/index.ts";
@@ -336,6 +336,36 @@ describe("Chesspal's plugin for OpenCode", () => {
         expect(third.killed).toBe(true);
     });
 
+    it("leaves alone the chats of other folders, which OpenCode's background service tells it of too", async () => {
+        const folder = temporary();
+        const opencode = fakeOpenCode(folder);
+        await (await plugin()).setup(opencode.context, opencode.run);
+
+        // A chat of this folder waits for the player after its turn.
+        await opencode.send("session.inbox.enqueued", { sessionID: "ses_here", item: { type: "user", payload: { text: "Giochiamo!" } } });
+        await opencode.send("session.execution.started", { sessionID: "ses_here" });
+        await opencode.send("session.execution.succeeded", { sessionID: "ses_here" });
+        const waiting = opencode.children.at(-1)!;
+        const before = opencode.hooks().length;
+
+        // One of another folder notes no start, lets no wait go, waits for nobody and signs nothing.
+        const elsewhere = join(folder, "..", `${basename(folder)}-other`);
+        await opencode.send("session.created", { sessionID: "ses_there", location: { directory: elsewhere } }, elsewhere);
+        await opencode.send("session.inbox.enqueued", { sessionID: "ses_there", item: { type: "user", payload: { text: "Ciao" } } }, elsewhere);
+        await opencode.send("session.execution.started", { sessionID: "ses_there" });
+        await opencode.send("session.step.started", { sessionID: "ses_there", model: { id: "gemma4:12b", providerID: "ollama" } }, elsewhere);
+        await opencode.send("session.execution.succeeded", { sessionID: "ses_there" });
+        expect(opencode.hooks()).toHaveLength(before);
+        expect(waiting.killed).toBe(false);
+        expect(existsSync(join(folder, "opencode-model.json"))).toBe(false);
+
+        // A session OpenCode places in this folder by another spelling is its own.
+        if (process.platform === "win32") {
+            await opencode.send("session.inbox.enqueued", { sessionID: "ses_case", item: { type: "user", payload: { text: "Ciao" } } }, folder.toUpperCase());
+            expect(opencode.hooks().at(-1)).toMatchObject({ command: "chesspal chat", input: { session_id: "ses_case", source: "clear" } });
+        }
+    });
+
     it("never stops OpenCode: a hook that cannot start, or a chat that cannot be woken, is noted in listen.log", async () => {
         const folder = temporary();
         const opencode = fakeOpenCode(folder, () => {
@@ -343,6 +373,7 @@ describe("Chesspal's plugin for OpenCode", () => {
         });
         await (await plugin()).setup({ ...opencode.context, session: { prompt: () => Promise.reject(new Error("closed")) } }, opencode.run);
 
+        await opencode.send("session.inbox.enqueued", { sessionID: "ses_1", item: { type: "user", payload: { text: "Ciao" } } });
         await opencode.send("session.execution.succeeded", { sessionID: "ses_1" });
         expect(readFileSync(join(folder, "listen.log"), "utf8")).toMatch(/plugin opencode chesspal chat did not start: no shell\n.*plugin opencode chesspal listen --opencode did not start: no shell\n$/);
     });
@@ -417,7 +448,7 @@ class FakeChild extends EventEmitter
 function fakeOpenCode(folder: string, start?: () => void): {
     context: PluginContext;
     run: Run;
-    send(type: string, data: object): Promise<void>;
+    send(type: string, data: object, directory?: string): Promise<void>;
     children: FakeChild[];
     prompts: object[];
     hooks(): object[];
@@ -454,8 +485,10 @@ function fakeOpenCode(folder: string, start?: () => void): {
             children.push(child);
             return child;
         },
-        send: async (type, data) => {
-            events.push({ type, data });
+        // As OpenCode's events, which say the session's folder but for a turn's start and end and its tokens.
+        send: async (type, data, directory = folder) => {
+            const placed = !type.startsWith("session.execution.") && type !== "session.usage.updated";
+            events.push(placed ? { type, location: { directory }, data } : { type, data });
             wake();
             await settled();
         },
