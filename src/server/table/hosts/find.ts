@@ -31,6 +31,12 @@ export function hostProgramPath(host: HostName, platform: string, env: NodeJS.Pr
     return exists(installed) ? installed : undefined;
 }
 
+/** Whether the program runs only through a shell: on Windows, a .cmd or .bat, as npm's shims are. */
+export function runsInShell(program: string, platform: string): boolean
+{
+    return platform === "win32" && /\.(cmd|bat)$/i.test(program);
+}
+
 /** The program's path on the PATH of `env`, the first found; none when it is not installed there. */
 export function programPath(name: string, platform: string, env: NodeJS.ProcessEnv, exists: (path: string) => boolean = present): string | undefined
 {

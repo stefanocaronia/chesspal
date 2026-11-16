@@ -7,7 +7,7 @@ import { type Context, speaksItalian } from "../../../commands/index.ts";
 import { endOf, gameInAnalysis, loadGame } from "../../../games/index.ts";
 import { tableFolder } from "../../../home/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
-import { hostProgramPath } from "./find.ts";
+import { hostProgramPath, runsInShell } from "./find.ts";
 import { type HooksNews, setUpTable, takeHooksNews } from "./hooks.ts";
 import { choiceIn, hostArgs, type HostChoice, hostEnvironment, type HostName, isHostName, startMessage } from "./hosts.ts";
 import { tableChoices } from "./models.ts";
@@ -203,7 +203,7 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
         return { program: process.execPath, args: [script, ...args], folder, env: childEnv, shell: false, choice, analysis, ...hooks };
     }
 
-    return { program: found, args, folder, env: childEnv, shell: context.platform === "win32" && /\.(cmd|bat)$/i.test(found), choice, analysis, ...hooks };
+    return { program: found, args, folder, env: childEnv, shell: runsInShell(found, context.platform), choice, analysis, ...hooks };
 }
 
 /** Whether the board page shows a game in analysis, none going on: the chat opened there is for that game, brought to review or to talk over, not for a new one. */

@@ -10,7 +10,7 @@ import { settingsFrom } from "../src/page/profile/settings.ts";
 import { activeProfile, gameFolder, saveProfileSettings } from "../src/profiles/index.ts";
 import type { TableChats } from "../src/server/page/table.ts";
 import { playCommand } from "../src/server/table/hosts/chats.ts";
-import { hostProgramPath } from "../src/server/table/hosts/find.ts";
+import { hostProgramPath, runsInShell } from "../src/server/table/hosts/find.ts";
 import { hostArgs, startMessage } from "../src/server/table/hosts/hosts.ts";
 import { setUpTable } from "../src/server/table/hosts/index.ts";
 import { type HostLaunch, playHost, runHost } from "../src/server/table/hosts/play.ts";
@@ -116,6 +116,10 @@ describe("a chat the table opens", () => {
         expect(hostProgramPath("opencode", "win32", env, (path) => path === "C:\\npm\\opencode.cmd" || path === program)).toBe(program);
         expect(hostProgramPath("opencode", "win32", env, (path) => path === "C:\\npm\\opencode.cmd")).toBe("C:\\npm\\opencode.cmd");
         expect(hostProgramPath("opencode", "linux", { PATH: "/usr/bin" }, (path) => path === "/usr/bin/opencode")).toBe("/usr/bin/opencode");
+        // The shim found alone still runs, through cmd, as every npm shim on Windows.
+        expect(runsInShell("C:\npm\opencode.cmd", "win32")).toBe(true);
+        expect(runsInShell(program, "win32")).toBe(false);
+        expect(runsInShell("/usr/bin/opencode.cmd", "linux")).toBe(false);
     });
 
     it("says when it wrote Codex's hooks, the first time or again over older ones, which Codex then asks the player to trust", () => {

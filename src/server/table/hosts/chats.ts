@@ -14,7 +14,7 @@ import { openTerminal } from "./terminal.ts";
  * The chats of a real table: the hosts installed, looked for again once a while has passed, since the player may install one with the page open; a
  * terminal opened with `chesspal play`, run by `chesspal`, the same Node and script as the table's. Antigravity's and OpenCode's models are read with
  * the context's network and user's home, and `sources` where given, as soon as the host is found, and again when it is looked for after a reading that
- * failed, or a few minutes after one that found too little; Ollama is asked whether it answers every few seconds at most, where OpenCode is installed.
+ * failed, or a few minutes after one that found too little; Ollama is asked whether it answers every few seconds, where OpenCode is installed, once the page has asked.
  */
 export function terminalChats(
     context: Context,
@@ -32,7 +32,7 @@ export function terminalChats(
         ...sources,
     };
     const models = Object.fromEntries(readHosts.map((host) => [host, hostModels(table, host, () => context.now(), given)])) as Record<ReadHost, HostModels>;
-    const ollama = ollamaWatch(given.fetch ?? fetch, env, () => context.now());
+    const ollama = ollamaWatch(given.fetch ?? fetch, env);
 
     const programs = (): Readonly<Record<HostName, string | undefined>> => {
         const now = context.now().getTime();

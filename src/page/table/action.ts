@@ -1,6 +1,13 @@
 // What the chat's window does with its one button: open a chat, start the one held again, or switch its host, by the table and the choices.
 import type { Settings } from "../profile/settings.ts";
 
+/** Ollama as the table tells it, where OpenCode is installed: whether it answers, and the context of each model it has loaded, by Ollama's name. */
+export interface OllamaShown
+{
+    readonly answering: boolean;
+    readonly contexts: Readonly<Record<string, number>>;
+}
+
 /** The button's action: a chat opened to play or to review a game, the chat held started again, or in another host. */
 export type ChatAction = "open" | "review" | "restart" | "switch";
 
@@ -102,7 +109,7 @@ export function canAct(table: ChatTable): boolean
  * What stops a model of OpenCode's that Ollama plays (D-117): `off` when Ollama does not answer, else the context it runs the model with when too small for
  * Chesspal's instructions, in tokens; nothing for a model of another provider's, or with no word from Ollama.
  */
-export function ollamaTroubleOf(ollama: { readonly answering: boolean; readonly contexts: Readonly<Record<string, number>>; } | undefined, model: string | undefined): "off" | number | undefined
+export function ollamaTroubleOf(ollama: OllamaShown | undefined, model: string | undefined): "off" | number | undefined
 {
     if (ollama === undefined || model?.startsWith("ollama/") !== true) {
         return undefined;

@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ollamaTroubleOf } from "../src/page/table/action.ts";
 import { terminalChats } from "../src/server/table/hosts/chats.ts";
 import { ollamaState, ollamaWatch } from "../src/server/table/hosts/ollama.ts";
@@ -25,8 +25,8 @@ describe("Ollama, which plays OpenCode's free models (D-117)", () => {
         expect(await ollamaState(() => Promise.resolve(new Response("", { status: 500 })), {})).toEqual({ answering: false, contexts: {} });
     });
 
-    it("asks Ollama at most every few seconds, and tells the watchers only when what it says changes", async () => {
-        let at = 0;
+    it("asks Ollama from the first look on, every ten seconds, and tells the watchers only when what it says changes", async () => {
+        vi.useFakeTimers();
         let up = true;
         const asked: string[] = [];
 
@@ -35,30 +35,34 @@ describe("Ollama, which plays OpenCode's free models (D-117)", () => {
             return up ? Promise.resolve(Response.json(loaded)) : Promise.reject(new Error("refused"));
         };
 
-        const watch = ollamaWatch(fetch, { OLLAMA_HOST: "127.0.0.1:11500" }, () => new Date(at));
+        const watch = ollamaWatch(fetch, { OLLAMA_HOST: "127.0.0.1:11500" });
         let told = 0;
         watch.watch(() => told++);
 
-        expect(watch.state()).toBeUndefined();
-        watch.look();
-        watch.look();
-        await settled();
-        expect(asked).toEqual(["http://127.0.0.1:11500/api/ps"]);
-        expect(watch.state()?.answering).toBe(true);
-        expect(told).toBe(1);
+        try {
+            await vi.advanceTimersByTimeAsync(30_000);
+            expect(asked).toEqual([]);
+            expect(watch.state()).toBeUndefined();
 
-        at = 10_000;
-        watch.look();
-        await settled();
-        expect(asked).toHaveLength(2);
-        expect(told).toBe(1);
+            watch.look();
+            watch.look();
+            await vi.advanceTimersByTimeAsync(0);
+            expect(asked).toEqual(["http://127.0.0.1:11500/api/ps"]);
+            expect(watch.state()?.answering).toBe(true);
+            expect(told).toBe(1);
 
-        up = false;
-        at = 20_000;
-        watch.look();
-        await settled();
-        expect(watch.state()).toEqual({ answering: false, contexts: {} });
-        expect(told).toBe(2);
+            // Nobody asks meanwhile: Ollama stops, and the table finds it out by itself.
+            await vi.advanceTimersByTimeAsync(10_000);
+            expect(asked).toHaveLength(2);
+            expect(told).toBe(1);
+
+            up = false;
+            await vi.advanceTimersByTimeAsync(10_000);
+            expect(watch.state()).toEqual({ answering: false, contexts: {} });
+            expect(told).toBe(2);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("is looked at by the table only where OpenCode is installed", async () => {
@@ -68,7 +72,7 @@ describe("Ollama, which plays OpenCode's free models (D-117)", () => {
 
         const bin = temporary();
         writeFileSync(join(bin, process.platform === "win32" ? "opencode.exe" : "opencode"), "");
-        const chats = terminalChats(context, ["node", "cli.js"], { PATH: bin, PATHEXT: ".EXE" });
+        const chats = terminalChats(context, ["node", "cli.js"], { PATH: bin, PATHEXT: ".EXE" }, { run: () => Promise.reject(new Error("no program")) });
         chats.ollama?.();
         await settled();
         expect(chats.ollama?.()).toEqual({ answering: true, contexts: { "gemma4:12b": 4096, "gpt-oss:20b": 65536 } });

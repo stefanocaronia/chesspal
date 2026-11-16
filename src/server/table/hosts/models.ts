@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { writeAtomically } from "../../../games/index.ts";
 import type { Fetch } from "../../../sites/index.ts";
 import { antigravityChoices, antigravityList } from "./antigravity.ts";
+import { runsInShell } from "./find.ts";
 import { type HostChoices, hostChoices, type HostName } from "./hosts.ts";
 import { isOllamaModel, openCodeChoices, openCodeList } from "./opencode.ts";
 
@@ -125,12 +126,19 @@ const readings: Readonly<
     opencode: { file: "opencode-models.json", list: openCodeList, choicesIn: openCodeChoices, complete: (choices) => choices.models.some(isOllamaModel) },
 };
 
-// The host's own program, never through a shell: the table finds OpenCode's behind npm's shim. In the user's home, which a program that leaves a
-// process behind does not hold on Windows.
+// The host's program, as the table finds it: OpenCode's own behind npm's shim, else a shim, which runs only through cmd, given one line of the host's own
+// words. In the user's home, which a program that leaves a process behind does not hold on Windows.
 function runProgram(program: string, args: readonly string[], timeout: number, userHome: string): Promise<string>
 {
+    const options = { timeout, windowsHide: true, encoding: "utf8", cwd: userHome } as const;
     return new Promise((done, failed) => {
-        execFile(program, args, { timeout, windowsHide: true, encoding: "utf8", cwd: userHome }, (error, stdout) => (error === null ? done(stdout) : failed(error)));
+        const ended = (error: Error | null, stdout: string): void => (error === null ? done(stdout) : failed(error));
+
+        if (runsInShell(program, process.platform)) {
+            execFile([`"${program}"`, ...args].join(" "), { ...options, shell: true }, ended);
+        } else {
+            execFile(program, args, options, ended);
+        }
     });
 }
 

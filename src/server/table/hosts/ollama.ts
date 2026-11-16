@@ -7,7 +7,7 @@ import type { OllamaState } from "../../page/index.ts";
 export interface OllamaWatch
 {
     state(): OllamaState | undefined;
-    /** Asks Ollama again, at most every few seconds: the page asks at every change, and while the chat thinks. */
+    /** Starts looking at Ollama, every few seconds from then on: the page asks for its state when it first needs it. */
     look(): void;
     watch(changed: () => void): void;
 }
@@ -68,33 +68,41 @@ export async function ollamaState(fetch: Fetch, env: NodeJS.ProcessEnv): Promise
     }
 }
 
-/** Ollama looked at with `fetch`, at most every few seconds by `now`; watchers are told when what it says changes. */
-export function ollamaWatch(fetch: Fetch, env: NodeJS.ProcessEnv, now: () => Date): OllamaWatch
+/**
+ * Ollama looked at with `fetch`: from the first look on, every few seconds, since the page asks only when the game changes, and Ollama may stop or start
+ * meanwhile; watchers are told when what it says changes.
+ */
+export function ollamaWatch(fetch: Fetch, env: NodeJS.ProcessEnv): OllamaWatch
 {
     let seen: OllamaState | undefined;
-    let lookedAt: number | undefined;
     let looking = false;
+    let timer: NodeJS.Timeout | undefined;
     const watchers: Array<() => void> = [];
+
+    const ask = (): void => {
+        if (looking) {
+            return;
+        }
+
+        looking = true;
+        void ollamaState(fetch, env).then((state) => {
+            looking = false;
+
+            if (JSON.stringify(state) !== JSON.stringify(seen)) {
+                seen = state;
+                watchers.forEach((changed) => changed());
+            }
+        });
+    };
 
     return {
         state: () => seen,
         look: () => {
-            const at = now().getTime();
-
-            if (looking || (lookedAt !== undefined && at - lookedAt < lookAgain)) {
-                return;
+            if (timer === undefined) {
+                ask();
+                timer = setInterval(ask, lookEvery);
+                timer.unref();
             }
-
-            looking = true;
-            lookedAt = at;
-            void ollamaState(fetch, env).then((state) => {
-                looking = false;
-
-                if (JSON.stringify(state) !== JSON.stringify(seen)) {
-                    seen = state;
-                    watchers.forEach((changed) => changed());
-                }
-            });
         },
         watch: (changed) => {
             watchers.push(changed);
@@ -104,8 +112,8 @@ export function ollamaWatch(fetch: Fetch, env: NodeJS.ProcessEnv, now: () => Dat
 
 // Ollama answers at once, or is not running.
 const askTime = 5_000;
-// The page asks at every change of the game and while the chat thinks: Ollama is asked no more often.
-const lookAgain = 10_000;
+// A local request every ten seconds: the page tells within as much that Ollama stopped or came back.
+const lookEvery = 10_000;
 
 async function usesTools(fetch: Fetch, address: string, model: string): Promise<boolean>
 {

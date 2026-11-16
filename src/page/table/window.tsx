@@ -76,15 +76,20 @@ export function tableNote({ table, name, inGame, onOpen, text }: { table: TableS
         );
     }
 
-    // A chat of OpenCode's that plays with a model of Ollama's is told what stops it, before what it is doing (D-117).
-    const ollama = table.chat && table.host === "opencode" ? ollamaTrouble(table, table.started?.model, words.ollamaOff(name), text) : undefined;
+    // A chat of OpenCode's that plays with a model of Ollama's is told when Ollama does not answer, before what it is doing; when its context is too
+    // small, once it is doing nothing else worth saying (D-117).
+    const trouble = table.chat && table.host === "opencode" ? ollamaTroubleOf(table.ollama, table.started?.model) : undefined;
 
-    if (ollama !== undefined) {
-        return <p class="asleep" role="status">{ollama}</p>;
+    if (trouble === "off") {
+        return <p class="asleep" role="status">{words.ollamaOff(name)}</p>;
     }
 
     if (state !== undefined) {
         return <p class="asleep" role="status">{state}</p>;
+    }
+
+    if (trouble !== undefined) {
+        return <p class="asleep" role="status">{words.ollamaContext(Math.round(trouble / 1024))}</p>;
     }
 
     if (!table.chat && inGame) {
