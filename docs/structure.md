@@ -51,7 +51,7 @@ The page's folders have no `index.ts`: they import each other's files directly, 
 | [board/](../src/page/board/) | The board: squares, pieces in motion, the pointer, the marks and arrows |
 | [pieces/](../src/page/pieces/) | The sets of pieces, one vector map each |
 | [players/](../src/page/players/) | A player's card: picture, name, clock, pieces taken, the AI's model |
-| [game/](../src/page/game/) | The game's column: move list, badges, opening, result, browsing a game, the variation the player plays in analysis, how far a review has got |
+| [game/](../src/page/game/) | The game's column: move list, badges, opening, result, browsing a game, the variation the player plays in analysis, what a new game started there goes on from, how far a review has got |
 | [talk/](../src/page/talk/) | The talk with the AI on the page, and the voice that reads it |
 | [table/](../src/page/table/) | The chat at the table (D-104, D-107): its window, from the AI's name, that opens one or starts it again with another model or host, and what the page says while it does; the mark and the window of a newer Chesspal, and on a chat's own page its strip (D-108) |
 | [dialogs/](../src/page/dialogs/) | The windows: who plays and the wizard, new game, settings, the analyses, a game to study, from the latest on the sites or a PGN |

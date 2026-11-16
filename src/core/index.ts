@@ -18,7 +18,7 @@ export type { BookPlace, Opening, OpeningBook, OpeningIndex } from "./openings.t
 export { pgnDate, readPgn, readPgnTags, readPgnUnplayed, writePgn } from "./pgn.ts";
 export type { Capture, Chances, DoubleAttack, Possibilities, StalemateTrap } from "./possibilities.ts";
 export type { BishopFacts, CentreSquare, KingFacts, Outpost, PawnFacts, PawnSquare, Phase, Profile, SideProfile } from "./profile.ts";
-export { movesOnly } from "./record.ts";
+export { carriedPlies, carriedTag, movesOnly } from "./record.ts";
 export type { Annotation, GameRecord, RecordedMove } from "./record.ts";
 export {
     aiHostIn,

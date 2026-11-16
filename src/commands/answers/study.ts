@@ -1,7 +1,7 @@
 // A game to study (D-68): one that is over, played here or kept to study, and any position of it, by its moves as the analysis numbers them. While a game
 // goes on, nothing is studied: the analysis would help the game being played (D-60, D-62).
 import { z } from "zod";
-import { Game, type GameRecord } from "../../core/index.ts";
+import { carriedPlies, Game, type GameRecord } from "../../core/index.ts";
 import { archivedGame, archivedGames, archivedName, type CurrentGame, endOf, gameInAnalysis, keptGame, listedName, type Shown, type ShownVariation } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import type { Context } from "../registry/index.ts";
@@ -69,8 +69,8 @@ export function gameToStudy(context: Context, name?: string): Studied
         return namedGame(context, name);
     }
 
-    // A game closed before any move has nothing to study: the one before it is the last played.
-    if (current !== undefined && current.game.record.moves.length > 0) {
+    // A game closed before any move of its own has nothing to study: the one before it is the last played.
+    if (current !== undefined && current.game.record.moves.length > carriedPlies(current.game.record)) {
         // The archive's record, which keeps the AI's review (D-69).
         const archived = archivedName(folder, current);
         return archived === undefined ? { record: current.game.record } : { record: archivedGame(folder, archived), name: archived };

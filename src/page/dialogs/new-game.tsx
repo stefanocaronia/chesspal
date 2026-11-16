@@ -17,10 +17,11 @@ export interface NewGameChoice
     readonly clock?: string;
 }
 
-/** The position a game replayed from analysis starts from: its FEN, the side to move there, which the player takes, and the move that led to it. */
+/** The position a game replayed from analysis starts from: what it goes on from, the side to move there, which the player takes, and the move that led to it. */
 export interface StartingPosition
 {
-    readonly fen: string;
+    /** What the new game goes on from: a PGN of the moves to the position, or its FEN when none led to it. */
+    readonly from: string;
     readonly turn: Side;
     /** None at the game's first position. */
     readonly after?: { readonly san: string; readonly side: Side; readonly number: number; };

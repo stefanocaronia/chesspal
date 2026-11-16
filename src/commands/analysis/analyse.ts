@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
     accountSide,
     type AiLevel,
+    carriedPlies,
     clockOfComment,
     clockText,
     closingOf,
@@ -112,6 +113,8 @@ interface Analysis
     inBook?: true;
     /** The last move the opening book knows, the end of the moves with the book's badge. */
     bookTo?: string;
+    /** In a game that went on from another's position: the last move played before it began. */
+    carriedTo?: string;
     /** The game's name in the archive, a game brought as a PGN too. */
     name?: string;
     /** In a game from a position: that position, and what is at risk and the mates in one there. */
@@ -350,6 +353,7 @@ function analysisOf({ record, name }: Studied, profile: PlayerProfile): Analysis
         opening: opening === undefined ? undefined : `${opening.eco} ${opening.name}`,
         inBook: opening !== undefined && !moves.some((move) => move.outOfBook) ? true : undefined,
         bookTo: opening === undefined ? undefined : moves[bookPlies(record) - 1]?.move,
+        carriedTo: moves[carriedPlies(record) - 1]?.move,
         review: [gameReviewOf(record), closingOf(record)].filter((word) => word !== undefined).join(" ") || undefined,
         name,
         start: tags.FEN === undefined ? undefined : { fen: tags.FEN, ...start },
@@ -432,12 +436,15 @@ function analysisHead(analysis: Analysis): string[]
     const book = analysis.bookTo === undefined ? "" : analysis.inBook ? ", in the book to the end" : `, in the book to ${analysis.bookTo}`;
     const badged = analysis.bookTo === undefined || analysis.name === undefined ? "" : ": those moves have the book badge, unless you give another";
     const opening = analysis.opening === undefined ? [] : [`Opening: ${analysis.opening}${book}${badged}`];
+    const carried = analysis.carriedTo === undefined
+        ? []
+        : [`The moves to ${analysis.carriedTo} were played before this game, which went on from another's position: the game's own moves come after.`];
     const name = analysis.name === undefined ? 'Look and position take a move alone, such as move "12..."' : `Look and position take it as game "${analysis.name}"`;
 
     const start = analysis.start === undefined ? [] : [moveLine({ ...analysis.start, move: `Start, ${analysis.start.fen}` })];
     const head = `${players}${when === "" ? "" : ` ${when[0]!.toUpperCase()}${when.slice(1)}.`} Result: ${result}, after ${count} ${count === 1 ? "move" : "moves"}.`;
     const review = analysis.review === undefined ? [] : [`Your review: ${analysis.review}`];
-    return [head, ...opening, ...review, `${name}.`, ...start];
+    return [head, ...opening, ...carried, ...review, `${name}.`, ...start];
 }
 
 /** 12...♞xe5: took P; spent 0:12, 4:32 left; material White +1 in pawns; at risk: undefended Black Nf6; mate in one: Qh7#; tactics: fork Nc7+ (Ke8 Ra8); out of book; you said "…"; your plan: …; ahead -1.5 */

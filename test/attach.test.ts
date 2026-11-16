@@ -23,7 +23,7 @@ import type { TableChats } from "../src/server/page/table.ts";
 import { notedPagePorts, pageAt, pagePorts } from "../src/server/ports/ports.ts";
 import { attachTable, startTable, type Table } from "../src/server/table/index.ts";
 import { version } from "../src/version.ts";
-import { testContext } from "./commands.ts";
+import { playedHere, testContext } from "./commands.ts";
 import { removeFolder } from "./folders.ts";
 import { sent } from "./http.ts";
 import { onFreePorts } from "./ports.ts";
@@ -978,6 +978,7 @@ async function longGameInTurn(home: string, chat: Context, page: Page, url: stri
     const moves = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7";
     saveChatStart(tableFolder(home), { source: "startup", at: "2026-01-01T00:00:00.000Z" });
     startNewGame(newGame.input.parse({ ai_colour: "white", from: moves, replace: true }), { ...homeContext(home), pageOpen: () => true }, "page");
+    playedHere(gameFolder(home));
     const { started } = loadGame(gameFolder(home))!;
     chat.positionFirstSeen = { started: "2026-11-01T10:00:00.000Z", plies: 0 };
     chat.positionSeen = { started, plies: 20 };

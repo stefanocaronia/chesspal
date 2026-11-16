@@ -47,11 +47,16 @@ describe("a game in chat", () => {
     });
 
     it("draws the AI's colour, and goes on from a FEN or a PGN", async () => {
-        expect(await run(playerFolder(0.2), "new_game", { ai_colour: "random" })).toContain("you play White");
+        const drawn = playerFolder(0.2);
+        expect(await run(drawn, "new_game", { ai_colour: "random" })).toContain("you play White");
         expect(await run(playerFolder(0.7), "new_game", { ai_colour: "random" })).toContain("you play Black");
-        expect(await run(playerFolder(), "new_game", { ai_colour: "white", from: "4k3/8/8/8/8/8/4P3/4K3 w - - 0 40" })).toContain(
+        const position = playerFolder();
+        expect(await run(position, "new_game", { ai_colour: "white", from: "4k3/8/8/8/8/8/4P3/4K3 w - - 0 40" })).toContain(
             "You (White) to move, move 40.\nMaterial: White +1 in pawns (White took Q 2R 2B 2N 8P, Black took Q 2R 2B 2N 7P)\nFEN: 4k3/8/8/8/8/8/4P3/4K3 w - - 0 40\nChecks: none for either side\nCaptures: none\n",
         );
+        // Only moves are carried: a game from the start or from a FEN has none.
+        expect(gameFile(drawn).pgn).not.toContain("CarriedPlies");
+        expect(gameFile(position).pgn).not.toContain("CarriedPlies");
 
         const context = playerFolder();
 
@@ -60,7 +65,7 @@ describe("a game in chat", () => {
         expect(await run(context, "new_game", { ai_colour: "black", from: lichess })).toMatch(
             /You \(Black\) to move, move 2\.\nLast move: 2\.♞f3 \(g1-f3\)\.\nOpening: C40 King's Knight Opening\nMaterial: even, nothing taken\nFEN: .*\n(?:.*\n)*Attacked pieces \(attackers \/ defenders\):\nBlack Pe5: Nf3 \/ -\nLegal by piece \(29\): [^\n]*\nNext: /,
         );
-        expect(gameFile(context).pgn).toContain('[White "Player"]\n[Black "AI"]\n[Result "*"]\n[AILevel "strong"]\n\n1. e4 e5 2. Nf3 *');
+        expect(gameFile(context).pgn).toContain('[White "Player"]\n[Black "AI"]\n[Result "*"]\n[AILevel "strong"]\n[CarriedPlies "3"]\n\n1. e4 e5 2. Nf3 *');
     });
 
     it("refuses to go on from a game that is over, from several games, or from an impossible position", async () => {
@@ -470,7 +475,31 @@ describe("a game in chat", () => {
         writeFileSync(join(games, "2026-11-01-100000.pgn"), '[White "Player"]\n[Black "AI"]\n[Result "0-1"]\n\n0-1\n');
         expect(await run(context, "past_games")).toBe("No game played yet.");
         writeFileSync(join(games, "2026-10-31-100000.pgn"), '[White "Player"]\n[Black "AI"]\n[Result "*"]\n\n1. e4 e5 *\n');
-        expect(await run(context, "analyse_game")).toContain('Look and position take it as game "games/2026-10-31-100000.pgn".');
+        const analysis = await run(context, "analyse_game");
+        expect(analysis).toContain('Look and position take it as game "games/2026-10-31-100000.pgn".');
+        expect(analysis).not.toContain("were played before this game");
+    });
+
+    it("keeps no game that went on from another's position closed before a move of its own, and keeps one with a move of its own with the moves it carried", async () => {
+        const context = playerFolder();
+        const games = join(gameFolder(context.home()), "games");
+        const opening = "1. e4 e5 2. Nf3 *";
+        await run(context, "new_game", { ai_colour: "black", from: opening });
+        await run(context, "end_game", { result: "player_resigns" });
+        expect(existsSync(games)).toBe(false);
+        await expect(run(context, "analyse_game")).rejects.toThrow("There is no game to study");
+
+        await run(context, "new_game", { ai_colour: "black", from: opening });
+        expect(await run(context, "new_game", { ai_colour: "black", from: opening, replace: true })).not.toContain("The game before");
+        expect(existsSync(games)).toBe(false);
+
+        await run(context, "ai_move", { move: "Nc6", plan: "p" });
+        await run(context, "end_game", { result: "player_resigns" });
+        const [kept] = readdirSync(games);
+        expect(readFileSync(join(games, kept!), "utf8")).toMatch(/\[CarriedPlies "3"\][^]*1\. e4 e5 2\. Nf3 Nc6/);
+        expect(await run(context, "analyse_game")).toMatch(
+            /\nThe moves to 2\.\S*f3 were played before this game, which went on from another's position: the game's own moves come after\.\n/,
+        );
     });
 
     it("draws a resignation the other side could never mate after (FIDE 5.1.2, D-65)", async () => {

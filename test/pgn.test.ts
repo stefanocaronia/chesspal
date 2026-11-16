@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Game, type GameRecord, readPgn, readPgnTags, readPgnUnplayed, writePgn } from "../src/core/index.ts";
+import { carriedPlies, Game, type GameRecord, readPgn, readPgnTags, readPgnUnplayed, writePgn } from "../src/core/index.ts";
 
 // Morphy against Duke Karl and Count Isouard, Paris 1858.
 const opera = "e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3 Qe7 Nc3 c6 Bg5 b5 Nxb5 cxb5 Bxb5+ Nbd7 O-O-O Rd8 Rxd7 Rxd7 Rd1 Qe6 Bxd7+ Nxd7 Qb8+ Nxb8 Rd8#"
@@ -128,5 +128,28 @@ describe("reading PGN without playing the moves", () => {
 
     it("takes the moves as written, illegal or not, and a FEN it cannot read", () => {
         expect(readPgnUnplayed('[FEN "nonsense"]\n\n1. e5 {A} Ke2 *')).toEqual([{ tags: { FEN: "nonsense", Result: "*" }, moves: [{ san: "e5", comment: "A" }, { san: "Ke2" }] }]);
+    });
+});
+
+describe("the moves a game carried from the game it went on from", () => {
+    const moves = [{ san: "e4" }, { san: "e5" }, { san: "Nf3" }];
+
+    it("are as many as its tag says, never more than its moves", () => {
+        expect(carriedPlies({ tags: { CarriedPlies: "2" }, moves })).toBe(2);
+        expect(carriedPlies({ tags: { CarriedPlies: "0" }, moves })).toBe(0);
+        expect(carriedPlies({ tags: { CarriedPlies: "9" }, moves })).toBe(3);
+    });
+
+    it("are none without the tag, or with one that is not a whole number", () => {
+        expect(carriedPlies({ tags: {}, moves })).toBe(0);
+
+        for (const tag of ["two", "-1", "1.5", "", " 2"]) {
+            expect(carriedPlies({ tags: { CarriedPlies: tag }, moves })).toBe(0);
+        }
+    });
+
+    it("survive the PGN Chesspal writes", () => {
+        const [record] = readPgn(writePgn({ tags: { CarriedPlies: "2" }, moves }));
+        expect(carriedPlies(record!)).toBe(2);
     });
 });

@@ -11,9 +11,9 @@ import { status } from "../src/commands/game/status.ts";
 import type { Context } from "../src/commands/registry/context.ts";
 import { instructions } from "../src/commands/setup/instructions.ts";
 import { Game, readPgn } from "../src/core/index.ts";
-import { loadGame, saveGame } from "../src/games/index.ts";
+import { loadGame, pliesSinceClean, saveGame } from "../src/games/index.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
-import { testContext } from "./commands.ts";
+import { playedHere, testContext } from "./commands.ts";
 
 const folders: string[] = [];
 // Twenty plies: a game long enough to ask for a clean chat before the next (D-57).
@@ -84,6 +84,17 @@ describe("a new game after one played in the chat (D-57)", () => {
         expect(() => newGame.run(newGame.input.parse({ ai_colour: "black" }), idle)).not.toThrow();
     });
 
+    it("does not count the moves a game carried from another's position, which the chat never held", async () => {
+        const carried = chatWith(longGame, "claude-code", false);
+        await chatStarted(carried, "startup", before);
+        expect(() => startAgain(carried)).not.toThrow();
+
+        const started = "2026-11-02T14:30:12.000Z";
+        expect(pliesSinceClean(undefined, started, 26, 20)).toBe(6);
+        expect(pliesSinceClean({ source: "resume", at: after.toISOString() }, started, 26, 20)).toBe(6);
+        expect(pliesSinceClean({ source: "clear", at: after.toISOString(), game: { started, plies: 22 } }, started, 26, 20)).toBe(4);
+    });
+
     it("waits for the chat to be cleared even when another profile starts the next game (D-66)", async () => {
         const context = chatWith(longGame);
         await chatStarted(context, "startup", before);
@@ -128,6 +139,9 @@ describe("a new game chosen on the board page", () => {
         expect(asked).toBe(0);
         // Without the page the player is asked in the chat, as before.
         expect(() => newGame.run({ replace: false }, chatWith(startingPosition))).toThrow(/There is no board page here/);
+        // A game that went on from another's position has just begun too until a move of its own.
+        const carried: Context = { ...chatWith(longGame, "claude-code", false), page: "http://127.0.0.1:5876", positionSeen: null, askNewGame: () => true };
+        expect(() => newGame.run({ replace: false }, carried)).toThrow(/A new game has just begun on the board page/);
     });
 
     it("refuses to open the window in a chat still holding the game before (D-57)", async () => {
@@ -192,13 +206,18 @@ describe("the opponent's instructions (D-102)", () => {
     });
 });
 
-/** A player's folder with a game played in a chat of the host named. */
-function chatWith(pgn: string, host = "claude-code"): Context
+/** A player's folder with a game played in a chat of the host named: its moves its own, or carried from the game it went on from. */
+function chatWith(pgn: string, host = "claude-code", own = true): Context
 {
     const folder = mkdtempSync(join(tmpdir(), "chesspal-"));
     folders.push(folder);
     const context: Context = { ...testContext(folder, 0, new Date(2026, 10, 2, 15, 30, 12)), host: () => host };
     newGame.run(newGame.input.parse({ ai_colour: "black", from: pgn }), context);
+
+    if (own) {
+        playedHere(gameFolder(context.home()));
+    }
+
     // The chat was shown the game, as the MCP server notes it (D-71).
     context.positionSeen = positionIn(gameFolder(context.home()));
     return context;

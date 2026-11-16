@@ -52,13 +52,13 @@ export function cleanSince(start: ChatStart | undefined, moment: string): boolea
 }
 
 /**
- * How many plies of a game the chat holds: all of them, but in a chat started clean since the game began, those played after its start; none when the hook
- * could not tell how many the game had then.
+ * How many plies of a game the chat holds: all of its own, not those carried from the game it went on from; in a chat started clean since the game began,
+ * those played after its start; none when the hook could not tell how many the game had then.
  */
-export function pliesSinceClean(start: ChatStart | undefined, started: string, plies: number): number
+export function pliesSinceClean(start: ChatStart | undefined, started: string, plies: number, carried = 0): number
 {
     if (!cleanSince(start, started)) {
-        return plies;
+        return plies - carried;
     }
 
     return start?.game?.started === started ? Math.max(0, plies - start.game.plies) : 0;

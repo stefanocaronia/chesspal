@@ -1,7 +1,7 @@
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { type AiLevel, aiLevels, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../../core/index.ts";
+import { type AiLevel, aiLevels, carriedPlies, carriedTag, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../../core/index.ts";
 import { archivedName, archiveGame, archiveName, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, pliesSinceClean, saveGame, startOfNewGame, withoutPlans } from "../../games/index.ts";
 import { hasDoorbell, hookedHosts } from "../../host-files/index.ts";
 import { gameFolder, gameFolders } from "../../profiles/index.ts";
@@ -183,11 +183,11 @@ function askedOnPage(context: Context): Asked
     );
 }
 
-/** Whether a game is going on with no move played yet. */
+/** Whether a game is going on with no move of its own played yet. */
 function justBegun(context: Context): boolean
 {
     const current = gameAt(gameFolder(context.home()), context.now());
-    return current !== undefined && endOf(current.game) === undefined && current.game.record.moves.length === 0;
+    return current !== undefined && endOf(current.game) === undefined && current.game.record.moves.length === carriedPlies(current.game.record);
 }
 
 function askedLine({ window, page }: Asked, doorbell: boolean): string
@@ -240,7 +240,7 @@ function chatToClear(context: Context): boolean
     }
 
     const last = gameFolders(context.home()).flatMap((folder) => loadGame(folder) ?? []).sort((one, other) => Date.parse(other.started) - Date.parse(one.started))[0];
-    return last !== undefined && last.started === context.positionSeen?.started && pliesSinceClean(start, last.started, last.game.record.moves.length) >= pliesBeforeClearing;
+    return last !== undefined && last.started === context.positionSeen?.started && pliesSinceClean(start, last.started, last.game.record.moves.length, carriedPlies(last.game.record)) >= pliesBeforeClearing;
 }
 
 /**
@@ -281,7 +281,7 @@ function archiveBefore(folder: string, before: CurrentGame): string | undefined
 
 /**
  * The new game: the standard position, or the one a FEN or PGN gives, which must still be going on. Its tags are Chesspal's, the AI's level among them:
- * an imported game gives its position only.
+ * an imported game gives its position and moves only, with how many of them it carries.
  */
 function startingGame(from: string | undefined, { ai, level }: { ai: Side; level: AiLevel; }, started: Date, control: TimeControl | undefined): Game
 {
@@ -298,7 +298,8 @@ function startingGame(from: string | undefined, { ai, level }: { ai: Side; level
     try {
         const record = from === undefined ? { tags: {}, moves: [] } : importedRecord(from.trim());
         const fen: Record<string, string> = record.tags.FEN === undefined ? {} : { SetUp: "1", FEN: record.tags.FEN };
-        game = new Game({ tags: { ...tags, ...fen }, moves: record.moves });
+        const carried: Record<string, string> = record.moves.length === 0 ? {} : { [carriedTag]: String(record.moves.length) };
+        game = new Game({ tags: { ...tags, ...fen, ...carried }, moves: record.moves });
     } catch (error) {
         throw new Error(`from: ${(error as Error).message} Nothing changed.`);
     }

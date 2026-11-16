@@ -17,7 +17,7 @@ import { chatHasRead, type Page, startPage } from "../src/server/page/page.ts";
 import { profilesShown } from "../src/server/page/profiles.ts";
 import { notedPagePorts, pageAt, pagePorts } from "../src/server/ports/ports.ts";
 import { version } from "../src/version.ts";
-import { testContext } from "./commands.ts";
+import { playedHere, testContext } from "./commands.ts";
 
 const opened: Page[] = [];
 const folders: string[] = [];
@@ -461,11 +461,13 @@ describe("the page's server", () => {
 
         for (const from of ["1. e4 c5 2. Nf3 d6 *", '[SetUp "1"]\n[FEN "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"]\n\n1. e3 Kd7 *', "1. d4 d5 2. c4 *"]) {
             await run(folder, "new_game", { ai_colour: "black", from, replace: true });
+            playedHere(gameFolder(home));
             await run(folder, "end_game", { result: "player_resigns" });
         }
 
         // One left unfinished, one reviewed, one with a review begun, and a game brought to study, which carries no tags of the archive.
         await run(folder, "new_game", { ai_colour: "white", from: "1. e4 e5 2. Nf3 *", replace: true });
+        playedHere(gameFolder(home));
         await run(folder, "new_game", { ai_colour: "black", replace: true });
         await run(folder, "player_move", { move: "e4" });
         await run(folder, "end_game", { result: "player_resigns" });
@@ -672,6 +674,19 @@ describe("the player's moves on the page", () => {
         expect(await post(page, "/api/new", { ai_colour: "white", from: "not a position" })).toMatchObject({ status: 409, body: expect.stringContaining("from:") });
         expect(await post(page, "/api/new", { ai_colour: "white", from: 42 })).toMatchObject({ status: 400, body: expect.stringContaining("no from for the standard position") });
         expect(JSON.parse((await get(page, "/api/game")).body).game.pgn).toContain(after);
+    });
+
+    it("replays a position of the game in analysis with the moves that led to it, which the new game carries", async () => {
+        const folder = playerFolder();
+        const page = await open(folder);
+
+        await run(folder, "analyse_game", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0' });
+        expect(await post(page, "/api/new", { ai_colour: "white", from: "1. e4 e5 2. Qh5 Nc6 *" })).toMatchObject({ status: 200, body: '{"started":true}' });
+        const { pgn } = JSON.parse((await get(page, "/api/game")).body).game;
+        expect(pgn).toContain('[CarriedPlies "4"]');
+        expect(pgn).toContain("1. e4 e5 2. Qh5 Nc6 *");
+        expect(pgn).not.toContain("[FEN");
+        expect(pgn).not.toContain("Ann");
     });
 
     it("offers a draw on the player's turn, answers the AI's, and resigns, ringing the chat (D-65)", async () => {

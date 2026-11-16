@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import { z } from "zod";
 import { type Context, withProfile } from "../src/commands/registry/context.ts";
 import { defineCommand } from "../src/commands/registry/registry.ts";
+import { carriedTag, Game } from "../src/core/index.ts";
+import { loadGame, saveGame } from "../src/games/index.ts";
 
 /**
  * A context for the tests: a folder, which is the data folder too, its first profile made by Chesspal for the account "Player" as it needs it, a fixed
@@ -11,6 +13,14 @@ import { defineCommand } from "../src/commands/registry/registry.ts";
 export function testContext(folder = "/the/player", random = 0, now = new Date(2026, 10, 2, 15, 30, 12), platform = "linux"): Context
 {
     return { folder, home: () => withProfile(temporary(folder), "Player"), random: () => random, now: () => now, platform, given: new Set() };
+}
+
+/** The game going on in a game folder as if its moves were its own, played there: a test that sets it up with new_game's from, which carries them. */
+export function playedHere(folder: string): void
+{
+    const current = loadGame(folder)!;
+    const { [carriedTag]: carried, ...tags } = current.game.record.tags;
+    saveGame(folder, { ...current, game: new Game({ ...current.game.record, tags }) });
 }
 
 // A test writes its data only in a temporary folder of its own, never on the disk at large.

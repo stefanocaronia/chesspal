@@ -21,6 +21,21 @@ export interface GameRecord
     readonly moves: readonly RecordedMove[];
 }
 
+/** The tag of a game that went on from another's position: how many of its first plies were played before it began. */
+export const carriedTag = "CarriedPlies";
+
+/** How many of the game's first plies were played before it began, in the game it went on from: none without the tag, never more than its moves. */
+export function carriedPlies(record: GameRecord): number
+{
+    const tag = record.tags[carriedTag];
+
+    if (tag === undefined || !/^\d+$/.test(tag)) {
+        return 0;
+    }
+
+    return Math.min(Number(tag), record.moves.length);
+}
+
 /** The game with its tags and moves alone, without comments, plans or judgments: for Lichess or chess.com to load. */
 export function movesOnly(record: GameRecord): GameRecord
 {

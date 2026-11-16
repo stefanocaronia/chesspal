@@ -8,7 +8,7 @@ import { pastGames } from "../src/commands/profiles/past-games.ts";
 import type { Context } from "../src/commands/registry/context.ts";
 import { archivedGame, GameMissing } from "../src/games/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
-import { testContext } from "./commands.ts";
+import { playedHere, testContext } from "./commands.ts";
 
 const folders: string[] = [];
 
@@ -22,6 +22,7 @@ describe("the games played (D-57)", async () => {
     it("are recalled by new_game, the latest first, and listed or read whole by past_games", async () => {
         const context = playerFolder();
         expect(newGame.format(await newGame.run(newGame.input.parse({ ai_colour: "black", from: "1. e4 c5 2. Nf3 d6 *" }), context))).not.toContain("Last games");
+        playedHere(gameFolder(context.home()));
         await endGame.run(endGame.input.parse({ result: "player_resigns" }), context);
 
         const started = newGame.format(await newGame.run(newGame.input.parse({ ai_colour: "white" }), { ...context, now: () => new Date(2026, 10, 2, 16, 0, 0) }));
@@ -106,13 +107,17 @@ async function playedGames(): Promise<Context>
     const context = playerFolder();
     const at = (hour: number): Context => ({ ...context, now: () => new Date(2026, 10, 2, hour, hour === 15 ? 30 : 0, hour === 15 ? 12 : 0) });
     await newGame.run(newGame.input.parse({ ai_colour: "black", from: "1. e4 c5 2. Nf3 d6 *" }), at(15));
+    playedHere(gameFolder(context.home()));
     await endGame.run(endGame.input.parse({ result: "player_resigns" }), at(15));
     await newGame.run(newGame.input.parse({ ai_colour: "white", from: "1. d4 d5 2. c4 *" }), at(16));
+    playedHere(gameFolder(context.home()));
     await endGame.run(endGame.input.parse({ result: "ai_resigns" }), at(16));
     const fromElsewhere = '[ECO "A00"]\n[Opening "Polish Opening"]\n[SetUp "1"]\n[FEN "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"]\n\n1. e3 Kd7 *';
     await newGame.run(newGame.input.parse({ ai_colour: "black", from: fromElsewhere }), at(17));
+    playedHere(gameFolder(context.home()));
     await endGame.run(endGame.input.parse({ result: "player_resigns" }), at(17));
     await newGame.run(newGame.input.parse({ ai_colour: "black", from: "1. e4 e5 2. Nf3 Nc6 3. Bb5 *" }), at(18));
+    playedHere(gameFolder(context.home()));
     await newGame.run(newGame.input.parse({ ai_colour: "white", replace: true }), at(19));
     return context;
 }

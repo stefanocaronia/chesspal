@@ -227,7 +227,7 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
  */
 async function newGameFromPage(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
-    const asked = 'Send the new game as JSON: {"ai_colour": "black", "level": "club", "clock": "10+5", "from": "<FEN>"}, each one optional; no clock for a game without one, no from for the standard position.';
+    const asked = 'Send the new game as JSON: {"ai_colour": "black", "level": "club", "clock": "10+5", "from": "<FEN or PGN>"}, each one optional; no clock for a game without one, no from for the standard position.';
     const body = isJson(request) ? jsonOf(await bodyOf(request)) : undefined;
     let relaunching = false;
     let chosen: NewGameChoices | undefined;

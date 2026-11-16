@@ -42,6 +42,7 @@ import { BadgeCounts } from "../game/badges.tsx";
 import { type Step, stepped } from "../game/browse.ts";
 import { GameColumn } from "../game/column.tsx";
 import { howEnded, useDeclined, useJustEnded, useSawEnd } from "../game/ending.ts";
+import { goOnFrom } from "../game/go-on.ts";
 import { type LineView, Steps, stepsLine } from "../game/move-list.tsx";
 import { useOpeningBook } from "../game/opening-book.ts";
 import {
@@ -737,7 +738,7 @@ export function App({ start }: { start: Settings; })
             ai_colour: colour === "random" ? "random" : colour === "white" ? "black" : "white",
             level: chosen,
             ...(control === undefined ? {} : { clock: control }),
-            ...(replayFrom === undefined ? {} : { from: replayFrom.fen }),
+            ...(replayFrom === undefined ? {} : { from: replayFrom.from }),
         });
     };
 
@@ -745,7 +746,7 @@ export function App({ start }: { start: Settings; })
     const shownAfter = onTheLine ? lineNumbered?.[line.cursor - 1] : at === 0 ? undefined : plies[at - 1];
     const replay = !analysing ? undefined : {
         off: shown.outcome.over,
-        onReplay: () => openNewGame({ fen: shown.position.fen, turn: shown.position.turn, ...(shownAfter === undefined ? {} : { after: shownAfter }) }),
+        onReplay: () => openNewGame({ from: goOnFrom(shown), turn: shown.position.turn, ...(shownAfter === undefined ? {} : { after: shownAfter }) }),
     };
 
     // In analysis a badge's count shows the side's next move with it, the first again after the last (Stefano).

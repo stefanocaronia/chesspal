@@ -1,7 +1,7 @@
 // The finished games, as PGN in games/ (D-9, D-41), with the AI's plans for the analyst (D-21); and the games played elsewhere, kept to study in study/ (D-68).
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { type GameRecord, type Mood, movesOnly, pgnDate, readPgn, readPgnTags, readPgnUnplayed, recordWithMood, unsigned, withAiHost, withAiModel, writePgn } from "../core/index.ts";
+import { carriedPlies, type GameRecord, type Mood, movesOnly, pgnDate, readPgn, readPgnTags, readPgnUnplayed, recordWithMood, unsigned, withAiHost, withAiModel, writePgn } from "../core/index.ts";
 import { aiHostOf, aiModelOf } from "./ai-model.ts";
 import { coachWords, withCoach } from "./coach.ts";
 import { type CurrentGame, endOf, loadGame } from "./current-game.ts";
@@ -43,11 +43,11 @@ export function startOfNewGame(folder: string, now: Date, before?: CurrentGame):
 
 /**
  * Writes the game to the archive, with the plans, how it ended, the AI's model and host last noted (D-82, D-97) and the opening's tags, and gives its name;
- * the same game again rewrites the same file. A game closed before any move is not kept, as Lichess aborts it: none.
+ * the same game again rewrites the same file. A game closed before any move of its own is not kept, as Lichess aborts it: none.
  */
 export function archiveGame(folder: string, current: CurrentGame, opening: OpeningTags): string | undefined
 {
-    if (current.game.record.moves.length === 0) {
+    if (current.game.record.moves.length === carriedPlies(current.game.record)) {
         return undefined;
     }
 
