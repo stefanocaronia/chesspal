@@ -65,7 +65,7 @@ describe("the coach, with the helps on (D-80, D-88)", () => {
 
         const start = await run(context, "coach");
         const game = keyOf(start);
-        expect(start).toMatch(/^Game "\w+", position 18: the player \(White\) to move, move 10; the opponent plays Black at the strong level\.\nThe player speaks Italian\.\n/);
+        expect(start).toMatch(/^Game "\w+", position 18: the player \(White\) to move, move 10; the opponent plays Black at the strong level\.\nThe player speaks Italian: write to them in Italian\.\n/);
         expect(start).toMatch(/\nMoves: 1\.e4 e5 2\.Nf3 .* 9\.d5 Bf6\nOpening: C5\d /);
         expect(start).toContain("\nTheir move to judge: 9.d5. The position they played it in:\nFEN: ");
         expect(start).toContain("\nMaterial: Black +4 in pawns (White took P, Black took N 2P)\n");

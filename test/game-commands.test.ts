@@ -163,7 +163,7 @@ describe("a game in chat", () => {
 
     it("gives the AI the player's language once a chat, and each move with the pieces' figurines alone, in every language (D-86, D-87)", async () => {
         const context = { ...playerFolder(), language: "it-IT" };
-        const speech = "\nThe player speaks Italian.\n";
+        const speech = "\nThe player speaks Italian: write to them in Italian.\n";
         expect(await run(context, "new_game", { ai_colour: "black" })).toContain(speech);
         expect(await run(context, "status")).toContain(speech);
         expect(await run(context, "player_move", { move: "Cf3" })).toMatch(/^Player: 1\.♞f3 \(g1-f3\)\.\n/);
@@ -172,7 +172,7 @@ describe("a game in chat", () => {
         expect(await run(context, "ai_move", { move: "Nf6", plan: "p" })).toMatch(/^Played 2\.\.\.♞f6\.\n/);
 
         writeFileSync(join(gameFolder(context.home()), "settings.json"), JSON.stringify({ language: "it" }));
-        expect(await run({ ...playerFolder(), language: "fr-FR" }, "status")).toMatch(/\nThe player speaks French\.\n/);
+        expect(await run({ ...playerFolder(), language: "fr-FR" }, "status")).toMatch(/\nThe player speaks French: write to them in French\.\n/);
         expect(await run({ ...playerFolder(), language: "en-GB" }, "status")).not.toContain("The player speaks");
         expect(await run(context, "player_move", { move: "Bf4" })).toMatch(/^Player: 3\.♝f4 \(c1-f4\)\.\n/);
         expect(await run(context, "ai_move", { move: "Bf5", plan: "p" })).toMatch(/^Played 3\.\.\.♝f5\.\n/);

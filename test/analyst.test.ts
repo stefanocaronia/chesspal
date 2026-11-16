@@ -39,7 +39,7 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         // The chat goes over its review then, and doesn't start it for that review (Stefano, after Priya's playtest).
         // The game's name given as pgn, as haiku gives it, is that game (Priya).
         const analyst = { ...context, agent: "chesspal-analyst", agentRun: "agent-a" };
-        expect(await run(analyst, "analyse_game", { pgn: "games/2026-11-02-153012.pgn" })).toMatch(/^The player speaks Italian\.\nYou played Black/);
+        expect(await run(analyst, "analyse_game", { pgn: "games/2026-11-02-153012.pgn" })).toMatch(/^The player speaks Italian: write to them in Italian\.\nYou played Black/);
         const reviewed = "The analyst agent has gone over this game, or is at it: don't start it for this review. When the player wants it gone over, go over it with them from what "
             + 'it told you, or, in a chat without it, from its review on the board page, which analyse_game {"game": "games/2026-11-02-153012.pgn"} gives.';
         const status = await run(context, "status");
@@ -201,7 +201,7 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         const analyst = { ...context, agent: "chesspal-analyst" };
 
         const analysis = await run(analyst, "analyse_game");
-        expect(analysis).toMatch(/^The player speaks Italian\.\nYou played Black at the /);
+        expect(analysis).toMatch(/^The player speaks Italian: write to them in Italian\.\nYou played Black at the /);
         expect(await run(analyst, "look")).not.toContain("Bella partita");
         expect(await run(analyst, "look", { move: "2..." })).not.toContain("Bella partita");
         // The game in analysis follows the board page: the agent names its game (Federico).
@@ -217,7 +217,7 @@ describe("the analyst agent, on the player's yes (D-89)", () => {
         await mate(context);
         await run(context, "ai_move", { move: "Qh4", plan: "Mate." });
 
-        expect(await run({ ...context, agent: "chesspal-analyst" }, "analyse_game")).toMatch(/^The player speaks Italian\.\nPlayer: Anna, plays often\.\nYou played Black /);
+        expect(await run({ ...context, agent: "chesspal-analyst" }, "analyse_game")).toMatch(/^The player speaks Italian: write to them in Italian\.\nPlayer: Anna, plays often\.\nYou played Black /);
         // The chat reads it in status.
         expect(await run(context, "analyse_game")).not.toContain("Player: Anna");
     });

@@ -9,11 +9,13 @@ import { recordChatStart } from "../src/cli/chat-hook.ts";
 import { aiNameOf } from "../src/core/index.ts";
 import { lastChatStart } from "../src/games/index.ts";
 import { hasDoorbell } from "../src/host-files/index.ts";
+import { activeProfile, saveProfileSettings } from "../src/profiles/index.ts";
 import { watchNewTurn } from "../src/server/bell/antigravity.ts";
-import { antigravityBellAnswer, bellLine, codexBellAnswer, hookAnswer } from "../src/server/bell/bell.ts";
+import { antigravityBellAnswer, bellLine, bellLineIn, codexBellAnswer, hookAnswer } from "../src/server/bell/bell.ts";
 import { callerOf } from "../src/server/mcp/caller.ts";
 import { pagePorts } from "../src/server/ports/index.ts";
 import { version } from "../src/version.ts";
+import { testContext } from "./commands.ts";
 import { removeFolder } from "./folders.ts";
 
 const folders: string[] = [];
@@ -44,6 +46,18 @@ describe("Antigravity, the third host (D-115)", () => {
         expect(hookAnswer("codex", false)).toBeUndefined();
         expect(hookAnswer("claude", true)).toBe(bellLine);
         expect(hookAnswer("claude", false)).toBeUndefined();
+    });
+
+    it("names the player's language in the line it wakes the chat with, when it is not English", () => {
+        const line = bellLineIn("Italian");
+        expect(hookAnswer("antigravity", true, "Italian")).toBe(JSON.stringify({ decision: "continue", reason: line }));
+        expect(hookAnswer("antigravity", false, "Italian")).toBe("{}");
+        expect(hookAnswer("codex", true, "Italian")).toBe(JSON.stringify({ decision: "block", reason: line }));
+        expect(hookAnswer("codex", false, "Italian")).toBeUndefined();
+        expect(hookAnswer("claude", true, "Italian")).toBe(line);
+        // With no language, the answers are the fixed ones.
+        expect(hookAnswer("antigravity", true, undefined)).toBe(antigravityBellAnswer);
+        expect(hookAnswer("codex", true, undefined)).toBe(codexBellAnswer);
     });
 
     it("sees the player start a new turn in the conversation its hook holds: a message or a command typed, or Esc in its log", async () => {
@@ -170,15 +184,26 @@ async function fakePage(folder: string): Promise<{ waiting: () => Promise<void>;
     };
 }
 
-/** `chesspal listen --antigravity` as Antigravity's Stop hook runs it, with the user's home given: what it answered, and its exit code. */
+/**
+ * `chesspal listen --antigravity` as Antigravity's Stop hook runs it, with the user's home given and a data folder in it whose player speaks English:
+ * what it answered, and its exit code.
+ */
 function listening(input: object, home: string): Promise<{ code: number | null; stdout: string; }>
 {
     const cli = join(import.meta.dirname, "..", "src", "cli", "cli.ts");
-    const child = spawn(process.execPath, ["--experimental-strip-types", "--no-warnings", cli, "listen", "--antigravity"], { env: { ...process.env, HOME: home, USERPROFILE: home } });
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--no-warnings", cli, "listen", "--antigravity"], { env: { ...process.env, HOME: home, USERPROFILE: home, CHESSPAL_HOME: englishData(home) } });
     let stdout = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += String(chunk)));
     child.stdin.end(JSON.stringify(input));
     return new Promise((done) => child.on("exit", (code) => done({ code, stdout })));
+}
+
+/** A data folder in the user's home whose profile in use speaks English on the page, whatever the system's language. */
+function englishData(home: string): string
+{
+    const data = testContext(join(home, "Chesspal")).home();
+    saveProfileSettings(data, activeProfile(data).id, { language: "en" });
+    return data;
 }
 
 /** Whether the promise settles within a few of the watch's turns. */

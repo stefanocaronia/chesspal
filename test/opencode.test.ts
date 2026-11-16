@@ -13,7 +13,7 @@ import { hasDoorbell } from "../src/host-files/index.ts";
 import { settingsFrom } from "../src/page/profile/settings.ts";
 import { chatAction, chosen, effortsOf, type HostChoices } from "../src/page/table/action.ts";
 import { activeProfile, saveProfileSettings } from "../src/profiles/index.ts";
-import { bellLine, hookAnswer } from "../src/server/bell/bell.ts";
+import { bellLine, bellLineIn, hookAnswer } from "../src/server/bell/bell.ts";
 import { callerOf } from "../src/server/mcp/caller.ts";
 import { pagePorts } from "../src/server/ports/index.ts";
 import { terminalChats } from "../src/server/table/hosts/chats.ts";
@@ -250,11 +250,27 @@ describe("OpenCode, the fourth host (D-117)", () => {
         const folder = temporary();
         const page = await fakePage(folder);
         const input = { cwd: folder, session_id: "ses_1", hook_event_name: "Stop" };
+        const home = speakingHome("en");
 
         page.answer("ring");
-        expect(await listening(input)).toEqual({ code: 0, stdout: `${bellLine}\n` });
+        expect(await listening(input, home)).toEqual({ code: 0, stdout: `${bellLine}\n` });
         page.answer("dismissed");
-        expect(await listening(input)).toEqual({ code: 0, stdout: "" });
+        expect(await listening(input, home)).toEqual({ code: 0, stdout: "" });
+    }, 30_000);
+
+    it("names the player's language in the doorbell's line when it is not English", async () => {
+        expect(bellLineIn(undefined)).toBe(bellLine);
+        expect(bellLineIn("Italian")).toBe(`${bellLine} Write to the player in Italian.`);
+        expect(hookAnswer("opencode", true, "Italian")).toBe(bellLineIn("Italian"));
+        expect(hookAnswer("claude", true, "Italian")).toBe(bellLineIn("Italian"));
+        expect(hookAnswer("opencode", false, "Italian")).toBeUndefined();
+
+        const folder = temporary();
+        const page = await fakePage(folder);
+        page.answer("ring");
+        const heard = await listening({ cwd: folder, session_id: "ses_1", hook_event_name: "Stop" }, speakingHome("it"));
+
+        expect(heard).toEqual({ code: 0, stdout: `${bellLine} Write to the player in Italian.\n` });
     }, 30_000);
 
     it("stops waiting once the OpenCode that started it is gone, as when its terminal closes, saying nothing", async () => {
@@ -570,10 +586,12 @@ async function fakePage(folder: string): Promise<{ answer(said: string): void; }
 }
 
 /** `chesspal listen --opencode` as the plugin runs it: what it wrote on stdout, and its exit code. */
-function listening(input: object): Promise<{ code: number | null; stdout: string; }>
+/** Runs the hook as OpenCode's plugin does, with `home` as its data folder when given. */
+function listening(input: object, home?: string): Promise<{ code: number | null; stdout: string; }>
 {
     const cli = join(import.meta.dirname, "..", "src", "cli", "cli.ts");
-    const child = spawn(process.execPath, ["--experimental-strip-types", "--no-warnings", cli, "listen", "--opencode"]);
+    const env = home === undefined ? process.env : { ...process.env, CHESSPAL_HOME: home };
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--no-warnings", cli, "listen", "--opencode"], { env });
     let stdout = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += String(chunk)));
     child.stdin.end(JSON.stringify(input));
@@ -588,6 +606,14 @@ function openCode<Host extends { name: string; }>(hosts: readonly Host[]): Host
 function settled(): Promise<void>
 {
     return new Promise((done) => setTimeout(done, 10));
+}
+
+/** A data folder whose profile in use speaks `language` on the page, whatever the system's language. */
+function speakingHome(language: string): string
+{
+    const home = homeContext().home();
+    saveProfileSettings(home, activeProfile(home).id, { language });
+    return home;
 }
 
 function homeContext(platform: string = process.platform): Context & { now: () => Date; }

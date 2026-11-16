@@ -14,10 +14,10 @@ export function speechOf(folder: string, systemLanguage: string | undefined): Sp
     return language === undefined ? undefined : { language };
 }
 
-/** What the AI is told of the player's speech once a chat (Priya); the moves are SAN in every language (D-87). */
+/** What the AI is told of the player's speech once a chat, and to write to them in it (Priya); the moves are SAN in every language (D-87). */
 export function speechLine({ language }: Speech): string
 {
-    return `The player speaks ${language}.`;
+    return `The player speaks ${language}: write to them in ${language}.`;
 }
 
 /** A language by its English name when it is not English (Italian), from the way the system or the page names it (it-IT, it). */

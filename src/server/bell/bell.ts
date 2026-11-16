@@ -1,5 +1,6 @@
 // The doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes for Claude Code, Codex and Antigravity, which OpenCode's plugin runs too,
 // waits at the page of its chat and, when the player moves or writes there, tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
+// It names the player's language when it is not English: the line is the last a chat reads before it answers.
 import { closeSync, fstatSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, join, resolve } from "node:path";
@@ -293,6 +294,12 @@ export function forgetPagePort(home: string, folder: string, port: number): void
     }
 }
 
+/** The doorbell's line, telling the chat to write to the player in their language when it is not English. */
+export function bellLineIn(language: string | undefined): string
+{
+    return language === undefined ? bellLine : `${bellLine} Write to the player in ${language}.`;
+}
+
 /** What Codex's Stop hook answers to wake the chat: its turn goes on with the doorbell's line. */
 export const codexBellAnswer = JSON.stringify({ decision: "block", reason: bellLine });
 
@@ -335,8 +342,8 @@ export async function listen(host: ListeningHost = "claude"): Promise<void>
     opener?.stop();
     noteBell(heard.folder, `${who} ${heard.rang ? "rang" : heard.why}`);
 
-    // It ends as soon as it knows: the chat hears the hook only once it ends.
-    const answer = hookAnswer(host, heard.rang);
+    // It ends as soon as it knows: the chat hears the hook only once it ends. The player's language is read only when it rang.
+    const answer = hookAnswer(host, heard.rang, heard.rang ? await playerLanguage() : undefined);
 
     if (answer === undefined) {
         process.exit(0);
@@ -347,18 +354,23 @@ export async function listen(host: ListeningHost = "claude"): Promise<void>
     }
 }
 
-/** What the hook says as it ends, by its host: the doorbell's line or answer when it rang; else nothing, but for Antigravity, which reads an answer. */
-export function hookAnswer(host: ListeningHost, rang: boolean): string | undefined
+/**
+ * What the hook says as it ends, by its host: the doorbell's line or answer when it rang, naming the player's `language` when given; else nothing, but
+ * for Antigravity, which reads an answer.
+ */
+export function hookAnswer(host: ListeningHost, rang: boolean, language?: string): string | undefined
 {
+    const line = bellLineIn(language);
+
     if (host === "antigravity") {
-        return rang ? antigravityBellAnswer : "{}";
+        return rang ? JSON.stringify({ decision: "continue", reason: line }) : "{}";
     }
 
     if (!rang) {
         return undefined;
     }
 
-    return host === "codex" ? codexBellAnswer : bellLine;
+    return host === "codex" ? JSON.stringify({ decision: "block", reason: line }) : line;
 }
 
 /**
@@ -465,6 +477,19 @@ function hookInput(input: string): { session?: string; cwd?: string; analystGone
         };
     } catch {
         return {};
+    }
+}
+
+/** The player's language as status tells it, undefined in English; loaded only once the bell rang, and never a reason for the doorbell to fail. */
+async function playerLanguage(): Promise<string | undefined>
+{
+    try {
+        const { defaultContext, speechOf } = await import("../../commands/index.ts");
+        const { gameFolder } = await import("../../profiles/index.ts");
+        const context = defaultContext();
+        return speechOf(gameFolder(context.home()), context.language)?.language;
+    } catch {
+        return undefined;
     }
 }
 
