@@ -327,8 +327,12 @@ export async function listen(host: ListeningHost = "claude"): Promise<void>
     const turn = conversation === undefined ? undefined : watchNewTurn(conversation);
     const waited = bellHeard(input).catch((error: unknown): BellHeard => ({ folder, rang: false, why: `failed: ${(error as Error).message}` }));
     const newTurn = turn?.started.then((): BellHeard => ({ folder, rang: false, why: "the player started a new turn" }));
-    const heard = await (newTurn === undefined ? waited : Promise.race([waited, newTurn]));
+    // OpenCode's plugin names its process: on macOS and Linux the hook runs in a process group of its own, which a closed terminal does not end.
+    const opener = hook.hostPid === undefined ? undefined : watchProcessEnd(hook.hostPid);
+    const hostGone = opener?.ended.then((): BellHeard => ({ folder, rang: false, why: `its host, pid ${hook.hostPid}, is gone` }));
+    const heard = await Promise.race([waited, ...(newTurn === undefined ? [] : [newTurn]), ...(hostGone === undefined ? [] : [hostGone])]);
     turn?.stop();
+    opener?.stop();
     noteBell(heard.folder, `${who} ${heard.rang ? "rang" : heard.why}`);
 
     // It ends as soon as it knows: the chat hears the hook only once it ends.
@@ -448,18 +452,44 @@ export function noteBell(folder: string, line: string, now = new Date()): void
 }
 
 /** What the hook reads of its host's input: the chat's session, Antigravity's conversation, its folder, and whether its analyst has gone. */
-function hookInput(input: string): { session?: string; cwd?: string; analystGone?: true; }
+function hookInput(input: string): { session?: string; cwd?: string; analystGone?: true; hostPid?: number; }
 {
     try {
-        const parsed = JSON.parse(input) as { session_id?: unknown; conversationId?: unknown; cwd?: unknown; background_tasks?: unknown; };
+        const parsed = JSON.parse(input) as { session_id?: unknown; conversationId?: unknown; cwd?: unknown; background_tasks?: unknown; host_pid?: unknown; };
         const session = typeof parsed.session_id === "string" ? parsed.session_id : parsed.conversationId;
         return {
             ...(typeof session === "string" ? { session } : {}),
             ...(typeof parsed.cwd === "string" ? { cwd: parsed.cwd } : {}),
+            ...(Number.isInteger(parsed.host_pid) && (parsed.host_pid as number) > 0 ? { hostPid: parsed.host_pid as number } : {}),
             ...(analystGone(parsed.background_tasks) ? { analystGone: true } : {}),
         };
     } catch {
         return {};
+    }
+}
+
+/** Looks every `every` ms whether the process `pid` still runs: `ended` once it does not. */
+function watchProcessEnd(pid: number, every = 2000): { ended: Promise<void>; stop: () => void; }
+{
+    let timer: NodeJS.Timeout | undefined;
+    const ended = new Promise<void>((done) => {
+        timer = setInterval(() => {
+            if (!processRuns(pid)) {
+                done();
+            }
+        }, every);
+    });
+    return { ended, stop: () => clearInterval(timer) };
+}
+
+// A process another user runs answers EPERM: it runs.
+function processRuns(pid: number): boolean
+{
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error) {
+        return (error as NodeJS.ErrnoException).code === "EPERM";
     }
 }
 

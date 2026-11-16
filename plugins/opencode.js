@@ -79,7 +79,7 @@ function chesspalChats(context, run)
     // A chat's doorbell, which the player's move on the page rings: its line is sent to the chat, which starts a turn.
     const listen = (session) => {
         letGo(session);
-        const child = hook("listen --opencode", { cwd: folder, session_id: session, hook_event_name: "Stop" }, (code, output) => {
+        const child = hook("listen --opencode", { cwd: folder, session_id: session, hook_event_name: "Stop", host_pid: process.pid }, (code, output) => {
             if (listeners.get(session) !== child) {
                 return;
             }

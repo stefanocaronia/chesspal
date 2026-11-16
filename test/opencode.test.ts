@@ -257,6 +257,17 @@ describe("OpenCode, the fourth host (D-117)", () => {
         expect(await listening(input)).toEqual({ code: 0, stdout: "" });
     }, 30_000);
 
+    it("stops waiting once the OpenCode that started it is gone, as when its terminal closes, saying nothing", async () => {
+        const folder = temporary();
+        const page = await fakePage(folder);
+        page.answer("hold");
+        const opencode = spawn(process.execPath, ["-e", "setTimeout(() => {}, 1000)"]);
+        const listened = listening({ cwd: folder, session_id: "ses_1", hook_event_name: "Stop", host_pid: opencode.pid });
+
+        expect(await listened).toEqual({ code: 0, stdout: "" });
+        expect(readFileSync(join(folder, "listen.log"), "utf8")).toContain(`its host, pid ${opencode.pid}, is gone\n`);
+    }, 30_000);
+
     it("signs the moves with the model of the session's step, as the plugin notes it, and names the AI OpenCode", async () => {
         const folder = temporary();
         const client = { name: "opencode", title: "OpenCode" };
@@ -525,12 +536,16 @@ function writeState(home: string, value: object): void
     writeFileSync(join(home, ".local", "state", "opencode", "model.json"), JSON.stringify(value));
 }
 
-/** A board page of the folder as the doorbell finds it, which answers the hook's wait as the test says. */
+/** A board page of the folder as the doorbell finds it, which answers the hook's wait as the test says, or holds it with "hold". */
 async function fakePage(folder: string): Promise<{ answer(said: string): void; }>
 {
     let said = "ring";
     const server = createServer((request, response) => {
-        response.end(request.url === "/api/bell?probe" ? JSON.stringify({ session: null, folder: resolve(folder), open: true, version }) : said);
+        if (request.url === "/api/bell?probe") {
+            response.end(JSON.stringify({ session: null, folder: resolve(folder), open: true, version }));
+        } else if (said !== "hold") {
+            response.end(said);
+        }
     });
     servers.push(server);
 
