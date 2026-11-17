@@ -337,8 +337,8 @@
     outline-offset: 1px;
 }
 
-/* The thread takes the room the cards and the box leave and scrolls with no scrollbar, fading at its top when there is more above; the bubbles sit at its
-   foot, by the box */
+/* The thread takes the room the cards and the box leave and scrolls with no scrollbar, fading at its top when there is more above and at its foot when
+   there is more below; the bubbles sit at its foot, by the box */
 .thread-box {
     position: relative;
     display: flex;
@@ -365,6 +365,14 @@
 
 .thread.more-above {
     mask-image: linear-gradient(transparent, #000 28px);
+}
+
+.thread.more-below {
+    mask-image: linear-gradient(#000 calc(100% - 20px), transparent);
+}
+
+.thread.more-above.more-below {
+    mask-image: linear-gradient(transparent, #000 28px, #000 calc(100% - 20px), transparent);
 }
 
 .thread > li {
@@ -474,6 +482,11 @@
     opacity: 0.7;
 }
 
+/* On the player's accent the corner is less faint, to read */
+.said .corner {
+    opacity: 0.9;
+}
+
 .corner .move-number {
     margin-right: 1px;
 }
@@ -502,11 +515,13 @@
     opacity: 1;
 }
 
-/* Scrolled up, a new bubble brings a round button at the thread's foot, with a dot, that takes the player down to it */
+/* Scrolled up, a round button in the middle of the thread's foot takes the player down to the newest, with a dot once a new bubble came meanwhile */
 .to-newest {
     position: absolute;
-    right: 10px;
+    right: 0;
     bottom: 8px;
+    left: 0;
+    margin: 0 auto;
     display: grid;
     place-items: center;
     width: 34px;

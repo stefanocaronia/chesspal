@@ -612,7 +612,8 @@
     min-height: 0;
 }
 
-/* In analysis a long note gives way too, scrolling in itself, while the thread and the box keep a room of their own; its padding holds the tail */
+/* In analysis the thread gives way first, down to a few lines; only a note that does not fit even then scrolls in itself, with no scrollbar and a fade at
+   its foot. Its padding holds the tail */
 .talk.studied > .ai-block {
     flex: 0 1 auto;
     min-height: 0;
@@ -626,7 +627,16 @@
     min-height: 0;
     padding-top: 12px;
     overflow-y: auto;
-    scrollbar-width: thin;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+}
+
+.talk.studied .ai-note::-webkit-scrollbar {
+    display: none;
+}
+
+.talk.studied .ai-note.more-below {
+    mask-image: linear-gradient(#000 calc(100% - 20px), transparent);
 }
 
 .flipped .talk.studied .ai-note {
@@ -634,7 +644,11 @@
 }
 
 .talk.studied > .chat {
-    min-height: min(240px, 50%);
+    min-height: auto;
+}
+
+.talk.studied > .chat > .thread-box {
+    min-height: 96px;
 }
 
 /* The game's column, which folds from its tab */
@@ -865,7 +879,7 @@
         grid-area: chat;
     }
 
-    .thread-box {
+    .chat > .thread-box {
         flex: none;
     }
 
@@ -904,6 +918,10 @@
         min-height: 0;
     }
 
+    .talk.studied > .chat > .thread-box {
+        min-height: 0;
+    }
+
     .talk.studied > .ai-block {
         display: contents;
     }
@@ -921,7 +939,8 @@
     }
 
     .talk.studied .ai-note > .say::before,
-    .talk.studied .ai-note > .say::after {
+    .talk.studied .ai-note > .say::after,
+    .flipped .talk.studied .ai-note > .say:last-child::after {
         content: none;
     }
 

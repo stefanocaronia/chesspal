@@ -14,8 +14,8 @@ import { hasVoice, hush, onReading, type Reading, reading, skip, speak, type Voi
 
 /**
  * The talk as one thread, as a chat app shows it: the AI's bubbles on the left, the player's on the right, the newest at the foot, each group's last with a
- * tail; in the corner the move the words go with, and how far the player's last line got. It follows the newest unless the player scrolled up to read; then
- * a button takes them down. In analysis each line of the player's names the move it was written on instead (D-101).
+ * tail; in the corner the move the words go with, when it changes, and how far the player's last line got. It follows the newest unless the player scrolled up
+ * to read; then a button takes them down. In analysis each line of the player's names in its corner the move it was written on instead (D-101).
  */
 export function Thread({ items, voice, name, about, text }: {
     items: readonly ThreadItem[];
@@ -30,18 +30,18 @@ export function Thread({ items, voice, name, about, text }: {
     const said = items.filter((item) => item.who === "ai").map((item) => item.text);
     useSpokenNews(said, voice);
     const read = useReading(voice);
-    const { moreAbove, unseen, toNewest } = useNewestInSight(list, items);
+    const { moreAbove, moreBelow, away, unseen, toNewest } = useNewestInSight(list, items);
     const lastWritten = items.findLastIndex((item) => item.who === "player");
     let spoken = -1;
 
     return (
         <div class="thread-box">
-            <ol ref={list} class={moreAbove ? "thread more-above" : "thread"} aria-live="polite">
+            <ol ref={list} class={`thread${moreAbove ? " more-above" : ""}${moreBelow ? " more-below" : ""}`} aria-live="polite">
                 {items.map((item, index) => {
                     const last = items[index + 1]?.who !== item.who;
                     const corner = (
                         <Corner
-                            move={about === undefined ? item.move : undefined}
+                            place={cornerPlace(item, about, text)}
                             status={index === lastWritten ? <Status heard={item.line?.heard} name={name} text={text} /> : null}
                         />
                     );
@@ -62,7 +62,6 @@ export function Thread({ items, voice, name, about, text }: {
                     return (
                         <li key={index} class={last ? "from-player last" : "from-player"}>
                             <p class="said">
-                                {about === undefined ? null : <ShownPlace shown={item.line?.shown} about={about} text={text} />}
                                 {item.text}
                                 {corner}
                             </p>
@@ -70,13 +69,13 @@ export function Thread({ items, voice, name, about, text }: {
                     );
                 })}
             </ol>
-            {unseen
+            {away
                 ? (
-                    <button type="button" class="to-newest" title={text.newMessages} aria-label={text.newMessages} onClick={toNewest}>
+                    <button type="button" class="to-newest" title={unseen ? text.newMessages : text.toNewest} aria-label={unseen ? text.newMessages : text.toNewest} onClick={toNewest}>
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M12 5V19M6 13L12 19L18 13" />
                         </svg>
-                        <span class="dot" aria-hidden="true" />
+                        {unseen ? <span class="dot" aria-hidden="true" /> : null}
                     </button>
                 )
                 : null}
@@ -121,6 +120,8 @@ export function AiNote({ ply, opening, closing, summary, reviewing, count, onCom
     ];
     const keys = spoken.map((part) => part.key).join("\n");
     const read = useReading(voice);
+    const box = useRef<HTMLDivElement>(null);
+    const moreBelow = useMoreBelow(box);
 
     useEffect(() => {
         if (voice !== undefined) {
@@ -131,7 +132,7 @@ export function AiNote({ ply, opening, closing, summary, reviewing, count, onCom
     }, [keys, voice]);
 
     return (
-        <div class="ai-note" aria-live="polite">
+        <div ref={box} class={moreBelow ? "ai-note more-below" : "ai-note"} aria-live="polite">
             {ply === undefined || shown === undefined ? null : (
                 <p class={`say move-note ${shown.badge ?? ""}`}>
                     <SkipReading at={spoken[0]!.key} read={read} voice={voice} />
@@ -337,25 +338,45 @@ export function TalkFaces({ name, aiPicture, you, picture, ai, player, aiMoves, 
     );
 }
 
-/** In a bubble's corner, small: the move the words go with, as the move list writes it, and the mark of how far the player's last line got. */
-function Corner({ move, status }: { move: Ply | undefined; status: ComponentChildren; })
+/**
+ * In a bubble's corner, small: the move the words go with, or in analysis where the player's line was written, and the mark of how far the player's last
+ * line got.
+ */
+function Corner({ place, status }: { place: ComponentChildren; status: ComponentChildren; })
 {
-    if (move === undefined && status === null) {
+    if (place === null && status === null) {
         return null;
     }
 
     return (
         <span class="corner">
-            {move === undefined ? null : (
-                <span class="corner-move">
-                    <span class="visually-hidden">{move.number}{move.side === "white" ? "." : "..."}{move.san}</span>
-                    <span aria-hidden="true">
-                        <span class="move-number">{move.number}{move.side === "white" ? "." : "..."}</span>
-                        <Figurines san={move.san} side={move.side} />
-                    </span>
-                </span>
-            )}
+            {place}
             {status}
+        </span>
+    );
+}
+
+/** What a bubble's corner names: in a game the move the words go with, when it changed; in analysis where the player's line was written, none at the start. */
+function cornerPlace(item: ThreadItem, about: About | undefined, text: Text): ComponentChildren
+{
+    if (about === undefined) {
+        return item.move === undefined ? null : <CornerMove move={item.move} />;
+    }
+
+    const shown = item.line?.shown;
+    return shown?.move === undefined && shown?.variation === undefined ? null : <ShownPlace shown={shown} about={about} text={text} />;
+}
+
+/** The move the words go with, as the move list writes it, its pieces in the words' colour: the number already says the side. */
+function CornerMove({ move }: { move: Ply; })
+{
+    return (
+        <span class="corner-move">
+            <span class="visually-hidden">{move.number}{move.side === "white" ? "." : "..."}{move.san}</span>
+            <span aria-hidden="true">
+                <span class="move-number">{move.number}{move.side === "white" ? "." : "..."}</span>
+                <Figurines san={move.san} side={move.side} mono />
+            </span>
         </span>
     );
 }
@@ -378,7 +399,7 @@ function ShownPlace({ shown, about, text }: { shown: TalkLine["shown"]; about: A
 }
 
 /**
- * The variation a line of the player's was written on, small at the line's head: the fork's sign in the accent and the move the board showed, none when
+ * The variation a line of the player's was written on, small in the line's corner: the fork's sign in the accent and the move the board showed, none when
  * it was set aside; a press puts the variation back on the board (D-116).
  */
 function ShownLine({ variation, onShow, text }: { variation: SentVariation; onShow: () => void; text: Text; })
@@ -393,14 +414,14 @@ function ShownLine({ variation, onShow, text }: { variation: SentVariation; onSh
             {move === undefined ? null : (
                 <>
                     <span class="move-number">{number}</span>
-                    <Figurines san={san} side={number.endsWith("...") ? "black" : "white"} />
+                    <Figurines san={san} side={number.endsWith("...") ? "black" : "white"} mono />
                 </>
             )}
         </button>
     );
 }
 
-/** The move a line of the player's was written on, 14.♘f3, small at the line's head: a press shows it on the board again (Zoe). */
+/** The move a line of the player's was written on, 14.♘f3, small in the line's corner: a press shows it on the board again (Zoe). */
 function ShownMove({ move, onShow, text }: { move: string; onShow: () => void; text: Text; })
 {
     const [, number = "", san = move] = /^(\d+\.+)(.+)$/.exec(move) ?? [];
@@ -408,7 +429,7 @@ function ShownMove({ move, onShow, text }: { move: string; onShow: () => void; t
     return (
         <button type="button" class="shown-move" title={text.goTo(move)} aria-label={text.goTo(move)} onClick={onShow}>
             <span class="move-number">{number}</span>
-            <Figurines san={san} side={number.endsWith("...") ? "black" : "white"} />
+            <Figurines san={san} side={number.endsWith("...") ? "black" : "white"} mono />
         </button>
     );
 }
@@ -566,12 +587,20 @@ function SkipReading({ at, read, voice }: { at: string; read: string | undefined
 
 /**
  * Keeps the newest bubble in sight: on a new one, or when the column changes height, the thread goes to its foot, unless the player has scrolled up to read;
- * then a new bubble is unseen until they come down. Says too whether there is more above, for the fade at the top.
+ * then the button that takes them down shows, with a dot once a new bubble came meanwhile. Says too whether there is more above and below, for the fades.
  */
-function useNewestInSight(list: RefObject<HTMLElement>, items: readonly ThreadItem[]): { moreAbove: boolean; unseen: boolean; toNewest: () => void; }
+function useNewestInSight(list: RefObject<HTMLElement>, items: readonly ThreadItem[]): {
+    moreAbove: boolean;
+    moreBelow: boolean;
+    away: boolean;
+    unseen: boolean;
+    toNewest: () => void;
+}
 {
-    const away = useRef(false);
+    const awayNow = useRef(false);
     const [moreAbove, setMoreAbove] = useState(false);
+    const [moreBelow, setMoreBelow] = useState(false);
+    const [away, setAway] = useState(false);
     const [unseen, setUnseen] = useState(false);
     const newest = items.at(-1);
 
@@ -583,6 +612,24 @@ function useNewestInSight(list: RefObject<HTMLElement>, items: readonly ThreadIt
         }
     };
 
+    const measure = (): void => {
+        const element = list.current;
+
+        if (element === null) {
+            return;
+        }
+
+        const below = element.scrollHeight - element.scrollTop - element.clientHeight;
+        awayNow.current = below > awayBy;
+        setAway(awayNow.current);
+        setMoreAbove(element.scrollTop > 1);
+        setMoreBelow(below > 1);
+
+        if (!awayNow.current) {
+            setUnseen(false);
+        }
+    };
+
     useEffect(() => {
         const element = list.current;
 
@@ -590,17 +637,8 @@ function useNewestInSight(list: RefObject<HTMLElement>, items: readonly ThreadIt
             return;
         }
 
-        const measure = (): void => {
-            away.current = element.scrollHeight - element.scrollTop - element.clientHeight > awayBy;
-            setMoreAbove(element.scrollTop > 1);
-
-            if (!away.current) {
-                setUnseen(false);
-            }
-        };
-
         const follow = (): void => {
-            if (!away.current) {
+            if (!awayNow.current) {
                 toNewest();
             }
 
@@ -619,14 +657,51 @@ function useNewestInSight(list: RefObject<HTMLElement>, items: readonly ThreadIt
 
     // The player's own line always brings them down to it.
     useLayoutEffect(() => {
-        if (!away.current || newest?.who === "player") {
+        if (!awayNow.current || newest?.who === "player") {
             toNewest();
         } else {
             setUnseen(true);
         }
+
+        measure();
     }, [items.length, newest?.text]);
 
-    return { moreAbove, unseen, toNewest };
+    return { moreAbove, moreBelow, away, unseen, toNewest };
+}
+
+/** Whether a box that scrolls has more below what it shows, for the fade at its foot: measured as it scrolls, changes size or shows something else. */
+function useMoreBelow(box: RefObject<HTMLElement>): boolean
+{
+    const [moreBelow, setMoreBelow] = useState(false);
+
+    const measure = (): void => {
+        const element = box.current;
+
+        if (element !== null) {
+            setMoreBelow(element.scrollHeight - element.scrollTop - element.clientHeight > 1);
+        }
+    };
+
+    useLayoutEffect(measure);
+
+    useEffect(() => {
+        const element = box.current;
+
+        if (element === null) {
+            return;
+        }
+
+        element.addEventListener("scroll", measure, { passive: true });
+        const observer = new ResizeObserver(measure);
+        observer.observe(element);
+
+        return () => {
+            element.removeEventListener("scroll", measure);
+            observer.disconnect();
+        };
+    }, [box]);
+
+    return moreBelow;
 }
 
 /** How far above its foot the player may have scrolled the thread and still follow the newest, in pixels. */

@@ -160,14 +160,14 @@ export interface ThreadItem
     readonly who: "player" | "ai";
     readonly text: string;
     readonly ply: number;
-    /** The move the words go with, the last played when they were said; none before the first. */
+    /** The move the words go with, the last played when they were said; none before the first, nor when the bubble before goes with the same. */
     readonly move?: Ply;
     readonly line?: TalkLine;
 }
 
 /**
  * The talk of the game going on (D-53) as one thread in the order said: the AI's comments on its moves and the lines of both on the page, a comment just
- * after its move, before what was said there; the lines keep their own order.
+ * after its move, before what was said there; the lines keep their own order. A bubble names its move only when it changes from the bubble before.
  */
 export function talkThread(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): ThreadItem[]
 {
@@ -184,9 +184,9 @@ export function talkThread(plies: readonly Ply[], ai: Side, talk: readonly TalkL
         thread.push(threadItem(line));
     }
 
-    return [...thread, ...comments.slice(next)].map((item) => {
+    return [...thread, ...comments.slice(next)].map((item, index, all) => {
         const move = plies[item.ply - 1];
-        return move === undefined ? item : { ...item, move };
+        return move === undefined || all[index - 1]?.ply === item.ply ? item : { ...item, move };
     });
 }
 

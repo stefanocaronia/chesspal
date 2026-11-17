@@ -171,11 +171,11 @@ export function stepsLine(line: LineView | undefined, plies: readonly Ply[]): { 
 }
 
 /** A move in SAN with each piece's letter drawn as its figure, the same in every language (D-50), and a capture's x in grey, so the squares stand out. */
-export function Figurines({ san, side }: { san: string; side: Side; })
+export function Figurines({ san, side, mono = false }: { san: string; side: Side; mono?: boolean; })
 {
     return (
         <>
-            {san.split(/([KQRBNx])/).map((part, index) => index % 2 === 0 ? part : part === "x" ? <span key={index} class="takes">x</span> : <Figurine key={index} letter={part} side={side} />)}
+            {san.split(/([KQRBNx])/).map((part, index) => index % 2 === 0 ? part : part === "x" ? <span key={index} class="takes">x</span> : <Figurine key={index} letter={part} side={side} mono={mono} />)}
         </>
     );
 }

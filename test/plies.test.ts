@@ -101,6 +101,24 @@ describe("the moves on the page", () => {
         ]);
     });
 
+    it("name a bubble's move only when it changes from the bubble before, whoever spoke", () => {
+        const plies = pliesOf(readPgn('[FEN "6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 23"]\n\n23... h6 {Air for the king.} 24. Rd8+ *')[0]!);
+        const thread = talkThread(plies, "black", [
+            { who: "player", text: "Why?", ply: 1 },
+            { who: "ai", text: "Room.", ply: 1 },
+            { who: "player", text: "Check!", ply: 2 },
+            { who: "player", text: "Again.", ply: 2 },
+        ]);
+
+        expect(thread.map((item) => [item.text, item.move?.san])).toEqual([
+            ["Air for the king.", "h6"],
+            ["Why?", undefined],
+            ["Room.", undefined],
+            ["Check!", "Rd8+"],
+            ["Again.", undefined],
+        ]);
+    });
+
     it("make a line of the talk in analysis a bubble with no move, the player's with its line", () => {
         const asked = { who: "player", text: "Why?", ply: 0, shown: { game: "study/a.pgn", at: 3, move: "2.Qh5" } } as const;
 

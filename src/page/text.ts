@@ -240,8 +240,9 @@ export interface Text
     /** The move a line of the player's was written on, to go back to it. */
     goTo(move: string): string;
     readBy(name: string): string;
-    /** The button that takes the talk's thread down to the words that came while the player read above. */
+    /** The button that takes the talk's thread down to its newest words, scrolled up to read: with words that came meanwhile, and without. */
     readonly newMessages: string;
+    readonly toNewest: string;
     /** At the foot of the note in analysis, the model that wrote the review, when another played the game (D-81). */
     noteBy(signature: string): string;
     wrote(name: string): string;
@@ -832,6 +833,7 @@ const english: Text = {
     goTo: (move) => `Go to ${move}`,
     readBy: (name) => `Read by ${name}`,
     newMessages: "New messages",
+    toNewest: "Go to the newest messages",
     noteBy: (signature) => `by ${signature}`,
     wrote: (name) => `${name} wrote`,
     offers: "offers a draw",
@@ -1302,6 +1304,7 @@ const italian: Text = {
     goTo: (move) => `Vai a ${move}`,
     readBy: (name) => `Letto da ${name}`,
     newMessages: "Nuovi messaggi",
+    toNewest: "Vai agli ultimi messaggi",
     noteBy: (signature) => `di ${signature}`,
     wrote: (name) => `${name} ha scritto`,
     offers: "propone patta",

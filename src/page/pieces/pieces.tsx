@@ -1,7 +1,7 @@
 // The pieces, drawn from a set: one vector map with a symbol for each piece, wK to bP (D-49): Nitida, the Torretta (D-46), or Capablanca (D-94), as the
 // settings choose (D-56). The pieces taken and the moves show the set's small pieces: one silhouette each, in fixed colours (D-50).
 import { createContext } from "preact";
-import { useContext } from "preact/hooks";
+import { useContext, useId } from "preact/hooks";
 import type { PieceSet } from "../profile/settings.ts";
 
 /** The set the player chose, for every piece the page draws. */
@@ -25,11 +25,15 @@ export function pieceSymbol(letter: string, set: PieceSet, small = false): strin
     return `${folder}${set}${small ? "-small" : ""}.svg#${letter === letter.toUpperCase() ? "w" : "b"}${letter.toUpperCase()}`;
 }
 
-/** A piece as the notation shows it (D-50): the chosen set's small piece, White's white and Black's black. */
-export function Figurine({ letter, side }: { letter: string; side: "white" | "black"; })
+/**
+ * A piece as the notation shows it (D-50): the chosen set's small piece, White's white and Black's black; a `mono` one is its silhouette in the colour of
+ * the words around it, where the move's number already says the side.
+ */
+export function Figurine({ letter, side, mono = false }: { letter: string; side: "white" | "black"; mono?: boolean; })
 {
     const chosen = useContext(ChosenSet);
-    return <Drawing href={`${folder}${chosen}-small.svg#${side === "white" ? "w" : "b"}${letter.toUpperCase()}`} class={`figurine ${side}`} />;
+    const href = `${folder}${chosen}-small.svg#${side === "white" ? "w" : "b"}${letter.toUpperCase()}`;
+    return mono ? <Silhouette href={href} /> : <Drawing href={href} class={`figurine ${side}`} />;
 }
 
 function Drawing({ href, class: name }: { href: string; class: string; })
@@ -41,6 +45,26 @@ function Drawing({ href, class: name }: { href: string; class: string; })
     return (
         <svg class={name} viewBox="0 0 100 100" aria-hidden="true">
             <use href={href} />
+        </svg>
+    );
+}
+
+// The piece's shape filled with the text's colour: a filter of its own, inside the drawing, so its currentColor is the words' around it.
+function Silhouette({ href }: { href: string; })
+{
+    const tint = useId();
+
+    if (!/#[wb][KQRBNP]$/.test(href)) {
+        return null;
+    }
+
+    return (
+        <svg class="figurine mono" viewBox="0 0 100 100" aria-hidden="true">
+            <filter id={tint}>
+                <feFlood flood-color="currentColor" />
+                <feComposite in2="SourceAlpha" operator="in" />
+            </filter>
+            <use href={href} filter={`url(#${tint})`} />
         </svg>
     );
 }
