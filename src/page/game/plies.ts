@@ -130,17 +130,11 @@ export interface SentVariation
 
 /**
  * The talk over a game in analysis (D-101): from the player's first line on it, the lines said since on it, a line without a position belonging to the game
- * of the player's last line before it; the last ten, which is all half the column holds (Zoe).
+ * of the player's last line before it.
  */
 export function analysisTalk(talk: readonly TalkLine[], game: string): TalkLine[]
 {
-    return talkOn(talk, game).slice(-10);
-}
-
-/** The AI's answers over a game in analysis, all of them in the order said: the voice reads those added while the page is open. */
-export function analysisAnswers(talk: readonly TalkLine[], game: string): string[]
-{
-    return talkOn(talk, game).filter((line) => line.who === "ai").map((line) => line.text);
+    return talkOn(talk, game);
 }
 
 // The lines of the talk over a game in analysis, a line without a position belonging to the game of the line before it.
@@ -160,18 +154,46 @@ export function aiSpoke(plies: readonly Ply[], ai: Side, talk: readonly TalkLine
     return plies.filter((ply) => ply.side === ai && ply.comment !== undefined).length + talk.filter((line) => line.who === "ai").length;
 }
 
-/** The AI's words in the game going on (D-53), in the order said: its comments on its moves and what it said on the page. */
-export function aiWords(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): string[]
+/** A bubble of the talk's thread: who speaks, the words, the plies played when they were said, and the player's line with how far it got. */
+export interface ThreadItem
 {
-    // A comment counts as said just after its move, before what the AI said there; the sort keeps that order.
-    const comments = plies.flatMap((ply, index) => ply.side === ai && ply.comment !== undefined ? [{ text: ply.comment, ply: index + 1 }] : []);
-    return [...comments, ...talk.filter((line) => line.who === "ai")].sort((one, other) => one.ply - other.ply).map((word) => word.text);
+    readonly who: "player" | "ai";
+    readonly text: string;
+    readonly ply: number;
+    /** The move the words go with, the last played when they were said; none before the first. */
+    readonly move?: Ply;
+    readonly line?: TalkLine;
 }
 
-/** The player's words in the game going on (D-53), in the order said. */
-export function playerWords(talk: readonly TalkLine[]): TalkLine[]
+/**
+ * The talk of the game going on (D-53) as one thread in the order said: the AI's comments on its moves and the lines of both on the page, a comment just
+ * after its move, before what was said there; the lines keep their own order.
+ */
+export function talkThread(plies: readonly Ply[], ai: Side, talk: readonly TalkLine[]): ThreadItem[]
 {
-    return talk.filter((line) => line.who === "player");
+    const comments = plies.flatMap((ply, index) => ply.side === ai && ply.comment !== undefined ? [{ who: "ai", text: ply.comment, ply: index + 1 } as const] : []);
+    const thread: ThreadItem[] = [];
+    let next = 0;
+
+    for (const line of talk) {
+        while (next < comments.length && comments[next]!.ply <= line.ply) {
+            thread.push(comments[next]!);
+            next++;
+        }
+
+        thread.push(threadItem(line));
+    }
+
+    return [...thread, ...comments.slice(next)].map((item) => {
+        const move = plies[item.ply - 1];
+        return move === undefined ? item : { ...item, move };
+    });
+}
+
+/** A line of the talk as a bubble of the thread, without its move: in analysis the player's line names its own. */
+export function threadItem(line: TalkLine): ThreadItem
+{
+    return { who: line.who, text: line.text, ply: line.ply, ...(line.who === "player" ? { line } : {}) };
 }
 
 /** How many characters the player has written since the AI's last move, of the 200 they may until its next one (D-54). */

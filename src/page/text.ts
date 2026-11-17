@@ -240,6 +240,10 @@ export interface Text
     /** The move a line of the player's was written on, to go back to it. */
     goTo(move: string): string;
     readBy(name: string): string;
+    /** The button that takes the talk's thread down to the words that came while the player read above. */
+    readonly newMessages: string;
+    /** At the foot of the note in analysis, the model that wrote the review, when another played the game (D-81). */
+    noteBy(signature: string): string;
     wrote(name: string): string;
     /** The header's words after the AI's name: its draw offer that stands, the player's it declined by its move (D-65). */
     readonly offers: string;
@@ -827,6 +831,8 @@ const english: Text = {
     askAbout: (name) => `Ask ${name} about this game…`,
     goTo: (move) => `Go to ${move}`,
     readBy: (name) => `Read by ${name}`,
+    newMessages: "New messages",
+    noteBy: (signature) => `by ${signature}`,
     wrote: (name) => `${name} wrote`,
     offers: "offers a draw",
     declines: "declines the draw",
@@ -1295,6 +1301,8 @@ const italian: Text = {
     askAbout: (name) => `Chiedi ${name === "AI" ? "all'AI" : `a ${name}`} di questa partita…`,
     goTo: (move) => `Vai a ${move}`,
     readBy: (name) => `Letto da ${name}`,
+    newMessages: "Nuovi messaggi",
+    noteBy: (signature) => `di ${signature}`,
     wrote: (name) => `${name} ha scritto`,
     offers: "propone patta",
     declines: "rifiuta la patta",

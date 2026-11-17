@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isReviewed, readPgn } from "../src/core/index.ts";
 import { talkLimits } from "../src/games/index.ts";
-import { aiSpoke, aiWords, analysisAnswers, analysisTalk, judgmentsOf, nextBadged, playerWords, pliesOf, type Ply, talkLimits as pageLimits, withBook, withoutReviews } from "../src/page/game/plies.ts";
+import { aiSpoke, analysisTalk, judgmentsOf, nextBadged, pliesOf, type Ply, talkLimits as pageLimits, talkThread, threadItem, withBook, withoutReviews } from "../src/page/game/plies.ts";
 
 describe("the moves on the page", () => {
     it("number the moves of a game that starts with Black to move", () => {
@@ -59,17 +59,53 @@ describe("the moves on the page", () => {
         expect(pliesOf(record!).map((ply) => ply.comment)).toEqual([undefined, "The open game.", undefined, "No, thanks."]);
     });
 
-    it("show all the AI's words of the game, comments and lines in the order said", () => {
-        // Black is the AI: 23... h6 is its move, 24. Rd8+ the player's.
-        const plies = pliesOf(readPgn('[FEN "6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 23"]\n\n23... h6 {Air for the king.} 24. Rd8+ *')[0]!);
+    it("thread the talk of the game in the order said, a comment just after its move and before the lines said there", () => {
+        // Black is the AI: 23... h6 is its move, 24. Rd8+ the player's, 24... Kh7 its answer.
+        const plies = pliesOf(readPgn('[FEN "6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 23"]\n\n23... h6 {Air for the king.} 24. Rd8+ {A check.} Kh7 {Out of it.} *')[0]!);
         const before = { who: "ai", text: "Your move.", ply: 0 } as const;
+        const hello = { who: "player", text: "Hi", ply: 1, heard: "answered" } as const;
         const after = { who: "ai", text: "Check, I see.", ply: 2 } as const;
         const alsoAfter = { who: "ai", text: "Let me think.", ply: 2 } as const;
 
-        expect(aiWords([], "black", [])).toEqual([]);
-        expect(aiWords([], "black", [before])).toEqual(["Your move."]);
-        expect(aiWords(plies, "black", [before, { who: "player", text: "Hi", ply: 2 }])).toEqual(["Your move.", "Air for the king."]);
-        expect(aiWords(plies, "black", [before, after, alsoAfter])).toEqual(["Your move.", "Air for the king.", "Check, I see.", "Let me think."]);
+        expect(talkThread([], "black", [])).toEqual([]);
+        expect(talkThread([], "black", [before])).toEqual([before]);
+        expect(talkThread(plies, "black", [before, hello, after, alsoAfter]).map(({ who, text, ply }) => ({ who, text, ply }))).toEqual([
+            before,
+            { who: "ai", text: "Air for the king.", ply: 1 },
+            { who: "player", text: "Hi", ply: 1 },
+            after,
+            alsoAfter,
+            { who: "ai", text: "Out of it.", ply: 3 },
+        ]);
+    });
+
+    it("keep the talk's own order in the thread, and the player's line with how far it got", () => {
+        const plies = pliesOf(readPgn("1. e4 {Centre.} e5 2. Nf3 *")[0]!);
+        const late = { who: "player", text: "Late.", ply: 3, heard: "read" } as const;
+        const early = { who: "ai", text: "Early.", ply: 1 } as const;
+        const thread = talkThread(plies, "white", [late, early]);
+
+        expect(thread.map(({ text }) => text)).toEqual(["Centre.", "Late.", "Early."]);
+        expect(thread[1]!.line).toEqual(late);
+        expect(thread[0]!.line).toBeUndefined();
+    });
+
+    it("give each bubble the move its words go with, the last played when they were said, none before the first", () => {
+        const plies = pliesOf(readPgn('[FEN "6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 23"]\n\n23... h6 {Air for the king.} 24. Rd8+ *')[0]!);
+        const thread = talkThread(plies, "black", [{ who: "ai", text: "Your move.", ply: 0 }, { who: "player", text: "Check!", ply: 2 }]);
+
+        expect(thread.map((item) => item.move === undefined ? undefined : `${item.move.number}${item.move.side === "white" ? "." : "..."}${item.move.san}`)).toEqual([
+            undefined,
+            "23...h6",
+            "24.Rd8+",
+        ]);
+    });
+
+    it("make a line of the talk in analysis a bubble with no move, the player's with its line", () => {
+        const asked = { who: "player", text: "Why?", ply: 0, shown: { game: "study/a.pgn", at: 3, move: "2.Qh5" } } as const;
+
+        expect(threadItem(asked)).toEqual({ who: "player", text: "Why?", ply: 0, line: asked });
+        expect(threadItem({ who: "ai", text: "Because.", ply: 0 })).toEqual({ who: "ai", text: "Because.", ply: 0 });
     });
 
     it("count each time the AI spoke, its comments and its lines, never the player's", () => {
@@ -80,15 +116,7 @@ describe("the moves on the page", () => {
         expect(aiSpoke(plies, "black", talk)).toBe(2);
     });
 
-    it("show all the player's words of the game, never the AI's", () => {
-        const sent = { who: "player", text: "Before Nf3.", ply: 2, heard: "answered" } as const;
-        const withMove = { who: "player", text: "With Nf3.", ply: 3, heard: "sent" } as const;
-
-        expect(playerWords([sent, { who: "ai", text: "Hm.", ply: 3 }, withMove])).toEqual([sent, withMove]);
-        expect(playerWords([])).toEqual([]);
-    });
-
-    it("give the talk over a game in analysis from the player's first line on it, never their lines on another, the last ten (D-101)", () => {
+    it("give the talk over a game in analysis from the player's first line on it, never their lines on another, all of it (D-101)", () => {
         const on = (game: string, text: string) => ({ who: "player", text, ply: 0, shown: { game, at: 3, move: "2.Qh5" } }) as const;
         const before = { who: "ai", text: "Good game.", ply: 0 } as const;
         const answer = { who: "ai", text: "The queen comes out early.", ply: 0 } as const;
@@ -100,18 +128,8 @@ describe("the moves on the page", () => {
         const back = on("study/a.pgn", "Back to a.");
         expect(analysisTalk([on("study/a.pgn", "Why?"), answer, on("study/b.pgn", "And here?"), other, back], "study/a.pgn")).toEqual([on("study/a.pgn", "Why?"), answer, back]);
         expect(analysisTalk(Array.from({ length: 12 }, (_, index) => on("study/a.pgn", `${index}`)), "study/a.pgn").map(({ text }) => text)).toEqual(
-            ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
+            ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
         );
-    });
-
-    it("give all the AI's answers over a game in analysis, past the ten shown, for the voice to read the new ones", () => {
-        const asked = (game: string) => ({ who: "player", text: "Why?", ply: 0, shown: { game, at: 3 } }) as const;
-        const said = (text: string) => ({ who: "ai", text, ply: 0 }) as const;
-        const talk = [asked("study/a.pgn"), ...Array.from({ length: 11 }, (_, index) => said(`${index}`)), asked("study/b.pgn"), said("On b.")];
-
-        expect(analysisAnswers(talk, "study/a.pgn")).toEqual(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]);
-        expect(analysisAnswers(talk, "study/b.pgn")).toEqual(["On b."]);
-        expect(analysisAnswers([said("Good game.")], "study/a.pgn")).toEqual([]);
     });
 
     it("go from a badge's count to the side's next move with it, the first again after the last", () => {

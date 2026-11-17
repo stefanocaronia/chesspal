@@ -283,50 +283,7 @@
     color: var(--accent);
 }
 
-/* In analysis the chat that answers, over the box as its addressee: its name opens the chat's window, as on the AI's card in a game */
-.sent + .ai-name {
-    align-self: flex-start;
-    margin: 0 0 6px 12px;
-    color: var(--soft);
-    font-size: 0.875rem;
-}
-
-/* The bubbles: the AI's under its card, the tail under the Torretta's centre (14 px of padding, 48 px picture), and the player's above their box */
-.says,
-.sent {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-/* The bubbles never scroll: those that do not fit whole are hidden, and on the side away from the card they overflow toward */
-.says {
-    overflow: hidden;
-    min-height: 0;
-    padding-top: 12px;
-}
-
-.says:empty {
-    display: none;
-}
-
-/* A bubble keeps its height: one that does not fit is hidden whole, the newest scrolls in itself (talk.tsx) */
-.says > li,
-.sent > li {
-    flex: none;
-}
-
-/* The newest, longer than its room, scrolls under the wheel or the finger with no scrollbar, fading where it is cut */
-.says > li.scrolls,
-.sent > li.scrolls {
-    overflow-y: auto;
-    scrollbar-width: none;
-    mask-image: linear-gradient(#000 calc(100% - 20px), transparent);
-}
-
+/* The bubbles: the AI's on the left on a neutral ground, the player's on the right in the accent, as in a chat app */
 .say {
     position: relative;
     background: var(--say);
@@ -380,36 +337,72 @@
     outline-offset: 1px;
 }
 
-.say:first-child::before {
-    content: "";
-    position: absolute;
-    left: 29px;
-    top: -10px;
-    border: 10px solid transparent;
-    border-top: 0;
-    border-bottom-color: var(--say);
-}
-
-.sent {
-    align-items: flex-end;
-    justify-content: flex-end;
-    margin-bottom: 8px;
-    overflow: hidden;
+/* The thread takes the room the cards and the box leave and scrolls with no scrollbar, fading at its top when there is more above; the bubbles sit at its
+   foot, by the box */
+.thread-box {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
     min-height: 0;
 }
 
-.sent li {
+.thread {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    max-width: 88%;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    padding: 4px 8px;
+    list-style: none;
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+}
+
+.thread::-webkit-scrollbar {
+    display: none;
+}
+
+.thread.more-above {
+    mask-image: linear-gradient(transparent, #000 28px);
+}
+
+.thread > li {
+    flex: none;
+    display: flex;
+    max-width: 85%;
+    margin-top: 2px;
+}
+
+.thread > li:first-child {
+    margin-top: auto;
+}
+
+.thread > .from-ai {
+    align-self: flex-start;
+}
+
+.thread > .from-player {
+    align-self: flex-end;
+}
+
+/* A group is a speaker's bubbles in a row: the next speaker's start a little further down */
+.thread > .from-ai + .from-player,
+.thread > .from-player + .from-ai {
+    margin-top: 8px;
+}
+
+.thread .say,
+.said {
+    position: relative;
+    display: flow-root;
+    margin: 0;
 }
 
 .said {
-    margin: 0;
     background: var(--accent);
     color: var(--on-accent);
-    border-radius: var(--bubble) var(--bubble) 4px var(--bubble);
+    border-radius: var(--bubble);
     padding: 8px 12px;
     font-size: 14.5px;
     line-height: 1.4;
@@ -417,12 +410,86 @@
     overflow-wrap: anywhere;
 }
 
-/* A mark under the player's last line, its words in its title; empty once answered, still as high */
+/* In a group the corners on the speaker's side close up; the group's last bubble has a tail at its foot on that side */
+.thread > .from-ai > .say {
+    border-bottom-left-radius: 6px;
+}
+
+.thread > .from-ai + .from-ai > .say {
+    border-top-left-radius: 6px;
+}
+
+.thread > .from-player > .said {
+    border-bottom-right-radius: 6px;
+}
+
+.thread > .from-player + .from-player > .said {
+    border-top-right-radius: 6px;
+}
+
+.thread > .last > .say,
+.thread > .last > .said {
+    border-bottom-left-radius: var(--bubble);
+    border-bottom-right-radius: var(--bubble);
+}
+
+.thread > .from-ai.last > .say {
+    border-bottom-left-radius: 0;
+}
+
+.thread > .from-player.last > .said {
+    border-bottom-right-radius: 0;
+}
+
+.thread > .last > .say::after,
+.thread > .last > .said::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    border-bottom: 10px solid;
+}
+
+.thread > .from-ai.last > .say::after {
+    left: -7px;
+    border-left: 7px solid transparent;
+    border-bottom-color: var(--say);
+}
+
+.thread > .from-player.last > .said::after {
+    right: -7px;
+    border-right: 7px solid transparent;
+    border-bottom-color: var(--accent);
+}
+
+/* In the bubble's foot corner, small, where a chat app puts the time: the move the words go with, and the player's mark; beside the last line when it fits */
+.corner {
+    float: right;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 6px -4px -3px 10px;
+    font-size: 11.5px;
+    line-height: 1;
+    white-space: nowrap;
+    opacity: 0.7;
+}
+
+.corner .move-number {
+    margin-right: 1px;
+}
+
+.corner .figurine {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+.corner .takes {
+    color: inherit;
+}
+
+/* The player's mark beside the move, its words in its title: one check once written, two once the AI has read it; none once answered */
 .status {
     display: inline-flex;
-    min-height: 15px;
-    margin-top: 3px;
-    color: var(--soft);
 }
 
 .status .icon {
@@ -431,8 +498,49 @@
     stroke-width: 2;
 }
 
-.status.read {
-    color: var(--accent);
+.corner:has(> .status.read) {
+    opacity: 1;
+}
+
+/* Scrolled up, a new bubble brings a round button at the thread's foot, with a dot, that takes the player down to it */
+.to-newest {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    animation: appear 200ms;
+}
+
+.to-newest .icon {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2;
+}
+
+.to-newest .dot {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--card);
+}
+
+.to-newest:hover,
+.to-newest:focus-visible {
+    border-color: var(--accent);
 }
 
 /* The box the player writes in: a bubble whose tail points at their picture */
@@ -442,7 +550,7 @@
     border: 1px solid var(--line);
     border-radius: var(--bubble);
     padding: 8px 8px 8px 12px;
-    margin: 0 0 12px;
+    margin: 6px 0 12px;
     box-shadow: var(--shadow);
 }
 
@@ -541,23 +649,42 @@
     display: none;
 }
 
-/* Turned round: the player on top, the AI below; the tails turn with them */
-.flipped .talk,
-.flipped .ai-block,
-.flipped .you-block {
+/* Turned round, the cards swap with the board: the AI's below, with its note over it, the player's on top. The thread and the box never move */
+.flipped .ai-block {
+    order: 1;
     flex-direction: column-reverse;
 }
 
-.flipped .says {
-    justify-content: flex-end;
-    padding: 0 0 12px;
+.flipped .you-block {
+    order: -1;
 }
 
-.flipped .say:first-child::before {
+/* The box's tail points at the player's card under it; turned round, the card is far away */
+.flipped .compose::after {
     content: none;
 }
 
-.flipped .say:last-child::after {
+.ai-note {
+    display: grid;
+    gap: 6px;
+}
+
+/* The note's bubble nearest the AI's card has a tail pointing at it: the first, up; turned round, the last, down (Stefano) */
+.ai-note > .say:first-child::before {
+    content: "";
+    position: absolute;
+    left: 29px;
+    top: -10px;
+    border: 10px solid transparent;
+    border-top: 0;
+    border-bottom-color: var(--say);
+}
+
+.flipped .ai-note > .say:first-child::before {
+    content: none;
+}
+
+.flipped .ai-note > .say:last-child::after {
     content: "";
     position: absolute;
     left: 29px;
@@ -567,72 +694,17 @@
     border-top-color: var(--say);
 }
 
-.flipped .compose {
-    margin: 12px 0 0;
+/* Turned round, the line that signs the note goes over its bubbles, so the last points at the card */
+.flipped .ai-note > .by {
+    order: -1;
 }
 
-.flipped .compose::after {
-    bottom: auto;
-    top: -8px;
-    transform: rotate(225deg);
-}
-
-.flipped .sent {
-    justify-content: flex-start;
-    margin: 8px 0 0;
-}
-
-.talk.studied > section,
-.talk.studied > section > * {
-    flex: none;
-}
-
-.ai-note {
-    display: grid;
-    gap: 6px;
-    margin-top: 12px;
-}
-
-.ai-note .who {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+/* Who wrote the review, at the note's foot, when another model played the game (D-81) */
+.ai-note > .by {
+    margin: 0 0 0 13px;
     color: var(--soft);
-    font-size: 13px;
-}
-
-/* Who made the analysis, signed under the Torretta's name in the Torretta's height (D-81, Zoe's sketch A) */
-.ai-note .signed {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    line-height: 1.25;
-}
-
-.ai-note .signed small {
     font-size: 12px;
     overflow-wrap: anywhere;
-}
-
-/* Only the note's first bubble has a tail, pointing up at the Torretta beside the AI's name, the board turned round or not (Stefano) */
-.ai-note > .say::before,
-.ai-note > .say::after,
-.flipped .ai-note > .say::after {
-    content: none;
-}
-
-.ai-note > .who + .say::before {
-    content: "";
-    position: absolute;
-    left: 8px;
-    top: -9px;
-    border: 10px solid transparent;
-    border-top: 0;
-    border-bottom-color: var(--say);
-}
-
-.ai-note > .who + .say {
-    margin-top: 4px;
 }
 
 .move-note .head {
@@ -762,7 +834,7 @@
     filter: grayscale(1) brightness(0.85) blur(2px);
 }
 
-/* No chat hears the player (Zoe): a note under the AI's card, by its stopped clock, on a page still in use. The AI's words below it lose their tail */
+/* No chat hears the player (Zoe): a note under the AI's card, by its stopped clock, on a page still in use. The AI's note below it loses its tail */
 .asleep {
     flex: none;
     margin: var(--between) 0 0;
@@ -780,8 +852,8 @@
     margin: 0 0 var(--between);
 }
 
-.ai-block:has(> .asleep) .says .say::before,
-.ai-block:has(> .asleep) .says .say::after {
+.ai-block:has(> .asleep) .ai-note > .say::before,
+.ai-block:has(> .asleep) .ai-note > .say::after {
     content: none;
 }
 
@@ -834,7 +906,8 @@
 
 @media (prefers-reduced-motion: reduce) {
     .offline::before,
-    .over-board {
+    .over-board,
+    .to-newest {
         animation: none;
     }
 }

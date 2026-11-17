@@ -1,59 +1,107 @@
-// The talk on the board page (D-51, D-53): the AI's words in bubbles that point at the Torretta, the player's above the box they write in.
+// The talk on the board page (D-51, D-53): one thread of the AI's words and the player's in the order said, the box to write in under it, and the AI's note
+// on the move shown of a game in analysis.
 import { type ComponentChildren, createContext, type RefObject } from "preact";
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import type { Mood, MoveReview, Opening, Side } from "../../core/index.ts";
+import type { MoveReview, Opening, Side } from "../../core/index.ts";
 import { Torretta } from "../avatars/torretta.tsx";
 import { BadgeIcon, NoteIcon } from "../game/badges.tsx";
 import { Figurines, ForkIcon } from "../game/move-list.tsx";
-import { type Ply, type ReviewCount, type SentVariation, talkLimits, type TalkLine } from "../game/plies.ts";
+import { type Ply, type ReviewCount, type SentVariation, talkLimits, type TalkLine, type ThreadItem } from "../game/plies.ts";
 import { ReviewProgress } from "../game/review-progress.tsx";
 import { signature } from "../players/model-name.ts";
 import type { Text } from "../text.ts";
 import { hasVoice, hush, onReading, type Reading, reading, skip, speak, type Voice } from "./voice.ts";
 
-/** The AI's words of the game, a bubble each, the newest by the Torretta: below it, or above it on a board turned round; the first points at it. */
-export function AiWords({ words, newestFirst, voice }: { words: readonly string[]; newestFirst: boolean; voice?: Voice; })
+/**
+ * The talk as one thread, as a chat app shows it: the AI's bubbles on the left, the player's on the right, the newest at the foot, each group's last with a
+ * tail; in the corner the move the words go with, and how far the player's last line got. It follows the newest unless the player scrolled up to read; then
+ * a button takes them down. In analysis each line of the player's names the move it was written on instead (D-101).
+ */
+export function Thread({ items, voice, name, about, text }: {
+    items: readonly ThreadItem[];
+    /** The voice that reads aloud the AI's words added while the page is open, when the player wants it. */
+    voice?: Voice;
+    name: string;
+    about?: About;
+    text: Text;
+})
 {
     const list = useRef<HTMLOListElement>(null);
-    useOnlyWhole(list, words, newestFirst);
-    useSpokenNews(words, voice);
+    const said = items.filter((item) => item.who === "ai").map((item) => item.text);
+    useSpokenNews(said, voice);
     const read = useReading(voice);
+    const { moreAbove, unseen, toNewest } = useNewestInSight(list, items);
+    const lastWritten = items.findLastIndex((item) => item.who === "player");
+    let spoken = -1;
 
     return (
-        <ol ref={list} class="says" aria-live="polite">
-            {inOrder(
-                words.map((word, index) => (
-                    <li key={index} class="say" style={aged(words.length - 1 - index)}>
-                        <SkipReading at={wordKey(index, word)} read={read} voice={voice} />
-                        <Marked text={word} />
-                    </li>
-                )),
-                newestFirst,
-            )}
-        </ol>
+        <div class="thread-box">
+            <ol ref={list} class={moreAbove ? "thread more-above" : "thread"} aria-live="polite">
+                {items.map((item, index) => {
+                    const last = items[index + 1]?.who !== item.who;
+                    const corner = (
+                        <Corner
+                            move={about === undefined ? item.move : undefined}
+                            status={index === lastWritten ? <Status heard={item.line?.heard} name={name} text={text} /> : null}
+                        />
+                    );
+
+                    if (item.who === "ai") {
+                        spoken++;
+                        return (
+                            <li key={index} class={last ? "from-ai last" : "from-ai"}>
+                                <p class="say">
+                                    <SkipReading at={wordKey(spoken, item.text)} read={read} voice={voice} />
+                                    <Marked text={item.text} />
+                                    {corner}
+                                </p>
+                            </li>
+                        );
+                    }
+
+                    return (
+                        <li key={index} class={last ? "from-player last" : "from-player"}>
+                            <p class="said">
+                                {about === undefined ? null : <ShownPlace shown={item.line?.shown} about={about} text={text} />}
+                                {item.text}
+                                {corner}
+                            </p>
+                        </li>
+                    );
+                })}
+            </ol>
+            {unseen
+                ? (
+                    <button type="button" class="to-newest" title={text.newMessages} aria-label={text.newMessages} onClick={toNewest}>
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 5V19M6 13L12 19L18 13" />
+                        </svg>
+                        <span class="dot" aria-hidden="true" />
+                    </button>
+                )
+                : null}
+        </div>
     );
 }
 
 /**
- * The AI's word on the move shown of a game in analysis (D-69), in a bubble under the Torretta beside the AI's name, pointing up at it: the move, its badge by name,
- * and its note when it wrote one; read out as the player steps through the game. The Torretta and the name stay when the move has no word.
+ * The AI's word on the move shown of a game in analysis (D-69), in bubbles under the AI's card, pointing at it: the move, its badge by name, and its note
+ * when it wrote one; read out as the player steps through the game.
  */
-export function AiNote({ ply, opening, closing, summary, reviewing, count, onComplete, name, by, mood, voice, text }: {
+export function AiNote({ ply, opening, closing, summary, reviewing, count, onComplete, name, by, voice, text }: {
     ply?: Ply;
     opening?: Opening;
     closing?: string;
     summary?: string;
-    /** The AI is still reviewing the game: the Torretta says so too. */
+    /** The AI is still reviewing the game: the note says so too. */
     reviewing?: true;
     /** How far the review has got, under the line that says the AI reviews, or that the review is not complete. */
     count?: ReviewCount;
     /** Nobody is finishing the review: the note says so, with the button that brings the game back to the AI (D-109). */
     onComplete?: () => void;
     name: string;
-    /** Who made the analysis, signed under the Torretta (D-81); none in a game no host signed. */
+    /** Who made the analysis (D-81), signed at the note's foot only when it is not the model that played the game. */
     by?: { annotator: string; effort?: string; } | undefined;
-    /** The AI's mood on the move shown, which the Torretta that speaks shows too (D-70). */
-    mood: Mood;
     /** The voice that reads the note aloud, when the player wants it. */
     voice?: Voice;
     text: Text;
@@ -82,16 +130,8 @@ export function AiNote({ ply, opening, closing, summary, reviewing, count, onCom
         return hush;
     }, [keys, voice]);
 
-    // The Torretta stays in sight through the whole analysis, over its bubbles, which show only where it wrote something.
     return (
         <div class="ai-note" aria-live="polite">
-            <p class="who">
-                <Torretta size={36} mood={mood} />
-                <span class="signed">
-                    {name}
-                    {by === undefined ? null : <small>{signature(by.annotator, by.effort)}</small>}
-                </span>
-            </p>
             {ply === undefined || shown === undefined ? null : (
                 <p class={`say move-note ${shown.badge ?? ""}`}>
                     <SkipReading at={spoken[0]!.key} read={read} voice={voice} />
@@ -138,6 +178,7 @@ export function AiNote({ ply, opening, closing, summary, reviewing, count, onCom
                     {count === undefined || count.done === 0 ? null : <ReviewProgress count={count} label={text.incomplete} stopped />}
                 </div>
             )}
+            {by === undefined ? null : <p class="by">{text.noteBy(signature(by.annotator, by.effort))}</p>}
         </div>
     );
 }
@@ -201,19 +242,10 @@ export interface About
 }
 
 /**
- * The player's words of the game, the newest by the box they write in with how far it got, and the box: Enter or the button sends the words alone, the next
- * move takes them with it. 200 characters from one move of the AI's to the next: once they are written, the box goes until its move (D-54). In analysis the
- * AI's answers are in the same thread, each by a small Torretta, read aloud as they come when the player wants it, and each line of the player's names the
- * move it was written on (D-101).
+ * The box the player writes in: Enter or the button sends the words alone, the next move takes them with it. 200 characters from one move of the AI's to
+ * the next: once they are written, the box goes until its move (D-54). In analysis it says the move the words go with (D-101).
  */
-export function Compose({ lines, answers = [], voice, newestFirst, spent, draft, onDraft, onSend, canMove, name, problem, about, to, text }: {
-    lines: readonly TalkLine[];
-    /** In analysis, all the AI's answers over the game, of which the voice reads those added while the page is open. */
-    answers?: readonly string[];
-    /** The voice that reads the answers aloud, when the player wants it. */
-    voice?: Voice;
-    /** On a board turned round the box is above the words, and the newest come first. */
-    newestFirst: boolean;
+export function Compose({ spent, draft, onDraft, onSend, canMove, name, problem, about, text }: {
     spent: number;
     draft: string;
     onDraft: (draft: string) => void;
@@ -222,18 +254,11 @@ export function Compose({ lines, answers = [], voice, newestFirst, spent, draft,
     name: string;
     problem?: string;
     about?: About;
-    /** Who the words go to, over the box. */
-    to?: ComponentChildren;
     text: Text;
 })
 {
-    const list = useRef<HTMLOListElement>(null);
-    useOnlyWhole(list, lines.map((line) => line.text));
-    useSpokenNews(answers, voice);
     const left = talkLimits.line - spent;
     const blank = draft.trim() === "";
-    const lastWritten = lines.findLastIndex((line) => line.who === "player");
-    const lastAnswer = lines.findLastIndex((line) => line.who === "ai");
     const prompt = about === undefined ? text.writeTo(name) : text.askAbout(name);
 
     const submit = (): void => {
@@ -242,71 +267,45 @@ export function Compose({ lines, answers = [], voice, newestFirst, spent, draft,
         }
     };
 
+    if (left <= 0) {
+        return null;
+    }
+
     return (
-        <>
-            <ol ref={list} class="sent" aria-live="polite">
-                {inOrder(
-                    lines.map((line, index) => (
-                        <li key={index} class={line.who === "ai" ? "from-ai" : undefined} style={about === undefined ? aged(lines.length - 1 - index) : reread(index, lastAnswer)}>
-                            {line.who === "ai"
-                                ? (
-                                    <>
-                                        <Torretta size={24} />
-                                        <p class="say">
-                                            <Marked text={line.text} />
-                                        </p>
-                                    </>
-                                )
-                                : (
-                                    <p class="said">
-                                        {about === undefined ? null : <ShownPlace shown={line.shown} about={about} text={text} />}
-                                        {line.text}
-                                    </p>
-                                )}
-                            {index === lastWritten ? <Status heard={line.heard} name={name} text={text} /> : null}
-                        </li>
-                    )),
-                    newestFirst,
-                )}
-            </ol>
-            {to}
-            {left <= 0 ? null : (
-                <form
-                    class={about === undefined ? "compose" : "compose asking"}
-                    onSubmit={(event) => {
+        <form
+            class={about === undefined ? "compose" : "compose asking"}
+            onSubmit={(event) => {
+                event.preventDefault();
+                submit();
+            }}
+        >
+            <p class="limit" role="status">{problem ?? ""}</p>
+            <textarea
+                rows={2}
+                maxLength={left}
+                placeholder={prompt}
+                aria-label={prompt}
+                value={draft}
+                onInput={(event) => onDraft(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
                         event.preventDefault();
                         submit();
-                    }}
-                >
-                    <p class="limit" role="status">{problem ?? ""}</p>
-                    <textarea
-                        rows={2}
-                        maxLength={left}
-                        placeholder={prompt}
-                        aria-label={prompt}
-                        value={draft}
-                        onInput={(event) => onDraft(event.currentTarget.value)}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-                                event.preventDefault();
-                                submit();
-                            }
-                        }}
-                    />
-                    <div class="foot">
-                        {spent + draft.length >= talkLimits.line - 50
-                            ? <span class="count">{spent + draft.length}/{talkLimits.line}</span>
-                            : <span class="hint">{about === undefined ? !blank && canMove ? text.withMove : "" : <OnMove ply={about.ply} text={text} />}</span>}
-                        <button class="send" type="submit" disabled={blank}>
-                            {text.send}
-                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M5 12H18M13 7L18 12L13 17" />
-                            </svg>
-                        </button>
-                    </div>
-                </form>
-            )}
-        </>
+                    }
+                }}
+            />
+            <div class="foot">
+                {spent + draft.length >= talkLimits.line - 50
+                    ? <span class="count">{spent + draft.length}/{talkLimits.line}</span>
+                    : <span class="hint">{about === undefined ? !blank && canMove ? text.withMove : "" : <OnMove ply={about.ply} text={text} />}</span>}
+                <button class="send" type="submit" disabled={blank}>
+                    {text.send}
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 12H18M13 7L18 12L13 17" />
+                    </svg>
+                </button>
+            </div>
+        </form>
     );
 }
 
@@ -335,6 +334,29 @@ export function TalkFaces({ name, aiPicture, you, picture, ai, player, aiMoves, 
             <RailPlayer place="ai" picture={aiPicture ?? <Torretta size={40} bust />} name={name} {...(ai === undefined ? {} : { side: text.sides[ai] })} moves={aiMoves} unread={unread} />
             <RailPlayer place="you" picture={picture} name={you} {...(player === undefined ? {} : { side: text.sides[player] })} moves={playerMoves} />
         </div>
+    );
+}
+
+/** In a bubble's corner, small: the move the words go with, as the move list writes it, and the mark of how far the player's last line got. */
+function Corner({ move, status }: { move: Ply | undefined; status: ComponentChildren; })
+{
+    if (move === undefined && status === null) {
+        return null;
+    }
+
+    return (
+        <span class="corner">
+            {move === undefined ? null : (
+                <span class="corner-move">
+                    <span class="visually-hidden">{move.number}{move.side === "white" ? "." : "..."}{move.san}</span>
+                    <span aria-hidden="true">
+                        <span class="move-number">{move.number}{move.side === "white" ? "." : "..."}</span>
+                        <Figurines san={move.san} side={move.side} />
+                    </span>
+                </span>
+            )}
+            {status}
+        </span>
     );
 }
 
@@ -542,62 +564,73 @@ function SkipReading({ at, read, voice }: { at: string; read: string | undefined
     );
 }
 
-/** A list's items, the newest first when it asks. */
-function inOrder<Item>(items: Item[], newestFirst: boolean): Item[]
-{
-    return newestFirst ? items.reverse() : items;
-}
-
 /**
- * A word fades with age: the newest whole, the older ones well back, so they never pass for the newest (Stefano), each fainter down to a floor where its text still
- * keeps 3.5:1 on its bubble in the light theme.
+ * Keeps the newest bubble in sight: on a new one, or when the column changes height, the thread goes to its foot, unless the player has scrolled up to read;
+ * then a new bubble is unseen until they come down. Says too whether there is more above, for the fade at the top.
  */
-function aged(age: number): { opacity: number; }
+function useNewestInSight(list: RefObject<HTMLElement>, items: readonly ThreadItem[]): { moreAbove: boolean; unseen: boolean; toNewest: () => void; }
 {
-    return { opacity: age === 0 ? 1 : Math.max(0.6, 0.7 - (age - 1) * 0.05) };
-}
+    const away = useRef(false);
+    const [moreAbove, setMoreAbove] = useState(false);
+    const [unseen, setUnseen] = useState(false);
+    const newest = items.at(-1);
 
-/** In analysis the talk is read again: the AI's last answer and what follows it whole, the older lines a little back, still readable (Zoe). */
-function reread(index: number, lastAnswer: number): { opacity: number; }
-{
-    return { opacity: index >= lastAnswer ? 1 : 0.75 };
-}
+    const toNewest = (): void => {
+        const element = list.current;
 
-/**
- * A list that never scrolls: a bubble that does not fit whole in it is hidden, the oldest first since the newest sit by the card, and shows again when the
- * window grows.
- */
-function useOnlyWhole(list: RefObject<HTMLElement>, lines: readonly string[], newestFirst = false): void
-{
-    useLayoutEffect(() => {
+        if (element !== null) {
+            element.scrollTop = element.scrollHeight;
+        }
+    };
+
+    useEffect(() => {
         const element = list.current;
 
         if (element === null) {
             return;
         }
 
-        const fit = (): void => {
-            const box = element.getBoundingClientRect();
-            const padding = getComputedStyle(element);
-            const room = element.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom);
-            const newest = newestFirst ? element.firstElementChild : element.lastElementChild;
+        const measure = (): void => {
+            away.current = element.scrollHeight - element.scrollTop - element.clientHeight > awayBy;
+            setMoreAbove(element.scrollTop > 1);
 
-            for (const item of element.children) {
-                const place = item.getBoundingClientRect();
-                const style = (item as HTMLElement).style;
-                // The newest never hides: one longer than the column, as a note with the helps on (D-78), scrolls in itself with no scrollbar (talk.css).
-                style.maxHeight = item === newest ? room + "px" : "";
-                item.classList.toggle("scrolls", item === newest && item.scrollHeight > room);
-                style.visibility = item === newest || (place.top >= box.top - 1 && place.bottom <= box.bottom + 1) ? "" : "hidden";
+            if (!away.current) {
+                setUnseen(false);
             }
         };
 
-        fit();
-        const observer = new ResizeObserver(fit);
+        const follow = (): void => {
+            if (!away.current) {
+                toNewest();
+            }
+
+            measure();
+        };
+
+        element.addEventListener("scroll", measure, { passive: true });
+        const observer = new ResizeObserver(follow);
         observer.observe(element);
-        return () => observer.disconnect();
-    }, [list, lines.length, lines.at(-1)]);
+
+        return () => {
+            element.removeEventListener("scroll", measure);
+            observer.disconnect();
+        };
+    }, [list]);
+
+    // The player's own line always brings them down to it.
+    useLayoutEffect(() => {
+        if (!away.current || newest?.who === "player") {
+            toNewest();
+        } else {
+            setUnseen(true);
+        }
+    }, [items.length, newest?.text]);
+
+    return { moreAbove, unseen, toNewest };
 }
+
+/** How far above its foot the player may have scrolled the thread and still follow the newest, in pixels. */
+const awayBy = 48;
 
 /**
  * Under the player's last line, a mark with its words as title: one check once written, two once the AI has read it; once it has answered, its answer says it and

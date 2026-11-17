@@ -45,24 +45,7 @@ import { howEnded, useDeclined, useJustEnded, useSawEnd } from "../game/ending.t
 import { goOnFrom } from "../game/go-on.ts";
 import { type LineView, Steps, stepsLine } from "../game/move-list.tsx";
 import { useOpeningBook } from "../game/opening-book.ts";
-import {
-    aiSpoke,
-    aiWords,
-    analysisAnswers,
-    analysisTalk,
-    type CoachShown,
-    judgmentsOf,
-    nextBadged,
-    playerSpent,
-    playerWords,
-    pliesOf,
-    type Ply,
-    reviewCount,
-    type SentVariation,
-    withBook,
-    withJudgments,
-    withoutReviews,
-} from "../game/plies.ts";
+import { aiSpoke, analysisTalk, type CoachShown, judgmentsOf, nextBadged, playerSpent, pliesOf, type Ply, reviewCount, type SentVariation, talkThread, threadItem, withBook, withJudgments, withoutReviews } from "../game/plies.ts";
 import { afterMove, isJump, leaveLine, linePlies, lineRecord, onLine, type Place, stepLine, type Variation } from "../game/variation.ts";
 import { GuideDialog } from "../guide/guide.tsx";
 import { BareButton, HelpsCard, HintLine, MapButton } from "../helps/helps.tsx";
@@ -84,7 +67,7 @@ import { endSoundOf, playSound, soundOf, wakeSounds } from "../sounds/sounds.ts"
 import { holdsChoice, withStartedChoice } from "../table/action.ts";
 import { UpdateDialog, UpdateNotice } from "../table/update.tsx";
 import { AiNameButton, ChatDialog, tableNote } from "../table/window.tsx";
-import { AiNote, AiWords, Compose, PointSquare, TalkFaces } from "../talk/talk.tsx";
+import { AiNote, Compose, PointSquare, TalkFaces, Thread } from "../talk/talk.tsx";
 import { textFor } from "../text.ts";
 import { anchorName, type LinkIgnored, useAnchor } from "./anchor.ts";
 import { useBrowseKeys, useEscapeKey, useFoldKeys, useHushKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
@@ -565,7 +548,10 @@ export function App({ start }: { start: Settings; })
     // In analysis the AI's card says who played that game, as its PGN keeps it (D-82), not who plays now.
     const playedBy = studied === undefined ? undefined : aiModelIn(live.record);
     const talk = game?.talk ?? served.talk ?? [];
-    const said = playerWords(talk);
+    // The review's model is signed under the note only when another played the game (D-81).
+    const reviewer = annotator !== undefined && (playedBy === undefined || signature(annotator.annotator, annotator.effort) !== signature(playedBy.model, playedBy.effort))
+        ? annotator
+        : undefined;
     // The clocks only in a game going on: between games the player's card holds the next one in their place (D-77).
     const clock = going ? game?.clock : undefined;
     // No chat hears the player: the page says where to wake it, and the AI's clock waits, as the server holds it.
@@ -776,6 +762,8 @@ export function App({ start }: { start: Settings; })
 
     // Where the words go in analysis: the game, the move shown, and the variation, on the board or set aside (D-116).
     const shownIn = (game: string): Shown => line === undefined ? { game, at } : { game, at, variation: line };
+    // In analysis the words go with the move shown, and the player's lines take the board back to where they were written.
+    const about = { ...(at === 0 ? {} : { ply: plies[at - 1]! }), onShow: goTo, onLine: putLineBack };
 
     // «Analyse» on the variation sends the player's request, as their words would (D-116).
     const analyseLine = (): void => {
@@ -946,36 +934,38 @@ export function App({ start }: { start: Settings; })
                                             {...(count === undefined ? {} : { count })}
                                             {...(completeIt === undefined ? {} : { onComplete: completeIt })}
                                             name={analyst}
-                                            by={annotator}
-                                            mood={mood}
+                                            by={reviewer}
                                             {...(voiced ? { voice: text } : {})}
                                             text={text}
                                         />
                                     </section>
+                                    <section class="chat" aria-label={text.talk}>
+                                        <Thread
+                                            // Another game in analysis starts the thread afresh: the voice reads only the answers that come after.
+                                            key={studied.name}
+                                            items={analysisTalk(talk, studied.name).map(threadItem)}
+                                            {...(voiced ? { voice: text } : {})}
+                                            name={name}
+                                            about={about}
+                                            text={text}
+                                        />
+                                        {chatName}
+                                        <Compose
+                                            spent={0}
+                                            draft={draft}
+                                            onDraft={(words) => {
+                                                setDraft(words);
+                                                setUnsent(undefined);
+                                            }}
+                                            onSend={() => sendWords(shownIn(studied.name))}
+                                            canMove={false}
+                                            name={name}
+                                            problem={unsent}
+                                            about={about}
+                                            text={text}
+                                        />
+                                    </section>
                                     <section class="you-block" aria-label={sides[player].name}>
-                                        <div class="chat">
-                                            <Compose
-                                                // Another game in analysis starts the thread afresh: the voice reads only the answers that come after.
-                                                key={studied.name}
-                                                lines={analysisTalk(talk, studied.name)}
-                                                answers={analysisAnswers(talk, studied.name)}
-                                                {...(voiced ? { voice: text } : {})}
-                                                newestFirst={false}
-                                                spent={0}
-                                                draft={draft}
-                                                onDraft={(words) => {
-                                                    setDraft(words);
-                                                    setUnsent(undefined);
-                                                }}
-                                                onSend={() => sendWords(shownIn(studied.name))}
-                                                canMove={false}
-                                                name={name}
-                                                problem={unsent}
-                                                about={{ ...(at === 0 ? {} : { ply: plies[at - 1]! }), onShow: goTo, onLine: putLineBack }}
-                                                {...(chatName === undefined ? {} : { to: chatName })}
-                                                text={text}
-                                            />
-                                        </div>
                                         {studiedCard(player, "you")}
                                     </section>
                                 </>
@@ -996,16 +986,10 @@ export function App({ start }: { start: Settings; })
                                             text={text}
                                         />
                                         {asleepNote}
-                                        <AiWords
-                                            words={aiWords(plies, ai, talk)}
-                                            newestFirst={!flipped}
-                                            {...(voiced ? { voice: text } : {})}
-                                        />
                                     </section>
-                                    <section class="you-block" aria-label={profile.name}>
+                                    <section class="chat" aria-label={text.talk}>
+                                        <Thread items={talkThread(plies, ai, talk)} {...(voiced ? { voice: text } : {})} name={name} text={text} />
                                         <Compose
-                                            lines={said}
-                                            newestFirst={flipped}
                                             // Between games, and before the first, the player writes freely, a line at a time, as the AI does (D-74, D-77).
                                             spent={going ? playerSpent(plies, ai, talk) : 0}
                                             draft={draft}
@@ -1019,6 +1003,8 @@ export function App({ start }: { start: Settings; })
                                             problem={unsent}
                                             text={text}
                                         />
+                                    </section>
+                                    <section class="you-block" aria-label={profile.name}>
                                         <PlayerCard
                                             place="you"
                                             picture={picture}

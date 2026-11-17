@@ -1,83 +1,13 @@
-/* The talk over a game in analysis (D-101): the player's words and the AI's answers in one thread over the box, by the player's card; the AI's note stays
-   with the other side's card, and the thread gives way before the cards do (Zoe) */
-.talk.studied > .you-block {
-    flex: 1 1 auto;
-    max-height: none;
-}
-
-/* Under the AI's note, with no line between them (Stefano) */
-.talk.studied > section > .chat {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
-    margin-top: 12px;
-}
-
-.chat > .compose {
-    flex: none;
-}
-
-/* The thread reads in time's order whichever way the board is turned: the newest words just over the box (Zoe) */
-.flipped .talk.studied,
-.flipped .talk.studied > section {
-    flex-direction: column;
-}
-
-.flipped .talk.studied .sent {
-    justify-content: flex-end;
-    margin: 0 0 8px;
-}
-
-.flipped .talk.studied .compose {
-    margin: 0;
-}
-
-/* Beside the board the talk takes the room the AI's notes leave, not half the column as in a game; turned round, the player's card goes on top and the
-   AI's note below the box; on a phone the talk has an area of its own (layout.css) */
-@media (min-width: 841px) {
-    .chat > .sent {
-        flex: 1 1 0;
-    }
-
-    .flipped .talk.studied,
-    .flipped .talk.studied > section {
-        flex-direction: column-reverse;
-    }
-
-    .flipped .talk.studied > section > .chat {
-        margin: 0 0 12px;
-    }
-
-    /* Turned round, the note's room goes under its bubbles, which would touch the AI's card or the note that no chat listens (Zoe) */
-    .flipped .talk.studied .ai-note {
-        margin: 0 0 12px;
-    }
-}
-
-/* The AI's answers on the left, in its bubbles, each with a small Torretta at its foot instead of the tail that points at the big one: it is not by them (Stefano) */
-.sent li.from-ai {
+/* The talk over a game in analysis (D-101): the chat that answers over the box as its addressee, its name opening the chat's window as on the AI's card in
+   a game */
+.thread-box + .ai-name {
     align-self: flex-start;
-    flex-direction: row;
-    align-items: flex-end;
-    gap: 6px;
+    margin: 6px 0 6px 12px;
+    color: var(--soft);
+    font-size: 0.875rem;
 }
 
-.sent li.from-ai > .torretta {
-    flex: none;
-}
-
-/* The bubble's foot level with the Torretta's, spaced as the player's lines are */
-.sent li.from-ai > .say {
-    margin: 0;
-}
-
-.talk.studied .sent .say::before,
-.talk.studied .sent .say::after {
-    content: none;
-}
-
-/* The box has no tail either: the card it would point at may be someone else's */
+/* The box in analysis has no tail: the card it would point at may be someone else's */
 .compose.asking::after {
     content: none;
 }

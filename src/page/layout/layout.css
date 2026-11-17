@@ -591,89 +591,50 @@
     }
 }
 
-/* A long name or model goes to its ellipsis instead of widening the page on a phone (Zoe). Each side's talk has half the column at most:
-   past it, its words scroll; the box and the cards never give way. */
+/* The talk's column: the AI's card, the thread with the box under it, the player's card; only the thread gives way. A long name or model goes to its
+   ellipsis instead of widening the page on a phone (Zoe) */
 .ai-block,
+.chat,
 .you-block {
     display: flex;
     flex-direction: column;
-    min-height: 0;
     min-width: 0;
-    flex: 0 1 auto;
-    max-height: calc(50% - var(--between) / 2);
 }
 
-.you-block > .compose,
-.you-block > .player {
+.ai-block,
+.you-block,
+.chat > :not(.thread-box) {
     flex: none;
 }
 
-/* Beside the board the talk is a row a side, each half the column, or what its card, note and box need when that is more: only the words give way, and
-   never spill over the other side (Stefano, Zoe). Turned round, the player's row comes first. In analysis the AI's note keeps its height while the thread
-   gives way, and never scrolls by itself */
-@media (min-width: 841px) {
-    .talk {
-        display: grid;
-        grid-template-rows: minmax(min-content, 1fr) minmax(min-content, 1fr);
-        container: talk / size;
-    }
+.chat {
+    flex: 1 1 0;
+    min-height: 0;
+}
 
-    .ai-block,
-    .you-block {
-        max-height: none;
-    }
+/* In analysis a long note gives way too, scrolling in itself, while the thread and the box keep a room of their own; its padding holds the tail */
+.talk.studied > .ai-block {
+    flex: 0 1 auto;
+    min-height: 0;
+}
 
-    /* The player's card stays by the board's edge when the words above it go */
-    .you-block {
-        justify-content: flex-end;
-    }
+.talk.studied > .ai-block > :not(.ai-note) {
+    flex: none;
+}
 
-    .flipped .ai-block {
-        grid-row: 2;
-    }
+.talk.studied .ai-note {
+    min-height: 0;
+    padding-top: 12px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
 
-    .flipped .you-block {
-        grid-row: 1;
-    }
+.flipped .talk.studied .ai-note {
+    padding: 0 0 12px;
+}
 
-    /* The words take the room left, and ask none of their own */
-    .says,
-    .sent {
-        flex: 1 1 0;
-        contain: size;
-    }
-
-    /* The note is always whole: when the column cannot hold it with the box and the cards, the column scrolls under the wheel or the finger, with no
-       scrollbar, fading at its edges as the game's column does; a halo keeps the cards' shadows. Positioned, so the words hidden for screen readers
-       scroll with it instead of stretching the page */
-    .talk.studied {
-        --halo: 16px;
-        position: relative;
-        grid-template-rows: max-content minmax(min-content, 1fr);
-        margin: calc(-1 * var(--halo));
-        padding: var(--halo);
-        overflow: hidden auto;
-        scrollbar-width: none;
-        mask-image: linear-gradient(transparent, #000 var(--halo), #000 calc(100% - var(--halo)), transparent);
-    }
-
-    /* Turned round the note is at the foot: a column laid from its foot opens scrolled to it */
-    .flipped .talk.studied {
-        display: flex;
-    }
-
-    .flipped .talk.studied > .you-block {
-        flex: 1 1 0;
-        min-height: auto;
-    }
-
-    .flipped .talk.studied > .ai-block {
-        flex: none;
-    }
-
-    .talk.studied > .ai-block > .ai-note {
-        flex: none;
-    }
+.talk.studied > .chat {
+    min-height: min(240px, 50%);
 }
 
 /* The game's column, which folds from its tab */
@@ -867,20 +828,20 @@
     .app.talk-folded {
         grid-template-columns: 1fr;
         grid-template-rows: none;
-        grid-template-areas: "head" "ai" "board" "you" "side";
+        grid-template-areas: "head" "ai" "board" "chat" "you" "side";
     }
 
     .app.flipped {
-        grid-template-areas: "head" "you" "board" "ai" "side";
+        grid-template-areas: "head" "you" "board" "chat" "ai" "side";
     }
 
     /* The helps' map right under the board, by the thumb, so the board stays in sight while it shows (D-78, Zoe) */
     .app:has(.board-map) {
-        grid-template-areas: "head" "ai" "board" "map" "you" "side";
+        grid-template-areas: "head" "ai" "board" "map" "chat" "you" "side";
     }
 
     .app.flipped:has(.board-map) {
-        grid-template-areas: "head" "you" "board" "map" "ai" "side";
+        grid-template-areas: "head" "you" "board" "map" "chat" "ai" "side";
     }
 
     .talk,
@@ -899,13 +860,21 @@
         grid-area: you;
     }
 
-    .board-wrap {
-        width: 100%;
+    /* The thread, under the board: as tall as its words, up to a part of the screen, then it scrolls */
+    .chat {
+        grid-area: chat;
     }
 
-    .says,
-    .sent {
-        max-height: 30vh;
+    .thread-box {
+        flex: none;
+    }
+
+    .thread {
+        max-height: 40vh;
+    }
+
+    .board-wrap {
+        width: 100%;
     }
 
     .side,
@@ -931,21 +900,8 @@
         grid-template-areas: "head" "you" "board" "steps" "note" "chat" "ai" "side";
     }
 
-    .talk.studied > .you-block {
-        display: contents;
-    }
-
-    .talk.studied > .you-block > :not(.chat) {
-        grid-area: you;
-    }
-
-    /* The talk, under the note: half the screen of it at most */
-    .talk.studied .chat {
-        grid-area: chat;
-    }
-
-    .talk.studied .sent {
-        max-height: 50vh;
+    .talk.studied > .chat {
+        min-height: 0;
     }
 
     .talk.studied > .ai-block {
@@ -956,9 +912,17 @@
         grid-area: ai;
     }
 
-    .talk.studied .ai-note {
+    /* The note is under the board, away from the AI's card: whole, with no tail */
+    .talk.studied .ai-note,
+    .flipped .talk.studied .ai-note {
         grid-area: note;
-        margin-top: 0;
+        padding: 0;
+        overflow: visible;
+    }
+
+    .talk.studied .ai-note > .say::before,
+    .talk.studied .ai-note > .say::after {
+        content: none;
     }
 
     /* With no chat listening, its note comes before the Torretta's (Zoe) */
