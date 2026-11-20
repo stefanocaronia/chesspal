@@ -1,17 +1,18 @@
 // The position a hook showed a chat outside its server (D-71), and the player's words on the board page it gave with it: `chesspal prompt` notes them
-// after playing the move the player wrote alone, and the chat's server takes them before its next tool, so that the AI moves without asking for status
-// and no tool gives those words again; the chat's doorbell does not ring for that move, which the chat hears from the prompt itself.
+// after playing the move the player wrote alone, the page as its doorbell gives the game; the chat's server takes them before its next tool, so that the AI
+// moves without asking for status and no tool gives those words again. The doorbell does not ring for the prompt's move, which the chat hears from the prompt.
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { writeAtomically } from "./files.ts";
 
 /**
- * The position shown to a chat by its session, as the host names it to its hooks, and by the host's process, when it names one: the game by its start, none
- * when there is none, its plies, the stamp of game.json after the move, when, and the keys of the player's words given with it.
+ * The position shown to a chat by its session, as the host names it to its hooks, and by the host's process, when it names one; or by the port of the page
+ * whose doorbell showed it: the game by its start, none when there is none, its plies, the stamp of game.json, when, and the keys of the player's words given.
  */
 export interface PositionShown
 {
-    readonly session: string;
+    readonly session?: string;
+    readonly page?: number;
     readonly process?: string;
     readonly stamp?: string;
     readonly started?: string;
@@ -42,14 +43,15 @@ export function positionShownNote(folder: string): PositionShown | undefined
     try {
         const shown = JSON.parse(readFileSync(join(folder, fileName), "utf8")) as Partial<PositionShown>;
 
-        if (typeof shown.session !== "string" || typeof shown.at !== "string" || !Number.isInteger(shown.plies)) {
+        if ((typeof shown.session !== "string" && !Number.isInteger(shown.page)) || typeof shown.at !== "string" || !Number.isInteger(shown.plies)) {
             return undefined;
         }
 
         // A note of an older Chesspal has no words.
         const given = Array.isArray(shown.given) ? shown.given.filter((key): key is string => typeof key === "string") : [];
         return {
-            session: shown.session,
+            ...(typeof shown.session === "string" ? { session: shown.session } : {}),
+            ...(Number.isInteger(shown.page) ? { page: shown.page! } : {}),
             ...(typeof shown.process === "string" ? { process: shown.process } : {}),
             ...(typeof shown.stamp === "string" ? { stamp: shown.stamp } : {}),
             ...(typeof shown.started === "string" ? { started: shown.started } : {}),

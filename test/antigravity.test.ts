@@ -60,6 +60,20 @@ describe("Antigravity, the third host (D-115)", () => {
         expect(hookAnswer("codex", true, undefined)).toBe(codexBellAnswer);
     });
 
+    it("wakes the chat with the game the page gave, telling it not to call status, in every host", () => {
+        const game = "Game: you play Black, the player White, at the club level.\nMoves: 1.e4";
+        const line = "The player acted on the board page. Here is the game now, as status shows it: don't call status for it, decide on it.";
+        const italian = `${line} Write to the player in Italian.\n${game}`;
+
+        expect(hookAnswer("claude", true, undefined, game)).toBe(`${line}\n${game}`);
+        expect(hookAnswer("opencode", true, "Italian", game)).toBe(italian);
+        expect(hookAnswer("claude", true, "Italian", game)).toBe(italian);
+        expect(JSON.parse(hookAnswer("codex", true, "Italian", game)!)).toEqual({ decision: "block", reason: italian });
+        expect(JSON.parse(hookAnswer("antigravity", true, "Italian", game)!)).toEqual({ decision: "continue", reason: italian });
+        expect(hookAnswer("claude", false, undefined, game)).toBeUndefined();
+        expect(hookAnswer("antigravity", false, undefined, game)).toBe("{}");
+    });
+
     it("sees the player start a new turn in the conversation its hook holds: a message or a command typed, or Esc in its log", async () => {
         const folder = scratch();
         const history = join(folder, "history.jsonl");

@@ -1,5 +1,6 @@
 // The doorbell for the page (D-47): `chesspal listen`, the Stop hook init writes for Claude Code, Codex and Antigravity, which OpenCode's plugin runs too,
-// waits at the page of its chat and, when the player moves or writes there, tells the chat to call status. It never carries the move, the words or the position: status reads them fresh.
+// waits at the page of its chat and, when the player moves or writes there, wakes the chat with the game as status shows it, which the page notes shown
+// for the chat's server: the chat moves on it with no status between (D-71). A page that cannot read the game rings alone, and the chat calls status.
 // It names the player's language when it is not English: the line is the last a chat reads before it answers.
 import { closeSync, fstatSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -10,8 +11,11 @@ import { analystAgent } from "../../host-files/index.ts";
 import { askPage, chatFolder, findChatPage, notedFolder, notedPagePorts, pageNote, probeOf, probeWait } from "../ports/index.ts";
 import { watchNewTurn } from "./antigravity.ts";
 
-/** What the chat hears from the doorbell: one line for whatever the player did, never what, only where to read it. */
+/** What the chat hears from the doorbell without the game: one line for whatever the player did, never what, only where to read it. */
 export const bellLine = "The player acted on the board page: call status to see it.";
+
+// What the page answers a hook it rings for with the game: the game follows on the next lines.
+const ringWithGame = "ring\n";
 
 /**
  * The doorbell's end on the page's server: the hook of the chat that ended its turn waits here, one at a time, and hears "ring" when the player moves or
@@ -36,18 +40,27 @@ export class Bell
     private readonly changed: () => void;
     private readonly stopped: () => boolean;
     private readonly log: (line: string) => void;
+    private readonly rung: () => string | undefined;
 
     /**
      * `news` says whether a ring no hook heard is still worth waking the chat for; `changed` is told when what the page shows of the chat may change: it
      * starts or stops listening, the doorbell wakes it, its turn ends; `stopped` whether the host says the chat was stopped in its turn (Esc), which no
-     * hook tells; `log` takes a line for the doorbell's log at each change of its state.
+     * hook tells; `log` takes a line for the doorbell's log at each change of its state; `rung` gives the game the hook carries to the chat as it hears the
+     * bell, none for the bell alone.
      */
-    constructor(news: () => boolean = () => true, changed: () => void = () => undefined, stopped: () => boolean = () => false, log: (line: string) => void = () => undefined)
+    constructor(
+        news: () => boolean = () => true,
+        changed: () => void = () => undefined,
+        stopped: () => boolean = () => false,
+        log: (line: string) => void = () => undefined,
+        rung: () => string | undefined = () => undefined,
+    )
     {
         this.news = news;
         this.changed = changed;
         this.stopped = stopped;
         this.log = log;
+        this.rung = rung;
     }
 
     /** Whether the chat is in a turn, as far as the doorbell knows: a chat stopped with Esc stays in it until its next tool, or until a ring finds it stopped. */
@@ -138,7 +151,7 @@ export class Bell
             return;
         }
 
-        this.listener.end("ring");
+        this.listener.end(this.ringHeard());
         this.listener = undefined;
         this.busy = true;
         this.woken = true;
@@ -160,7 +173,7 @@ export class Bell
         const who = hookNamed(hook);
 
         if (missed && this.news()) {
-            response.end("ring");
+            response.end(this.ringHeard());
             this.busy = true;
             this.woken = true;
             this.note(`listen${who}, rung at once for a ring it missed`);
@@ -204,6 +217,13 @@ export class Bell
     note(event: string): void
     {
         this.log(`bell ${event} -> ${this.state()}`);
+    }
+
+    /** What the hook hears: "ring", and on the lines after it the game, when the page gives it. */
+    private ringHeard(): string
+    {
+        const game = this.rung();
+        return game === undefined ? "ring" : `${ringWithGame}${game}`;
     }
 
     private tellIf(changed: boolean): void
@@ -300,6 +320,13 @@ export function bellLineIn(language: string | undefined): string
     return language === undefined ? bellLine : `${bellLine} Write to the player in ${language}.`;
 }
 
+/** The doorbell's line with the game as status shows it, which the chat decides on without calling status; in the player's language when not English. */
+export function gameBellLine(language: string | undefined, game: string): string
+{
+    const line = "The player acted on the board page. Here is the game now, as status shows it: don't call status for it, decide on it.";
+    return `${line}${language === undefined ? "" : ` Write to the player in ${language}.`}\n${game}`;
+}
+
 /** What Codex's Stop hook answers to wake the chat: its turn goes on with the doorbell's line. */
 export const codexBellAnswer = JSON.stringify({ decision: "block", reason: bellLine });
 
@@ -343,7 +370,7 @@ export async function listen(host: ListeningHost = "claude"): Promise<void>
     noteBell(heard.folder, `${who} ${heard.rang ? "rang" : heard.why}`);
 
     // It ends as soon as it knows: the chat hears the hook only once it ends. The player's language is read only when it rang.
-    const answer = hookAnswer(host, heard.rang, heard.rang ? await playerLanguage() : undefined);
+    const answer = heard.rang ? hookAnswer(host, true, await playerLanguage(), heard.game) : hookAnswer(host, false);
 
     if (answer === undefined) {
         process.exit(0);
@@ -355,12 +382,12 @@ export async function listen(host: ListeningHost = "claude"): Promise<void>
 }
 
 /**
- * What the hook says as it ends, by its host: the doorbell's line or answer when it rang, naming the player's `language` when given; else nothing, but
- * for Antigravity, which reads an answer.
+ * What the hook says as it ends, by its host: the doorbell's line or answer when it rang, naming the player's `language` when given, with the `game` as
+ * status shows it when the page gave it; else nothing, but for Antigravity, which reads an answer.
  */
-export function hookAnswer(host: ListeningHost, rang: boolean, language?: string): string | undefined
+export function hookAnswer(host: ListeningHost, rang: boolean, language?: string, game?: string): string | undefined
 {
-    const line = bellLineIn(language);
+    const line = game === undefined ? bellLineIn(language) : gameBellLine(language, game);
 
     if (host === "antigravity") {
         return rang ? JSON.stringify({ decision: "continue", reason: line }) : "{}";
@@ -382,8 +409,8 @@ export async function waitForBell(input: string, ports?: number[]): Promise<bool
     return (await bellHeard(input, ports)).rang;
 }
 
-/** What the hook heard at the page of its chat, in its folder: the bell, or why not. */
-export type BellHeard = { folder: string; rang: true; } | { folder: string; rang: false; why: string; };
+/** What the hook heard at the page of its chat, in its folder: the bell, with the game as status shows it when the page gave it, or why not. */
+export type BellHeard = { folder: string; rang: true; game?: string; } | { folder: string; rang: false; why: string; };
 
 /**
  * Waits at the page of the hook's chat, as waitForBell does, and says what it heard. The chat may be attached to the table (D-104), beside another chat
@@ -411,7 +438,16 @@ export async function bellHeard(input: string, ports?: number[]): Promise<BellHe
         pid: String(process.pid),
     });
     const said = (await askPage(port, `/api/bell?${query}`)).text;
-    return said === "ring" ? { folder, rang: true } : { folder, rang: false, why: said === undefined ? `the page at port ${port} did not answer` : `the page at port ${port} said "${said}"` };
+
+    if (said === "ring") {
+        return { folder, rang: true };
+    }
+
+    if (said?.startsWith(ringWithGame) === true) {
+        return { folder, rang: true, game: said.slice(ringWithGame.length) };
+    }
+
+    return { folder, rang: false, why: said === undefined ? `the page at port ${port} did not answer` : `the page at port ${port} said "${said}"` };
 }
 
 /**

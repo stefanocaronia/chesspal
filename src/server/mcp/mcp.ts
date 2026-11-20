@@ -298,9 +298,9 @@ async function gameNow(context: Context, home: () => string, caller: NonNullable
 }
 
 /**
- * The position the prompt hook showed the chat with the move the player wrote alone (D-71), taken before the chat's tool runs as if a tool had shown it,
- * while the game is still there: the AI moves on it without a status, and the player's words the hook gave count as given, which the page hears. A note
- * on another position goes; one of another chat's stays for it.
+ * The position the prompt hook showed the chat with the move the player wrote alone (D-71), or its page's doorbell with the game, taken before the chat's
+ * tool runs as if a tool had shown it, while the game is still there: the AI moves on it without a status, and the player's words the hook gave count as
+ * given, which the page hears. A note on another position goes; one of another chat's stays for it.
  */
 function takePositionShown(context: Context, home: () => string): void
 {
@@ -319,7 +319,7 @@ function takePositionShown(context: Context, home: () => string): void
         return;
     }
 
-    if (current && !chatsNote(shown, context.folder)) {
+    if (current && !chatsNote(shown, context.folder, context.page)) {
         return;
     }
 
@@ -335,18 +335,23 @@ function takePositionShown(context: Context, home: () => string): void
 }
 
 /**
- * Whether a note of the hooks is this server's chat's: by the Claude Code process, which names itself alike to the server and its hooks, when both have its
+ * Whether a note of the hooks is this server's chat's: the doorbell's by the port of the page this chat's server serves, or of the table it is attached
+ * to, which it names; the prompt hook's by the Claude Code process, which names itself alike to the server and its hooks, when both have its
  * name. Else by the session: the server's is the one Claude Code started it with, and the hooks get a new one after /clear, which the chat's start notes;
  * a chat started or resumed since in the folder is taken for another Claude Code.
  */
-function chatsNote({ process: noted, session }: PositionShown, folder: string, own = hostProcess(), ownSession = process.env.CLAUDE_CODE_SESSION_ID): boolean
+function chatsNote({ process: noted, session, page }: PositionShown, folder: string, ownPage: string | undefined, own = hostProcess(), ownSession = process.env.CLAUDE_CODE_SESSION_ID): boolean
 {
+    if (page !== undefined) {
+        return ownPage !== undefined && Number(new URL(ownPage).port) === page;
+    }
+
     if (noted !== undefined && own !== undefined) {
         return noted === own;
     }
 
     const start = lastChatStart(folder);
-    return session === ownSession || (start?.session === session && start.source !== "startup" && start.source !== "resume");
+    return session !== undefined && (session === ownSession || (start?.session === session && start.source !== "startup" && start.source !== "resume"));
 }
 
 /**

@@ -10,4 +10,4 @@ export { ChatNotClear, newGame, pliesBeforeClearing, startNewGame } from "./new.
 export { type MoveSentAlone, playerMove, playMoveSentAlone } from "./player-move.ts";
 export { ponder } from "./ponder.ts";
 export { position } from "./position.ts";
-export { status } from "./status.ts";
+export { type GameAtRing, gameAtRing, status } from "./status.ts";

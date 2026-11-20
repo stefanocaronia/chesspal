@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Game, gameReviewOf, leadOf, reviewOf } from "../../core/index.ts";
-import { archivedName, cleanSince, endOf, gameInAnalysis, lastChatStart } from "../../games/index.ts";
+import { archivedName, type ChatStart, cleanSince, endOf, gameInAnalysis, gameStamp, lastChatStart } from "../../games/index.ts";
 import { hasDoorbell, isCodex, outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
@@ -16,6 +16,7 @@ import {
     goneOver,
     namedGame,
     newGameStep,
+    positionIn,
     positionLines,
     reviewedLine,
     shownMoves,
@@ -31,7 +32,7 @@ import {
     type Written,
 } from "../answers/index.ts";
 import { playerLine } from "../profiles/index.ts";
-import { type Context, defineCommand } from "../registry/index.ts";
+import { type Context, defineCommand, type SeenPosition } from "../registry/index.ts";
 import { instructionsRead } from "../setup/index.ts";
 import { levelText } from "./levels.ts";
 import { closedPage, pageGiven, pageLine } from "./page-link.ts";
@@ -98,56 +99,10 @@ export const status = defineCommand({
             status.unread = true;
         }
 
-        try {
-            const current = gameAt(folder, context.now());
-
-            // With no game the player may have written before the first (D-77).
-            const words = unansweredWords(context);
-
-            if (words.length > 0) {
-                status.words = words;
-            }
-
-            if (current !== undefined) {
-                status.game = withAnalyst(withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current, coachRuns(context), context.host?.()), context, current);
-
-                if (status.pageClosed === true) {
-                    pageGiven(context, current.started);
-                }
-
-                // A game a summarized or resumed chat still holds is its own; without the host's word of the chat's start, any game began before it. One with no
-                // move yet has nothing to go on with: the chat the table starts again for a new game begins just after it (D-76).
-                if (first && endOf(current.game) === undefined && current.game.record.moves.length > 0 && (chatStart === undefined || cleanSince(chatStart, current.started))) {
-                    status.fromBefore = true;
-                }
-
-                // A move that ended the game: the coach judges the player's last move, told until it starts (D-88).
-                if (coachOnEnd(context, folder, current)) {
-                    status.coach = true;
-                }
-            }
-
-            const analysis = current === undefined || status.game?.end !== undefined ? gameInAnalysis(folder) : undefined;
-
-            if (analysis !== undefined) {
-                // The analyst agent goes over a game the player brought, or whose review was deleted, where it runs, and the chat over what it reviewed (D-89).
-                const review = analysis.brought === true ? undefined : reviewProgress(context, analysis.game);
-                status.analysis = {
-                    game: analysis.game,
-                    ...(analysis.brought === true ? { brought: true } : {}),
-                    ...(analysis.redo === true ? { redo: true } : {}),
-                    ...(analystRuns(context) ? { analyst: goneOver(context, analysis.game) ? "done" as const : "offer" as const } : {}),
-                    ...(analystRuns(context) && isCodex(context.host?.()) ? { codex: true as const } : {}),
-                    ...(review === undefined ? {} : { review }),
-                };
-            }
-        } catch (error) {
-            status.problem = (error as Error).message;
-        }
-
+        readGame(status, context, folder, first, chatStart);
         return status;
     },
-    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words = [], analysis, fromBefore, coach, outdated, unread }, context) =>
+    format: ({ version, folder, page, pageClosed, player, speech, game, problem, words, analysis, fromBefore, coach, outdated, unread }, context) =>
         [
             `Chesspal ${version}. Folder: ${folder}`,
             ...(unread === true ? [unreadLine] : []),
@@ -156,10 +111,97 @@ export const status = defineCommand({
             ...(player === undefined ? [] : [player]),
             ...(speech === undefined ? [] : [speechLine(speech)]),
             ...(fromBefore === true ? [fromBeforeLine] : []),
-            ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true, pageClosed === true, coach === true, hasDoorbell(context?.host?.()))),
-            ...(analysis === undefined ? [] : [analysisLine(analysis)]),
+            ...shownGame({ game, problem, words, analysis, pageClosed, coach }, context),
         ].join("\n"),
 });
+
+/** The game as the doorbell gives it to the chat it wakes, with the position that shows and the keys of the player's words it gave, as the prompt hook's move. */
+export interface GameAtRing
+{
+    text: string;
+    position: SeenPosition;
+    stamp?: string;
+    given: string[];
+}
+
+/**
+ * The game as status shows it, without what only a chat's first status adds: the version, the folders, the page, the player, their language, the
+ * instructions to read and an older init's files. The page is open: the player acted there.
+ */
+export function gameAtRing(context: Context): GameAtRing
+{
+    const folder = gameFolder(context.home());
+    const before = new Set(context.given);
+    const seen: Status = { version, folder };
+    readGame(seen, context, folder, false, undefined);
+    const stamp = gameStamp(folder);
+    return {
+        text: shownGame(seen, context).join("\n"),
+        position: positionIn(folder),
+        ...(stamp === undefined ? {} : { stamp }),
+        given: [...context.given].filter((key) => !before.has(key)),
+    };
+}
+
+/** What status shows of the game: why it cannot be read, or its lines with the next step; then the game in analysis. */
+function shownGame({ game, problem, words = [], analysis, pageClosed, coach }: Pick<Status, "game" | "problem" | "words" | "analysis" | "pageClosed" | "coach">, context: Context | undefined): string[]
+{
+    return [
+        ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true, pageClosed === true, coach === true, hasDoorbell(context?.host?.()))),
+        ...(analysis === undefined ? [] : [analysisLine(analysis)]),
+    ];
+}
+
+/** Reads the game into the status: the game, the words the AI has not answered, the coach to start and the game in analysis; or why it cannot be read. */
+function readGame(status: Status, context: Context, folder: string, first: boolean, chatStart: ChatStart | undefined): void
+{
+    try {
+        const current = gameAt(folder, context.now());
+
+        // With no game the player may have written before the first (D-77).
+        const words = unansweredWords(context);
+
+        if (words.length > 0) {
+            status.words = words;
+        }
+
+        if (current !== undefined) {
+            status.game = withAnalyst(withThought(summaryOf(current, context.now(), archivedName(folder, current)), folder, current, coachRuns(context), context.host?.()), context, current);
+
+            if (status.pageClosed === true) {
+                pageGiven(context, current.started);
+            }
+
+            // A game a summarized or resumed chat still holds is its own; without the host's word of the chat's start, any game began before it. One with no
+            // move yet has nothing to go on with: the chat the table starts again for a new game begins just after it (D-76).
+            if (first && endOf(current.game) === undefined && current.game.record.moves.length > 0 && (chatStart === undefined || cleanSince(chatStart, current.started))) {
+                status.fromBefore = true;
+            }
+
+            // A move that ended the game: the coach judges the player's last move, told until it starts (D-88).
+            if (coachOnEnd(context, folder, current)) {
+                status.coach = true;
+            }
+        }
+
+        const analysis = current === undefined || status.game?.end !== undefined ? gameInAnalysis(folder) : undefined;
+
+        if (analysis !== undefined) {
+            // The analyst agent goes over a game the player brought, or whose review was deleted, where it runs, and the chat over what it reviewed (D-89).
+            const review = analysis.brought === true ? undefined : reviewProgress(context, analysis.game);
+            status.analysis = {
+                game: analysis.game,
+                ...(analysis.brought === true ? { brought: true } : {}),
+                ...(analysis.redo === true ? { redo: true } : {}),
+                ...(analystRuns(context) ? { analyst: goneOver(context, analysis.game) ? "done" as const : "offer" as const } : {}),
+                ...(analystRuns(context) && isCodex(context.host?.()) ? { codex: true as const } : {}),
+                ...(review === undefined ? {} : { review }),
+            };
+        }
+    } catch (error) {
+        status.problem = (error as Error).message;
+    }
+}
 
 /** An older init's files in the player's folder: the player runs init again, with the chat closed, since the host reads them as a chat starts. */
 function outdatedLine(files: readonly string[]): string

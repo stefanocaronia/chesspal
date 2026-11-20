@@ -3,16 +3,16 @@
 import { type FSWatcher, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { basename, join } from "node:path";
-import { analystQuietAt, type Context, positionIn, samePosition, type SeenPosition } from "../../commands/index.ts";
+import { analystQuietAt, type Context, gameAtRing, positionIn, samePosition, type SeenPosition } from "../../commands/index.ts";
 import { aiNameOf } from "../../core/index.ts";
-import { forgetAnalyst, gameStamp, tableTalkStamp } from "../../games/index.ts";
+import { forgetAnalyst, gameStamp, notePositionShown, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { Bell, chatInterrupted, forgetPagePort, noteBell, notePagePort } from "../bell/index.ts";
 import { bellProbe, pagePorts, type TableChat } from "../ports/index.ts";
 import { analysesOf, answerAnalyses, sendSiteGames } from "./analyses.ts";
 import { answerChat } from "./attach.ts";
-import { type Attached, attachedSeen, type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";
+import { asTheChatSees, type Attached, attachedSeen, type ChatSeen, chatSeenOf, pageContext } from "./chat.ts";
 import { askNewGame, keepPosted, tellWatchers } from "./events.ts";
 import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls, thinkingChanged } from "./game.ts";
@@ -98,6 +98,7 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
             },
             () => chatInterrupted(folder),
             (line) => noteBell(folder, line),
+            () => gameAtBell(served),
         ),
         watchers,
         port: 0,
@@ -295,6 +296,26 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
         send(response, 200, "text/plain; charset=utf-8", "at work");
     } else {
         sendFile(response, path);
+    }
+}
+
+/**
+ * The game as status shows it to the chat the doorbell wakes, noted in the chat's folder as shown to it by this page, for its server to let it move on it
+ * (D-71), with the keys of the player's words it had not been given yet. Undefined when it cannot be read or noted: the hook rings alone, and the chat calls status.
+ */
+function gameAtBell(served: Served): string | undefined
+{
+    const { chat, context } = served;
+
+    try {
+        const { text, position, stamp, given } = gameAtRing({ ...asTheChatSees(context, chat), given: new Set(chat.given) });
+        // On the table the chat attached to it may run in another folder: its hook and its server read the note there.
+        const folder = served.attached?.chat.folder ?? served.folder;
+        notePositionShown(folder, { page: served.port, ...position, ...(stamp === undefined ? {} : { stamp }), at: context.now().toISOString(), given });
+        return text;
+    } catch (error) {
+        noteBell(served.folder, `the game for the bell could not be read: ${(error as Error).message}`);
+        return undefined;
     }
 }
 

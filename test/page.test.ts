@@ -1010,6 +1010,46 @@ describe("the doorbell of the chat", () => {
         expect(hookAt(bell).heard).toBeUndefined();
     });
 
+    it("rings with the game the page gives as the bell is heard, by the hook that waits or by the next one at once, and alone when it gives none", () => {
+        let game: string | undefined = "Moves: 1.e4";
+        const bell = new Bell(() => true, () => undefined, () => false, () => undefined, () => game);
+        const waiting = hookAt(bell);
+
+        bell.ring();
+        expect(waiting.heard).toBe("ring\nMoves: 1.e4");
+        game = "Moves: 1.e4 e5 2.Nf3";
+        bell.ring();
+        expect(hookAt(bell).heard).toBe("ring\nMoves: 1.e4 e5 2.Nf3");
+        game = undefined;
+        bell.ring();
+        expect(hookAt(bell).heard).toBe("ring");
+
+        const alone = new Bell();
+        const hook = hookAt(alone);
+        alone.ring();
+        expect(hook.heard).toBe("ring");
+    });
+
+    it("wakes the chat with the game as status shows it, noted in the chat's folder as shown by this page", async () => {
+        const folder = playerFolder();
+        const context = testContext(folder);
+        const page = await open(folder, undefined, context);
+        const port = Number(new URL(page.url).port);
+        await run(folder, "new_game", { ai_colour: "black" }, context);
+        chatHasRead(context, true);
+
+        const waiting = bellHeard(JSON.stringify({ cwd: folder }), [port]);
+        await untilListening(page);
+        await post(page, "/api/move", { move: "e4" });
+        const heard = await waiting;
+
+        expect(heard).toMatchObject({ rang: true, game: expect.stringContaining("Moves: 1.e4") });
+        expect(heard).not.toMatchObject({ game: expect.stringContaining("Chesspal ") });
+        const note = JSON.parse(readFileSync(join(folder, "position-shown.json"), "utf8")) as Record<string, unknown>;
+        expect(note).toMatchObject({ page: port, plies: 1, given: [] });
+        expect(note.session).toBeUndefined();
+    });
+
     it("knows whether the chat hears the player: in a turn, or with a hook waiting, never before its first tool or once its hook went", () => {
         let told = 0;
         const bell = new Bell(() => true, () => told++);
@@ -1333,7 +1373,7 @@ describe("the doorbell of the chat", () => {
 
         // The game started on the page rings at once the hook of the chat that ends its turn.
         expect(await post(page, "/api/new", { ai_colour: "white" })).toMatchObject({ status: 200 });
-        expect((await get(page, "/api/bell")).body).toBe("ring");
+        expect((await get(page, "/api/bell")).body).toMatch(/^ring\nGame: you play White/);
         expect((await served()).thinking).toBe("move");
 
         // Its turn ends without a move: nothing, until the player's words wake it again.
@@ -1344,7 +1384,7 @@ describe("the doorbell of the chat", () => {
         }
 
         await post(page, "/api/message", { text: "Your move." });
-        expect((await hook).body).toBe("ring");
+        expect((await hook).body).toMatch(/^ring\n[^]*«Your move\.»/);
         expect((await served()).thinking).toBe("move");
     });
 
@@ -1600,7 +1640,7 @@ describe("the doorbell of the chat", () => {
             await untilListening(page);
             await post(page, "/api/move", { move: "e4" });
 
-            expect(await waiting).toEqual({ folder: resolve(folder), rang: true });
+            expect(await waiting).toEqual({ folder: resolve(folder), rang: true, game: expect.stringContaining("Moves: 1.e4") });
 
             await page.close();
             expect(existsSync(join(folder, "pages", `${port}.json`))).toBe(false);
@@ -1666,7 +1706,7 @@ describe("the doorbell of the chat", () => {
             await untilListening(page);
             await post(page, "/api/move", { move: "e4" });
 
-            expect(await waiting).toEqual({ folder: resolve(folder), rang: true });
+            expect(await waiting).toEqual({ folder: resolve(folder), rang: true, game: expect.stringContaining("Moves: 1.e4") });
         } finally {
             await taken.close();
         }

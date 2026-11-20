@@ -8,7 +8,7 @@ import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { answerPrompt, promptAnswer } from "../src/cli/prompt-hook.ts";
 import { commands, type Context, say } from "../src/commands/index.ts";
-import { loadGame, saveChatStart } from "../src/games/index.ts";
+import { loadGame, notePositionShown, saveChatStart } from "../src/games/index.ts";
 import { setUpHosts } from "../src/host-files/index.ts";
 import { gameFolder } from "../src/profiles/index.ts";
 import { waitForBell } from "../src/server/bell/bell.ts";
@@ -258,6 +258,37 @@ describe("the chat's server after a move the hook played (D-71)", () => {
         expect(existsSync(join(context.folder, noteFile))).toBe(false);
     });
 });
+
+describe("the chat's server after the doorbell gave it the game", () => {
+    it("takes the note of the page it serves, or of the table it is attached to: the AI moves without a status", async () => {
+        const context = { ...gameWith("black"), page: "http://127.0.0.1:4567/" };
+        const server = await connect(context);
+        await server.callTool({ name: "status", arguments: {} });
+        await play(context, "player_move", { move: "e4" });
+        notePositionShown(context.folder, { page: 4567, ...positionOf(context), at: start.toISOString(), given: [] });
+
+        expect(await answer(server, "ai_move", { move: "e5", plan: "Mirror." })).toMatchObject({ isError: false });
+        expect(existsSync(join(context.folder, noteFile))).toBe(false);
+    });
+
+    it("leaves the note of another page for its chat: the AI is refused, and sees the game", async () => {
+        const context = { ...gameWith("black"), page: "http://127.0.0.1:4567/" };
+        const server = await connect(context);
+        await server.callTool({ name: "status", arguments: {} });
+        await play(context, "player_move", { move: "e4" });
+        notePositionShown(context.folder, { page: 4568, ...positionOf(context), at: start.toISOString(), given: [] });
+
+        expect(await answer(server, "ai_move", { move: "e5", plan: "Mirror." })).toMatchObject({ isError: true, text: expect.stringMatching(/here it is now/) });
+        expect(existsSync(join(context.folder, noteFile))).toBe(true);
+    });
+});
+
+/** The game's position as the doorbell notes it shown: its start and its plies. */
+function positionOf(context: Context): { started: string; plies: number; }
+{
+    const current = loadGame(gameFolder(context.home()))!;
+    return { started: current.started, plies: current.game.record.moves.length };
+}
 
 describe("the board page after a move the hook played", () => {
     it("rings no doorbell, and the AI's clock runs from the move while the chat's hook waits", async () => {
