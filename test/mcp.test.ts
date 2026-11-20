@@ -90,6 +90,32 @@ describe("the MCP server", () => {
         rmSync(context.folder, { recursive: true, force: true });
     });
 
+    it("refuses the AI's move on a position it had not seen with the game as status shows it, which it has seen then: its next move needs no status (D-71)", async () => {
+        const context = testContext(mkdtempSync(join(tmpdir(), "chesspal-")));
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await createMcpServer(context).connect(serverTransport);
+        client = new Client({ name: "test", version: "1.0.0" });
+        await client.connect(clientTransport);
+        const text = (result: Awaited<ReturnType<Client["callTool"]>>) => (result.content as { text: string; }[])[0]?.text ?? "";
+
+        await client.callTool({ name: "status", arguments: {} });
+        await client.callTool({ name: "new_game", arguments: { ai_colour: "black" } });
+        // The player moves on the page, which the chat has not seen.
+        commands.find((command) => command.name === "player_move")!.run({ move: "e4" }, testContext(context.folder));
+        const refused = await client.callTool({ name: "ai_move", arguments: { move: "e5", plan: "Meet the centre." } });
+
+        expect(refused.isError).toBe(true);
+        expect(text(refused)).toMatch(/^The game changed since you last saw it, in another chat or on the board page: here it is now\. Decide on it, then call ai_move again\. Nothing changed\.\n/);
+        expect(text(refused)).toContain("1.e4");
+        expect(text(refused)).not.toContain("from before this chat");
+
+        const played = await client.callTool({ name: "ai_move", arguments: { move: "e5", plan: "Meet the centre." } });
+
+        expect(played.isError).not.toBe(true);
+        expect(text(played)).toContain("Played 1...e5.");
+        rmSync(context.folder, { recursive: true, force: true });
+    });
+
     it("notes the AI's model and host after its move has gone back, keeps the last one known, and writes them into the game's PGN at the end (D-82, D-97)", async () => {
         const context = testContext(mkdtempSync(join(tmpdir(), "chesspal-")));
         const heard = vi.fn();

@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, homeForOneCall, inputProblems, isBoolean, PositionChanged, positionIn, samePosition } from "../../commands/index.ts";
+import { aiMove, type AnyCommand, type Caller, commands, type Context, defaultContext, homeForOneCall, inputProblems, isBoolean, PositionChanged, positionChangedShown, positionIn, samePosition, status } from "../../commands/index.ts";
 import { aiNameOf } from "../../core/index.ts";
 import { endOf, forgetPositionShown, hostProcess, lastChatStart, loadGame, noteAiHost, noteAiModel, type PositionShown, positionShownNote, rerunIfChanged } from "../../games/index.ts";
 import { agentTools, hasAgent, startInstructions } from "../../host-files/index.ts";
@@ -258,7 +258,7 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
     const agent = calling !== undefined && "agent" in calling ? calling.agent : undefined;
     const chat = command.byAgents === undefined && agent === undefined;
     const home = homeForOneCall(context);
-    let refused = false;
+    let showed = command.showsGame === true;
 
     try {
         if (chat) {
@@ -272,14 +272,28 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
         const result: unknown = await rerunIfChanged(() => command.run(checkedInput(command, input), { ...context, home, caller, ...who }));
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {
-        refused = error instanceof PositionChanged;
-        return { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], isError: true };
+        // A chat refused for a position it had not seen gets the game as it is now with the refusal, and has seen it: no status call between.
+        const view = chat && error instanceof PositionChanged ? await gameNow(context, home, caller, calling) : undefined;
+        showed = view !== undefined || (showed && !(error instanceof PositionChanged));
+        const text = view === undefined ? (error instanceof Error ? error.message : String(error)) : `${positionChangedShown(command.name)}\n${view}`;
+        return { content: [{ type: "text", text }], isError: true };
     } finally {
         // What the tool read or wrote, the chat has seen: the doorbell rings it only for what changes after, and it may move on the game a tool showed it,
-        // unless that tool was refused for a position it had not seen. An agent's call is not the chat's.
+        // unless that tool was refused for a position it had not seen and could not show it. An agent's call is not the chat's.
         if (chat) {
-            chatHasRead(context, command.showsGame === true && !refused, home);
+            chatHasRead(context, showed, home);
         }
+    }
+}
+
+/** The game as status shows it now, for a chat refused on a position it had not seen; undefined when status fails, and the refusal goes alone. */
+async function gameNow(context: Context, home: () => string, caller: NonNullable<Context["caller"]>, calling: CallingAgent | undefined): Promise<string | undefined>
+{
+    try {
+        const who = calling !== undefined ? { chat: true as const } : {};
+        return status.format(await rerunIfChanged(() => status.run({}, { ...context, home, caller, ...who })), context);
+    } catch {
+        return undefined;
     }
 }
 

@@ -101,6 +101,12 @@ export class PositionChanged extends Error
     }
 }
 
+/** The refusal of a chat's call on a position it had not seen, given with the game as status shows it now: the chat has seen it, and may call again on it. */
+export function positionChangedShown(tool: string): string
+{
+    return `The game changed since you last saw it, in another chat or on the board page: here it is now. Decide on it, then call ${tool} again. Nothing changed.`;
+}
+
 /** The position of the profile's game now. */
 export function positionIn(folder: string): SeenPosition
 {

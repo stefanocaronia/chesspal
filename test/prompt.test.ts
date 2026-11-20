@@ -182,9 +182,11 @@ describe("the chat's server after a move the hook played (D-71)", () => {
         saveChatStart(context.folder, { source: "startup", at: start.toISOString(), session: "chat-2" });
 
         expect(await prompt(context, "e4", "chat-2")).toContain("Watch this one");
-        expect(await answer(server, "ai_move", { move: "e5", plan: "Mirror." })).toMatchObject({ isError: true });
-        expect(context.given.size).toBe(0);
-        expect((await answer(server, "status", {})).text).toContain("Player wrote on the board page: «Watch this one.»");
+        // Refused on the position the other chat was shown, this one sees the game as status shows it, the words among it.
+        expect(await answer(server, "ai_move", { move: "e5", plan: "Mirror." })).toMatchObject({
+            isError: true,
+            text: expect.stringContaining("Player wrote on the board page: «Watch this one.»"),
+        });
     });
 
     it("takes a note of an older shape, with no words, as one that gave none", async () => {
@@ -208,7 +210,7 @@ describe("the chat's server after a move the hook played (D-71)", () => {
 
         saveChatStart(context.folder, { source: "startup", at: start.toISOString(), session: "chat-2" });
         expect(await prompt(context, "e4", "chat-2")).toBeDefined();
-        expect(await answer(server, "ai_move", { move: "e5", plan: "Mirror." })).toMatchObject({ isError: true, text: expect.stringMatching(/call status/) });
+        expect(await answer(server, "ai_move", { move: "e5", plan: "Mirror." })).toMatchObject({ isError: true, text: expect.stringMatching(/here it is now/) });
         // Another chat's note on the game as it is stays for that chat.
         expect(existsSync(join(context.folder, noteFile))).toBe(true);
 
