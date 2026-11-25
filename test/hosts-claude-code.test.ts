@@ -61,9 +61,21 @@ describe("the chat in Claude Code", () => {
                 "--disable-slash-commands",
                 "--tools",
                 "Read,Glob,Grep,WebSearch,WebFetch,Task,Bash,PowerShell,Write,Edit,NotebookEdit",
+                "--settings",
+                JSON.stringify({ permissions: { ask: ["Agent"] } }),
                 "--resume",
                 "a-session",
             ]);
+        });
+
+        it("makes the host ask before any subagent starts only where the AI may start one", () => {
+            const settings = (allowed: ToolKind[]): string[] => {
+                const args = open([], { allowed }).host.started?.args ?? [];
+                return args.flatMap((arg, index) => (arg === "--settings" ? [args[index + 1] ?? ""] : []));
+            };
+
+            expect(settings(["chesspal", "agent"])).toEqual(['{"permissions":{"ask":["Agent"]}}']);
+            expect(settings(["chesspal", "read", "shell"])).toEqual([]);
         });
 
         it("lists only the kinds allowed: searching the web is not fetching from it", () => {

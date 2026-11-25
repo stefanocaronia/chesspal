@@ -2,6 +2,7 @@
 // tools, and names the commands it ran only at the end, in the update's metadata.
 import { type AcpHost, pathsOfCall, patternOutside } from "../acp/index.ts";
 import type { ToolKind } from "../chat.ts";
+import { isObject } from "../lines.ts";
 import { staysInside } from "../paths.ts";
 
 // OpenCode's own tools, by kind, by their names old and new (bash and shell, apply_patch and patch); any other is of kind other.
@@ -114,9 +115,4 @@ function ranTools(call: Record<string, unknown>): { tool: string; failed: boolea
 function nameOf(call: Record<string, unknown>): string
 {
     return typeof call.name === "string" ? call.name : typeof call.title === "string" ? call.title : "";
-}
-
-function isObject(value: unknown): value is Record<string, unknown>
-{
-    return typeof value === "object" && value !== null && !Array.isArray(value);
 }

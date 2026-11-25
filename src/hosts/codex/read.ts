@@ -1,39 +1,18 @@
 // Reading Codex's lines: answers to the table's requests, Codex's own requests, and the thread's notifications; a line not understood changes nothing.
+import { error, isObject, type Message, result } from "../lines.ts";
 import { inside } from "../paths.ts";
-import { error, isObject, type Message, result } from "./protocol.ts";
+import { askToStop, nextBlock, playing, tell, write } from "../state.ts";
 import { turnCompleted } from "./setup.ts";
-import { askToStop, sendInterrupt, type State, tell, type Turn, write } from "./state.ts";
+import { sendInterrupt, type State, type Turn } from "./state.ts";
 import { approvalAnswer, type CodexTool, toolOfItem, toolOfRequest } from "./tools.ts";
 
-/** One line of Codex: whatever it holds, reading it never throws; what the chat's listener throws its queue takes. */
-export function readLine(state: State, line: string): void
-{
-    if (state.closed || state.ended) {
-        return;
-    }
-
-    try {
-        const message: unknown = JSON.parse(line);
-
-        if (isObject(message)) {
-            readMessage(state, message);
-        }
-    } catch {
-        // Not JSON, or a shape that broke the reading: ignored.
-    }
-}
-
-function readMessage(state: State, message: Message): void
+/** One line of Codex, an object: an answer, a request of Codex's, or a notification of the thread or of a subagent's. */
+export function readMessage(state: State, message: Message): void
 {
     const hasId = typeof message.id === "number" || typeof message.id === "string";
 
     if (typeof message.method !== "string") {
-        const answered = typeof message.id === "number" ? state.pending.get(message.id) : undefined;
-
-        if (answered !== undefined && typeof message.id === "number") {
-            state.pending.delete(message.id);
-            answered(message);
-        }
+        state.requests.answer(message);
     } else if (hasId) {
         readRequest(state, message.method, message.id, isObject(message.params) ? message.params : {});
     } else if (isObject(message.params) && (state.thread === undefined || message.params.threadId === state.thread)) {
@@ -242,20 +221,4 @@ function pathOutside(state: State, tool: CodexTool): string | undefined
 {
     const outside = tool.paths.find((path) => typeof path !== "string" || !inside(path, state.folder));
     return outside === undefined ? undefined : String(outside);
-}
-
-/** A new block of text, unless the one in course is still empty. */
-function nextBlock(turn: Turn): void
-{
-    if (turn.block < 0 || turn.filled) {
-        turn.block += 1;
-        turn.filled = false;
-    }
-}
-
-/** The turn Codex's notifications belong to: none between turns, while the player's words wait, nor for a turn failing. */
-function playing(state: State): Turn | undefined
-{
-    const turn = state.turn;
-    return turn === undefined || turn.held !== undefined || turn.failure !== undefined ? undefined : turn;
 }

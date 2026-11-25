@@ -1,6 +1,8 @@
 // Getting the chat ready: the protocol begun, the account read, the thread opened or taken up with the model and effort, confirmed before the player's words.
-import { failureOf, initializeParams, isObject, type Message, notification, wordsOf } from "./protocol.ts";
-import { ask, endTurn, refused, sendInterrupt, type State, tell, type Turn, write } from "./state.ts";
+import { failureOf, isObject, type Message, notification, wordsOf } from "../lines.ts";
+import { chatReady, endTurn, refused, tell, write } from "../state.ts";
+import { initializeParams } from "./protocol.ts";
+import { sendInterrupt, type State, type Turn } from "./state.ts";
 
 // How long Codex may take to get ready: its program started, its account read, its thread opened.
 const readyWait = 60_000;
@@ -9,7 +11,7 @@ const readyWait = 60_000;
 export function begin(state: State): void
 {
     state.cancelReadyWait = state.later(readyWait, () => refused(state, `the host was not ready to play with the model ${state.model.asked} within ${String(readyWait / 1000)} seconds`));
-    ask(state, "initialize", initializeParams(), (answer) => {
+    state.requests.ask("initialize", initializeParams(), (answer) => {
         const why = failureOf(answer);
 
         if (why !== undefined || !isObject(answer.result)) {
@@ -18,7 +20,7 @@ export function begin(state: State): void
         }
 
         write(state, notification("initialized"));
-        ask(state, "account/read", { refreshToken: false }, (account) => accountRead(state, account));
+        state.requests.ask("account/read", { refreshToken: false }, (account) => accountRead(state, account));
     });
 }
 
@@ -36,7 +38,7 @@ export function writeWords(state: State, turn: Turn, text: string): void
     }
 
     const params = { threadId: session, input: [{ type: "text", text, text_elements: [] }], model, ...(effort === undefined ? {} : { effort }) };
-    ask(state, "turn/start", params, (answer) => turnStarted(state, turn, answer));
+    state.requests.ask("turn/start", params, (answer) => turnStarted(state, turn, answer));
 }
 
 /** The turn's end as Codex tells it: done, interrupted when the table asked it or Codex says so, else failed with why. */
@@ -83,9 +85,9 @@ function openThread(state: State): void
     const resumed = state.resumed;
 
     if (resumed === undefined) {
-        ask(state, "thread/start", options, (answer) => threadOpened(state, answer));
+        state.requests.ask("thread/start", options, (answer) => threadOpened(state, answer));
     } else {
-        ask(state, "thread/resume", { threadId: resumed, ...options, excludeTurns: true }, (answer) => threadOpened(state, answer));
+        state.requests.ask("thread/resume", { threadId: resumed, ...options, excludeTurns: true }, (answer) => threadOpened(state, answer));
     }
 }
 
@@ -106,20 +108,7 @@ function threadOpened(state: State, answer: Message): void
     } else {
         state.thread = thread;
         state.model.confirmed = asked;
-        ready(state);
-    }
-}
-
-/** The chat is ready: the words held, if any, are written. */
-function ready(state: State): void
-{
-    state.ready = true;
-    state.cancelReadyWait?.();
-    state.cancelReadyWait = undefined;
-    const turn = state.turn;
-
-    if (turn?.held !== undefined) {
-        writeWords(state, turn, turn.held);
+        chatReady(state);
     }
 }
 

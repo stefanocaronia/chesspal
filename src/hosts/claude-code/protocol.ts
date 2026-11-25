@@ -1,7 +1,6 @@
 // What the table writes to Claude Code, and the kinds of its tools.
 import type { ToolKind } from "../chat.ts";
-
-export type Message = Record<string, unknown>;
+import type { Message } from "../lines.ts";
 
 /** The host's built-in tools the table may give the AI, by kind; `--tools` lists those whose kind is allowed. */
 export const builtInTools: { name: string; kind: ToolKind; }[] = [
@@ -57,9 +56,4 @@ export function controlAnswer(id: unknown, response: Message): Message
 export function controlError(id: unknown, error: string): Message
 {
     return { type: "control_response", response: { subtype: "error", request_id: id, error } };
-}
-
-export function isObject(value: unknown): value is Message
-{
-    return typeof value === "object" && value !== null && !Array.isArray(value);
 }

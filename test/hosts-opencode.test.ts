@@ -4,7 +4,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { type ChatOptions, hostDriver, type HostEvent, openHostChat } from "../src/hosts/index.ts";
 import type { LineProcess } from "../src/hosts/process.ts";
 import { checklist, type Scenario } from "./hosts/checklist.ts";
-import { fakeAgent, type FakeAgentOptions, isModelSetting, isPrompt, joinedTexts, promptWords, sessionOfFlow } from "./hosts/fake-agent.ts";
+import { type FakeAgent, fakeAgent, type FakeAgentOptions, isModelSetting, isPrompt, joinedTexts, promptWords, sessionOfFlow } from "./hosts/fake-agent.ts";
 import { type FakeHost, type FlowEntry, listen, loadFlow, manualClock, ticksUntil, turnEnds } from "./hosts/fake-host.ts";
 import { makeTempFolder, removeTempFolders } from "./hosts/temp.ts";
 
@@ -367,6 +367,136 @@ describe("the chat in OpenCode", () => {
         });
     });
 
+    describe("a turn the host begins by itself", () => {
+        const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "agent", "image"];
+        const child = { "opencode/child-session": { id: "ses_child", parentID: "ses_1", depth: 1, title: "Bertoldo" } };
+        const hostTurn = { type: "turnStart", by: "host" };
+        const silence = 20_000;
+        // The player's turn, in which the AI starts a subagent, whose answer comes after it.
+        const flow = [
+            ...begin(),
+            ...newSession(),
+            ...turn(
+                "Hello",
+                update({ sessionUpdate: "tool_call", toolCallId: "a1", status: "in_progress", kind: "think", name: "subagent", rawInput: { agent: "rpg-character", prompt: "Bertoldo" } }),
+                update({ sessionUpdate: "tool_call_update", toolCallId: "a1", status: "completed", rawOutput: { metadata: { sessionID: "ses_child" } } }),
+                text("The innkeeper listens."),
+            ),
+        ];
+
+        /** A chat on the clock of the test, whose first turn of the player's ended. */
+        async function afterTurn(flow: FlowEntry[], overrides: Partial<ChatOptions> = {}): Promise<ReturnType<typeof play> & { clock: ReturnType<typeof manualClock>; }>
+        {
+            const clock = manualClock();
+            const played = play(flow, { allowed: tableKinds, later: clock.later, ...overrides }, { ignore: ["session/cancel"] });
+            played.chat.send(promptWords(flow)[0]!);
+            await played.until(() => turnEnds(played.events).length === 1 && played.host.done());
+            return { ...played, clock };
+        }
+
+        /** The AI's prose told since `from`, joined. */
+        function toldSince(events: HostEvent[], from: number): string
+        {
+            return events.slice(from).map((event) => (event.type === "text" ? event.text : "")).join("");
+        }
+
+        it("tells the AI's words after the prompt's answer in a turn of its own, which a silence ends; no word of the subagent's (recorded, DeepSeek)", async () => {
+            const flow = loadFlow("opencode/voice-answer-after-prompt");
+            const asked = flow.find((entry) => entry.dir === "in" && isModelSetting(entry.msg))?.msg.params as Message;
+            const { events, host, clock } = await afterTurn(flow, { model: String(asked.value) });
+            const ended = events.findIndex((event) => event.type === "turnEnd");
+            expect(events[ended]).toEqual({ type: "turnEnd", reason: "done" });
+            expect(events[ended + 1]).toEqual(hostTurn);
+            const answer = flow.slice(flow.findIndex((entry) => isObject(entry.msg.result) && entry.msg.result.stopReason === "end_turn"));
+            const parentWords = (entries: FlowEntry[]): string =>
+                entries.map((entry) => (isObject(entry.msg.params) && isObject(entry.msg.params.update) ? entry.msg.params.update : {}))
+                    .filter((one) => one.sessionUpdate === "agent_message_chunk" && one._meta === undefined)
+                    .map((one) => String((one.content as Message).text))
+                    .join("");
+            expect(toldSince(events, ended)).toBe(parentWords(answer));
+            expect(toldSince(events, ended)).toContain("come se quel debito potesse essere tuo.");
+            expect(toldSince(events, 0)).toBe(parentWords(flow));
+            expect(turnEnds(events)).toHaveLength(1);
+            clock.advance(silence - 1);
+            expect(turnEnds(events)).toHaveLength(1);
+            clock.advance(1);
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done" }, { type: "turnEnd", reason: "done" }]);
+            expect(host.problems).toEqual([]);
+        });
+
+        it("goes on while the AI or its subagent says anything, or a tool of the AI's runs; a later word opens another turn", async () => {
+            const { chat, events, host, until, clock } = await afterTurn(flow);
+            host.says(update({ sessionUpdate: "usage_update", used: 10 }).msg);
+            host.says(update({ sessionUpdate: "available_commands_update", availableCommands: [] }).msg);
+            await ticksUntil(() => host.done());
+            expect(events.at(-1)).toEqual({ type: "turnEnd", reason: "done" });
+
+            host.says(update({ sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Bertoldo answered." } }).msg);
+            await until((all) => all.at(-1)?.type === "turnStart");
+            expect(chat.send("Too soon")).toBe(false);
+            clock.advance(silence - 1000);
+            host.says(update({ sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Still." }, _meta: child }).msg);
+            await ticksUntil(() => host.done());
+            clock.advance(silence - 1000);
+            host.says(update({ sessionUpdate: "tool_call", toolCallId: "ask-1", name: "execute", kind: "other", status: "in_progress", rawInput: { code: "return await tools.chesspal.ask({});" } }).msg);
+            await until((all) => all.some((event) => event.type === "tool" && event.id === "ask-1"));
+            clock.advance(silence * 3);
+            expect(turnEnds(events)).toHaveLength(1);
+            host.says(update({ sessionUpdate: "tool_call_update", toolCallId: "ask-1", status: "completed" }).msg);
+            host.says(text("Bertoldo shrugs.", "m2").msg);
+            await until((all) => toldSince(all, 0).includes("Bertoldo shrugs."));
+            clock.advance(silence);
+            expect(turnEnds(events)).toHaveLength(2);
+
+            host.says(text("And leaves.", "m3").msg);
+            await until((all) => all.at(-1)?.type === "text");
+            clock.advance(silence);
+            expect(events.slice(-3)).toEqual([hostTurn, { type: "text", block: 0, text: "And leaves." }, { type: "turnEnd", reason: "done" }]);
+            expect(chat.send("Now me")).toBe(true);
+        });
+
+        it("ends at interrupt(), asking the agent to cancel, and fails at once where it runs a tool the table does not allow", async () => {
+            const { chat, events, host, until, clock } = await afterTurn(flow);
+            host.says(text("Bertoldo", "m2").msg);
+            await until((all) => all.at(-1)?.type === "text");
+            chat.interrupt();
+            expect(events.at(-1)).toEqual({ type: "turnEnd", reason: "interrupted" });
+            expect(host.written.filter((message) => message.method === "session/cancel")).toHaveLength(1);
+
+            host.says(update({ sessionUpdate: "tool_call", toolCallId: "sh-1", name: "bash", kind: "execute", status: "completed", rawInput: { command: "curl example.com" } }).msg);
+            await until(() => turnEnds(events).length === 3);
+            expect(events.slice(-4)).toEqual([
+                hostTurn,
+                { type: "tool", id: "sh-1", name: "bash", kind: "shell", state: "started" },
+                { type: "tool", id: "sh-1", name: "bash", kind: "shell", state: "done" },
+                { type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use bash" },
+            ]);
+            expect(host.written.filter((message) => message.method === "session/cancel")).toHaveLength(2);
+            clock.advance(silence);
+            expect(turnEnds(events)).toHaveLength(3);
+            expect(host.stopped).toBe(false);
+        });
+
+        it("opens no turn of the host's for a subagent's words between turns, nor before the chat is ready", async () => {
+            const { events, host } = await afterTurn(flow);
+            host.says(update({ sessionUpdate: "agent_message_chunk", messageId: "k1", content: { type: "text", text: "Keeps: the key." }, _meta: child }).msg);
+            await ticksUntil(() => host.done());
+            expect(events.some((event) => event.type === "turnStart")).toBe(false);
+
+            const replayed = loadFlow("opencode/load");
+            const { chat, events: loaded, until } = play(replayed, { session: sessionOfFlow(replayed) });
+            chat.send(promptWords(replayed)[0]!);
+            await until(() => turnEnds(loaded).length === 1);
+            expect(loaded.some((event) => event.type === "turnStart")).toBe(false);
+
+            // The session open, its model not confirmed yet.
+            const early = play([...begin(), ...newSession(), text("Before the model.")], { later: manualClock().later }, { ignore: ["session/set_config_option"] });
+            await ticksUntil(() => early.host.done());
+            expect(early.host.written.at(-1)).toMatchObject({ method: "session/set_config_option" });
+            expect(early.events).toEqual([]);
+        });
+    });
+
     describe("permissions", () => {
         /** A turn whose agent asks for a tool, and the option the table must choose. */
         function asking(call: Message, chosen: string): FlowEntry[]
@@ -640,7 +770,7 @@ describe("OpenCode as the table drives it", () => {
 });
 
 /** The driver on a fake agent. */
-function open(flow: FlowEntry[], overrides: Partial<ChatOptions> = {}, fake: FakeAgentOptions = {}): { chat: NonNullable<ReturnType<typeof openHostChat>>; host: FakeHost; }
+function open(flow: FlowEntry[], overrides: Partial<ChatOptions> = {}, fake: FakeAgentOptions = {}): { chat: NonNullable<ReturnType<typeof openHostChat>>; host: FakeAgent; }
 {
     const host = fakeAgent(flow, fake);
     const chat = openHostChat("openCode", { ...options(host), ...overrides });

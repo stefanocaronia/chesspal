@@ -1,9 +1,10 @@
 // The models an agent offers on this computer: its program started in the chat's folder, asked for a new session whose answer lists them, then stopped.
 // The session made for asking is deleted where the agent says it can delete one.
 import { type HostModel, isHostName, laterByTimer, type ModelsOptions } from "../chat.ts";
+import { failureOf, isObject, type Message, parsedLine, Requests } from "../lines.ts";
 import { type LineProcess, startLineProcess } from "../process.ts";
 import type { AcpHost } from "./host.ts";
-import { configOption, failureOf, initializeParams, isObject, type Message, optionValues, request } from "./protocol.ts";
+import { configOption, initializeParams, optionValues } from "./protocol.ts";
 
 // How long the program has to answer, as its session starts the folder's MCP servers, and how many models are kept.
 const answerWait = 20_000;
@@ -24,7 +25,7 @@ export function acpModels(options: ModelsOptions, host: AcpHost): Promise<HostMo
         let agent: LineProcess | undefined;
         let finished = false;
         let found: HostModel[] = [];
-        const answers = new Map<number, (answer: Message) => void>();
+        const requests = new Requests((line) => agent?.write(line));
 
         const finish = (models: HostModel[]): void => {
             if (!finished) {
@@ -37,11 +38,6 @@ export function acpModels(options: ModelsOptions, host: AcpHost): Promise<HostMo
 
         const cancel = later(answerWait, () => finish(found));
 
-        const ask = (id: number, method: string, params: Message, answered: (answer: Message) => void): void => {
-            answers.set(id, answered);
-            agent?.write(JSON.stringify(request(id, method, params)));
-        };
-
         try {
             agent = start(options.program.command, [...options.program.args, ...host.args], { cwd: options.folder, env: options.environment, errors: () => undefined });
         } catch {
@@ -50,12 +46,14 @@ export function acpModels(options: ModelsOptions, host: AcpHost): Promise<HostMo
         }
 
         agent.onLine((line) => {
-            const message = parsed(line);
-            const answered = typeof message?.id === "number" && message.method === undefined ? answers.get(message.id) : undefined;
-            answered?.(message ?? {});
+            const message = parsedLine(line);
+
+            if (message !== undefined && message.method === undefined) {
+                requests.answer(message);
+            }
         });
         agent.onEnd(() => finish(found));
-        ask(1, "initialize", initializeParams(), (initialized) => {
+        requests.ask("initialize", initializeParams(), (initialized) => {
             const capabilities = isObject(initialized.result) && isObject(initialized.result.agentCapabilities) ? initialized.result.agentCapabilities : {};
             const deletes = isObject(capabilities.sessionCapabilities) && capabilities.sessionCapabilities.delete !== undefined;
 
@@ -64,12 +62,12 @@ export function acpModels(options: ModelsOptions, host: AcpHost): Promise<HostMo
                 return;
             }
 
-            ask(2, "session/new", { cwd: options.folder, mcpServers: [] }, (opened) => {
+            requests.ask("session/new", { cwd: options.folder, mcpServers: [] }, (opened) => {
                 const session = isObject(opened.result) ? opened.result : {};
                 found = modelsOf(session);
 
                 if (deletes && typeof session.sessionId === "string") {
-                    ask(3, "session/delete", { sessionId: session.sessionId }, () => finish(found));
+                    requests.ask("session/delete", { sessionId: session.sessionId }, () => finish(found));
                 } else {
                     finish(found);
                 }
@@ -122,14 +120,4 @@ function kept(values: { value: string; name?: string; about?: string; efforts: s
     }
 
     return models;
-}
-
-function parsed(line: string): Message | undefined
-{
-    try {
-        const message: unknown = JSON.parse(line);
-        return isObject(message) ? message : undefined;
-    } catch {
-        return undefined;
-    }
 }

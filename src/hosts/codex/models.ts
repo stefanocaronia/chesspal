@@ -1,9 +1,10 @@
 // The models Codex offers on this computer: its app-server started, asked for its list of models after the protocol's first request, then stopped.
 // No thread is opened, so no MCP server starts.
 import { type HostModel, isHostName, laterByTimer, type ModelsOptions } from "../chat.ts";
+import { isObject, notification, parsedLine, Requests } from "../lines.ts";
 import { type LineProcess, startLineProcess } from "../process.ts";
 import { modelArguments } from "./program.ts";
-import { initializeParams, isObject, type Message, notification, request } from "./protocol.ts";
+import { initializeParams } from "./protocol.ts";
 
 // How long the program has to answer, and how many models are kept.
 const answerWait = 10_000;
@@ -21,7 +22,7 @@ export function codexModels(options: ModelsOptions): Promise<HostModel[]>
     return new Promise((done) => {
         let host: LineProcess | undefined;
         let finished = false;
-        const answers = new Map<number, (answer: Message) => void>();
+        const requests = new Requests((line) => host?.write(line));
 
         const finish = (models: HostModel[]): void => {
             if (!finished) {
@@ -34,11 +35,6 @@ export function codexModels(options: ModelsOptions): Promise<HostModel[]>
 
         const cancel = later(answerWait, () => finish([]));
 
-        const ask = (id: number, method: string, params: Message, answered: (answer: Message) => void): void => {
-            answers.set(id, answered);
-            host?.write(JSON.stringify(request(id, method, params)));
-        };
-
         try {
             host = start(options.program.command, [...options.program.args, ...modelArguments], { cwd: options.folder, env: options.environment, errors: () => undefined });
         } catch {
@@ -47,19 +43,21 @@ export function codexModels(options: ModelsOptions): Promise<HostModel[]>
         }
 
         host.onLine((line) => {
-            const message = parsed(line);
-            const answered = typeof message?.id === "number" && message.method === undefined ? answers.get(message.id) : undefined;
-            answered?.(message ?? {});
+            const message = parsedLine(line);
+
+            if (message !== undefined && message.method === undefined) {
+                requests.answer(message);
+            }
         });
         host.onEnd(() => finish([]));
-        ask(1, "initialize", initializeParams(), (initialized) => {
+        requests.ask("initialize", initializeParams(), (initialized) => {
             if (initialized.error !== undefined) {
                 finish([]);
                 return;
             }
 
             host?.write(JSON.stringify(notification("initialized")));
-            ask(2, "model/list", {}, (listed) => finish(isObject(listed.result) ? modelsOf(listed.result.data) : []));
+            requests.ask("model/list", {}, (listed) => finish(isObject(listed.result) ? modelsOf(listed.result.data) : []));
         });
     });
 }
@@ -92,14 +90,4 @@ function effortsOf(options: unknown): string[]
 {
     const efforts = (Array.isArray(options) ? options : []).map((option) => (isObject(option) ? option.reasoningEffort : option));
     return efforts.every((effort) => typeof effort === "string" && isHostName(effort)) ? efforts as string[] : [];
-}
-
-function parsed(line: string): Message | undefined
-{
-    try {
-        const message: unknown = JSON.parse(line);
-        return isObject(message) ? message : undefined;
-    } catch {
-        return undefined;
-    }
 }

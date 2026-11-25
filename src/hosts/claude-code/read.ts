@@ -1,28 +1,13 @@
 // Reading Claude Code's lines: one function per type of message; a line not understood changes nothing.
 import type { ToolKind } from "../chat.ts";
+import { isObject, type Message } from "../lines.ts";
+import { askToStop, endTurn, nextBlock, playing, tell, write } from "../state.ts";
 import { pathOutside } from "./paths.ts";
-import { controlAnswer, controlError, isObject, type Message, toolLoaders, toolOf } from "./protocol.ts";
-import { askToStop, endTurn, modelConfirmed, modelRefused, type State, tell, type Turn, write } from "./state.ts";
+import { controlAnswer, controlError, toolLoaders, toolOf } from "./protocol.ts";
+import { modelConfirmed, modelRefused, type State, type Turn } from "./state.ts";
 
-/** One line of the host: whatever it holds, reading it never throws; what the chat's listener throws its queue takes. */
-export function readLine(state: State, line: string): void
-{
-    if (state.closed || state.ended) {
-        return;
-    }
-
-    try {
-        const message: unknown = JSON.parse(line);
-
-        if (isObject(message)) {
-            readMessage(state, message);
-        }
-    } catch {
-        // Not JSON, or a shape that broke the reading: ignored.
-    }
-}
-
-function readMessage(state: State, message: Message): void
+/** One line of the host, an object: one function per type of message. */
+export function readMessage(state: State, message: Message): void
 {
     switch (message.type) {
         case "control_request":
@@ -121,7 +106,7 @@ function readSystem(state: State, message: Message): void
 /** The AI's prose in pieces: a new block of text, then its deltas. */
 function readStreamEvent(state: State, message: Message): void
 {
-    const turn = playing(state, message);
+    const turn = aiTurn(state, message);
     const event = isObject(message.event) ? message.event : undefined;
 
     if (turn === undefined || event === undefined) {
@@ -151,7 +136,7 @@ function readStreamEvent(state: State, message: Message): void
 /** A whole message of the AI: its tools start; its text is told only when none of it came in pieces. */
 function readAssistant(state: State, message: Message): void
 {
-    const turn = playing(state, message);
+    const turn = aiTurn(state, message);
     const body = isObject(message.message) ? message.message : undefined;
 
     if (turn === undefined || body === undefined || !Array.isArray(body.content)) {
@@ -175,7 +160,7 @@ function readAssistant(state: State, message: Message): void
 /** The results of the AI's tools: done, or failed. One that ran, which the table does not let the AI use, stops the turn, which fails saying so. */
 function readToolResults(state: State, message: Message): void
 {
-    const turn = playing(state, message);
+    const turn = aiTurn(state, message);
     const content = isObject(message.message) ? message.message.content : undefined;
 
     if (turn === undefined || !Array.isArray(content)) {
@@ -248,19 +233,9 @@ function tellWholeText(state: State, turn: Turn, id: string | undefined, text: s
     tell(state, { type: "text", block: turn.block, text });
 }
 
-/** A new block of text, unless the one in course is still empty. */
-function nextBlock(turn: Turn): void
-{
-    if (turn.block < 0 || turn.filled) {
-        turn.block += 1;
-        turn.filled = false;
-    }
-}
-
 /** The turn a message of the AI belongs to: none between turns, for a turn failing, or for a subagent's message. */
-function playing(state: State, message: Message): Turn | undefined
+function aiTurn(state: State, message: Message): Turn | undefined
 {
-    const turn = state.turn;
     const subagent = message.parent_tool_use_id !== undefined && message.parent_tool_use_id !== null;
-    return turn === undefined || turn.held !== undefined || turn.failure !== undefined || subagent ? undefined : turn;
+    return subagent ? undefined : playing(state);
 }

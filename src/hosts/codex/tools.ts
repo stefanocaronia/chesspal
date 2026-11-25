@@ -1,6 +1,6 @@
 // Codex's tools as the table reads them: the items of a thread and the approvals it asks, each a tool with its kind, and the answer to each approval.
 import type { ToolKind } from "../chat.ts";
-import { isObject, type Message } from "./protocol.ts";
+import { isObject, type Message } from "../lines.ts";
 
 /** A tool for the table: its name, its kind, the MCP server it belongs to, the paths it reads where it is of kind read, and the permissions it asks as read. */
 export interface CodexTool

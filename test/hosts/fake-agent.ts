@@ -19,8 +19,15 @@ const linesPerTick = 3;
 // The methods whose answers the fake makes itself, from the recorded ones where the flow has them.
 const settings = ["session/set_config_option", "session/set_model"];
 
+/** The fake agent's process: lines it writes after the prompt's answer are played too, with no line of the driver's before them. */
+export interface FakeAgent extends FakeHost
+{
+    /** A line the agent writes by itself now, after the flow played so far, as after a pause. */
+    says(message: Message): void;
+}
+
 /** Plays a flow as the agent's process. */
-export function fakeAgent(flow: FlowEntry[], options: FakeAgentOptions = {}): FakeHost
+export function fakeAgent(flow: FlowEntry[], options: FakeAgentOptions = {}): FakeAgent
 {
     const entries = [...flow];
     const recordedSettings = takeSettings(entries);
@@ -193,7 +200,8 @@ export function fakeAgent(flow: FlowEntry[], options: FakeAgentOptions = {}): Fa
             fake.stopped = true;
         },
     };
-    const fake: FakeHost = {
+    const fake: FakeAgent = {
+        says: say,
         start: (command, args, startOptions) => {
             fake.started = { command, args, options: startOptions };
             return process;

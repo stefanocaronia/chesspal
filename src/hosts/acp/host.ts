@@ -1,6 +1,6 @@
 // What a host's driver tells the protocol's client: the program's arguments, how its tools are read, and how its player signs in.
 import type { ToolKind } from "../chat.ts";
-import { isObject, type Message } from "./protocol.ts";
+import { isObject, type Message } from "../lines.ts";
 
 /** A host spoken to by the Agent Client Protocol, as its driver describes it. */
 export interface AcpHost

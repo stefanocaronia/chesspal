@@ -7,6 +7,8 @@ export type ToolKind = "chesspal" | "read" | "web" | "fetch" | "agent" | "image"
 export type HostEvent =
     /** The host said which chat this is and the model it runs: at the first turn, and when either changes. */
     | { type: "session"; session: string; model: string; }
+    /** A turn the host began by itself, with no words of the player's, as OpenCode tells a subagent's answer once its turn ended; a turnEnd ends it. */
+    | { type: "turnStart"; by: "host"; }
     /** A piece of the AI's prose; `block` grows with each new block of text in a turn. */
     | { type: "text"; block: number; text: string; }
     /** A tool the AI uses: for a tool of the chesspal server, `name` is the command's name alone. */
@@ -20,11 +22,11 @@ export type HostEvent =
 
 export interface HostChat
 {
-    /** The player's words: a turn begins. False, and nothing is sent, while a turn runs or once the chat ended. */
+    /** The player's words: a turn begins. False, and nothing is sent, while a turn runs, the host's own too, or once the chat ended. */
     send(text: string): boolean;
     /** Every event of the chat, in order; one listener (a later call replaces it). Events that came before a listener was set are kept and told to it when set. */
     onEvent(listener: (event: HostEvent) => void): void;
-    /** Stops the turn in course: its end comes as a turnEnd "interrupted". Nothing between turns. */
+    /** Stops the turn in course, the host's own too: its end comes as a turnEnd "interrupted". Nothing between turns. */
     interrupt(): void;
     /** Ends the chat and its process; no event comes after. */
     close(): void;

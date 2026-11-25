@@ -1,6 +1,8 @@
 // Getting the chat ready: the protocol begun, the session opened or taken up, the model and effort set and confirmed before the player's first words.
-import { configOption, failureOf, initializeParams, isObject, type Message } from "./protocol.ts";
-import { ask, endTurn, refused, type State, tell, type Turn } from "./state.ts";
+import { failureOf, isObject, type Message } from "../lines.ts";
+import { chatReady, endTurn, refused, tell } from "../state.ts";
+import { configOption, initializeParams } from "./protocol.ts";
+import type { State, Turn } from "./state.ts";
 
 // How long the agent may take to get ready: its program started, its session opened with its MCP servers, the model set.
 const readyWait = 60_000;
@@ -9,7 +11,7 @@ const readyWait = 60_000;
 export function begin(state: State): void
 {
     waitReady(state);
-    ask(state, "initialize", initializeParams(), (answer) => {
+    state.requests.ask("initialize", initializeParams(), (answer) => {
         const why = failureWords(state, answer);
 
         if (why !== undefined || !isObject(answer.result)) {
@@ -31,19 +33,6 @@ export function askModelAgain(state: State): void
     askModel(state);
 }
 
-/** The chat is ready: the words held, if any, are written. */
-function ready(state: State): void
-{
-    state.ready = true;
-    state.cancelReadyWait?.();
-    state.cancelReadyWait = undefined;
-    const turn = state.turn;
-
-    if (turn?.held !== undefined) {
-        writePrompt(state, turn, turn.held);
-    }
-}
-
 /** Writes the player's words: the session is told first where it or the model changed. */
 export function writePrompt(state: State, turn: Turn, text: string): void
 {
@@ -56,7 +45,7 @@ export function writePrompt(state: State, turn: Turn, text: string): void
         tell(state, { type: "session", session, model });
     }
 
-    ask(state, "session/prompt", { sessionId: session, prompt: [{ type: "text", text }] }, (answer) => promptAnswered(state, turn, answer));
+    state.requests.ask("session/prompt", { sessionId: session, prompt: [{ type: "text", text }] }, (answer) => promptAnswered(state, turn, answer));
 }
 
 function waitReady(state: State): void
@@ -73,11 +62,11 @@ function openSession(state: State): void
     const resumed = state.resumed;
 
     if (resumed === undefined) {
-        ask(state, "session/new", where, (answer) => sessionOpened(state, answer));
+        state.requests.ask("session/new", where, (answer) => sessionOpened(state, answer));
     } else if (state.capabilities.loadSession === true) {
-        ask(state, "session/load", { ...where, sessionId: resumed }, (answer) => sessionOpened(state, answer));
+        state.requests.ask("session/load", { ...where, sessionId: resumed }, (answer) => sessionOpened(state, answer));
     } else if (sessions.resume !== undefined) {
-        ask(state, "session/resume", { ...where, sessionId: resumed }, (answer) => sessionOpened(state, answer));
+        state.requests.ask("session/resume", { ...where, sessionId: resumed }, (answer) => sessionOpened(state, answer));
     } else {
         refused(state, "the host cannot take a chat up again: open a new one");
     }
@@ -112,7 +101,7 @@ function askModel(state: State): void
         });
     } else {
         // Without such an option, the protocol's own call: its success is the confirmation, and a host that has no such call says so in its error.
-        ask(state, "session/set_model", { sessionId: state.session, modelId: asked }, (answer) => {
+        state.requests.ask("session/set_model", { sessionId: state.session, modelId: asked }, (answer) => {
             const why = failureWords(state, answer);
 
             if (why !== undefined) {
@@ -133,17 +122,17 @@ function askEffort(state: State): void
     const option = configOption(state.config, "thought_level", "effort");
 
     if (effort === undefined || option === undefined || typeof option.id !== "string") {
-        ready(state);
+        chatReady(state);
         return;
     }
 
-    setOption(state, option.id, effort, "effort", () => ready(state));
+    setOption(state, option.id, effort, "effort", () => chatReady(state));
 }
 
 /** Sets an option of the session and calls `confirmed` once the agent's answer shows it set; else the chat ends saying what the agent did. */
 function setOption(state: State, id: string, value: string, what: "model" | "effort", confirmed: (value: string) => void): void
 {
-    ask(state, "session/set_config_option", { sessionId: state.session, configId: id, value }, (answer) => {
+    state.requests.ask("session/set_config_option", { sessionId: state.session, configId: id, value }, (answer) => {
         const why = failureWords(state, answer);
         const result = isObject(answer.result) ? answer.result : {};
 

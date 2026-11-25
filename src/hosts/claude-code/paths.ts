@@ -1,6 +1,6 @@
 // The paths a tool that reads asks for, held to the chat's folder: the AI reads its folder, nothing else on the player's computer.
+import { isObject } from "../lines.ts";
 import { inside, staysInside } from "../paths.ts";
-import { isObject } from "./protocol.ts";
 
 /** The first path a tool of kind read asks for outside `folder`, as the host gave it; undefined where every path given is inside. */
 export function pathOutside(tool: string, input: unknown, folder: string): string | undefined

@@ -1,9 +1,10 @@
 // The models Claude Code offers on this computer: its program started with no tool and no MCP server, asked by the protocol's first request, then stopped.
 // Its answer holds the account too: nothing of it but the models is read.
 import { type HostModel, isHostName, laterByTimer, type ModelsOptions } from "../chat.ts";
+import { isObject } from "../lines.ts";
 import { type LineProcess, startLineProcess } from "../process.ts";
 import { settingArguments, streamArguments } from "./program.ts";
-import { controlRequest, isObject } from "./protocol.ts";
+import { controlRequest } from "./protocol.ts";
 
 // How long the program has to answer, the id of the request, and how many models are kept.
 const answerWait = 10_000;

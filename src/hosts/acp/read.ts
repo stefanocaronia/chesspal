@@ -1,40 +1,21 @@
 // Reading the agent's lines: answers to the table's requests, the agent's own requests, and the session's updates; a line not understood changes nothing.
 import type { ToolKind } from "../chat.ts";
+import { error, isObject, type Message, result } from "../lines.ts";
 import { inside } from "../paths.ts";
+import { askToStop, nextBlock, playing, tell, write } from "../state.ts";
+import { heardHost } from "./host-turn.ts";
 import { pathWords } from "./host.ts";
-import { configOption, error, isObject, type Message, result } from "./protocol.ts";
+import { configOption } from "./protocol.ts";
 import { askModelAgain } from "./setup.ts";
-import { askToStop, type State, tell, type Turn, write } from "./state.ts";
+import type { State, Turn } from "./state.ts";
 
-/** One line of the agent: whatever it holds, reading it never throws; what the chat's listener throws its queue takes. */
-export function readLine(state: State, line: string): void
-{
-    if (state.closed || state.ended) {
-        return;
-    }
-
-    try {
-        const message: unknown = JSON.parse(line);
-
-        if (isObject(message)) {
-            readMessage(state, message);
-        }
-    } catch {
-        // Not JSON, or a shape that broke the reading: ignored.
-    }
-}
-
-function readMessage(state: State, message: Message): void
+/** One line of the agent, an object: an answer, a request of the agent's, or an update of the session. */
+export function readMessage(state: State, message: Message): void
 {
     const hasId = typeof message.id === "number" || typeof message.id === "string";
 
     if (typeof message.method !== "string") {
-        const answered = typeof message.id === "number" ? state.pending.get(message.id) : undefined;
-
-        if (answered !== undefined && typeof message.id === "number") {
-            state.pending.delete(message.id);
-            answered(message);
-        }
+        state.requests.answer(message);
     } else if (hasId) {
         readRequest(state, message);
     } else if (message.method === "session/update" && isObject(message.params)) {
@@ -105,6 +86,7 @@ function readUpdate(state: State, params: Message): void
     }
 
     const child = state.host.childOf?.(update);
+    heardHost(state, update, child);
 
     if (child !== undefined) {
         return readChild(state, child, update);
@@ -286,20 +268,4 @@ function remember(turn: Turn | undefined, update: Message): Message
     }
 
     return merged;
-}
-
-/** A new block of text, unless the one in course is still empty. */
-function nextBlock(turn: Turn): void
-{
-    if (turn.block < 0 || turn.filled) {
-        turn.block += 1;
-        turn.filled = false;
-    }
-}
-
-/** The turn the agent's updates belong to: none between turns, while the player's words wait, nor for a turn failing. */
-function playing(state: State): Turn | undefined
-{
-    const turn = state.turn;
-    return turn === undefined || turn.held !== undefined || turn.failure !== undefined ? undefined : turn;
 }
