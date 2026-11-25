@@ -183,6 +183,31 @@ export default [
             }],
         },
     },
+    // The table never imports the places of the chats it opens: they import the MCP server, which imports the table; the command line hands them over.
+    {
+        files: ["src/server/table/**/*.ts"],
+        rules: {
+            "no-restricted-imports": ["error", {
+                patterns: [
+                    { regex: "^(?:\\.\\./)+places/", message: "The table never imports server/places, which imports server/mcp, which imports the table: take the places as a parameter." },
+                    ...boundaries,
+                ],
+            }],
+        },
+    },
+    // The door between the table and the chats it opens imports Node and the version alone: the process of a chat that only pipes its lines starts light.
+    {
+        files: ["src/server/door/**/*.ts"],
+        rules: {
+            "no-restricted-imports": ["error", {
+                patterns: [
+                    { regex: "^\\.\\./(?!\\.\\./version\\.ts$)", message: "The door imports nothing of the other modules, but ../../version.ts." },
+                    { regex: "^(?!node:|\\.)", message: "The door imports Node alone, as node:*, and no package: the chat's process that pipes loads nothing else." },
+                    ...boundaries,
+                ],
+            }],
+        },
+    },
     // The MCP server speaks on stdout: commands return values, and only the CLI prints.
     {
         files: ["src/commands/**/*.ts", "src/server/**/*.ts"],

@@ -25,9 +25,7 @@ if (args.length === 0) {
 
     await playHere(args[1]!);
 } else if (args.length === 1 && args[0] === "mcp") {
-    // The server and its SDK load only here: every other command starts faster without them.
-    const { startMcpServer } = await import("../server/mcp/index.ts");
-    await startMcpServer();
+    await serveMcp();
 } else if (args[0] === "listen" && (args.length === 1 || (args.length === 2 && listenFlags.has(args[1]!)))) {
     const { listen } = await import("../server/bell/index.ts");
     await listen(listenFlags.get(args[1] ?? "") ?? "claude");
@@ -108,6 +106,25 @@ async function playHere(host: string): Promise<void>
         console.error((error as Error).message);
         process.exitCode = 1;
     }
+}
+
+/**
+ * The MCP server of the chat: its SDK loads only here, so that every other command starts faster without it. A chat the table opened, as its environment
+ * says, only passes its lines to the table, which runs its commands, and loads neither the server nor the commands.
+ */
+async function serveMcp(): Promise<void>
+{
+    const { pipeHere } = await import("../server/door/index.ts");
+    const piped = await pipeHere(process.stdin, process.stdout, process.env);
+
+    if (piped === undefined) {
+        const { startMcpServer } = await import("../server/mcp/index.ts");
+        await startMcpServer();
+        return;
+    }
+
+    // What the table wrote last must reach the host before the process goes; the host's input may still be open.
+    process.stdout.write("", () => process.exit(piped));
 }
 
 /** The table, until it closes: `chesspal` alone starts it apart from the terminal. */

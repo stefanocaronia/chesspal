@@ -25,6 +25,9 @@ export function isCodex(host: string | undefined): boolean
 /** The agents that think for the AI, by their names. */
 export const ponderAgents: readonly string[] = [quickAgent, ownAgent];
 
+/** The agent that thinks for the AI on the chat's own model. */
+export const ownModelPonderAgent = ownAgent;
+
 /** The coach's agent (D-88). */
 export const coachAgent = "chesspal-coach";
 

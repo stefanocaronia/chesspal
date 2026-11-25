@@ -20,8 +20,25 @@ import { allowedCaller, callerOf, type CallingAgent, callingAgent, fromCodexAgen
  */
 export const serverInstructions = startInstructions();
 
-/** The MCP server for an AI host: every command of the registry as a tool, with its description and parameters (D-5). */
-export function createMcpServer(context: Context = defaultContext(), list: AnyCommand[] = commands, beforeCall?: (meta: Record<string, unknown> | undefined) => Promise<void>): McpServer
+/**
+ * The seat of a chat the table opened, whose commands the table runs: every call is its agent's, or the chat's without one, never looked up in the call's
+ * metadata or the host's files; `caller` says who plays as the AI there.
+ */
+export interface TableSeat
+{
+    agent?: string;
+    /** Which run of the agent: the same for every call of the seat. */
+    run?: string;
+    caller?: () => Promise<Caller | undefined>;
+}
+
+/** The MCP server for an AI host: every command of the registry as a tool, with its description and parameters (D-5); with `seat`, a chat the table opened. */
+export function createMcpServer(
+    context: Context = defaultContext(),
+    list: AnyCommand[] = commands,
+    beforeCall?: (meta: Record<string, unknown> | undefined) => Promise<void>,
+    seat?: TableSeat,
+): McpServer
 {
     const server = new McpServer({ name: "chesspal", version }, { instructions: serverInstructions });
     // The server keeps what it told the chat, the instructions a tool gives once, and the position it showed: none yet (D-71).
@@ -34,7 +51,7 @@ export function createMcpServer(context: Context = defaultContext(), list: AnyCo
 
     for (const command of list.filter((each) => each.cliOnly !== true)) {
         // A call runs from its start, the page started before it too: the server that leaves waits for it.
-        const tool = server.registerTool(command.name, toolConfig(command), (input: unknown, extra) => track(callTool(command, input, context, server, extra._meta, beforeCall)));
+        const tool = server.registerTool(command.name, toolConfig(command), (input: unknown, extra) => track(server, callTool(command, input, context, server, extra._meta, beforeCall, seat)));
 
         if (command.hosts !== undefined) {
             tool.disable();
@@ -62,7 +79,7 @@ export async function startMcpServer(context: Context = defaultContext(), list: 
 {
     const leave = async (): Promise<void> => {
         // A tool stuck on something that never ends must not keep the server alive once the host has gone.
-        await Promise.race([Promise.allSettled(running), new Promise((done) => setTimeout(done, 5_000))]);
+        await callsAnswered(server, 5_000);
         // The SDK sends the answer a moment after the call ends: it must reach stdout before the process goes.
         setImmediate(() => process.stdout.write("", () => process.exit(0)));
     };
@@ -191,7 +208,10 @@ function noteTheAi(context: Context, caller: () => Promise<Caller | undefined>):
     });
 }
 
-/** A tool called: the page started first, at the chat's first call; refused to an agent it is not for (D-89, D-98); and who played as the AI noted after a move. */
+/**
+ * A tool called: the page started first, at the chat's first call; refused to an agent it is not for (D-89, D-98); and who played as the AI noted after a
+ * move. A seat of the table's says who calls.
+ */
 async function callTool(
     command: AnyCommand,
     input: unknown,
@@ -199,13 +219,14 @@ async function callTool(
     server: McpServer,
     meta: Record<string, unknown> | undefined,
     beforeCall?: (meta: Record<string, unknown> | undefined) => Promise<void>,
+    seat?: TableSeat,
 ): Promise<CallToolResult>
 {
     await beforeCall?.(meta);
-    const codexAgent = fromCodexAgent(meta);
-    const openCode = fromOpenCode(meta);
+    const codexAgent = seat === undefined && fromCodexAgent(meta);
+    const openCode = seat === undefined && fromOpenCode(meta);
     // In OpenCode a call of the agent the plugin starts is told from the chat's by a note the plugin writes: a small file, read once a call.
-    const calling = command.byAgents !== undefined || codexAgent || openCode ? await callingAgent(meta, context.folder) : undefined;
+    const calling = seat !== undefined ? seatedCaller(seat) : command.byAgents !== undefined || codexAgent || openCode ? await callingAgent(meta, context.folder) : undefined;
 
     // An agent's tool called by the chat, or by another agent, would give what only that agent may see (Priya).
     if (command.byAgents !== undefined && !allowedCaller(calling, command.byAgents)) {
@@ -222,8 +243,8 @@ async function callTool(
     }
 
     // Each call knows who makes it, for the commands that write it down (D-81).
-    const caller = () => callerOf(meta, server.server.getClientVersion(), context.folder);
-    const result = await runTool(command, input, context, caller, meta);
+    const caller = seat?.caller ?? (() => callerOf(meta, server.server.getClientVersion(), context.folder));
+    const result = await runTool(command, input, context, caller, meta, seat === undefined ? undefined : calling);
 
     if (command === aiMove && result.isError !== true) {
         noteTheAi(context, caller);
@@ -232,14 +253,28 @@ async function callTool(
     return result;
 }
 
-// The tool calls still running, which the server waits for before it leaves.
-const running = new Set<Promise<CallToolResult>>();
-
-function track(call: Promise<CallToolResult>): Promise<CallToolResult>
+/** Settles once the server's tool calls still running have answered, or after `most` ms: a tool stuck on something that never ends is not waited for. */
+export async function callsAnswered(server: McpServer, most: number): Promise<void>
 {
-    running.add(call);
-    void call.finally(() => running.delete(call));
+    await Promise.race([Promise.allSettled(running.get(server) ?? []), new Promise((done) => setTimeout(done, most))]);
+}
+
+// The tool calls still running, by server, which a server waits for before it leaves.
+const running = new WeakMap<McpServer, Set<Promise<CallToolResult>>>();
+
+function track(server: McpServer, call: Promise<CallToolResult>): Promise<CallToolResult>
+{
+    const calls = running.get(server) ?? new Set();
+    running.set(server, calls);
+    calls.add(call);
+    void call.finally(() => calls.delete(call));
     return call;
+}
+
+/** Who calls at a seat of the table's: its agent, with its run, or the chat. */
+function seatedCaller(seat: TableSeat): CallingAgent
+{
+    return seat.agent === undefined ? { chat: true } : { agent: seat.agent, ...(seat.run === undefined ? {} : { run: seat.run }) };
 }
 
 /** Every hint stated, since the spec reads a missing one as the worst case: everything is local, but for the tools that ask the sites the player plays on (D-110). */
@@ -252,9 +287,16 @@ function toolConfig(command: AnyCommand)
     return { description: command.description, inputSchema: z.looseObject({}).meta({ ...shownInput(command), $schema: undefined }), annotations, _meta: meta };
 }
 
-async function runTool(command: AnyCommand, input: unknown, context: Context, caller: NonNullable<Context["caller"]>, meta: Record<string, unknown> | undefined): Promise<CallToolResult>
+async function runTool(
+    command: AnyCommand,
+    input: unknown,
+    context: Context,
+    caller: NonNullable<Context["caller"]>,
+    meta: Record<string, unknown> | undefined,
+    seated?: CallingAgent,
+): Promise<CallToolResult>
 {
-    const calling = await sharingCaller(command, meta, context);
+    const calling = seated ?? await sharingCaller(command, meta, context);
     const agent = calling !== undefined && "agent" in calling ? calling.agent : undefined;
     const chat = command.byAgents === undefined && agent === undefined;
     const home = homeForOneCall(context);
@@ -262,7 +304,11 @@ async function runTool(command: AnyCommand, input: unknown, context: Context, ca
 
     try {
         if (chat) {
-            takePositionShown(context, home);
+            // A chat the table opened has no hooks to leave a note.
+            if (seated === undefined) {
+                takePositionShown(context, home);
+            }
+
             await context.calls?.();
         }
 
