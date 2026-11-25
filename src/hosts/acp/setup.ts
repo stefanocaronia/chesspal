@@ -10,7 +10,7 @@ export function begin(state: State): void
 {
     waitReady(state);
     ask(state, "initialize", initializeParams(), (answer) => {
-        const why = failureOf(answer);
+        const why = failureWords(state, answer);
 
         if (why !== undefined || !isObject(answer.result)) {
             refused(state, `the host did not begin the protocol: ${why ?? "its answer is no answer"}`);
@@ -85,7 +85,7 @@ function openSession(state: State): void
 
 function sessionOpened(state: State, answer: Message): void
 {
-    const why = failureOf(answer);
+    const why = failureWords(state, answer);
     const opened = isObject(answer.result) ? answer.result : {};
     const session = state.resumed ?? opened.sessionId;
 
@@ -113,7 +113,7 @@ function askModel(state: State): void
     } else {
         // Without such an option, the protocol's own call: its success is the confirmation, and a host that has no such call says so in its error.
         ask(state, "session/set_model", { sessionId: state.session, modelId: asked }, (answer) => {
-            const why = failureOf(answer);
+            const why = failureWords(state, answer);
 
             if (why !== undefined) {
                 refused(state, `the host did not take the model ${asked}: ${why}`);
@@ -144,7 +144,7 @@ function askEffort(state: State): void
 function setOption(state: State, id: string, value: string, what: "model" | "effort", confirmed: (value: string) => void): void
 {
     ask(state, "session/set_config_option", { sessionId: state.session, configId: id, value }, (answer) => {
-        const why = failureOf(answer);
+        const why = failureWords(state, answer);
         const result = isObject(answer.result) ? answer.result : {};
 
         if (why !== undefined) {
@@ -176,7 +176,7 @@ function promptAnswered(state: State, turn: Turn, answer: Message): void
         return;
     }
 
-    const why = failureOf(answer);
+    const why = failureWords(state, answer);
     const reason = isObject(answer.result) ? answer.result.stopReason : undefined;
 
     if (turn.failure !== undefined) {
@@ -198,3 +198,14 @@ const stopWords: Record<string, string> = {
     max_turn_requests: "the AI took more steps than one turn allows",
     refusal: "the model refused to go on",
 };
+
+// The protocol's error for an agent whose player is not signed in.
+const authRequired = -32000;
+
+/** Why an answer failed, undefined where it did not: for a host not signed in, with how to sign it in. */
+function failureWords(state: State, answer: Message): string | undefined
+{
+    const why = failureOf(answer);
+    const code = isObject(answer.error) ? answer.error.code : undefined;
+    return why !== undefined && (code === authRequired || /authenticat/i.test(why)) ? `${why}: ${state.host.login}` : why;
+}

@@ -18,8 +18,12 @@ export const builtInTools: { name: string; kind: ToolKind; }[] = [
     { name: "NotebookEdit", kind: "write" },
 ];
 
-// The chesspal server's tools.
+/** The host's tools that only load the others, which it runs without asking: never a reason to stop a turn. */
+export const toolLoaders = ["ToolSearch"];
+
+// The chesspal server's tools, and the subagent tool by its names old and new.
 const chesspalPrefix = "mcp__chesspal__";
+const agentTools = ["Task", "Agent"];
 
 /** A tool's name for the table and its kind: a command of the chesspal server by its own name; any subagent is of kind agent. */
 export function toolOf(name: string, input: unknown): { name: string; kind: ToolKind; }
@@ -28,7 +32,7 @@ export function toolOf(name: string, input: unknown): { name: string; kind: Tool
         return { name: name.slice(chesspalPrefix.length), kind: "chesspal" };
     }
 
-    if (name === "Task") {
+    if (agentTools.includes(name)) {
         return { name, kind: "agent" };
     }
 

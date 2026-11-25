@@ -12,12 +12,27 @@ const dropped = /^(PWD|OLDPWD|INIT_CWD)$/i;
 // A tool of the chesspal server, by the names a host gives one: mcp__chesspal__status, chesspal.status, chesspal_status, chesspal/status, or the title "chesspal: status".
 const chesspalTool = /^(?:mcp__)?chesspal(?:__|[._/]|:\s*)([a-z][\w-]*)$/i;
 
-/** Antigravity as the protocol's client reads it: its own names of tools are not known, so a tool is read by the protocol's kinds, a command of chesspal by its name. */
+// The protocol's kinds that change something on the computer: what such a call is named or titled never makes it a command of chesspal.
+const actingKinds = ["execute", "edit", "delete", "move"];
+
+// Antigravity's own tools, by the names the table saw it give; write_to_file is from its other modes, and of a kind never allowed. Any other is read by the
+// protocol's kind. An MCP tool, a reading and the subagents are read from their input, by the name Antigravity gives, never by a title.
+const builtInKinds: Record<string, ToolKind> = { run_command: "shell", write_file: "write", write_to_file: "write" };
+const inputTools = ["call_mcp_tool", "invoke_subagent", "manage_subagents", "read_file"];
+
+// What the AI may do with the subagents it started; any subagent it starts is of kind agent, whatever its name.
+const agentActions = ["list", "kill"];
+
+// The description of a chesspal tool, which Antigravity keeps in its own folder and reads before it calls one.
+const chesspalDescription = /[\\/]antigravity-cli[\\/]mcp[\\/]chesspal[\\/][\w-]+\.(?:json|md)$/i;
+
+/** Antigravity as the protocol's client reads it: a tool by its own name where the table knows it, else by the protocol's kind; a command of chesspal by its name. */
 export const antigravityAcp: AcpHost = {
     args: ["acp"],
-    toolOf: (call) => toolOf(call),
+    toolOf: (call, session) => toolOf(call, session),
     pathsOf: pathsOfCall,
     innerTools: () => [],
+    login: "run agy in a terminal and sign in, then try again",
 };
 
 /** Antigravity as the table drives it: the model a new chat proposes is the first Antigravity lists. */
@@ -42,10 +57,29 @@ function antigravityProgram(environment: NodeJS.ProcessEnv, platform: string, ho
     return found === undefined ? undefined : { command: found, args: [] };
 }
 
-/** A call's name for the table and its kind: a command of the chesspal server by its own name, whether the host names it or titles it so. */
-function toolOf(call: Record<string, unknown>): { name: string; kind: ToolKind; }
+/**
+ * A call's name for the table and its kind: a tool of Antigravity's read from its input, by the name it gives; else a call that changes something by
+ * the protocol's kind, whatever its name or title; then a tool of Antigravity's own by its name; then a command of the chesspal server by its own name,
+ * whether the host names it or titles it so.
+ */
+function toolOf(call: Record<string, unknown>, session: string | undefined): { name: string; kind: ToolKind; }
 {
     const names = [call.name, call.title].filter((one) => typeof one === "string") as string[];
+    const first = names[0] ?? "";
+
+    if (typeof call.name === "string" && inputTools.includes(call.name)) {
+        return toolOfInput(call.name, call, session);
+    }
+
+    if (typeof call.kind === "string" && actingKinds.includes(call.kind)) {
+        return { name: first, kind: kindOfCall(call) };
+    }
+
+    const own = names.find((name) => Object.hasOwn(builtInKinds, name));
+
+    if (own !== undefined) {
+        return { name: own, kind: builtInKinds[own] ?? "other" };
+    }
 
     for (const name of names) {
         const command = chesspalTool.exec(name.trim())?.[1];
@@ -55,5 +89,39 @@ function toolOf(call: Record<string, unknown>): { name: string; kind: ToolKind; 
         }
     }
 
-    return { name: names[0] ?? "", kind: kindOfCall(call) };
+    return { name: first, kind: kindOfCall(call) };
+}
+
+/**
+ * A call of Antigravity's own read from its input, by the fields agy 1.5.17 gives: a tool of the chesspal server is chesspal's, any other server's of kind
+ * other; reading a tool's description, or what a tool of this chat answered, which Antigravity keeps in its own folder, is chesspal's; any subagent, and
+ * listing or stopping them, are the agent's. Where its input names them otherwise, the call is of kind other, never allowed.
+ */
+function toolOfInput(name: string, call: Record<string, unknown>, session: string | undefined): { name: string; kind: ToolKind; }
+{
+    const input = typeof call.rawInput === "object" && call.rawInput !== null ? call.rawInput as Record<string, unknown> : {};
+
+    if (name === "call_mcp_tool") {
+        return input.ServerName === "chesspal" ? { name: typeof input.ToolName === "string" ? input.ToolName : name, kind: "chesspal" } : { name, kind: "other" };
+    }
+
+    if (name === "read_file") {
+        const own = typeof input.Path === "string" && (chesspalDescription.test(input.Path) || isAnswerOf(input.Path, session));
+        return { name, kind: own ? "chesspal" : "read" };
+    }
+
+    if (name === "invoke_subagent") {
+        return { name, kind: "agent" };
+    }
+
+    return { name, kind: typeof input.Action === "string" && agentActions.includes(input.Action) ? "agent" : "other" };
+}
+
+/** Whether a path is where Antigravity keeps what a tool of the chat's session answered: .gemini/antigravity-cli/brain/<session>/.system_generated/steps/<n>/output.txt. */
+function isAnswerOf(path: string, session: string | undefined): boolean
+{
+    const parts = path.split(/[\\/]/);
+    const at = parts.length - 8;
+    const expected = [".gemini", "antigravity-cli", "brain", session, ".system_generated", "steps"];
+    return session !== undefined && at >= 0 && expected.every((part, index) => parts[at + index] === part) && /^\d+$/.test(parts[at + 6] ?? "") && parts[at + 7] === "output.txt";
 }

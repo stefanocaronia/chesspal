@@ -7,7 +7,7 @@ import { readLine } from "./read.ts";
 import { begin, writePrompt } from "./setup.ts";
 import { askToStop, cancelWaits, endTurn, newTurn, processEnded, type State } from "./state.ts";
 
-export { type AcpHost, kindOfCall, pathsOfCall } from "./host.ts";
+export { type AcpHost, kindOfCall, pathsOfCall, patternOutside } from "./host.ts";
 export { acpModels } from "./models.ts";
 
 /** Opens a chat with the AI in the host, or takes one up again by its session; the player's words wait until the model is confirmed. */
@@ -31,6 +31,7 @@ export function openAcp(options: ChatOptions, host: AcpHost): HostChat
         model: { asked: options.model, ...(options.effort === undefined ? {} : { effort: options.effort }) },
         ready: false,
         errors,
+        children: new Set(),
         closed: false,
         ended: false,
     };

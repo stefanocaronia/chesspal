@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
-import { type ChatOptions, hostDriver, type HostEvent, openHostChat } from "../src/hosts/index.ts";
+import { type ChatOptions, hostDriver, type HostEvent, openHostChat, type ToolKind } from "../src/hosts/index.ts";
 import { checklist, type Scenario } from "./hosts/checklist.ts";
 import { fakeAgent, type FakeAgentOptions, isModelSetting, isPrompt, joinedTexts, promptWords } from "./hosts/fake-agent.ts";
 import { type FakeHost, type FlowEntry, listen, loadFlow, turnEnds } from "./hosts/fake-host.ts";
@@ -74,18 +74,27 @@ describe("the chat in Antigravity", () => {
         expect(host.written.filter(isPrompt)).toHaveLength(1);
     });
 
-    it("reads a command of chesspal by every name a host gives it, and other tools by the protocol's kinds", async () => {
+    it("reads its own tools by name, a command of chesspal by every name a host gives it, and other tools by the protocol's kinds, which a name never overrides where they act", async () => {
+        const inside = [{ path: join(folder, "game.json") }];
         const tools = [
             call("c1", { title: "chesspal: status", kind: "other" }),
             call("c2", { name: "mcp__chesspal__roll", kind: "other" }),
             call("c3", { name: "chesspal_scene", kind: "other" }),
-            call("c4", { title: "Read game.json", kind: "read" }),
-            call("c5", { title: "Run npm test", kind: "execute" }),
-            call("c6", { title: "Edit a file", kind: "edit" }),
-            call("c7", { title: "Fetch a page", kind: "fetch" }),
-            call("c8", { title: "Think", kind: "think" }),
+            call("c4", { title: "Read game.json", kind: "read", locations: inside }),
+            call("c5", { title: "Fetch a page", kind: "fetch" }),
+            call("c6", { name: "call_mcp_tool", kind: "other", rawInput: { ServerName: "chesspal", ToolName: "advance" } }),
+            call("c7", { name: "read_file", kind: "read", rawInput: { Path: "C:\\Users\\player\\.gemini\\antigravity-cli\\mcp\\chesspal\\advance.json" } }),
+            call("c8", { name: "read_file", kind: "other", rawInput: { Path: join(folder, "game.json") } }),
+            call("c9", { title: "chesspal/steal", kind: "execute" }),
+            call("c10", { title: "chesspal: write", kind: "edit" }),
+            call("c11", { name: "run_command", kind: "other" }),
+            call("c12", { name: "write_file", kind: "other" }),
+            call("c13", { name: "call_mcp_tool", kind: "other", rawInput: { ServerName: "jira", ToolName: "search" } }),
+            call("c14", { name: "invoke_subagent", kind: "other", rawInput: {} }),
+            call("c15", { title: "Think", kind: "think" }),
+            call("c16", { title: "Plan mode", kind: "switch_mode" }),
         ].flat();
-        const { chat, events, until } = play([...handshake, ...newSession(), ...turn("Hello", ...tools)]);
+        const { chat, events, until } = play([...handshake, ...newSession(), ...turn("Hello", ...tools)], { allowed: ["chesspal", "read", "fetch", "shell", "write", "agent"] });
         chat.send("Hello");
         await until(() => turnEnds(events).length === 1);
         const done = events.filter((event) => event.type === "tool" && event.state === "done").map((event) => event.type === "tool" && [event.name, event.kind]);
@@ -94,11 +103,113 @@ describe("the chat in Antigravity", () => {
             ["roll", "chesspal"],
             ["scene", "chesspal"],
             ["Read game.json", "read"],
-            ["Run npm test", "shell"],
-            ["Edit a file", "write"],
             ["Fetch a page", "fetch"],
-            ["Think", "other"],
+            ["advance", "chesspal"],
+            ["read_file", "chesspal"],
+            ["read_file", "read"],
+            ["chesspal/steal", "shell"],
+            ["chesspal: write", "write"],
+            ["run_command", "shell"],
+            ["write_file", "write"],
+            ["call_mcp_tool", "other"],
         ]);
+        expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use call_mcp_tool" }]);
+        expect(events.filter((event) => event.type === "permission")).toEqual([]);
+    });
+
+    it("reads any subagent as of kind agent, allowed only where that kind is, and a thought and a switch of mode as of kind other, never allowed", async () => {
+        const asked = async (toolCall: Message, allowed: ToolKind[], chosen = "reject"): Promise<HostEvent[]> => {
+            const { chat, events, until } = play([...handshake, ...newSession(), ...turn("Hello", ...permission(toolCall, chosen))], { allowed });
+            chat.send("Hello");
+            await until(() => turnEnds(events).length === 1);
+            return events.filter((event) => event.type === "permission");
+        };
+
+        const every: ToolKind[] = ["chesspal", "read", "agent", "shell", "write", "fetch", "web"];
+        const subagent = { name: "invoke_subagent", kind: "other", rawInput: { subagents: [{ type_name: "general" }] } };
+
+        expect(await asked(subagent, every, "allow-once")).toEqual([{ type: "permission", name: "invoke_subagent", kind: "agent", allowed: true }]);
+        expect(await asked(subagent, every.filter((kind) => kind !== "agent"))).toEqual([{ type: "permission", name: "invoke_subagent", kind: "agent", allowed: false }]);
+        expect(await asked({ title: "Think", kind: "think", rawInput: {} }, every)).toEqual([{ type: "permission", name: "Think", kind: "other", allowed: false }]);
+        expect(await asked({ title: "Bypass permissions", kind: "switch_mode", rawInput: {} }, every)).toEqual([{ type: "permission", name: "Bypass permissions", kind: "other", allowed: false }]);
+    });
+
+    describe("recorded turns (agy 1.5.17, gemini-3.8-flash)", () => {
+        // The table's own kinds.
+        const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "agent", "image"];
+
+        function playRecorded(name: string): ReturnType<typeof play> & { flow: FlowEntry[]; }
+        {
+            const flow = loadFlow(`antigravity/${name}`);
+            const opened = play(flow, { model: "gemini-3.8-flash", allowed: tableKinds });
+            opened.chat.send(promptWords(flow)[0] ?? "");
+            return { ...opened, flow };
+        }
+
+        const done = (events: HostEvent[]): (string | ToolKind)[][] => events.flatMap((event) => (event.type === "tool" && event.state === "done" ? [[event.name, event.kind]] : []));
+
+        it("reads chesspal's commands through call_mcp_tool, the descriptions and the answers of the chat it reads in its folder, and the subagent it starts; the shell is refused", async () => {
+            const { events, host, until } = playRecorded("picture-by-subagent");
+            await until(() => turnEnds(events).length === 1);
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done" }]);
+            expect(done(events).filter(([, kind]) => kind !== "chesspal")).toEqual([["invoke_subagent", "agent"]]);
+            expect(done(events).filter(([name]) => name === "read_file")).toHaveLength(4);
+            expect(events.filter((event) => event.type === "permission")).toEqual([{ type: "permission", name: "run_command", kind: "shell", allowed: false }]);
+            expect(host.problems).toEqual([]);
+        });
+
+        it("ends the turn as agy does when its shell is refused, with no word of the AI's", async () => {
+            const { events, host, until } = playRecorded("denied-command-ends-turn");
+            await until(() => turnEnds(events).length === 1);
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done" }]);
+            expect(events.filter((event) => event.type === "text")).toEqual([]);
+            expect(events.filter((event) => event.type === "permission")).toEqual([{ type: "permission", name: "run_command", kind: "shell", allowed: false }]);
+            expect(host.problems).toEqual([]);
+        });
+
+        it("lets a subagent start, be listed and stopped, and tells the AI's words around it, in the turn after one its shell ended", async () => {
+            const { chat, events, host, until, flow } = playRecorded("voice-subagent-stop-hook-waits");
+            await until(() => turnEnds(events).length === 1);
+            expect(chat.send(promptWords(flow)[1] ?? "")).toBe(true);
+            await until(() => host.done());
+            expect(done(events).filter(([, kind]) => kind !== "chesspal")).toEqual([["invoke_subagent", "agent"], ["manage_subagents", "agent"], ["manage_subagents", "agent"]]);
+            expect(events.filter((event) => event.type === "text").map((event) => event.type === "text" && event.text).join("")).toBe((joinedTexts(flow)[1] ?? []).join(""));
+            // Its Stop hook held the prompt's answer past the recording's end.
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done" }]);
+            expect(host.problems).toEqual([]);
+        });
+
+        it("holds what is not the chat's own to the table's limits: another chat's answers, another server, another action", async () => {
+            const answers = (chat: string): string => `/home/player/.gemini/antigravity-cli/brain/${chat}/.system_generated/steps/2/output.txt`;
+            const tools = [
+                call("c1", { name: "read_file", kind: "read", rawInput: { Path: answers(session) } }),
+                call("c2", { name: "invoke_subagent", kind: "other", rawInput: { TypeName: "general", Role: "Helper", Prompt: "Look around" } }),
+                call("c3", { name: "manage_subagents", kind: "other", rawInput: { Action: "send" } }),
+                call("c4", { name: "call_mcp_tool", kind: "execute", rawInput: { ServerName: "jira", ToolName: "search" } }),
+                call("c5", { name: "read_file", kind: "read", rawInput: { Path: answers("another-chat") } }),
+            ].flat();
+            // Every kind allowed, but reading outside the chat's folder: only the kinds tell what each is.
+            const { chat, events, until } = play([...handshake, ...newSession(), ...turn("Hello", ...tools)], { allowed: ["chesspal", "read", "agent", "other"] });
+            chat.send("Hello");
+            await until(() => turnEnds(events).length === 1);
+            expect(done(events)).toEqual([["read_file", "chesspal"], ["invoke_subagent", "agent"], ["manage_subagents", "other"], ["call_mcp_tool", "other"], ["read_file", "read"]]);
+            expect(turnEnds(events)).toEqual([{
+                type: "turnEnd",
+                reason: "failed",
+                why: `the host ran a tool without asking: read_file read ${answers("another-chat")}, and the table lets the AI read only the chat's folder`,
+            }]);
+        });
+    });
+
+    it("refuses a session it is not signed in for, saying how to sign in", async () => {
+        const { chat, events, until } = play([
+            ...handshake,
+            { dir: "in", msg: { jsonrpc: "2.0", id: 2, method: "session/new", params: {} } },
+            { dir: "out", msg: { jsonrpc: "2.0", id: 2, error: { code: -32000, message: "Authentication required" } } },
+        ]);
+        chat.send("Hello");
+        await until(() => events.some((event) => event.type === "ended"));
+        expect(events.at(-1)).toEqual({ type: "ended", why: "the host did not open the chat: Authentication required: run agy in a terminal and sign in, then try again" });
     });
 
     it("answers a permission by the tool's kind, and a read by its paths", async () => {

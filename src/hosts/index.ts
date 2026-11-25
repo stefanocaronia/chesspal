@@ -1,4 +1,4 @@
-// Ported from rpg-engine's src/master at 66b60310.
+// Ported from rpg-engine's src/master at b9816504.
 // The AI hosts driven without a terminal: a chat with the host's own program, driven by its protocol so that the table can show it.
 import { antigravity } from "./antigravity/index.ts";
 import type { ChatOptions, HostChat, HostDriver, HostModel } from "./chat.ts";

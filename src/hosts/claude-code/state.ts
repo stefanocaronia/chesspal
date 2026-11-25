@@ -41,10 +41,11 @@ export interface Turn
     message?: string;
     streamed: Set<string>;
     told: Set<string>;
-    /** The tools started, and those ended. */
-    tools: Map<string, { name: string; kind: ToolKind; }>;
+    /** The tools started, with why the table would not let the AI use one, and those ended. */
+    tools: Map<string, { name: string; kind: ToolKind; refused?: string; }>;
+
     ended: Set<string>;
-    /** Asked to stop; and why it fails, when the host runs another model. */
+    /** Asked to stop; and why it fails, as when the host runs another model or a tool the table does not allow. */
     interrupted: boolean;
     failure?: string;
 }

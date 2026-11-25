@@ -14,8 +14,8 @@ export function inside(path: string, folder: string): boolean
     return target === base || target.startsWith(base.endsWith(sep) ? base : `${base}${sep}`);
 }
 
-/** Whether a pattern of files stays in the path it is read from: neither absolute nor climbing out of it. */
+/** Whether a pattern of files stays in the path it is read from: neither absolute nor climbing out of it, nor with braces, whose choices may do either. */
 export function staysInside(pattern: unknown): boolean
 {
-    return typeof pattern === "string" && !isAbsolute(pattern) && !/^([a-zA-Z]:|[\\/~])/.test(pattern) && !pattern.split(/[\\/]/).includes("..");
+    return typeof pattern === "string" && !isAbsolute(pattern) && !/^([a-zA-Z]:|[\\/~])/.test(pattern) && !/[{}]/.test(pattern) && !pattern.split(/[\\/]/).includes("..");
 }

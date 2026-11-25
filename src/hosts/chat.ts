@@ -2,7 +2,7 @@
 import type { startLineProcess } from "./process.ts";
 
 /** What a tool of the host does, so that the table says yes or no without knowing the host. */
-export type ToolKind = "chesspal" | "read" | "web" | "fetch" | "agent" | "shell" | "write" | "other";
+export type ToolKind = "chesspal" | "read" | "web" | "fetch" | "agent" | "image" | "shell" | "write" | "other";
 
 export type HostEvent =
     /** The host said which chat this is and the model it runs: at the first turn, and when either changes. */

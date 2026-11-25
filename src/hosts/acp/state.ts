@@ -35,6 +35,8 @@ export interface State
     /** The session and model last told. */
     told?: { session: string; model: string; };
     turn?: Turn;
+    /** The subagents' sessions started by a call the table allows: their updates are never the AI's. */
+    children: Set<string>;
     cancelInterruptWait?: () => void;
     /** Closed by close(); ended when its process is gone. */
     closed: boolean;
@@ -51,18 +53,19 @@ export interface Turn
     filled: boolean;
     message?: string;
     toolSince: boolean;
-    /** What the agent said of each tool call, merged; those told started, and those ended. */
+    /** What the agent said of each tool call, merged; those told started, those ended, and those the table allowed when asked. */
     calls: Map<string, Message>;
     started: Map<string, { name: string; kind: ToolKind; }>;
     ended: Set<string>;
-    /** Asked to stop; and why it fails, when the agent runs another model. */
+    approved: Set<string>;
+    /** Asked to stop; and why it fails, as when the agent runs another model or a tool the table does not allow. */
     interrupted: boolean;
     failure?: string;
 }
 
 export function newTurn(): Turn
 {
-    return { block: -1, filled: false, toolSince: false, calls: new Map(), started: new Map(), ended: new Set(), interrupted: false };
+    return { block: -1, filled: false, toolSince: false, calls: new Map(), started: new Map(), ended: new Set(), approved: new Set(), interrupted: false };
 }
 
 /** Writes a request, and reads its answer with `answered`. */

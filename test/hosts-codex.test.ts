@@ -15,6 +15,8 @@ type Message = Record<string, unknown>;
 const folder = "/players/test";
 const model = "gpt-6-luna";
 const thread = "thr_1";
+// The kinds of tools the table allows.
+const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "agent", "image"];
 // The flows of codex-cli 0.171.0 (24 Nov): a new chat of two turns that runs chesspal's commands without asking, as the folder's configuration lets them.
 // Codex asked no approval and took no thread up in those runs: the refused flow is the first turn with each command asking its approval as an MCP form of
 // the shape guessed, and the resumed one the same turn on thread/resume.
@@ -43,10 +45,10 @@ describe("the chat in Codex", () => {
             expect(host.started?.options.env).toEqual({ HOME: "/home/player" });
         });
 
-        it("names no trust for a folder with a dot, which a key of -c cannot hold", () => {
+        it("trusts a folder with a dot, which a key of -c cannot hold, in the value: a table of projects holding it alone, in TOML's quotes", () => {
             const host = fakeCodex([]);
-            codex.open({ ...options(host), folder: "/home/jo.doe/test" });
-            expect(host.started?.args).toEqual(["--first", "app-server", "-c", "check_for_update_on_startup=false"]);
+            codex.open({ ...options(host), folder: 'C:\\Users\\mario.rossi\\"x"' });
+            expect(host.started?.args).toEqual(["--first", "app-server", "-c", 'projects={"C:\\\\Users\\\\mario.rossi\\\\\\"x\\""={trust_level="trusted"}}', "-c", "check_for_update_on_startup=false"]);
         });
 
         it("begins the protocol as the table, reads the account, then opens a thread with the model, the effort, its approvals, its sandbox and no web search", async () => {
@@ -187,9 +189,125 @@ describe("the chat in Codex", () => {
             chat.send("Hello");
             await until(() => turnEnds(events).length === 1);
             expect(events.filter((event) => event.type === "tool").map((event) => event.type === "tool" && [event.kind, event.state])).toEqual([["shell", "started"], ["shell", "done"]]);
-            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "failed", why: "the host ran commandExecution without asking, and the table does not let the AI use it" }]);
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use commandExecution" }]);
             expect(host.written.some((message) => message.method === "turn/interrupt")).toBe(true);
             expect(events.some((event) => event.type === "text")).toBe(false);
+        });
+
+        it("names the path where a read outside the folder ran without asking", async () => {
+            const command = { type: "commandExecution", id: "cmd_1", command: "cat /etc/passwd", cwd: folder, commandActions: [{ type: "read", command: "cat /etc/passwd", name: "passwd", path: "/etc/passwd" }] };
+            const flow = [...begin(), ...threadStart(), ...turn("Hello", item("completed", { ...command, status: "completed" }))];
+            const { chat, events, until } = play(flow, { allowed: ["chesspal", "read"] });
+            chat.send("Hello");
+            await until(() => turnEnds(events).length === 1);
+            expect(turnEnds(events)).toEqual([
+                { type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: commandExecution read /etc/passwd, and the table lets the AI read only the chat's folder" },
+            ]);
+        });
+
+        it("reads a picture Codex painted as failed only where it says its failure, whatever its status says", async () => {
+            const painted = async (fields: Message): Promise<string[]> => {
+                const picture = { type: "imageGeneration", id: "img_1", revisedPrompt: null, result: "", ...fields };
+                const flow = [...begin(), ...threadStart(), ...turn("Hello", item("started", { ...picture, status: "generating" }), item("completed", picture))];
+                const { chat, events, until } = play(flow, { allowed: ["chesspal"] });
+                chat.send("Hello");
+                await until(() => turnEnds(events).length === 1);
+                return events.flatMap((event) => (event.type === "tool" && event.state !== "started" ? [event.state] : event.type === "turnEnd" ? [event.reason] : []));
+            };
+
+            expect(await painted({ status: "generated", savedPath: "/home/player/.codex/images/a.png", failure: null })).toEqual(["done", "failed"]);
+            expect(await painted({ status: "failed", failure: "the model refused" })).toEqual(["failed", "done"]);
+        });
+
+        it("reads a picture whose line is megabytes long, its whole image in it, and tells nothing of the image (recorded, its image grown back)", async () => {
+            const flow = loadFlow("codex/picture-saved-outside").map((entry): FlowEntry => {
+                const painted = entry.msg.method === "item/completed" && (entry.msg.params as { item: Message; }).item.type === "imageGeneration";
+                const params = entry.msg.params as { item: Message; };
+                return painted ? { ...entry, raw: JSON.stringify({ ...entry.msg, params: { ...params, item: { ...params.item, result: "iVBORw0KGgo".repeat(400_000) } } }) } : entry;
+            });
+            expect(flow.find((entry) => entry.raw !== undefined)?.raw?.length).toBeGreaterThan(4_000_000);
+            const { chat, host, events, until } = play(flow, { effort: "low", allowed: tableKinds });
+
+            for (const [index, words] of turnWords(flow).entries()) {
+                await until(() => turnEnds(events).length === index);
+                chat.send(words);
+            }
+
+            await until(() => turnEnds(events).length === 2);
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done" }, { type: "turnEnd", reason: "done" }]);
+            expect(events.filter((event) => event.type === "tool" && event.kind === "image")).toEqual([
+                { type: "tool", id: "exec-964013f0-660c-4d08-a847-4b7f6072e75d", name: "imageGeneration", kind: "image", state: "started" },
+                { type: "tool", id: "exec-964013f0-660c-4d08-a847-4b7f6072e75d", name: "imageGeneration", kind: "image", state: "done" },
+            ]);
+            expect(JSON.stringify(events)).not.toContain("iVBORw0KGgo");
+            expect(host.problems).toEqual([]);
+        });
+    });
+
+    describe("a subagent", () => {
+        const voice = loadFlow("codex/voice-subagent");
+
+        async function played(flow: FlowEntry[], allowed: ChatOptions["allowed"] = tableKinds): Promise<{ events: HostEvent[]; host: FakeHost; }>
+        {
+            const { chat, host, events, until } = play(flow, { effort: "low", allowed });
+            chat.send(turnWords(flow)[0] ?? "");
+            await until(() => turnEnds(events).length === 1);
+            return { events, host };
+        }
+
+        it("lets any subagent play, never asking Codex which agent it is: its words and tools are never told as the AI's (recorded)", async () => {
+            const { events, host } = await played(voice);
+            expect(host.written.filter((message) => message.method === "thread/read")).toEqual([]);
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done" }]);
+            const told = events.filter((event) => event.type === "text").map((event) => event.type === "text" && event.text).join("");
+            expect(told).not.toContain("Keeps");
+            expect(told).toContain("Bertoldo incrocia le braccia");
+            expect(events.filter((event) => event.type === "tool" && event.state === "done").map((event) => event.type === "tool" && `${event.name}:${event.kind}`)).toEqual([
+                "instructions:chesspal",
+                "status:chesspal",
+                "find:chesspal",
+                "show:chesspal",
+                "scene:chesspal",
+                "subAgentActivity:agent",
+                "collabAgentToolCall:agent",
+            ]);
+            expect(host.problems).toEqual([]);
+        });
+
+        it("fails the turn where the table does not allow a subagent", async () => {
+            const { events } = await played(voice, tableKinds.filter((kind) => kind !== "agent"));
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use subAgentActivity" }]);
+        });
+
+        it("holds what a subagent's thread ran without asking to the AI's limits, and never tells its words", async () => {
+            const ran = async (fields: Message): Promise<HostEvent[]> => {
+                const launch = { type: "subAgentActivity", id: "call_1", kind: "started", agentThreadId: "thr_child", agentPath: "/root/bertoldo" };
+                const inChild = (phase: "started" | "completed", one: Message): FlowEntry => ({ dir: "out", msg: { method: `item/${phase}`, params: { threadId: "thr_child", turnId: "turn_c", item: one } } });
+                const flow = [
+                    ...begin(),
+                    ...threadStart(),
+                    ...turn(
+                        "Hello",
+                        item("started", launch),
+                        item("completed", launch),
+                        inChild("started", { id: "c1", ...fields, status: "inProgress" }),
+                        inChild("completed", { id: "c1", ...fields, status: "completed" }),
+                        inChild("completed", { type: "agentMessage", id: "k1", text: "Keeps: the key." }),
+                        item("completed", { type: "agentMessage", id: "m1", text: "The innkeeper shrugs." }),
+                    ),
+                ];
+                const { events } = await played(flow);
+                expect(events.filter((event) => event.type === "text").map((event) => event.type === "text" && event.text)).not.toContain("Keeps: the key.");
+                expect(events.filter((event) => event.type === "tool" && event.id === "c1")).toEqual([]);
+                return turnEnds(events);
+            };
+
+            expect(await ran({ type: "mcpToolCall", server: "chesspal", tool: "view", arguments: { as: "Bertoldo" } })).toEqual([{ type: "turnEnd", reason: "done" }]);
+            expect(await ran({ type: "commandExecution", command: "dir", cwd: folder, commandActions: [{ type: "unknown", command: "dir" }] })).toEqual([{
+                type: "turnEnd",
+                reason: "failed",
+                why: "the host ran a tool without asking: the table does not let the AI use commandExecution",
+            }]);
         });
     });
 
@@ -228,6 +346,29 @@ describe("the chat in Codex", () => {
             expect(await answered(asking("item/fileChange/requestApproval", { itemId: "patch_1" }, { decision: "decline" }))).toEqual([{ type: "permission", name: "fileChange", kind: "write", allowed: false }]);
             const network = { itemId: "cmd_1", cwd: folder, reason: null, permissions: { network: { enabled: true }, fileSystem: null } };
             expect(await answered(asking("item/permissions/requestApproval", network, { permissions: {}, scope: "turn" }))).toEqual([{ type: "permission", name: "permissions", kind: "fetch", allowed: false }]);
+        });
+
+        it("grants more permissions only in the shapes it reads, and only what it read; any other shape is refused", async () => {
+            const permissions = "item/permissions/requestApproval";
+            const asked = (fileSystem: unknown, network: unknown = null): Message => ({ itemId: "cmd_1", cwd: folder, reason: null, permissions: { network, fileSystem } });
+            const inside = join(folder, "games");
+            const read = { read: [inside], write: null, entries: null, globScanMaxDepth: null };
+            expect(await answered(asking(permissions, asked(read), { permissions: { fileSystem: { read: [inside] } }, scope: "turn" }))).toEqual([{ type: "permission", name: "permissions", kind: "read", allowed: true }]);
+
+            const refused = { permissions: {}, scope: "turn" };
+            const odd = [
+                asked({ read: [inside], write: "/etc" }),
+                asked({ read: [inside], extra: ["/"] }),
+                asked({ read: [inside] }, { enabled: true }),
+                asked({ read: [inside] }, { domains: ["example.com"] }),
+                { itemId: "cmd_1", cwd: folder, permissions: { fileSystem: { read: [inside] }, macos: { accessibility: true } } },
+                asked({ read: [inside, 7] }),
+                asked({ entries: [{ access: "read", path: { type: "path", path: inside } }] }),
+            ];
+
+            for (const params of odd) {
+                expect(await answered(asking(permissions, params, refused), ["chesspal", "read", "fetch", "write"])).toEqual([{ type: "permission", name: "permissions", kind: "other", allowed: false }]);
+            }
         });
 
         it("answers an MCP server's approval by the tool of that server running, a chesspal command by its own name", async () => {

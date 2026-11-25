@@ -1,6 +1,7 @@
 // Reading Claude Code's lines: one function per type of message; a line not understood changes nothing.
+import type { ToolKind } from "../chat.ts";
 import { pathOutside } from "./paths.ts";
-import { controlAnswer, controlError, isObject, type Message, toolOf } from "./protocol.ts";
+import { controlAnswer, controlError, isObject, type Message, toolLoaders, toolOf } from "./protocol.ts";
 import { askToStop, endTurn, modelConfirmed, modelRefused, type State, tell, type Turn, write } from "./state.ts";
 
 /** One line of the host: whatever it holds, reading it never throws; what the chat's listener throws its queue takes. */
@@ -162,7 +163,8 @@ function readAssistant(state: State, message: Message): void
     for (const block of body.content.filter(isObject)) {
         if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string" && !turn.tools.has(block.id)) {
             const tool = toolOf(block.name, block.input);
-            turn.tools.set(block.id, tool);
+            const refused = refusal(state, block.name, tool.kind, block.input);
+            turn.tools.set(block.id, refused === undefined ? tool : { ...tool, refused });
             tell(state, { type: "tool", id: block.id, name: tool.name, kind: tool.kind, state: "started" });
         } else if (block.type === "text" && typeof block.text === "string") {
             tellWholeText(state, turn, id, block.text);
@@ -170,7 +172,7 @@ function readAssistant(state: State, message: Message): void
     }
 }
 
-/** The results of the AI's tools: done, or failed. */
+/** The results of the AI's tools: done, or failed. One that ran, which the table does not let the AI use, stops the turn, which fails saying so. */
 function readToolResults(state: State, message: Message): void
 {
     const turn = playing(state, message);
@@ -188,8 +190,28 @@ function readToolResults(state: State, message: Message): void
         if (block.type === "tool_result" && typeof id === "string" && tool !== undefined && !turn.ended.has(id)) {
             turn.ended.add(id);
             tell(state, { type: "tool", id, name: tool.name, kind: tool.kind, state: block.is_error === true ? "failed" : "done" });
+
+            if (block.is_error !== true && tool.refused !== undefined && turn.failure === undefined) {
+                turn.failure = `the host ran a tool without asking: ${tool.refused}`;
+                askToStop(state, turn);
+            }
         }
     }
+}
+
+/** Why the table does not let the AI use a tool: its kind, or a path it reads outside the chat's folder; undefined where it may, or the tool only loads others. */
+function refusal(state: State, name: string, kind: ToolKind, input: unknown): string | undefined
+{
+    if (toolLoaders.includes(name)) {
+        return undefined;
+    }
+
+    if (!state.allowed.includes(kind)) {
+        return `the table does not let the AI use ${name}`;
+    }
+
+    const outside = kind === "read" ? pathOutside(name, input, state.folder) : undefined;
+    return outside === undefined ? undefined : `${name} read ${outside}, and the table lets the AI read only the chat's folder`;
 }
 
 /** The turn's end: done, interrupted when the table asked it, else failed with the host's words. */
