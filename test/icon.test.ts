@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import { stripVTControlCharacters } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import { iconsRemoved, offerIcon, type Terminal } from "../src/cli/icon.ts";
@@ -241,11 +242,14 @@ function fakeTerminal(answer: string, options: { tty?: boolean; env?: NodeJS.Pro
     const input = Object.assign(new PassThrough(), { isTTY: tty });
     const output = Object.assign(new PassThrough(), { isTTY: tty });
     let shown = "";
+    let answered = false;
+    // The player answers once the question is on screen, not at the cursor's escapes that readline may write before it.
     output.on("data", (chunk: Buffer) => {
-        const first = shown === "";
-        shown += chunk.toString("utf8");
+        const text = chunk.toString("utf8");
+        shown += text;
 
-        if (first) {
+        if (!answered && stripVTControlCharacters(text).trim() !== "") {
+            answered = true;
             input.write(`${answer}\r`);
         }
     });
