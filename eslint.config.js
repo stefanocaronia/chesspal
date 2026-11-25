@@ -159,6 +159,29 @@ export default [
             }],
         },
     },
+    // The AI hosts driven without a terminal stand alone: they import nothing of the other modules but the version, and print nothing. Their drivers, in
+    // the folders below, share the files of src/hosts itself, the chat and the process they speak through.
+    {
+        files: ["src/hosts/*.ts"],
+        rules: {
+            "no-console": "error",
+            "no-restricted-imports": ["error", {
+                patterns: [{ regex: "^\\.\\./(?!version\\.ts$)", message: "The hosts module imports nothing of the other modules, but ../version.ts." }, ...boundaries],
+            }],
+        },
+    },
+    {
+        files: ["src/hosts/*/**/*.ts"],
+        rules: {
+            "no-console": "error",
+            "no-restricted-imports": ["error", {
+                patterns: [
+                    { regex: "^\\.\\./\\.\\./(?!version\\.ts$)", message: "The hosts module imports nothing of the other modules, but ../../version.ts." },
+                    ...boundaries.filter((boundary) => boundary !== boundaries[1]),
+                ],
+            }],
+        },
+    },
     // The MCP server speaks on stdout: commands return values, and only the CLI prints.
     {
         files: ["src/commands/**/*.ts", "src/server/**/*.ts"],
