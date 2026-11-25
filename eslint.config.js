@@ -177,6 +177,7 @@ export default [
             "no-restricted-imports": ["error", {
                 patterns: [
                     { regex: "^\\.\\./\\.\\./(?!version\\.ts$)", message: "The hosts module imports nothing of the other modules, but ../../version.ts." },
+                    { regex: "^\\.\\./(?!(?:chat|paths|process|program)\\.ts$)[^/]+$", message: "A driver shares only chat.ts, paths.ts, process.ts and program.ts of src/hosts." },
                     ...boundaries.filter((boundary) => boundary !== boundaries[1]),
                 ],
             }],
