@@ -88,7 +88,10 @@ export interface ChatOptions
     environment: NodeJS.ProcessEnv;
     /** The MCP server the chat gets, given by whoever opens it instead of the folder's files: then the chat's servers are this one alone. */
     server?: ChatServer;
-    /** What the chat is told before the player's first words: who it is and how it works. */
+    /**
+     * What the chat is told before the player's first words: who it is and how it works. A driver whose host has no place for them gives them as part of
+     * the chat's first message, before the player's words, and not again in a chat taken up.
+     */
     instructions?: string;
     /** What the chat's listener threw, which never stops the chat; by default a warning of this process. */
     failed?: (error: unknown) => void;
@@ -265,14 +268,6 @@ export function serverNameOf(options: ChatOptions): string
     }
 
     return name;
-}
-
-/** Throws, before any process starts, where a driver that does not take them yet is given a server or instructions. */
-export function refuseGiven(options: ChatOptions, host: string): void
-{
-    if (options.server !== undefined || options.instructions !== undefined) {
-        throw new Error(`${host}'s driver does not take its server or its instructions from the table yet.`);
-    }
 }
 
 /** What a chat's listener threw, where the table gave no handler: a warning of this process, never lost. */

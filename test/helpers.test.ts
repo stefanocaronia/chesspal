@@ -1,10 +1,11 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { analysisStopped, anotherAnalyst } from "../src/commands/answers/index.ts";
 import type { TableHelpers } from "../src/commands/index.ts";
 import { gameInAnalysis, loadGame, notePondering, thoughtKey } from "../src/games/index.ts";
+import { tableFolder } from "../src/home/index.ts";
 import { agentFiles } from "../src/host-files/agents.ts";
 import { atTableInstructions, instructionsFile, opponentInstructions, tableHelperInstructions } from "../src/host-files/index.ts";
 import { activeProfile, gameFolder, type PageSettings, saveProfileSettings } from "../src/profiles/index.ts";
@@ -146,6 +147,33 @@ describe("the opponent's helpers the table runs itself", () => {
         await until(() => opponent.sent.length >= 4);
         expect(opponent.sent[3]).toContain("Thought on their time by your model (legal, not checked): d5, The centre.");
     }, 30_000);
+
+    it("runs the helpers of a chat in Antigravity or OpenCode on the chat's own model at every level, the coach too, as the opponent's next turn says", async () => {
+        const hosts = [{ host: "antigravity", driver: "antigravity", model: "gemini-3.8-flash-medium" }, { host: "opencode", driver: "openCode", model: "ollama/gpt-oss:20b" }];
+
+        for (const { host, driver, model } of hosts) {
+            const { table, ai } = await playing({ level: "club", helps: true, host }, (fake) => {
+                fake.helpers.coach = coaching;
+            });
+            ai.helpers.ponder = pondering("d4", "d5");
+            const opponent = ai.chats[0]!;
+            expect(opponent.options).toMatchObject({ model, allowed: ["chesspal"] });
+            opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Centre." })));
+            await posted(table.url, "/api/move", { move: "e4" });
+            await until(() => helperOf(ai, "ponder")?.ends.includes("done") === true && helperOf(ai, "coach")?.ends.includes("done") === true);
+
+            for (const role of ["ponder", "coach"] as const) {
+                expect(helperOf(ai, role)!.options, `${host} ${role}`).toMatchObject({ model, allowed: ["chesspal"] });
+                expect(helperOf(ai, role)!.options.effort, `${host} ${role}`).toBeUndefined();
+                expect(helperOf(ai, role)!.options.server?.name, `${host} ${role}`).toBe("chesspal");
+            }
+
+            expect(new Set(ai.asked), host).toEqual(new Set([driver]));
+            await posted(table.url, "/api/move", { move: "d4" });
+            await until(() => opponent.sent.length >= 4);
+            expect(opponent.sent[3], host).toContain("Thought on their time by your model (legal, not checked): d5, The centre.");
+        }
+    }, 60_000);
 
     it("stops the thinking at the player's move, its thought kept and given, and starts the next turn from ponder {} on the chat waiting ahead", async () => {
         const { table, ai } = await playing({ level: "strong" });
@@ -767,6 +795,8 @@ describe("the opponent's helpers the table runs itself", () => {
         left.ai.helpers.analyst = analysing(gate(), "");
         await study(left.table.url, { pgn: brought });
         await until(() => analysts(left.ai)[0]?.calls.length === 1);
+        // The opponent leaves for a chat in a terminal, with the switch off.
+        saveProfileSettings(left.home, activeProfile(left.home).id, { [chatInPage]: false });
         await posted(left.table.url, "/api/table/restart", { host: "antigravity" });
         await until(() => analysts(left.ai)[0]!.closed && left.terminal.opened.length === 1);
         expect(left.terminal.opened).toEqual(["antigravity"]);
@@ -778,6 +808,7 @@ describe("the opponent's helpers the table runs itself", () => {
         gone.ai.chats[0]!.turns.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Centre." })));
         await posted(gone.table.url, "/api/move", { move: "e4" });
         await until(() => working === 4);
+        saveProfileSettings(gone.home, activeProfile(gone.home).id, { [chatInPage]: false });
         await posted(gone.table.url, "/api/table/restart", { host: "antigravity" });
         await until(() => gone.ai.helperChats.every((chat) => chat.closed));
     }, 30_000);
@@ -793,6 +824,8 @@ async function playing(
 ): Promise<Awaited<ReturnType<typeof drivenTable>>>
 {
     const driven = await drivenTable();
+    // OpenCode's models as the table keeps them once read: OpenCode offers none before.
+    writeFileSync(join(tableFolder(driven.home), "opencode-models.json"), `${JSON.stringify({ models: ["ollama/gpt-oss:20b"], model: "ollama/gpt-oss:20b" })}\n`);
     const chosen = { ...(model === undefined ? {} : { [`${host}Model`]: model }), ...(effort === undefined ? {} : { [`${host}Effort`]: effort }) };
     saveProfileSettings(driven.home, activeProfile(driven.home).id, { [chatInPage]: true, ...(helps ? { helps: true } : {}), ...chosen });
     set(driven.ai);

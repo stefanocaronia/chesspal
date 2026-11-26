@@ -9,6 +9,9 @@ const quickAgent = "chesspal-ponder-quick";
 const ownAgent = "chesspal-ponder";
 const codexHost = "codex-mcp-client";
 const openCodeHost = "opencode";
+const antigravityHost = "antigravity-client";
+// The hosts whose thoughts on the player's time come from the chat's own model: OpenCode, and Antigravity, which has a quick model in neither chat.
+const ownModelHosts = [openCodeHost, antigravityHost];
 
 /** The hosts whose chat starts Chesspal's agents, by the names they give the server (D-98). */
 export const agentHosts: readonly string[] = ["claude-code", codexHost];
@@ -40,10 +43,10 @@ export function ponderAgentFor(level: AiLevel): string
     return onQuickModel(level) ? quickAgent : ownAgent;
 }
 
-/** Whether the AI's thoughts on the player's time come from a quicker model than its own at a level: never in OpenCode, which thinks on the chat's model. */
+/** Whether the AI's thoughts on the player's time come from a quicker model than its own at a level: never in OpenCode or Antigravity, which think on the chat's model. */
 export function onQuickModel(level: AiLevel, host?: string): boolean
 {
-    return host !== openCodeHost && (level === "beginner" || level === "club");
+    return !ownModelHosts.includes(host ?? "") && (level === "beginner" || level === "club");
 }
 
 /** Whether the player's folder has the agent for the host, as init writes it: a folder set up before it has none, and the AI then plays as before. */

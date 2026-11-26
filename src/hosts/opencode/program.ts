@@ -30,17 +30,40 @@ export function openCodeEnvironment(environment: NodeJS.ProcessEnv): NodeJS.Proc
 }
 
 /**
- * The environment of the chat's OpenCode at the table: its own tools that read files denied where the kinds allowed hold no read, and any folder outside
- * the chat's always, given for this process alone beside the folder's opencode.json, so that a chat opened by hand keeps the player's.
+ * The environment of the chat's OpenCode at the table: its own tools denied where the kinds allowed do not hold theirs, since it runs them without asking,
+ * and any folder outside the chat's always, given for this process alone beside the folder's opencode.json, so that a chat opened by hand keeps the player's; added to the
+ * configuration the environment gives already, as the model chosen.
  */
 export function allowedEnvironment(environment: NodeJS.ProcessEnv, allowed: ToolKind[]): NodeJS.ProcessEnv
 {
-    const reading = allowed.includes("read") ? {} : Object.fromEntries(readingTools.map((tool) => [tool, "deny"]));
-    return { ...environment, OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: { ...reading, external_directory: "deny" } }) };
+    const denied = Object.fromEntries(Object.entries(permissionKinds).filter(([, kind]) => !allowed.includes(kind)).map(([tool]) => [tool, "deny"]));
+    return { ...environment, OPENCODE_CONFIG_CONTENT: JSON.stringify({ ...givenConfig(environment), permission: { ...denied, external_directory: "deny" } }) };
 }
 
-// OpenCode's tools that read files, by their permission's names.
-const readingTools = ["read", "glob", "grep", "list"];
+/** The configuration the environment gives OpenCode already: none where it gives none, or no object. */
+function givenConfig(environment: NodeJS.ProcessEnv): Record<string, unknown>
+{
+    try {
+        const given = JSON.parse(environment.OPENCODE_CONFIG_CONTENT ?? "{}") as unknown;
+        return typeof given === "object" && given !== null && !Array.isArray(given) ? given as Record<string, unknown> : {};
+    } catch {
+        return {};
+    }
+}
+
+// OpenCode's own tools by their permission's names, and the kind of each.
+const permissionKinds: Record<string, ToolKind> = {
+    read: "read",
+    glob: "read",
+    grep: "read",
+    list: "read",
+    bash: "shell",
+    edit: "write",
+    webfetch: "fetch",
+    websearch: "web",
+    codesearch: "web",
+    task: "agent",
+};
 
 /** The environment of OpenCode in a folder: it takes the folder it works in from PWD, not from where its process starts. */
 export function inFolder(environment: NodeJS.ProcessEnv, folder: string): NodeJS.ProcessEnv

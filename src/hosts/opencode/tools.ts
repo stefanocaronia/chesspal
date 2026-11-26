@@ -1,5 +1,6 @@
 // OpenCode's tools as the table reads them. Its agent calls the chesspal server's commands inside `execute`, a tool that runs code over the MCP servers'
-// tools, and names the commands it ran only at the end, in the update's metadata.
+// tools, and names the commands it ran only at the end, in the update's metadata. The chesspal server is the one of the chat's server name: the folder's
+// `chesspal`, or the one given by who opens the chat.
 import { type AcpHost, pathsOfCall, patternOutside } from "../acp/index.ts";
 import type { ToolKind } from "../chat.ts";
 import { isObject } from "../lines.ts";
@@ -30,9 +31,7 @@ const unmetered = ["opencode", "ollama", "lmstudio", "llama.cpp"];
 // The tools that read the folder they run in where their input names no path.
 const folderTools = ["glob", "grep", "list"];
 
-// The chesspal server's commands as OpenCode names them, the tool that runs code over the servers' tools, and the subagent tool by its names old and
-// new: task and subagent.
-const chesspalPrefix = "chesspal.";
+// The tool that runs code over the servers' tools, and the subagent tool by its names old and new: task and subagent.
 const codeTool = "execute";
 const agentTools = ["task", "subagent"];
 // How OpenCode marks the update of a subagent's session; the search `execute` gives its code over the servers' tools, which reads only what they are.
@@ -43,7 +42,7 @@ const toolLoaders = ["search"];
 export const openCodeAcp: AcpHost = {
     name: hosts.openCode.name,
     args: ["acp"],
-    toolOf: (call) => toolOf(nameOf(call), isObject(call.rawInput) ? call.rawInput : {}, ranTools(call)),
+    toolOf: (call, _session, server) => toolOf(nameOf(call), isObject(call.rawInput) ? call.rawInput : {}, ranTools(call), server),
     pathsOf: (call) => {
         const input = isObject(call.rawInput) ? call.rawInput : {};
         const name = nameOf(call);
@@ -63,7 +62,7 @@ export const openCodeAcp: AcpHost = {
         const free = provider === undefined ? -1 : unmetered.indexOf(provider);
         return free >= 0 ? free : unmetered.length + (provider === undefined ? 0 : 1);
     },
-    innerTools: (call) => (ranTools(call) ?? []).filter((one) => !toolLoaders.includes(one.tool)).map((one) => ({ ...commandOf(one.tool), failed: one.failed })),
+    innerTools: (call, server) => (ranTools(call) ?? []).filter((one) => !toolLoaders.includes(one.tool)).map((one) => ({ ...commandOf(one.tool, server), failed: one.failed })),
     // A subagent's work comes among the chat's updates, marked with its session; a mark with no id is a subagent all the same, never the AI.
     childOf: (update) => {
         const child = isObject(update._meta) ? update._meta[childMark] : undefined;
@@ -76,22 +75,22 @@ export const openCodeAcp: AcpHost = {
 };
 
 /**
- * A tool's name and kind: a command of the chesspal server by its own name; any subagent is of kind agent; `execute` is the chesspal server's when it
- * ran, besides the search of the tools, that server's tools alone, and until it ends when its code reaches that server's tools alone.
+ * A tool's name and kind: a command of the chesspal server, named `server`, by its own name; any subagent is of kind agent; `execute` is the chesspal
+ * server's when it ran, besides the search of the tools, that server's tools alone, and until it ends when its code reaches that server's tools alone.
  */
-function toolOf(name: string, input: Record<string, unknown>, ran: { tool: string; }[] | undefined): { name: string; kind: ToolKind; }
+function toolOf(name: string, input: Record<string, unknown>, ran: { tool: string; }[] | undefined, server: string): { name: string; kind: ToolKind; }
 {
-    if (name.startsWith(chesspalPrefix)) {
-        return commandOf(name);
+    if (name.startsWith(`${server}.`)) {
+        return commandOf(name, server);
     }
 
     if (name === codeTool && ran !== undefined) {
-        return { name, kind: ran.every((one) => toolLoaders.includes(one.tool) || commandOf(one.tool).kind === "chesspal") ? "chesspal" : "other" };
+        return { name, kind: ran.every((one) => toolLoaders.includes(one.tool) || commandOf(one.tool, server).kind === "chesspal") ? "chesspal" : "other" };
     }
 
     if (name === codeTool) {
         const servers = serversOf(input.code);
-        return { name, kind: servers.length > 0 && servers.every((server) => server === "chesspal") ? "chesspal" : "other" };
+        return { name, kind: servers.length > 0 && servers.every((reached) => reached === server) ? "chesspal" : "other" };
     }
 
     if (agentTools.includes(name)) {
@@ -101,10 +100,11 @@ function toolOf(name: string, input: Record<string, unknown>, ran: { tool: strin
     return { name, kind: builtInKinds[name] ?? "other" };
 }
 
-/** A tool as OpenCode names a command it ran: `chesspal.status` is the command status of the chesspal server. */
-function commandOf(tool: string): { name: string; kind: ToolKind; }
+/** A tool as OpenCode names a command it ran: `chesspal.status` is the command status of the chesspal server, here named `server`. */
+function commandOf(tool: string, server: string): { name: string; kind: ToolKind; }
 {
-    return tool.startsWith(chesspalPrefix) && tool.length > chesspalPrefix.length ? { name: tool.slice(chesspalPrefix.length), kind: "chesspal" } : { name: tool, kind: "other" };
+    const prefix = `${server}.`;
+    return tool.startsWith(prefix) && tool.length > prefix.length ? { name: tool.slice(prefix.length), kind: "chesspal" } : { name: tool, kind: "other" };
 }
 
 /** The MCP servers a piece of code reaches, as `tools.chesspal` or `tools["chesspal"]`; none where it is no code. */
@@ -133,7 +133,6 @@ function providerOf(id: string): string | undefined
 }
 
 /** A call's tool name: OpenCode's own field, else the title it gives. */
-
 function nameOf(call: Record<string, unknown>): string
 {
     return typeof call.name === "string" ? call.name : typeof call.title === "string" ? call.title : "";

@@ -139,7 +139,7 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
     };
 
     // A chat of the role for `current`, on its host's quick model for the one that thinks at the levels where the opponent's answers say a quicker model
-    // thought, as they ask by the name the host's MCP client gives itself.
+    // thought, as they ask by the name the host's MCP client gives itself; on the opponent's own in a host that has none.
     const chatOf = (shift: Shift, current: CurrentGame): HelperChat | undefined => {
         const opponent = options.opponent();
 
@@ -147,8 +147,8 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
             return undefined;
         }
 
-        const quick = shift.role === "ponder" && onQuickModel(levelOf(current.game.record), opponent.host.client);
-        const model = quick ? { host: opponent.host, model: opponent.host.quickModel } : opponent;
+        const quickModel = shift.role === "ponder" && onQuickModel(levelOf(current.game.record), opponent.host.client) ? opponent.host.quickModel : undefined;
+        const model = quickModel === undefined ? opponent : { host: opponent.host, model: quickModel };
         const chat: HelperChat = open(shift.role, model, {
             ended: () => shiftEnded(shift, chat),
             answered: (tool, result) => toolAnswered(shift, chat, tool, result),

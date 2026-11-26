@@ -1,7 +1,7 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { type ChatOptions, hostDriver, type HostEvent, openHostChat } from "../src/hosts/index.ts";
+import { type ChatOptions, type ChatServer, hostDriver, type HostEvent, openHostChat } from "../src/hosts/index.ts";
 import type { LineProcess } from "../src/hosts/process.ts";
 import { checklist, type Scenario } from "./hosts/checklist.ts";
 import { type FakeAgent, fakeAgent, type FakeAgentOptions, isModelSetting, isPrompt, joinedTexts, promptWords, sessionOfFlow } from "./hosts/fake-agent.ts";
@@ -30,10 +30,12 @@ checklist({
     isPlayerWords: isPrompt,
 });
 
-// What the table's OpenCode may not do by itself: read files, and reach any folder outside the chat's.
+// What the table's OpenCode may not do by itself where the table allows the web and agents: read files, run commands, edit, and reach any folder outside the chat's.
 // The kinds of tools the table allows.
 const tableKinds: ChatOptions["allowed"] = ["chesspal", "web", "fetch", "agent", "image"];
-const denied = { read: "deny", glob: "deny", grep: "deny", list: "deny", external_directory: "deny" };
+const denied = { read: "deny", glob: "deny", grep: "deny", list: "deny", bash: "deny", edit: "deny", external_directory: "deny" };
+// With Chesspal's commands alone: every tool of its own.
+const allDenied = { read: "deny", glob: "deny", grep: "deny", list: "deny", bash: "deny", edit: "deny", webfetch: "deny", websearch: "deny", codesearch: "deny", task: "deny", external_directory: "deny" };
 
 describe("the chat in OpenCode", () => {
     describe("its program", () => {
@@ -43,10 +45,10 @@ describe("the chat in OpenCode", () => {
             expect(host.started?.command).toBe("opencode-program");
             expect(host.started?.args).toEqual(["--first", "acp"]);
             expect(host.started?.options.cwd).toBe(folder);
-            expect(host.started?.options.env).toEqual({ HOME: "/home/player", PWD: folder, OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: denied }) });
+            expect(host.started?.options.env).toEqual({ HOME: "/home/player", PWD: folder, OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: allDenied }) });
         });
 
-        it("denies its reading tools only where the kinds allowed hold no read, and any folder outside the chat's always, in this process alone", () => {
+        it("denies its own tools where the kinds allowed do not hold theirs, and any folder outside the chat's always, in this process alone", () => {
             const given = (allowed: ChatOptions["allowed"]): unknown => {
                 const host = fakeAgent([]);
                 openHostChat("openCode", { ...options(host), allowed });
@@ -54,7 +56,7 @@ describe("the chat in OpenCode", () => {
             };
 
             expect(given(tableKinds)).toEqual({ permission: denied });
-            expect(given(["chesspal", "read"])).toEqual({ permission: { external_directory: "deny" } });
+            expect(given(["chesspal", "read"])).toEqual({ permission: { bash: "deny", edit: "deny", webfetch: "deny", websearch: "deny", codesearch: "deny", task: "deny", external_directory: "deny" } });
         });
 
         it("begins the protocol, then opens a new session in the chat's folder with no MCP server of the table's", async () => {
@@ -768,15 +770,94 @@ describe("the chat in OpenCode", () => {
     });
 });
 
-describe("OpenCode as the table drives it", () => {
-    it("refuses a server or instructions from the table, before starting any process", () => {
-        for (const given of [{ server: { name: "chesspal", command: "node", args: [], environment: { KEY: "secret" } } }, { instructions: "You play chess." }]) {
-            const host = fakeAgent([]);
-            expect(() => openHostChat("openCode", { ...options(host), ...given })).toThrow("OpenCode's driver does not take its server or its instructions from the table yet.");
-            expect(host.started).toBeUndefined();
-        }
+describe("OpenCode with the server and the instructions of who opens the chat", () => {
+    // A server's name other than the folder's, so that its tools are known by it alone.
+    const given: ChatServer = { name: "t361", command: "node", args: ["cli.js", "mcp"], environment: { CHESSPAL_KEY: "secret-key", CHESSPAL_DOOR: "4242" } };
+    const entry = { name: "t361", command: "node", args: ["cli.js", "mcp"], env: [{ name: "CHESSPAL_KEY", value: "secret-key" }, { name: "CHESSPAL_DOOR", value: "4242" }] };
+    const instructions = "You are Chesspal's opponent at the table.";
+
+    function loaded(): FlowEntry[]
+    {
+        return [
+            { dir: "in", msg: { jsonrpc: "2.0", id: 2, method: "session/load", params: {} } },
+            { dir: "out", msg: { jsonrpc: "2.0", id: 2, result: { configOptions: [modelOption()] } } },
+        ];
+    }
+
+    it("opens the session with that server alone, its key in its own entry, and loads a chat with it again; the key in no argument, environment or trace", async () => {
+        const trace = join(makeTempFolder(), "trace.jsonl");
+        const { chat, host, events, until } = play([...begin(), ...newSession(), ...turn("Hello", text("Fine"))], { server: given, trace });
+        chat.send("Hello");
+        await until(() => turnEnds(events).length === 1);
+        expect(host.written[1]).toEqual({ jsonrpc: "2.0", id: expect.anything(), method: "session/new", params: { cwd: folder, mcpServers: [entry] } });
+        expect(JSON.stringify(host.started?.args)).not.toContain("secret-key");
+        expect(JSON.stringify(host.started?.options.env)).not.toContain("secret-key");
+        const traced = readFileSync(trace, "utf8");
+        expect(traced).toContain("CHESSPAL_KEY");
+        expect(traced).toContain("<hidden>");
+        expect(traced).not.toContain("secret-key");
+        expect(host.problems).toEqual([]);
+
+        const again = play([...begin(), ...loaded(), ...turn("Again", text("Back"))], { server: given, session: "ses_1" });
+        again.chat.send("Again");
+        await again.until(() => turnEnds(again.events).length === 1);
+        expect(again.host.written[1]!.params).toEqual({ cwd: folder, mcpServers: [entry], sessionId: "ses_1" });
+        expect(again.host.problems).toEqual([]);
     });
 
+    it("gives the instructions before the chat's first words, in the first prompt alone; none in a chat taken up again", async () => {
+        const { chat, host, events, until } = play([...begin(), ...newSession(), ...turn(`${instructions}\n\nHello`, text("Fine")), ...turn("Again", text("Sure", "m2"))], { instructions });
+        chat.send("Hello");
+        await until(() => turnEnds(events).length === 1);
+        chat.send("Again");
+        await until(() => turnEnds(events).length === 2);
+        expect(host.written.filter(isPrompt).map((message) => (message.params as Message).prompt)).toEqual([[{ type: "text", text: `${instructions}\n\nHello` }], [{ type: "text", text: "Again" }]]);
+        expect(host.problems).toEqual([]);
+
+        const again = play([...begin(), ...loaded(), ...turn("Again", text("Back"))], { instructions, session: "ses_1" });
+        again.chat.send("Again");
+        await again.until(() => turnEnds(again.events).length === 1);
+        expect(again.host.written.filter(isPrompt).map((message) => (message.params as Message).prompt)).toEqual([[{ type: "text", text: "Again" }]]);
+        expect(again.host.problems).toEqual([]);
+    });
+
+    it("knows Chesspal's commands by the server's name: as tools of their own, and in execute; the folder's chesspal is another server then", async () => {
+        const ran = (id: string, fields: Message, end: Message = {}): FlowEntry[] => [
+            update({ sessionUpdate: "tool_call", toolCallId: id, status: "pending", ...fields }),
+            update({ sessionUpdate: "tool_call_update", toolCallId: id, status: "completed", ...end }),
+        ];
+        const metadata = { rawOutput: { metadata: { toolCalls: [{ tool: "t361.status", status: "completed" }] } } };
+        const tools = [
+            ...ran("call_1", { title: "t361.roll", kind: "other", rawInput: {} }),
+            ...ran("call_2", { name: "execute", kind: "other", rawInput: { code: "await tools.t361.status();" } }, metadata),
+            ...ran("call_3", { name: "execute", kind: "other", rawInput: { code: "await tools.chesspal.status();" } }),
+        ];
+        const { chat, events, until } = play([...begin(), ...newSession(), ...turn("Hello", ...tools)], { server: given });
+        chat.send("Hello");
+        await until(() => turnEnds(events).length === 1);
+        expect(events.filter((event) => event.type === "tool" && event.state !== "started").map((event) => event.type === "tool" && [event.name, event.kind])).toEqual([
+            ["roll", "chesspal"],
+            ["status", "chesspal"],
+            ["execute", "chesspal"],
+            ["execute", "other"],
+        ]);
+        expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use execute" }]);
+    });
+
+    it("refuses a server whose name OpenCode would change in its tools' names, before starting any process", () => {
+        const host = fakeAgent([]);
+        expect(() => openHostChat("openCode", { ...options(host), server: { ...given, name: "chess pal" } })).toThrow("is no name of an MCP server");
+        expect(host.started).toBeUndefined();
+    });
+
+    it("keeps the model chosen in its configuration beside the permissions it denies", () => {
+        const host = fakeAgent([]);
+        openHostChat("openCode", { ...options(host), allowed: ["chesspal"], environment: { OPENCODE_CONFIG_CONTENT: JSON.stringify({ model }) } });
+        expect(JSON.parse(String(host.started?.options.env?.OPENCODE_CONFIG_CONTENT))).toEqual({ model, permission: allDenied });
+    });
+});
+
+describe("OpenCode as the table drives it", () => {
     const driver = hostDriver("openCode")!;
     const exe = process.platform === "win32" ? "opencode.exe" : "opencode";
     const separator = process.platform === "win32" ? ";" : ":";

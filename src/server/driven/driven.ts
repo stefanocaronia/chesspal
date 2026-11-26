@@ -1,4 +1,4 @@
-// The chat the table drives itself, without a terminal: Claude Code or Codex started by its driver in a folder of the data folder's, its commands run at its
+// The chat the table drives itself, without a terminal: its host's program started by its driver in a folder of the data folder's, its commands run at its
 // place, in the table's process, and its turns given by the doorbell. To the page it is a chat at the table as any other, which the table plays the hooks of.
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -12,11 +12,11 @@ import { version } from "../../version.ts";
 import { bellLineIn, type BellListener, gameBellLine, noteBell } from "../bell/index.ts";
 import type { ChatFailure, ChatSeat, HeldChat, TableChats } from "../page/index.ts";
 import type { Place, TablePlaces } from "../places/index.ts";
-import { chatStart } from "../table/index.ts";
+import { chatStart, noOpenCodeModel } from "../table/index.ts";
 import { chatEnvironment, chatTrace } from "./environment.ts";
 import { failureOf } from "./failure.ts";
 import { tableHelpers } from "./helpers.ts";
-import { type DrivenHost, drivenHost } from "./hosts.ts";
+import { chatModel, type DrivenHost, drivenHost } from "./hosts.ts";
 import { keepChat, keptChat } from "./kept.ts";
 import { moveEndsTurn } from "./move-ends-turn.ts";
 import { oneByOne, type ProgramStart } from "./starts.ts";
@@ -44,9 +44,8 @@ export interface DrivenOptions
 export const chatInPage = "chatInPage";
 
 /**
- * The chats of a table that drives the chat itself in Claude Code or Codex when the profile in use says so (`chatInPage`), the terminal's for every other
- * host. The chat's
- * folder is `chats/opponent` in the data folder, outside the table's, whose files init wrote for a chat in a terminal; its place is the opponent's. The
+ * The chats of a table that drives the chat itself, in a host it drives, when the profile in use says so (`chatInPage`), the terminal's for every other
+ * host. The chat's folder is `chats/opponent` in the data folder, outside the table's, whose files init wrote for a chat in a terminal; its place is the opponent's. The
  * chat it drove is kept across the table's restarts, and taken up again with its session while the game it played goes on. Beside it the table runs the
  * opponent's helpers, a chat each, in `chats/<role>`.
  */
@@ -330,6 +329,11 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 return "missing";
             }
 
+            // OpenCode with no model chosen may fall back to a paid key in the environment: it does not start.
+            if (state.model === "" && host.name === "opencode") {
+                throw new Error(noOpenCodeModel);
+            }
+
             makeFolder(folder);
             notedStart(context, folder, session);
             const caller = (): Promise<Caller | undefined> => Promise.resolve({ annotator: state.model, ...(state.effort === undefined ? {} : { effort: state.effort }) });
@@ -340,7 +344,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
 
             const answered = (tool: string, result: unknown): void => {
                 if (tool === "ai_move") {
-                    state.moved = state.inTurn && moveEndsTurn(tool, result);
+                    state.moved = host.endsTurnAtMove && state.inTurn && moveEndsTurn(tool, result);
                     helpers.afterMove();
                 }
             };
@@ -367,8 +371,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             state.chat = hostDriver.open({
                 folder,
                 program,
-                model: state.model === "" ? hostDriver.model : state.model,
-                ...(state.effort === undefined ? {} : { effort: state.effort }),
+                ...chatModel(host, state.model === "" ? hostDriver.model : state.model, state.effort),
                 ...(session === undefined ? {} : { session }),
                 allowed: [...host.allowed],
                 environment: chatEnvironment(hostDriver, environment, host.name, start.choice),

@@ -343,7 +343,7 @@ function savedTerminal(platform: string): { restore(): void; }
 // What marks a chat's own session, which a table started from inside a chat would hand down, and the host take for its own (Priya).
 const sessionMarks = ["CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ATTENDED", "CLAUDE_PID", "CLAUDE_EFFORT", "AI_AGENT", "TRACEPARENT"];
 // What `chesspal play opencode` says when the table found no model to give OpenCode.
-const noOpenCodeModel =
+export const noOpenCodeModel =
     "OpenCode has no model to play with on this computer yet, and Chesspal does not start it without one: install Ollama (https://ollama.com/download) and download a model that can use tools, such as with ollama pull gpt-oss:20b; then open the board page with chesspal, so that it finds the model, and try again.";
 const installHint: Record<HostName, string> = {
     claude: "https://claude.com/claude-code",

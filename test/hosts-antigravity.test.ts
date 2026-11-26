@@ -1,7 +1,7 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
-import { type ChatOptions, hostDriver, type HostEvent, openHostChat, type ToolKind } from "../src/hosts/index.ts";
+import { type ChatOptions, type ChatServer, hostDriver, type HostEvent, openHostChat, type ToolKind } from "../src/hosts/index.ts";
 import { checklist, type Scenario } from "./hosts/checklist.ts";
 import { fakeAgent, type FakeAgentOptions, isModelSetting, isPrompt, joinedTexts, promptWords } from "./hosts/fake-agent.ts";
 import { type FakeHost, type FlowEntry, listen, loadFlow, manualClock, turnEnds } from "./hosts/fake-host.ts";
@@ -283,17 +283,93 @@ describe("the chat in Antigravity", () => {
     });
 });
 
-describe("Antigravity as the table drives it", () => {
-    it("refuses a server or instructions from the table, before starting any process", () => {
-        for (const given of [{ server: { name: "chesspal", command: "node", args: [], environment: { KEY: "secret" } } }, { instructions: "You play chess." }]) {
-            const host = fakeAgent([]);
-            expect(() => openHostChat("antigravity", { folder, program: { command: "agy-program", args: [] }, model, allowed: ["chesspal"], environment: {}, start: host.start, ...given })).toThrow(
-                "Antigravity's driver does not take its server or its instructions from the table yet.",
-            );
-            expect(host.started).toBeUndefined();
-        }
+describe("Antigravity with the server and the instructions of who opens the chat", () => {
+    // A server's name other than the folder's, so that its tools are known by it alone.
+    const given: ChatServer = { name: "t361", command: "node", args: ["cli.js", "mcp"], environment: { CHESSPAL_KEY: "secret-key" } };
+    const entry = { name: "t361", command: "node", args: ["cli.js", "mcp"], env: [{ name: "CHESSPAL_KEY", value: "secret-key" }] };
+    const instructions = "You are Chesspal's opponent at the table.";
+
+    function loaded(): FlowEntry[]
+    {
+        return [
+            { dir: "in", msg: { jsonrpc: "2.0", id: 2, method: "session/load", params: {} } },
+            { dir: "out", msg: { jsonrpc: "2.0", id: 2, result: { models: listed() } } },
+        ];
+    }
+
+    it("opens the session with that server alone, its key in its own entry, and loads a chat with it again; the key in no argument, environment or trace", async () => {
+        const trace = join(makeTempFolder(), "trace.jsonl");
+        const { chat, host, events, until } = play([...handshake, ...newSession(), ...turn("Hello", text("Fine.", "m1"))], { server: given, trace });
+        chat.send("Hello");
+        await until(() => turnEnds(events).length === 1);
+        expect(host.written[1]).toMatchObject({ method: "session/new", params: { cwd: folder, mcpServers: [entry] } });
+        expect(JSON.stringify(host.started?.args)).not.toContain("secret-key");
+        expect(JSON.stringify(host.started?.options.env)).not.toContain("secret-key");
+        const traced = readFileSync(trace, "utf8");
+        expect(traced).toContain("CHESSPAL_KEY");
+        expect(traced).not.toContain("secret-key");
+        expect(host.problems).toEqual([]);
+
+        const again = play([...handshake, ...loaded(), ...turn("Again", text("Back.", "m2"))], { server: given, session });
+        again.chat.send("Again");
+        await again.until(() => turnEnds(again.events).length === 1);
+        expect(again.host.written[1]!.params).toEqual({ cwd: folder, mcpServers: [entry], sessionId: session });
+        expect(again.host.problems).toEqual([]);
     });
 
+    it("gives the instructions before the chat's first words, in the first prompt alone; none in a chat taken up again", async () => {
+        const first = `${instructions}\n\nHello`;
+        const { chat, host, events, until } = play([...handshake, ...newSession(), ...turn(first, text("Fine.", "m1")), ...turn("Again", text("Sure.", "m2"))], { instructions });
+        chat.send("Hello");
+        await until(() => turnEnds(events).length === 1);
+        chat.send("Again");
+        await until(() => turnEnds(events).length === 2);
+        expect(host.written.filter(isPrompt).map((message) => (message.params as Message).prompt)).toEqual([[{ type: "text", text: first }], [{ type: "text", text: "Again" }]]);
+        expect(host.problems).toEqual([]);
+
+        const again = play([...handshake, ...loaded(), ...turn("Again", text("Back.", "m3"))], { instructions, session });
+        again.chat.send("Again");
+        await again.until(() => turnEnds(again.events).length === 1);
+        expect(again.host.written.filter(isPrompt).map((message) => (message.params as Message).prompt)).toEqual([[{ type: "text", text: "Again" }]]);
+        expect(again.host.problems).toEqual([]);
+    });
+
+    it("knows Chesspal's commands by the server's name, in every shape Antigravity gives them, its suffix included; the folder's chesspal is another server then", async () => {
+        const tools = [
+            call("c1", { name: "mcp_t361_status", kind: "other" }),
+            call("c2", { name: "mcp_t361_db2ed3c2_ai_move", kind: "other" }),
+            call("c3", { title: "mcp_t361_ponder", kind: "other" }),
+            call("c4", { name: "call_mcp_tool", kind: "other", rawInput: { ServerName: "t361", ToolName: "coach" } }),
+            call("c5", { name: "read_file", kind: "read", rawInput: { Path: "C:\\Users\\player\\.gemini\\antigravity-cli\\mcp\\t361\\advance.json" } }),
+            call("c6", { name: "call_mcp_tool", kind: "other", rawInput: { ServerName: "chesspal", ToolName: "status" } }),
+        ].flat();
+        const { chat, events, until } = play([...handshake, ...newSession(), ...turn("Hello", ...tools)], { server: given });
+        chat.send("Hello");
+        await until(() => turnEnds(events).length === 1);
+        expect(events.filter((event) => event.type === "tool" && event.state === "done").map((event) => event.type === "tool" && [event.name, event.kind])).toEqual([
+            ["status", "chesspal"],
+            ["ai_move", "chesspal"],
+            ["ponder", "chesspal"],
+            ["coach", "chesspal"],
+            ["read_file", "chesspal"],
+            ["call_mcp_tool", "other"],
+        ]);
+        expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use call_mcp_tool" }]);
+    });
+
+    it("allows at once each call of a tool of the server it asks a permission for, for this once", async () => {
+        const { chat, host, events, until } = play([...handshake, ...newSession(), ...turn("Hello", ...permission({ name: "mcp_t361_db2ed3c2_ai_move", kind: "other", rawInput: {} }, "allow-once"))], {
+            server: given,
+        });
+        chat.send("Hello");
+        await until(() => turnEnds(events).length === 1);
+        expect(events.filter((event) => event.type === "permission")).toEqual([{ type: "permission", name: "ai_move", kind: "chesspal", allowed: true }]);
+        expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done" }]);
+        expect(host.problems).toEqual([]);
+    });
+});
+
+describe("Antigravity as the table drives it", () => {
     const driver = hostDriver("antigravity")!;
     const exe = process.platform === "win32" ? "agy.exe" : "agy";
 

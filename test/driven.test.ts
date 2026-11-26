@@ -12,6 +12,7 @@ import { activeProfile, gameFolder, saveProfileSettings } from "../src/profiles/
 import { Bell, type BellListener } from "../src/server/bell/index.ts";
 import { doorVariable, keyVariable } from "../src/server/door/index.ts";
 import { chatInPage, failureCode, failureOf, keepChat, keptChat } from "../src/server/driven/index.ts";
+import { hostNames } from "../src/server/table/hosts/hosts.ts";
 import type { Table } from "../src/server/table/index.ts";
 import { playedHere } from "./commands.ts";
 import {
@@ -314,22 +315,16 @@ describe("the chat the table drives", () => {
         expect(table1).not.toHaveProperty("opening");
     }, 30_000);
 
-    it("leaves every host to the terminal with the switch off, and every other host with it on", async () => {
+    it("leaves every host to the terminal with the switch off", async () => {
         const off = await drivenTable(undefined, undefined, undefined, false);
-        await opened(off.table.url);
-        expect(off.terminal.opened).toEqual(["claude"]);
-        expect(off.ai.chats).toEqual([]);
 
-        await opened(off.table.url, "codex");
-        expect(off.terminal.opened).toEqual(["claude", "codex"]);
-        expect(off.ai.chats).toEqual([]);
+        for (const host of hostNames) {
+            await opened(off.table.url, host);
+        }
 
-        const on = await drivenTable();
-        await opened(on.table.url, "antigravity");
-        await opened(on.table.url, "opencode");
-        expect(on.terminal.opened).toEqual(["antigravity", "opencode"]);
-        expect(on.ai.chats).toEqual([]);
-        expect(on.ai.asked).toEqual([]);
+        expect(off.terminal.opened).toEqual([...hostNames]);
+        expect(off.ai.chats).toEqual([]);
+        expect(off.ai.asked).toEqual([]);
     }, 30_000);
 
     it("opens Claude Code in a terminal where the driver does not find its program, as one npm installed", async () => {
@@ -396,6 +391,8 @@ describe("the chat the table drives", () => {
         await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
         expect(ai.timeline.filter((entry) => entry.endsWith(" opponent"))).toEqual(["start opponent", "sat opponent", "exit opponent", "start opponent", "sat opponent"]);
 
+        // In a terminal, with the switch off.
+        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: false });
         await posted(table.url, "/api/table/restart", { host: "antigravity" });
         expect(terminal.opened).toEqual([]);
         await until(() => terminal.opened.length === 1);
@@ -495,6 +492,103 @@ describe("the chat the table drives in Codex", () => {
             expect(new Set(ai.asked)).toEqual(new Set(["codex"]));
             expect(ai.chats[1]!.options).toMatchObject({ session: ai.chats[0]!.session, model: "gpt-6.1-terra", allowed: ["chesspal", "read"] });
             expect((await shown(again.table.url)).table).toMatchObject({ chat: true, host: "codex", driven: true });
+        } finally {
+            page.destroy();
+        }
+    }, 30_000);
+});
+
+describe("the chat the table drives in Antigravity and OpenCode", () => {
+    // OpenCode's models as the table keeps them once read: OpenCode offers none before.
+    const openCodeModel = "ollama/gpt-oss:20b";
+
+    async function openedIn(host: "antigravity" | "opencode", home?: string, ai?: FakeDriver): Promise<Awaited<ReturnType<typeof drivenTable>>>
+    {
+        const driven = await drivenTable(home, ai);
+        writeFileSync(join(tableFolder(driven.home), "opencode-models.json"), `${JSON.stringify({ models: [openCodeModel], model: openCodeModel })}\n`);
+        expect(await opened(driven.table.url, host)).toEqual({ status: 200, text: JSON.stringify({ opened: true }) });
+        await until(() => driven.ai.chats.length >= 1 && driven.ai.chats.at(-1)!.idle());
+        return driven;
+    }
+
+    it("opens Antigravity in the page with the switch on, by its driver, with Chesspal's commands alone, the effort chosen in the model's id", async () => {
+        const { table, home, ai, terminal } = await openedIn("antigravity");
+        const chat = ai.chats[0]!;
+        expect(ai.asked).toEqual(["antigravity"]);
+        expect(terminal.opened).toEqual([]);
+        expect(chat.options).toMatchObject({ model: "gemini-3.8-flash-medium", allowed: ["chesspal"], folder: join(home, "chats", "opponent") });
+        expect(chat.options.effort).toBeUndefined();
+        expect(chat.options.server).toMatchObject({ name: "chesspal", command: "node", args: ["cli.js", "mcp"] });
+        expect(chat.options.instructions).toContain("open the chat again from the board page");
+        expect(chat.sent).toEqual(["Let's play!"]);
+        expect((await shown(table.url)).table).toMatchObject({ chat: true, host: "antigravity", held: true, started: { model: "gemini-3.8-flash", effort: "medium" }, driven: true });
+    }, 30_000);
+
+    it("opens OpenCode in the page with the switch on, by its driver, with Chesspal's commands alone, on the model the table found", async () => {
+        const { table, ai, terminal } = await openedIn("opencode");
+        const chat = ai.chats[0]!;
+        expect(ai.asked).toEqual(["openCode"]);
+        expect(terminal.opened).toEqual([]);
+        expect(chat.options).toMatchObject({ model: openCodeModel, allowed: ["chesspal"] });
+        expect(chat.options.effort).toBeUndefined();
+        expect(JSON.parse(String(chat.options.environment.OPENCODE_CONFIG_CONTENT))).toEqual({ model: openCodeModel });
+        expect(chat.options.server?.name).toBe("chesspal");
+        expect((await shown(table.url)).table).toMatchObject({ chat: true, host: "opencode", driven: true });
+    }, 30_000);
+
+    it("does not open OpenCode with no model found, which could fall back to a paid key, and says how to get one", async () => {
+        const { table, ai } = await drivenTable();
+        await opened(table.url, "opencode");
+        await until(async () => (await shown(table.url)).table?.failed !== undefined);
+        expect(ai.chats).toEqual([]);
+        expect((await shown(table.url)).table?.failed).toMatchObject({ why: expect.stringContaining("OpenCode has no model to play with") });
+    }, 30_000);
+
+    it("ends OpenCode's turn itself once the AI's move asks nothing more of it, and leaves Antigravity's to end by itself", async () => {
+        for (const host of ["opencode", "antigravity"] as const) {
+            const { table, ai } = await openedIn(host);
+            const chat = ai.chats[0]!;
+            await posted(table.url, "/api/new", { ai_colour: "black" });
+            await until(() => chat.sent.length === 2 && chat.idle());
+
+            chat.turns.push(async (client) => {
+                chat.answers.push(await call(client, "ai_move", { move: "e5", plan: "Hold the centre." }));
+                chat.emit({ type: "text", block: 0, text: "I played e5: your move." });
+
+                // Antigravity's turn ends by itself; OpenCode's waits for the table to end it.
+                if (host === "opencode") {
+                    await new Promise<void>(() => undefined);
+                }
+            });
+            await posted(table.url, "/api/move", { move: "f3" });
+            await until(() => chat.sent.length === 3 && chat.idle());
+            expect(chat.answers.map((one) => one.isError), host).toEqual([false]);
+            expect(chat.ends.at(-1), host).toBe(host === "opencode" ? "interrupted" : "done");
+            expect(chat.steps.includes("interrupt"), host).toBe(host === "opencode");
+            expect((await shown(table.url)).game?.talk ?? [], host).toEqual([]);
+        }
+    }, 60_000);
+
+    it("is taken up again in Antigravity, by its driver, as the table starts again while its game goes on", async () => {
+        const home = temporary();
+        const ai = fakeDriver();
+        const context = homeContext(home);
+        const first = await drivenTable(home, ai, context);
+        await opened(first.table.url, "antigravity");
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        await posted(first.table.url, "/api/new", { ai_colour: "black" });
+        await until(() => ai.chats[0]!.sent.length === 2 && ai.chats[0]!.idle());
+        await first.table.close();
+        expect(keptChat(join(home, "chats"))).toMatchObject({ host: "antigravity", closed: false });
+
+        const again = await drivenTable(home, ai, context);
+        const page = await eventsOf(again.table.url);
+
+        try {
+            await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
+            expect(new Set(ai.asked)).toEqual(new Set(["antigravity"]));
+            expect(ai.chats[1]!.options).toMatchObject({ session: ai.chats[0]!.session, model: "gemini-3.8-flash-medium", allowed: ["chesspal"] });
+            expect((await shown(again.table.url)).table).toMatchObject({ chat: true, host: "antigravity", driven: true });
         } finally {
             page.destroy();
         }
@@ -1014,7 +1108,8 @@ describe("the opening of a chat the table drives", () => {
         await until(async () => (await shown(table.url)).table?.opening === "chat");
         expect((await shown(table.url)).table).toMatchObject({ opening: "chat", openingDriven: true });
 
-        // The player chooses Antigravity while Claude Code is still opening.
+        // The player turns the switch off and chooses Antigravity, in a terminal, while Claude Code is still opening.
+        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: false });
         expect(chats.relaunch(tableFolder(home), "antigravity")).toBe(true);
         loaded.open();
         await asked;

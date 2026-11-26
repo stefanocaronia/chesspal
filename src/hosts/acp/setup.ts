@@ -1,5 +1,5 @@
 // Getting the chat ready: the protocol begun, the session opened or taken up, the model and effort set and confirmed before the player's first words.
-import type { EndCode } from "../chat.ts";
+import type { ChatServer, EndCode } from "../chat.ts";
 import { failureOf, isObject, type Message } from "../lines.ts";
 import { chatReady, endTurn, modelChanged, refused, tell } from "../state.ts";
 import { configOption, effortsOf, initializeParams } from "./protocol.ts";
@@ -42,10 +42,12 @@ export function askModelAgain(state: State): void
     askModel(state);
 }
 
-/** Writes the player's words: the session is told first where it or the model changed. */
+/** Writes the player's words: the session is told first where it or the model changed; the instructions given go before the chat's first words, once. */
 export function writePrompt(state: State, turn: Turn, text: string): void
 {
     turn.held = undefined;
+    const words = state.instructions === undefined ? text : `${state.instructions}\n\n${text}`;
+    state.instructions = undefined;
     const session = state.session ?? "";
     const model = state.model.confirmed ?? "";
 
@@ -54,7 +56,7 @@ export function writePrompt(state: State, turn: Turn, text: string): void
         tell(state, { type: "session", session, model, efforts: effortsOf(state.config) });
     }
 
-    state.requests.ask("session/prompt", { sessionId: session, prompt: [{ type: "text", text }] }, (answer) => promptAnswered(state, turn, answer));
+    state.requests.ask("session/prompt", { sessionId: session, prompt: [{ type: "text", text: words }] }, (answer) => promptAnswered(state, turn, answer));
 }
 
 function waitReady(state: State): void
@@ -63,11 +65,14 @@ function waitReady(state: State): void
     state.cancelReadyWait = state.later(readyWait, () => refused(state, `the host was not ready to play with the model ${state.model.asked} within ${String(readyWait / 1000)} seconds`));
 }
 
-/** A new session, or the one taken up: by loading it, or resuming it where the agent cannot load. */
+/**
+ * A new session, or the one taken up: by loading it, or resuming it where the agent cannot load; with the server given alone, its environment in its own
+ * entry, which holds its key, else none of the table's.
+ */
 function openSession(state: State): void
 {
     const sessions = isObject(state.capabilities.sessionCapabilities) ? state.capabilities.sessionCapabilities : {};
-    const where = { cwd: state.folder, mcpServers: [] };
+    const where = { cwd: state.folder, mcpServers: state.given === undefined ? [] : [serverEntry(state.given)] };
     const resumed = state.resumed;
 
     if (resumed === undefined) {
@@ -79,6 +84,13 @@ function openSession(state: State): void
     } else {
         refused(state, "the host cannot take a chat up again: open a new one");
     }
+}
+
+/** A server as the protocol gives a stdio one: its name, command, arguments, and environment as a list of names and values. */
+function serverEntry(server: ChatServer): Message
+{
+    const env = Object.entries(server.environment).map(([name, value]) => ({ name, value }));
+    return { name: server.name, command: server.command, args: [...server.args], env };
 }
 
 function sessionOpened(state: State, answer: Message): void

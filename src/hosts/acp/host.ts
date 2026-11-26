@@ -9,12 +9,15 @@ export interface AcpHost
     name: string;
     /** The program's arguments after its own, which make it speak the protocol on its input and output. */
     args: string[];
-    /** A tool call's name for the table and its kind, from all the agent said of it and the chat's session: for a command of the chesspal server, the command's name alone. */
-    toolOf(call: Message, session: string | undefined): { name: string; kind: ToolKind; };
+    /**
+     * A tool call's name for the table and its kind, from all the agent said of it, the chat's session and the name of the server whose tools are
+     * Chesspal's: for a command of that server, the command's name alone.
+     */
+    toolOf(call: Message, session: string | undefined, server: string): { name: string; kind: ToolKind; };
     /** The paths a call of kind read asks for, as given, "." for the folder it runs in; none where nothing says what it reads. Any not text is outside. */
     pathsOf(call: Message): unknown[];
-    /** The tools a call ran within itself, which the agent names only at its end; none for most calls. */
-    innerTools(call: Message): { name: string; kind: ToolKind; failed: boolean; }[];
+    /** The tools a call ran within itself, which the agent names only at its end, Chesspal's by the name of its server; none for most calls. */
+    innerTools(call: Message, server: string): { name: string; kind: ToolKind; failed: boolean; }[];
     /** For a host that tells a subagent's work among its chat's updates: the subagent's session an update is of, undefined for the AI's own. */
     childOf?(update: Message): string | undefined;
     /** The subagent's session a call of kind agent started, as its end names it. */

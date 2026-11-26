@@ -1,5 +1,5 @@
 // The chat's state as the protocol's client keeps it, beside what every driver keeps: the requests written, the session, the agent's options, the turn.
-import type { ToolKind } from "../chat.ts";
+import type { ChatServer, ToolKind } from "../chat.ts";
 import type { Message, Requests } from "../lines.ts";
 import type { ChatState, Turn as SharedTurn } from "../state.ts";
 import type { AcpHost } from "./host.ts";
@@ -7,6 +7,11 @@ import type { AcpHost } from "./host.ts";
 export interface State extends ChatState<Turn>
 {
     host: AcpHost;
+    /** The name of the server whose tools are Chesspal's commands; the server given by who opens the chat, its servers then this one alone. */
+    server: string;
+    given?: ChatServer;
+    /** The instructions given, until they are written with the chat's first words: never in a chat taken up again. */
+    instructions?: string;
     /** The requests written that wait for their answer. */
     requests: Requests;
     /** The chat taken up, and the session the agent opened. */

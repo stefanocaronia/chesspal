@@ -1,17 +1,23 @@
 // The chat in Antigravity: its program started with no terminal as `agy acp`, spoken to by the Agent Client Protocol, in the chat's folder. The
-// chesspal server comes from the player's own .gemini/config/mcp_config.json, which `chesspal init` writes: the table passes none of its own.
+// chesspal server comes from the player's own .gemini/config/mcp_config.json, which `chesspal init` writes, or, given by who opens the chat, with the
+// session.
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { type AcpHost, acpModels, kindOfCall, openAcp, pathsOfCall } from "../acp/index.ts";
-import { type HostDriver, refuseGiven, type ToolKind } from "../chat.ts";
+import type { HostDriver, ToolKind } from "../chat.ts";
 import { hosts } from "../names.ts";
 import { fileOnPath, type FoundProgram, isFile } from "../program.ts";
 
 // What belongs to another chat or shell, never to the AI's: the folders of a shell. Chesspal's own variables stay, as CHESSPAL_HOME, which the chat needs.
 const dropped = /^(PWD|OLDPWD|INIT_CWD)$/i;
 
-// A tool of the chesspal server, by the names a host gives one: mcp__chesspal__status, chesspal.status, chesspal_status, chesspal/status, or the title "chesspal: status".
-const chesspalTool = /^(?:mcp__)?chesspal(?:__|[._/]|:\s*)([a-z][\w-]*)$/i;
+// A tool of the chesspal server, by the names a host gives one: mcp__chesspal__status, chesspal.status, chesspal_status, chesspal/status, or the title
+// "chesspal: status"; and as Antigravity names the tools of a server given with the session, mcp_chesspal_status, with a suffix after the server's name
+// where its process has several sessions, mcp_chesspal_db2ed3c2_status, as agy 1.5.17 was seen to. The server's name holds no sign a pattern reads.
+function chesspalTool(server: string): RegExp
+{
+    return new RegExp(`^(?:(?:mcp__)?${server}(?:__|[._/]|:\\s*)|mcp_${server}_(?:[0-9a-f]{8}_)?)([a-z][\\w-]*)$`, "i");
+}
 
 // The protocol's kinds that change something on the computer: what such a call is named or titled never makes it a command of chesspal.
 const actingKinds = ["execute", "edit", "delete", "move"];
@@ -29,14 +35,17 @@ const agentActions = ["list", "kill"];
 const timerFields = ["DurationSeconds", "Prompt"];
 const taskActions = ["status"];
 
-// The description of a chesspal tool, which Antigravity keeps in its own folder and reads before it calls one.
-const chesspalDescription = /[\\/]antigravity-cli[\\/]mcp[\\/]chesspal[\\/][\w-]+\.(?:json|md)$/i;
+// The description of a tool of the chesspal server, which Antigravity keeps in its own folder and reads before it calls one.
+function chesspalDescription(server: string): RegExp
+{
+    return new RegExp(`[\\\\/]antigravity-cli[\\\\/]mcp[\\\\/]${server}[\\\\/][\\w-]+\\.(?:json|md)$`, "i");
+}
 
 /** Antigravity as the protocol's client reads it: a tool by its own name where the table knows it, else by the protocol's kind; a command of chesspal by its name. */
 export const antigravityAcp: AcpHost = {
     name: hosts.antigravity.name,
     args: ["acp"],
-    toolOf: (call, session) => toolOf(call, session),
+    toolOf: (call, session, server) => toolOf(call, session, server),
     pathsOf: pathsOfCall,
     innerTools: () => [],
     login: "open Antigravity on this computer and sign in there, then try again",
@@ -46,10 +55,7 @@ export const antigravityAcp: AcpHost = {
 
 /** Antigravity as the table drives it: the model a new chat proposes is the first Antigravity lists. */
 export const antigravity: HostDriver = {
-    open: (options) => {
-        refuseGiven(options, "Antigravity");
-        return openAcp(options, antigravityAcp);
-    },
+    open: (options) => openAcp(options, antigravityAcp),
     missing: () =>
         isFile(join(homedir(), ".gemini", "config", "mcp_config.json"))
             ? undefined
@@ -75,13 +81,13 @@ function antigravityProgram(environment: NodeJS.ProcessEnv, platform: string, ho
  * the protocol's kind, whatever its name or title; then a tool of Antigravity's own by its name; then a command of the chesspal server by its own name,
  * whether the host names it or titles it so.
  */
-function toolOf(call: Record<string, unknown>, session: string | undefined): { name: string; kind: ToolKind; }
+function toolOf(call: Record<string, unknown>, session: string | undefined, server: string): { name: string; kind: ToolKind; }
 {
     const names = [call.name, call.title].filter((one) => typeof one === "string") as string[];
     const first = names[0] ?? "";
 
     if (typeof call.name === "string" && inputTools.includes(call.name)) {
-        return toolOfInput(call.name, call, session);
+        return toolOfInput(call.name, call, session, server);
     }
 
     if (typeof call.kind === "string" && actingKinds.includes(call.kind)) {
@@ -95,7 +101,7 @@ function toolOf(call: Record<string, unknown>, session: string | undefined): { n
     }
 
     for (const name of names) {
-        const command = chesspalTool.exec(name.trim())?.[1];
+        const command = chesspalTool(server).exec(name.trim())?.[1];
 
         if (command !== undefined) {
             return { name: command, kind: "chesspal" };
@@ -111,16 +117,16 @@ function toolOf(call: Record<string, unknown>, session: string | undefined): { n
  * listing or stopping them, a timer that wakes the AI once and a look at a subagent's task, are the agent's. Where its input names them otherwise, the
  * call is of kind other, never allowed.
  */
-function toolOfInput(name: string, call: Record<string, unknown>, session: string | undefined): { name: string; kind: ToolKind; }
+function toolOfInput(name: string, call: Record<string, unknown>, session: string | undefined, server: string): { name: string; kind: ToolKind; }
 {
     const input = typeof call.rawInput === "object" && call.rawInput !== null ? call.rawInput as Record<string, unknown> : {};
 
     if (name === "call_mcp_tool") {
-        return input.ServerName === "chesspal" ? { name: typeof input.ToolName === "string" ? input.ToolName : name, kind: "chesspal" } : { name, kind: "other" };
+        return input.ServerName === server ? { name: typeof input.ToolName === "string" ? input.ToolName : name, kind: "chesspal" } : { name, kind: "other" };
     }
 
     if (name === "read_file") {
-        const own = typeof input.Path === "string" && (chesspalDescription.test(input.Path) || isAnswerOf(input.Path, session));
+        const own = typeof input.Path === "string" && (chesspalDescription(server).test(input.Path) || isAnswerOf(input.Path, session));
         return { name, kind: own ? "chesspal" : "read" };
     }
 

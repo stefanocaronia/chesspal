@@ -38,7 +38,7 @@ function readRequest(state: State, message: Message): void
 
     const turn = state.turn;
     const call = remember(turn, params.toolCall);
-    const tool = state.host.toolOf(call, state.session);
+    const tool = state.host.toolOf(call, state.session, state.server);
     const allowed = turn?.interrupted !== true && mayRun(state, tool, call) === undefined;
     const options = Array.isArray(params.options) ? params.options.filter(isObject) : [];
     // Never an option that lasts beyond this call: with no option for this once, the answer is cancelled.
@@ -144,7 +144,7 @@ function readToolCall(state: State, update: Message): void
         return;
     }
 
-    const tool = turn.started.get(id) ?? state.host.toolOf(call, state.session);
+    const tool = turn.started.get(id) ?? state.host.toolOf(call, state.session, state.server);
 
     if (!turn.started.has(id)) {
         turn.started.set(id, tool);
@@ -157,7 +157,7 @@ function readToolCall(state: State, update: Message): void
     }
 
     turn.ended.add(id);
-    const inners = state.host.innerTools(call);
+    const inners = state.host.innerTools(call, state.server);
 
     for (const [index, inner] of inners.entries()) {
         const innerId = `${id}/${String(index)}`;
@@ -207,7 +207,7 @@ function readChild(state: State, child: string, update: Message): void
 
     if (call.status === "completed") {
         turn.ended.add(id);
-        ranUnasked(state, turn, id, call, state.host.innerTools(call));
+        ranUnasked(state, turn, id, call, state.host.innerTools(call, state.server));
     }
 }
 
@@ -215,7 +215,7 @@ function readChild(state: State, child: string, update: Message): void
 function ranUnasked(state: State, turn: Turn, id: string, call: Message, inners: { name: string; kind: ToolKind; failed: boolean; }[]): void
 {
     const ranInner = inners.find((inner) => !inner.failed && !state.allowed.includes(inner.kind));
-    const why = (ranInner === undefined ? undefined : `the table does not let the AI use ${ranInner.name}`) ?? (turn.approved.has(id) ? undefined : mayRun(state, state.host.toolOf(call, state.session), call));
+    const why = (ranInner === undefined ? undefined : `the table does not let the AI use ${ranInner.name}`) ?? (turn.approved.has(id) ? undefined : mayRun(state, state.host.toolOf(call, state.session, state.server), call));
 
     if (why !== undefined) {
         turn.failure = `the host ran a tool without asking: ${why}`;

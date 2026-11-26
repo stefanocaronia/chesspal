@@ -843,7 +843,7 @@ const english: Text = {
         inPage: {
             experimental: "Experimental",
             switch: "The chat with the AI in the page, without a terminal",
-            switchNote: "Only with Claude Code and Codex for now. It applies from the next chat.",
+            switchNote: "It applies from the next chat.",
             choose: (host) => `Choose the chat to play with: ${host} plays here in the page, with no window of its own.`,
             reviewChoose: (host) => `Choose the chat that reviews the game: ${host} works here in the page, with no window of its own.`,
             restartHint: "The chat starts again, clean, once it has ended its answer, with the chat, model and effort chosen here. The game stays as it is.",
@@ -1346,7 +1346,7 @@ const italian: Text = {
         inPage: {
             experimental: "Sperimentale",
             switch: "La chat con l'AI nella pagina, senza terminale",
-            switchNote: "Per ora solo con Claude Code e Codex. Vale dalla prossima chat.",
+            switchNote: "Vale dalla prossima chat.",
             choose: (host) => `Scegli la chat con cui giocare: ${host} gioca qui nella pagina, senza una finestra a parte.`,
             reviewChoose: (host) => `Scegli la chat che analizza la partita: ${host} lavora qui nella pagina, senza una finestra a parte.`,
             restartHint: "La chat riparte pulita, appena ha finito di rispondere, con la chat, il modello e il ragionamento scelti qui. La partita resta com'è.",

@@ -40,7 +40,7 @@ export interface FailureSaid
 export type Stalled = "stopped" | "noMove";
 
 /** The hosts whose chat the table drives in the page, by the names the page gives them, each with its name for the player. */
-export const drivenHosts: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex" };
+export const drivenHosts: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity", opencode: "OpenCode" };
 
 /**
  * Whether the window's button opens the chat in the page, with no terminal: in a host the table drives, with the switch on, and never in place of a chat

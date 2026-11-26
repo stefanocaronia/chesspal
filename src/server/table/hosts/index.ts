@@ -2,4 +2,4 @@
 export { terminalChats } from "./chats.ts";
 export { setUpTable } from "./hooks.ts";
 export { hostEnvironment, type HostName, isHostName } from "./hosts.ts";
-export { chatStart, endTree, hostLaunch, playHost } from "./play.ts";
+export { chatStart, endTree, hostLaunch, noOpenCodeModel, playHost } from "./play.ts";
