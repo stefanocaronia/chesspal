@@ -689,6 +689,14 @@ describe("the chat in OpenCode", () => {
 });
 
 describe("OpenCode as the table drives it", () => {
+    it("refuses a server or instructions from the table, before starting any process", () => {
+        for (const given of [{ server: { name: "chesspal", command: "node", args: [], environment: { KEY: "secret" } } }, { instructions: "You play chess." }]) {
+            const host = fakeAgent([]);
+            expect(() => openHostChat("openCode", { ...options(host), ...given })).toThrow("OpenCode's driver does not take its server or its instructions from the table yet.");
+            expect(host.started).toBeUndefined();
+        }
+    });
+
     const driver = hostDriver("openCode")!;
     const exe = process.platform === "win32" ? "opencode.exe" : "opencode";
     const separator = process.platform === "win32" ? ";" : ":";

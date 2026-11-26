@@ -5,8 +5,8 @@ import type { startLineProcess } from "./process.ts";
 export type ToolKind = "chesspal" | "read" | "web" | "fetch" | "agent" | "image" | "shell" | "write" | "other";
 
 export type HostEvent =
-    /** The host said which chat this is and the model it runs: at the first turn, and when either changes. */
-    | { type: "session"; session: string; model: string; }
+    /** The host said which chat this is and the model it runs, with the effort where the driver knows it: at the first turn, and when either changes. */
+    | { type: "session"; session: string; model: string; effort?: string; }
     /** A turn the host began by itself, with no words of the player's, as OpenCode tells a subagent's answer once its turn ended; a turnEnd ends it. */
     | { type: "turnStart"; by: "host"; }
     /** A piece of the AI's prose; `block` grows with each new block of text in a turn. */
@@ -15,8 +15,11 @@ export type HostEvent =
     | { type: "tool"; id: string; name: string; kind: ToolKind; state: "started" | "done" | "failed"; }
     /** A permission the host asked and the chat answered by its `allowed` kinds. */
     | { type: "permission"; name: string; kind: ToolKind; allowed: boolean; }
-    /** The turn ended: done, stopped by interrupt(), or failed, with why in words a player can read. */
-    | { type: "turnEnd"; reason: "done" | "interrupted" | "failed"; why?: string; }
+    /**
+     * The turn ended: done, stopped by interrupt(), or failed, with why in words a player can read; and the turn's tokens where the host reports them, its
+     * input counting those of its cache too.
+     */
+    | { type: "turnEnd"; reason: "done" | "interrupted" | "failed"; why?: string; usage?: { input: number; output: number; }; }
     /** The host's process is gone: nothing comes after. */
     | { type: "ended"; why: string; };
 
@@ -50,6 +53,10 @@ export interface ChatOptions
     allowed: ToolKind[];
     /** The environment of the host's process. */
     environment: NodeJS.ProcessEnv;
+    /** The MCP server the chat gets, given by whoever opens it instead of the folder's files: then the chat's servers are this one alone. */
+    server?: ChatServer;
+    /** What the chat is told before the player's first words: who it is and how it works. */
+    instructions?: string;
     /** What the chat's listener threw, which never stops the chat; by default a warning of this process. */
     failed?: (error: unknown) => void;
     /** Starts the process, the core's by default. Injected in tests. */
@@ -58,12 +65,27 @@ export interface ChatOptions
     later?: (ms: number, run: () => void) => () => void;
 }
 
+/**
+ * An MCP server as whoever opens a chat gives it: its name, the command that starts it and its environment, which is the server's own, in its
+ * configuration: it may carry a secret, so it is never on the host's command line nor in its process's environment.
+ */
+export interface ChatServer
+{
+    name: string;
+    command: string;
+    args: string[];
+    environment: Record<string, string>;
+}
+
 /** What the table knows of a host it can open a chat with: how to open it, its program, the environment it runs in, its model and efforts. */
 export interface HostDriver
 {
     /** Opens the chat; throws where the host's program cannot start. */
     open(options: ChatOptions): HostChat;
-    /** What the chat's `folder` lacks for this host, in words that say how to mend it; undefined where it lacks nothing. */
+    /**
+     * What the chat's `folder` lacks for this host, in words that say how to mend it; undefined where it lacks nothing. Whoever gives the chat its `server`
+     * does not ask it: the folder's own files are not read then.
+     */
     missing(folder: string): string | undefined;
     /** The host's own program on this computer, where it is installed by itself; undefined where it is not found. */
     program(environment: NodeJS.ProcessEnv, platform: string, home: string): { command: string; args: string[]; } | undefined;
@@ -167,6 +189,14 @@ export class EventQueue
 export function isHostName(value: string): boolean
 {
     return /^[A-Za-z0-9][\w.:/@[\]-]{0,199}$/.test(value);
+}
+
+/** Throws, before any process starts, where a driver that does not take them yet is given a server or instructions. */
+export function refuseGiven(options: ChatOptions, host: string): void
+{
+    if (options.server !== undefined || options.instructions !== undefined) {
+        throw new Error(`${host}'s driver does not take its server or its instructions from the table yet.`);
+    }
 }
 
 /** What a chat's listener threw, where the table gave no handler: a warning of this process, never lost. */

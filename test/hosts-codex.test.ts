@@ -451,6 +451,14 @@ describe("the chat in Codex", () => {
 });
 
 describe("Codex as the table drives it", () => {
+    it("refuses a server or instructions from the table, before starting any process", () => {
+        for (const given of [{ server: { name: "chesspal", command: "node", args: [], environment: { KEY: "secret" } } }, { instructions: "You play chess." }]) {
+            const host = fakeCodex([]);
+            expect(() => codex.open({ ...options(host), ...given })).toThrow("Codex's driver does not take its server or its instructions from the table yet.");
+            expect(host.started).toBeUndefined();
+        }
+    });
+
     const exe = process.platform === "win32" ? "codex.exe" : "codex";
     const separator = process.platform === "win32" ? ";" : ":";
 

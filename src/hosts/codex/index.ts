@@ -1,6 +1,6 @@
 // The chat in Codex: its program started with no terminal as `codex app-server`, spoken to by its own JSON-RPC protocol, in the chat's folder.
 import { join } from "node:path";
-import type { ChatOptions, HostChat, HostDriver } from "../chat.ts";
+import { type ChatOptions, type HostChat, type HostDriver, refuseGiven } from "../chat.ts";
 import { Requests } from "../lines.ts";
 import { isFile } from "../program.ts";
 import { heldChat, startHost } from "../state.ts";
@@ -27,6 +27,7 @@ export const codex: HostDriver = {
 /** Opens a chat with the AI in Codex, or takes one up again by its thread; the player's words wait until the model is confirmed. */
 function openCodex(options: ChatOptions): HostChat
 {
+    refuseGiven(options, "Codex");
     const shared = startHost(options, serverArguments(options.folder));
     const state: State = {
         ...shared,

@@ -45,7 +45,7 @@ function readControlRequest(state: State, message: Message): void
         return;
     }
 
-    const tool = toolOf(request.tool_name, request.input);
+    const tool = toolOf(request.tool_name, request.input, state.server);
     const kindAllowed = state.allowed.includes(tool.kind);
     const outside = kindAllowed && tool.kind === "read" ? pathOutside(request.tool_name, request.input, state.folder) : undefined;
     const allowed = kindAllowed && outside === undefined;
@@ -99,7 +99,7 @@ function readSystem(state: State, message: Message): void
 
     if (typeof session === "string" && (state.told?.session !== session || state.told.model !== model)) {
         state.told = { session, model };
-        tell(state, { type: "session", session, model });
+        tell(state, { type: "session", session, model, ...(state.effort === undefined ? {} : { effort: state.effort }) });
     }
 }
 
@@ -147,7 +147,7 @@ function readAssistant(state: State, message: Message): void
 
     for (const block of body.content.filter(isObject)) {
         if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string" && !turn.tools.has(block.id)) {
-            const tool = toolOf(block.name, block.input);
+            const tool = toolOf(block.name, block.input, state.server);
             const refused = refusal(state, block.name, tool.kind, block.input);
             turn.tools.set(block.id, refused === undefined ? tool : { ...tool, refused });
             tell(state, { type: "tool", id: block.id, name: tool.name, kind: tool.kind, state: "started" });
@@ -208,15 +208,28 @@ function readResult(state: State, message: Message): void
         return;
     }
 
+    const usage = usageOf(message.usage);
+
     if (turn.failure !== undefined) {
-        endTurn(state, "failed", turn.failure);
+        endTurn(state, "failed", turn.failure, usage);
     } else if (turn.interrupted) {
-        endTurn(state, "interrupted");
+        endTurn(state, "interrupted", undefined, usage);
     } else if (message.subtype === "success" && message.is_error !== true) {
-        endTurn(state, "done");
+        endTurn(state, "done", undefined, usage);
     } else {
-        endTurn(state, "failed", typeof message.result === "string" && message.result.trim() !== "" ? message.result : String(message.subtype));
+        endTurn(state, "failed", typeof message.result === "string" && message.result.trim() !== "" ? message.result : String(message.subtype), usage);
     }
+}
+
+/** The turn's tokens as its result reports them, the cache's written and read counted in the input; undefined where it reports none. */
+function usageOf(usage: unknown): { input: number; output: number; } | undefined
+{
+    if (!isObject(usage) || typeof usage.input_tokens !== "number" || typeof usage.output_tokens !== "number") {
+        return undefined;
+    }
+
+    const cache = (field: unknown): number => (typeof field === "number" ? field : 0);
+    return { input: usage.input_tokens + cache(usage.cache_creation_input_tokens) + cache(usage.cache_read_input_tokens), output: usage.output_tokens };
 }
 
 function tellWholeText(state: State, turn: Turn, id: string | undefined, text: string): void

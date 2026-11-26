@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { type ChatOptions, type HostChat, type HostDriver, isHostName } from "../chat.ts";
 import { isFile } from "../program.ts";
 import { heldChat, startHost } from "../state.ts";
+import { givenArguments, serverOf } from "./given.ts";
 import { claudeModels } from "./models.ts";
 import { agentArguments, claudeEnvironment, claudeProgram, settingArguments, streamArguments } from "./program.ts";
 import { builtInTools } from "./protocol.ts";
@@ -33,8 +34,11 @@ function openClaudeCode(options: ChatOptions): HostChat
         }
     }
 
+    const server = serverOf(options);
     const state: State = {
         ...startHost(options, programArguments(options)),
+        server,
+        ...(options.effort === undefined ? {} : { effort: options.effort }),
         requests: 0,
         model: { asked: options.model, request: "" },
         protocol: {
@@ -48,8 +52,8 @@ function openClaudeCode(options: ChatOptions): HostChat
 }
 
 /**
- * The program's arguments after its own: the protocol, the model and effort, the folder's settings and its chesspal server alone, the tools allowed, a subagent
- * asked before it starts, the chat taken up.
+ * The program's arguments after its own: the protocol, the model and effort, the folder's settings and its chesspal server alone, or the server and the
+ * instructions given, the tools allowed, a subagent asked before it starts, the chat taken up.
  */
 function programArguments(options: ChatOptions): string[]
 {
@@ -63,8 +67,7 @@ function programArguments(options: ChatOptions): string[]
         options.model,
         ...(options.effort === undefined ? [] : ["--effort", options.effort]),
         ...settingArguments,
-        "--mcp-config",
-        join(options.folder, ".mcp.json"),
+        ...givenArguments(options),
         "--disable-slash-commands",
         "--tools",
         tools.join(","),

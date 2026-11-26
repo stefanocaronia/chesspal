@@ -9,6 +9,9 @@ const modelWait = 30_000;
 export interface State extends ChatState<Turn>
 {
     requests: number;
+    /** The name of the server whose tools are the table's commands, and the effort the chat was started with. */
+    server: string;
+    effort?: string;
     /** The model asked, the request that asked it, and the model the host confirmed. */
     model: { asked: string; request: string; confirmed?: string; };
 }

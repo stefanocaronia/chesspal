@@ -1,8 +1,8 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { type ChatOptions, drivenHosts, type HostChat, hostDriver, type HostEvent, isHostName, openHostChat, type ToolKind } from "../src/hosts/index.ts";
+import { type ChatOptions, type ChatServer, drivenHosts, type HostChat, hostDriver, type HostEvent, isHostName, openHostChat, type ToolKind } from "../src/hosts/index.ts";
 import { hostIds } from "../src/hosts/names.ts";
 import { checklist, type Scenario } from "./hosts/checklist.ts";
 import { type FakeHost, fakeHost, type FakeOptions, type FlowEntry, isModelRequest, isPlayerWords, listen, loadFlow, manualClock, playerWords, sessionOf, ticksUntil, turnEnds, wholeTexts } from "./hosts/fake-host.ts";
@@ -542,6 +542,114 @@ describe("the chat in Claude Code", () => {
             chat.onEvent((event) => events.push(event));
             expect(events).toEqual([session("session-1"), { type: "text", block: 0, text: "a" }, { type: "turnEnd", reason: "done" }]);
         });
+    });
+});
+
+describe("the chat in Claude Code given its server and instructions", () => {
+    const key = "secret-key-of-the-place";
+    const server: ChatServer = { name: "table", command: "node", args: ["chesspal.js", "mcp"], environment: { CHESSPAL_DOOR: "door-1", CHESSPAL_KEY: key } };
+    const instructions = "You are Chesspal's opponent: play with its commands alone.";
+
+    /** A new folder of the test's, and the chat opened in it with the server and instructions given. */
+    function openGiven(overrides: Partial<ChatOptions> = {}, flow: FlowEntry[] = []): ReturnType<typeof play> & { place: string; }
+    {
+        const place = makeTempFolder();
+        return { ...play(flow, { folder: place, server, instructions, ...overrides }), place };
+    }
+
+    it("starts with the server given alone and the instructions in place of the host's own, and no built-in tool for the chesspal kind alone", () => {
+        const { host, place } = openGiven();
+        expect(host.started?.args).toEqual([
+            "--first",
+            ...protocol,
+            "--model",
+            "haiku",
+            "--setting-sources",
+            "project,local",
+            "--strict-mcp-config",
+            "--mcp-config",
+            join(place, "mcp.json"),
+            "--system-prompt-file",
+            join(place, "instructions.md"),
+            "--disable-slash-commands",
+            "--tools",
+            "",
+        ]);
+    });
+
+    it("writes the server's configuration whole, readable by the player alone, and the instructions as given", () => {
+        const { place } = openGiven();
+        expect(JSON.parse(readFileSync(join(place, "mcp.json"), "utf8"))).toEqual({ mcpServers: { table: { command: "node", args: ["chesspal.js", "mcp"], env: server.environment } } });
+        expect(readFileSync(join(place, "instructions.md"), "utf8")).toBe(instructions);
+
+        if (process.platform !== "win32") {
+            expect(statSync(join(place, "mcp.json")).mode & 0o777).toBe(0o600);
+        }
+    });
+
+    it("never puts the server's key on the host's command line nor in its environment", () => {
+        const { host } = openGiven({ environment: { HOME: "/home/player" } });
+        expect(host.started?.args.some((arg) => arg.includes(key))).toBe(false);
+        expect(Object.values(host.started?.options.env ?? {}).some((value) => value?.includes(key))).toBe(false);
+        expect(Object.keys(host.started?.options.env ?? {})).toEqual(["HOME"]);
+    });
+
+    it("reads the given server's tools as Chesspal's commands, by its name: chesspal's are another server's then", async () => {
+        const flow = turn("Move", asks("p1", "mcp__table__move", { move: "e4" }), answered("p1"), asks("p2", "mcp__chesspal__move", { move: "e4" }), answered("p2"));
+        const { chat, host, events, until } = openGiven({}, flow);
+        chat.send("Move");
+        await until((all) => turnEnds(all).length === 1);
+        expect(events.filter((event) => event.type === "permission")).toEqual([
+            { type: "permission", name: "move", kind: "chesspal", allowed: true },
+            { type: "permission", name: "mcp__chesspal__move", kind: "other", allowed: false },
+        ]);
+        expect(host.problems).toEqual([]);
+    });
+
+    it("writes the files again and passes the same flags when it takes a chat up", () => {
+        const place = makeTempFolder();
+        writeFileSync(join(place, "mcp.json"), "stale");
+        writeFileSync(join(place, "instructions.md"), "stale");
+        const { host } = play([], { folder: place, server, instructions, session: "a-session" });
+        expect(host.started?.args.slice(-9)).toEqual(["--mcp-config", join(place, "mcp.json"), "--system-prompt-file", join(place, "instructions.md"), "--disable-slash-commands", "--tools", "", "--resume", "a-session"]);
+        expect(JSON.parse(readFileSync(join(place, "mcp.json"), "utf8"))).toHaveProperty("mcpServers.table.env.CHESSPAL_KEY", key);
+        expect(readFileSync(join(place, "instructions.md"), "utf8")).toBe(instructions);
+    });
+
+    it("never starts with a server whose name Claude Code would change in its tools' names", () => {
+        for (const name of ["", "chess.pal", "a b", "x".repeat(65)]) {
+            const host = fakeHost([]);
+            expect(() => openHostChat("claudeCode", { ...options(host), folder: makeTempFolder(), server: { ...server, name } }), name).toThrow("is no name of an MCP server");
+            expect(host.started).toBeUndefined();
+        }
+    });
+
+    it("writes nothing in the folder and reads its .mcp.json when it is given neither", () => {
+        const place = makeTempFolder();
+        const { host } = play([], { folder: place });
+        expect(readdirSync(place)).toEqual([]);
+        expect(host.started?.args).toContain(join(place, ".mcp.json"));
+        expect(host.started?.args).not.toContain("--system-prompt-file");
+    });
+
+    it("tells the effort it was started with and each turn's tokens, the cache's counted in the input, on a recorded flow", async () => {
+        const flow = loadFlow("claude-code/three-turns").map((entry) =>
+            entry.dir === "out" && entry.msg.type === "result"
+                ? { ...entry, msg: { ...entry.msg, usage: { input_tokens: 3, cache_creation_input_tokens: 1200, cache_read_input_tokens: 9000, output_tokens: 80 } } }
+                : entry
+        );
+        const { chat, events, until } = play(flow, { allowed: ["chesspal", "read", "shell"], effort: "high" });
+        chat.send(playerWords(flow)[0]!);
+        await until((all) => turnEnds(all).length === 1);
+        expect(events.find((event) => event.type === "session")).toEqual({ type: "session", session: sessionOf(flow), model: "claude-haiku-5-5", effort: "high" });
+        expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done", usage: { input: 10_203, output: 80 } }]);
+    });
+
+    it("tells no effort and no tokens where it was started with none and the host reports none", async () => {
+        const { chat, events, until } = play(turn("Hello", delta("Hi")));
+        chat.send("Hello");
+        await until((all) => turnEnds(all).length === 1);
+        expect(events).toEqual([session("session-1"), { type: "text", block: 0, text: "Hi" }, { type: "turnEnd", reason: "done" }]);
     });
 });
 

@@ -127,13 +127,13 @@ export function askToStop<T extends Turn>(state: ChatState<T>, turn: T): void
     });
 }
 
-/** Ends the turn in course, the chat free for the next words, then tells it. */
-export function endTurn(state: ChatState, reason: "done" | "interrupted" | "failed", why?: string): void
+/** Ends the turn in course, the chat free for the next words, then tells it, with its tokens where the host reported them. */
+export function endTurn(state: ChatState, reason: "done" | "interrupted" | "failed", why?: string, usage?: { input: number; output: number; }): void
 {
     state.turn = undefined;
     state.cancelInterruptWait?.();
     state.cancelInterruptWait = undefined;
-    tell(state, why === undefined ? { type: "turnEnd", reason } : { type: "turnEnd", reason, why });
+    tell(state, { type: "turnEnd", reason, ...(why === undefined ? {} : { why }), ...(usage === undefined ? {} : { usage }) });
 }
 
 /** The chat cannot play: the turn held ends failed, and the chat ends with its process. */

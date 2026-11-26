@@ -229,6 +229,16 @@ describe("the chat in Antigravity", () => {
 });
 
 describe("Antigravity as the table drives it", () => {
+    it("refuses a server or instructions from the table, before starting any process", () => {
+        for (const given of [{ server: { name: "chesspal", command: "node", args: [], environment: { KEY: "secret" } } }, { instructions: "You play chess." }]) {
+            const host = fakeAgent([]);
+            expect(() => openHostChat("antigravity", { folder, program: { command: "agy-program", args: [] }, model, allowed: ["chesspal"], environment: {}, start: host.start, ...given })).toThrow(
+                "Antigravity's driver does not take its server or its instructions from the table yet.",
+            );
+            expect(host.started).toBeUndefined();
+        }
+    });
+
     const driver = hostDriver("antigravity")!;
     const exe = process.platform === "win32" ? "agy.exe" : "agy";
 

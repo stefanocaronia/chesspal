@@ -20,13 +20,17 @@ export const builtInTools: { name: string; kind: ToolKind; }[] = [
 /** The host's tools that only load the others, which it runs without asking: never a reason to stop a turn. */
 export const toolLoaders = ["ToolSearch"];
 
-// The chesspal server's tools, and the subagent tool by its names old and new.
-const chesspalPrefix = "mcp__chesspal__";
+// The subagent tool by its names old and new.
 const agentTools = ["Task", "Agent"];
 
-/** A tool's name for the table and its kind: a command of the chesspal server by its own name; any subagent is of kind agent. */
-export function toolOf(name: string, input: unknown): { name: string; kind: ToolKind; }
+/**
+ * A tool's name for the table and its kind: a command of the chesspal server, or of the server given by that name, by its own name; any subagent is of kind
+ * agent.
+ */
+export function toolOf(name: string, input: unknown, server = "chesspal"): { name: string; kind: ToolKind; }
 {
+    const chesspalPrefix = `mcp__${server}__`;
+
     if (name.startsWith(chesspalPrefix) && name.length > chesspalPrefix.length) {
         return { name: name.slice(chesspalPrefix.length), kind: "chesspal" };
     }

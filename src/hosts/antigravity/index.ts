@@ -3,7 +3,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { type AcpHost, acpModels, kindOfCall, openAcp, pathsOfCall } from "../acp/index.ts";
-import type { HostDriver, ToolKind } from "../chat.ts";
+import { type HostDriver, refuseGiven, type ToolKind } from "../chat.ts";
 import { fileOnPath, type FoundProgram, isFile } from "../program.ts";
 
 // What belongs to another chat or shell, never to the AI's: the folders of a shell. Chesspal's own variables stay, as CHESSPAL_HOME, which the chat needs.
@@ -37,7 +37,10 @@ export const antigravityAcp: AcpHost = {
 
 /** Antigravity as the table drives it: the model a new chat proposes is the first Antigravity lists. */
 export const antigravity: HostDriver = {
-    open: (options) => openAcp(options, antigravityAcp),
+    open: (options) => {
+        refuseGiven(options, "Antigravity");
+        return openAcp(options, antigravityAcp);
+    },
     missing: () =>
         isFile(join(homedir(), ".gemini", "config", "mcp_config.json"))
             ? undefined
