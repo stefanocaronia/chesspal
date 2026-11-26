@@ -516,7 +516,8 @@ describe("the chat the table drives in Antigravity and OpenCode", () => {
         expect(ai.asked).toEqual(["antigravity"]);
         expect(terminal.opened).toEqual([]);
         expect(chat.options).toMatchObject({ model: "gemini-3.8-flash", effort: "medium", allowed: ["chesspal"], folder: join(home, "chats", "opponent") });
-        expect(chat.options.server).toMatchObject({ name: "chesspal", command: "node", args: ["cli.js", "mcp"] });
+        expect(chat.options.server).toBeUndefined();
+        expect(Object.keys(chat.options.environment)).toEqual(expect.arrayContaining([doorVariable, keyVariable]));
         expect(chat.options.instructions).toContain("open the chat again from the board page");
         expect(chat.sent).toEqual(["Let's play!"]);
         expect((await shown(table.url)).table).toMatchObject({ chat: true, host: "antigravity", held: true, started: { model: "gemini-3.8-flash", effort: "medium" }, driven: true });

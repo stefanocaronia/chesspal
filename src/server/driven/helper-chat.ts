@@ -9,7 +9,7 @@ import type { HostChat, HostDriver, HostEvent, HostId } from "../../hosts/index.
 import type { Place, TablePlaces } from "../places/index.ts";
 import { chatEnvironment, chatTrace } from "./environment.ts";
 import { failureCode } from "./failure.ts";
-import type { DrivenHost } from "./hosts.ts";
+import { type DrivenHost, placeServer } from "./hosts.ts";
 import type { Starts } from "./starts.ts";
 
 /** The host a helper's chat runs in, the model as the host names it, and its effort: the driver's own model where `model` is empty. */
@@ -178,7 +178,6 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
 
         // A chat opened ahead says which chat it is only at its first words: its server sat at its place says its program is up.
         void place.seated.then(started);
-        const [command, ...args] = options.chesspal;
         const choice = { ...(model.model === "" ? {} : { model: model.model }), ...(model.effort === undefined ? {} : { effort: model.effort }) };
         const trace = chatTrace(options.environment, role, context.now());
         runs = { host: model.host, model: model.model === "" ? driver.model : model.model, effort: model.effort };
@@ -188,8 +187,7 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
             model: runs.model,
             ...(model.effort === undefined ? {} : { effort: model.effort }),
             allowed: [...model.host.allowed],
-            environment: chatEnvironment(driver, options.environment, model.host.name, choice),
-            server: { name: model.host.server, command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...place.environment } },
+            ...placeServer(model.host, options.chesspal, place.environment, chatEnvironment(driver, options.environment, model.host.name, choice)),
             instructions: tableHelperInstructions(role),
             log: options.log,
             start: options.starts.starter(role),

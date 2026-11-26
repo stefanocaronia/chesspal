@@ -184,7 +184,7 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver, prog
     // A helper's program starts its server at once, as Claude Code does before its first words: the table hears it sit at its place, its MCP client named
     // as the host's the table last asked a driver for.
     const name = hosts[ai.asked.at(-1) ?? "claudeCode"].client;
-    const sit = (): Promise<Client> => (client ??= pause(role === undefined ? 0 : ai.sitAfter).then(() => sitAt(options.server!.environment, (made) => void clients.push(made), name)));
+    const sit = (): Promise<Client> => (client ??= pause(role === undefined ? 0 : ai.sitAfter).then(() => sitAt(options.server?.environment ?? (options.environment as Record<string, string>), (made) => void clients.push(made), name)));
 
     if (role !== undefined) {
         void sit().catch(() => undefined);

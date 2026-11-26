@@ -51,6 +51,7 @@ const allDenied = {
     todowrite: "deny",
     todoread: "deny",
     question: "deny",
+    experimental_image_generate: "deny",
     external_directory: "deny",
 };
 
@@ -74,7 +75,20 @@ describe("the chat in OpenCode", () => {
 
             expect(given(tableKinds)).toEqual({ permission: denied });
             expect(given(["chesspal", "read"])).toEqual({
-                permission: { bash: "deny", edit: "deny", webfetch: "deny", websearch: "deny", codesearch: "deny", task: "deny", skill: "deny", todowrite: "deny", todoread: "deny", question: "deny", external_directory: "deny" },
+                permission: {
+                    bash: "deny",
+                    edit: "deny",
+                    webfetch: "deny",
+                    websearch: "deny",
+                    codesearch: "deny",
+                    task: "deny",
+                    skill: "deny",
+                    todowrite: "deny",
+                    todoread: "deny",
+                    question: "deny",
+                    experimental_image_generate: "deny",
+                    external_directory: "deny",
+                },
             });
         });
 

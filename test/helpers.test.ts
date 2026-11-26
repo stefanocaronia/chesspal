@@ -9,6 +9,7 @@ import { tableFolder } from "../src/home/index.ts";
 import { agentFiles } from "../src/host-files/agents.ts";
 import { atTableInstructions, instructionsFile, opponentInstructions, tableHelperInstructions } from "../src/host-files/index.ts";
 import { activeProfile, gameFolder, type PageSettings, saveProfileSettings } from "../src/profiles/index.ts";
+import { doorVariable, keyVariable } from "../src/server/door/index.ts";
 import { chatInPage } from "../src/server/driven/index.ts";
 import { testContext } from "./commands.ts";
 import { call, cleanUp, drivenTable, type FakeChat, type FakeDriver, fakeDriver, gate, movingContext, opened, pageListening, pause, posted, raw, shown, temporary, until } from "./driven-fakes.ts";
@@ -165,7 +166,8 @@ describe("the opponent's helpers the table runs itself", () => {
             for (const role of ["ponder", "coach"] as const) {
                 expect(helperOf(ai, role)!.options, `${host} ${role}`).toMatchObject({ model, allowed: ["chesspal"] });
                 expect(helperOf(ai, role)!.options.effort, `${host} ${role}`).toBe(effort);
-                expect(helperOf(ai, role)!.options.server?.name, `${host} ${role}`).toBe("chesspal");
+                const server = helperOf(ai, role)!.options.server;
+                expect(server === undefined ? Object.keys(helperOf(ai, role)!.options.environment) : server.name, `${host} ${role}`).toEqual(host === "antigravity" ? expect.arrayContaining([doorVariable, keyVariable]) : "chesspal");
                 expect(helperOf(ai, role)!.sent, `${host} ${role}`).toEqual([role === "ponder" ? "Ponder." : "Coach."]);
             }
 

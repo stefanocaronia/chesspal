@@ -68,6 +68,7 @@ const permissionKinds: Record<string, ToolKind> = {
     todowrite: "other",
     todoread: "other",
     question: "other",
+    experimental_image_generate: "image",
 };
 
 /** The environment of OpenCode in a folder: it takes the folder it works in from PWD, not from where its process starts. */
