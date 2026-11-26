@@ -80,14 +80,14 @@ export const annotateGame = defineCommand({
         const holder = context.agent === analystAgent ? analystOf(context, studied.name) : undefined;
 
         if (holder !== undefined && holder !== context.agentRun) {
-            throw new Error(`${anotherAnalyst} Nothing changed.`);
+            throw new Error(`${anotherAnalyst(context)} Nothing changed.`);
         }
 
         const folder = gameFolder(context.home());
 
         // A review whose analysis the player stopped on the page is not written on, nor brought back to the page, by whoever was at it (Stefano).
         if (stoppedAnalysis(folder)?.game === studied.name) {
-            throw new Error(analysisStopped(studied.name));
+            throw new Error(analysisStopped(studied.name, context));
         }
 
         const numbers = moveNumbers(studied.record);

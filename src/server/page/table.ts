@@ -48,8 +48,10 @@ export interface TableChats
     turnSince?(): Date | undefined;
     /** Why the last chat the table drove failed or ended by itself, numbered, until the next chat opens. */
     failure?(): ChatFailure | undefined;
-    /** Has the table's analyst go over a game brought to analyse: whether it does; false where the table runs no analyst. */
-    analyse?(game: string): boolean;
+    /** Has the table's analyst go over a game brought to analyse, a new one for a review asked again (`redo`): whether it does; false where it runs none. */
+    analyse?(game: string, redo?: boolean): boolean;
+    /** When the earliest turn of a helper the table runs at work began: none while none is. */
+    helperTurnSince?(): Date | undefined;
     /** Stops the table's analyst, as the player stops the analysis on the page. */
     stopAnalysis?(): void;
     /** The helpers the table runs itself, with the game its analyst goes over: none where it runs none, and the chat at the table has its own. */

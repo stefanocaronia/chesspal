@@ -150,14 +150,21 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver, role
             emit({ type: "session", session, model: `claude-${options.model}`, ...(options.effort === undefined ? {} : { effort: options.effort }) });
         }
 
+        // A turn may be stopped from its first instant, as a real host's is, before its client has sat.
+        let wasStopped = false;
+        const stopped = new Promise<"interrupted">((done) => (stopTurn = () => {
+            wasStopped = true;
+            done("interrupted");
+        }));
         client ??= sitAt(options.server!.environment, (made) => void clients.push(made));
         const sitting = await client;
         const traced = tracing(sitting, chat);
-        const stopped = new Promise<"interrupted">((done) => (stopTurn = () => done("interrupted")));
         // A clean chat's first words are the table's start message.
         const starting = options.session === undefined && chat.sent.length === 1 && text === chat.sent[0];
         const helping = role === undefined ? undefined : ai.helpers[role];
-        const play = role !== undefined
+        const play = wasStopped
+            ? Promise.resolve()
+            : role !== undefined
             ? helping === undefined ? Promise.resolve() : helping(traced, text, chat)
             : starting
             ? (ai.first ?? startTurn)(traced)
@@ -369,6 +376,21 @@ export async function eventsOf(url: string): Promise<{ destroy(): void; }>
     const { get } = await import("node:http");
     return new Promise((done) => {
         const events = get(new URL("/api/events", url), { agent: false }, () => done(events));
+    });
+}
+
+/** A browser that has the page open, with the events it was sent: `changed` for each telling. */
+export async function pageListening(url: string): Promise<{ events: string[]; destroy(): void; }>
+{
+    const { get } = await import("node:http");
+    const events: string[] = [];
+    return new Promise((done) => {
+        const asked = get(new URL("/api/events", url), { agent: false }, (response) => {
+            response.setEncoding("utf8");
+            response.on("data", (chunk: string) => events.push(...chunk.split("\n\n").filter((line) => line.startsWith("data: ")).map((line) => line.slice(6))));
+            done({ events, destroy: () => asked.destroy() });
+        });
+        asked.on("error", () => undefined);
     });
 }
 

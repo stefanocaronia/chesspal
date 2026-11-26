@@ -12,12 +12,13 @@ import { version } from "../../version.ts";
 import { bellLineIn, type BellListener, gameBellLine, noteBell } from "../bell/index.ts";
 import type { ChatFailure, ChatSeat, HeldChat, TableChats } from "../page/index.ts";
 import type { Place, TablePlaces } from "../places/index.ts";
-import { chatStart, hostEnvironment } from "../table/index.ts";
+import { chatStart } from "../table/index.ts";
+import { chatEnvironment } from "./environment.ts";
 import { failureOf } from "./failure.ts";
-import { defined } from "./helper-chat.ts";
 import { tableHelpers } from "./helpers.ts";
 import { keepChat, keptChat } from "./kept.ts";
 import { moveEndsTurn } from "./move-ends-turn.ts";
+import { oneByOne } from "./starts.ts";
 
 /** What the chats the table drives run with besides the table's context; the tests inject them. */
 export interface DrivenOptions
@@ -64,6 +65,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
     const driver = options.driver ?? claudeDriver;
     const environment = options.environment ?? process.env;
     const placesOpen = (): Promise<TablePlaces> => (places ??= Promise.resolve(options.places()));
+    const starts = oneByOne();
 
     const helpers = tableHelpers(context, {
         places: placesOpen,
@@ -72,8 +74,9 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         environment,
         log: options.log ?? ((line) => noteBell(table, line)),
         switchedOn: () => switchedOn(context),
-        opponent: () => (driven?.attached === true ? { model: driven.model, effort: driven.effort } : undefined),
-        tableFree: () => seat?.free() === true,
+        starts,
+        // The helpers open with what the opponent was opened with, not the name its host gives the model.
+        opponent: () => (driven !== undefined && !driven.closing ? { model: driven.choice.model ?? "", effort: driven.choice.effort } : undefined),
         changed: () => seat?.changed(),
         tell: (line) => news(line),
     });
@@ -94,6 +97,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
     // it started, only where it is still there after the driver's grace.
     const close = (state: Driven): void => {
         state.closing = true;
+        state.started?.();
         state.gone?.();
         state.chat?.close(true);
         helpers.opponentLeft();
@@ -131,6 +135,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
     // A turn begins: the pages see the chat at work, and what it writes outside its tools is gathered from here.
     const begin = (state: Driven): void => {
         state.inTurn = true;
+        state.held = false;
         state.moved = false;
         state.tools.clear();
         state.prose = [];
@@ -173,6 +178,10 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             return;
         }
 
+        if (event.type !== "text" && event.type !== "tool") {
+            state.started?.();
+        }
+
         if (event.type === "session") {
             state.session = event.session;
             state.model = event.model;
@@ -199,7 +208,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         }
     };
 
-    // What the analyst found reaches the opponent's chat at the table: at once at rest, else once its turn ends.
+    // What the analyst found reaches the opponent's chat at the table: at once at rest, else once its turn ends; after the player's Stop, with the turn
+    // the player's next act gives it.
     const news = (line: string): void => {
         if (driven?.attached !== true) {
             return;
@@ -207,7 +217,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
 
         driven.news = line;
 
-        if (!driven.inTurn) {
+        if (!driven.inTurn && !driven.held) {
             seat?.ring();
         }
     };
@@ -216,6 +226,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         helpers.check();
         const stopped = state.stopping;
         state.inTurn = false;
+        state.held = stopped;
         state.stopping = false;
         state.moved = false;
         state.tools.clear();
@@ -246,7 +257,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         // After the player's Stop a ring missed in the turn wakes nobody: the player's next act does.
         state.gone = seat?.wait(listener(state), stopped);
 
-        if (state.news !== undefined && !state.inTurn) {
+        if (state.news !== undefined && !state.inTurn && !stopped) {
             seat?.ring();
         }
 
@@ -285,6 +296,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             resumed: session !== undefined,
             attached: false,
             inTurn: false,
+            held: false,
             closing: false,
             startAgain: false,
             stopping: false,
@@ -296,6 +308,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         };
         driven = state;
         failure = undefined;
+        helpers.opponentOpened();
 
         try {
             const claude = await driver();
@@ -329,6 +342,15 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 return false;
             }
 
+            // One program starts at a time: the helpers' wait for this one to open, and it for theirs.
+            const turn = await starts.next();
+            state.started = () => turn.opened();
+
+            if (state.closing) {
+                state.started();
+                return false;
+            }
+
             const [command, ...args] = options.chesspal;
             state.chat = claude.open({
                 folder,
@@ -337,7 +359,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 ...(state.effort === undefined ? {} : { effort: state.effort }),
                 ...(session === undefined ? {} : { session }),
                 allowed: ["chesspal"],
-                environment: defined({ ...claude.environment(environment), ...hostEnvironment(host, start.choice) }),
+                environment: chatEnvironment(claude, environment, start.choice),
                 server: { name: "chesspal", command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...state.place.environment } },
                 instructions: drivenStartInstructions(),
             });
@@ -435,7 +457,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         atWork: () => driven?.attached === true && driven.inTurn,
         turnSince: () => (driven?.attached === true && driven.inTurn ? driven.from?.at : undefined),
         failure: () => failure,
-        analyse: (game) => helpers.field.analyse(game),
+        analyse: (game, redo) => helpers.analyse(game, redo),
+        helperTurnSince: () => helpers.turnSince(),
         stopAnalysis: () => helpers.stopAnalysis(),
         helpers: () => {
             const analysing = helpers.field.analysing();
@@ -458,6 +481,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
 interface Driven
 {
     readonly seat: number;
+    /** Lets the next program start, once this one has opened or failed. */
+    started?: () => void;
     /** The model and effort chosen on the page, which the page shows the chat started with; and those the host says it runs. */
     readonly choice: { readonly model?: string | undefined; readonly effort?: string | undefined; };
     model: string;
@@ -472,6 +497,8 @@ interface Driven
     chat?: HostChat;
     attached: boolean;
     inTurn: boolean;
+    /** At rest after the player's Stop: only the player's next act wakes it. */
+    held: boolean;
     /** Waits at the bell no more, when it went without it. */
     gone?: () => void;
     closing: boolean;

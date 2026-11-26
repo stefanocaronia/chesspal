@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { makeFolder, writeAtomically } from "../games/index.ts";
-import { agentFiles, agentHosts, instructionsFile } from "./agents.ts";
+import { agentFiles, agentHosts, atTableInstructions, instructionsFile } from "./agents.ts";
 
 /**
  * Sets up the player's folder for Claude Code, Codex, Antigravity and OpenCode (D-31, D-115, D-117): .mcp.json with the chesspal server, AGENTS.md with
@@ -57,23 +57,12 @@ export const hookedHosts: readonly string[] = [...agentHosts, "antigravity-clien
 
 /**
  * The instructions of the AI opponent, read from the package wherever it is installed: the MCP server's `instructions` tool gives them (D-102). `atTable`,
- * for a chat at the table's place, whose helpers the table runs: its own lines in place of those that start the agents.
+ * for a chat at the table's place, whose helpers the table runs and whose player is on the board page: the table's own lines in place of the chat's.
  */
 export function opponentInstructions(atTable = false): string
 {
-    const text = instructionsFile("opponent");
-
-    if (!atTable) {
-        return text;
-    }
-
-    const [helpers = "", analysis = ""] = instructionsFile("opponent-table").split("\n");
-    return text.split("\n").map((line) => (line.startsWith(agentsBullet) ? helpers : line.replace(analystClause, analysis))).join("\n");
+    return atTable ? atTableInstructions("opponent") : instructionsFile("opponent");
 }
-
-// What the opponent's instructions say of the agents it starts, which the table's own lines replace.
-const agentsBullet = "- When `ai_move` tells you to start an agent";
-const analystClause = /it reads the PGN for you;.*?not even when the player asks for the analysis again\./;
 
 /** The lines that start a chat, in the MCP server's instructions and in AGENTS.md: call `instructions`, then `status` (D-102). */
 export function startInstructions(): string

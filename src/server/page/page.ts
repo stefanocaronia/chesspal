@@ -149,7 +149,7 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
                 chatCalls: () => chatCalls(served),
                 toolEnded: () => undefined,
                 open: () => watchers.size > 0,
-                // A chat the table drives in its own process keeps it in use only while a turn of its is at work, for `longestTurn` at most: else the table
+                // A chat the table drives in its own process keeps it in use only while a turn of its, or of a helper of the table's, is at work, for `longestTurn` at most: else the table
                 // closes, and keeps the chat for its next start.
                 inUse: () => watchers.size > 0 || (served.attached !== undefined && served.attached.local === undefined) || drivenAtWork(served),
                 askNewGame: () => askNewGame(watchers),
@@ -317,11 +317,15 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
 /** The longest turn of the chat the table drives that keeps the table in use with no browser: longer than the longest review of a game (D-109). */
 const longestTurn = 30 * 60_000;
 
-/** Whether a turn of the chat the table drives is at work, and began less than `longestTurn` ago: one that never ends keeps the table open no longer. */
+/**
+ * Whether a turn of the chat the table drives, or of a helper the table runs beside it, is at work, and began less than `longestTurn` ago: one that never
+ * ends keeps the table open no longer.
+ */
 function drivenAtWork(served: Served): boolean
 {
-    const since = served.attached?.local === undefined ? undefined : served.table?.chats?.turnSince?.();
-    return since !== undefined && served.context.now().getTime() - since.getTime() < longestTurn;
+    const chats = served.table?.chats;
+    const turns = [served.attached?.local === undefined ? undefined : chats?.turnSince?.(), chats?.helperTurnSince?.()];
+    return turns.some((since) => since !== undefined && served.context.now().getTime() - since.getTime() < longestTurn);
 }
 
 /**
@@ -334,9 +338,11 @@ function gameAtBell(served: Served): string | undefined
 
     try {
         // The chat's own folder, where its agents are: the table's has those init wrote, which a chat the table drives has not.
-        const sees = { ...asTheChatSees(context, chat), folder: served.attached?.chat.folder ?? context.folder, given: new Set(chat.given) };
-        const { text, position, stamp, given } = gameAtRing(sees);
         const local = served.attached?.local;
+        // The table's own chat is told what its status tells it: the helpers the table runs, and that the table drives it.
+        const atPlace = local === undefined ? {} : { ...(local.helpers === undefined ? {} : { helpers: local.helpers }), ...(local.drivenByTable === true ? { drivenByTable: true as const } : {}) };
+        const sees = { ...asTheChatSees(context, chat), ...atPlace, folder: served.attached?.chat.folder ?? context.folder, given: new Set(chat.given) };
+        const { text, position, stamp, given } = gameAtRing(sees);
 
         // The table's own chat is shown the game in its context, as its server would take the note before its next tool: no note on disk.
         if (local !== undefined) {

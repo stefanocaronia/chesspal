@@ -58,8 +58,9 @@ export function analystStartIn(said: { codex?: true; table?: true; }): AnalystSt
 export function analystLine(game?: string, start?: AnalystStart): string
 {
     if (start === "table") {
-        return `call analyse_game ${game === undefined ? "{}" : `{"game": "${game}"}`}: the table's analyst then writes its review on the board page, which shows it at `
-            + "work, while you talk the game over with the player whenever they ask; when it ends, the table tells you, and you go over it with them.";
+        return `call analyse_game ${game === undefined ? '{"review": true}' : `{"game": "${game}", "review": true}`}: the table's analyst then writes its review `
+            + "on the board page, which shows it at work, while you talk the game over with the player whenever they ask; when it ends, the table tells "
+            + "you, and you go over it with them. Without review, analyse_game only gives you the game.";
     }
 
     const prompt = `Analyse${game === undefined ? "" : ` ${game}`}. The player speaks <their language>.`;
@@ -221,16 +222,27 @@ export function analystQuietAt(context: Context): Date | undefined
 /** How long an analyst may write nothing before it counts as gone. */
 const analystQuiet = 30 * 60 * 1000;
 
-/** What stops an analyst agent on a game another analyst has taken: the chat hears of the review from that one (Priya). */
-export const anotherAnalyst = "Stop now: another analyst is reviewing this game. End with one line for the AI that started you: its review is on its way to the "
-    + "board page, and its end comes to you by itself; meanwhile talk the game over with the player whenever they ask. Should it never come, the player has "
-    + "the game analysed again from the board page's list of analyses.";
+/**
+ * What stops an analyst agent on a game another analyst has taken: the chat hears of the review from that one (Priya). At the table, whose analyst no AI
+ * started, the table tells the opponent.
+ */
+export function anotherAnalyst(context: Context): string
+{
+    if (context.helpers !== undefined) {
+        return "Stop now: another analyst is reviewing this game, and the table tells the opponent when its review is on the board page. End with one word.";
+    }
+
+    return "Stop now: another analyst is reviewing this game. End with one line for the AI that started you: its review is on its way to the board page, and "
+        + "its end comes to you by itself; meanwhile talk the game over with the player whenever they ask. Should it never come, the player has the game "
+        + "analysed again from the board page's list of analyses.";
+}
 
 /** What refuses a review's writes once the player has stopped its analysis on the board page: the analyst that held it ends, the chat waits for the player. */
-export function analysisStopped(game: string): string
+export function analysisStopped(game: string, context: Context): string
 {
-    return `Stop now: the player stopped the analysis of ${game} on the board page; what was written of its review stays. Nothing changed. An analyst agent ends `
-        + "with one line for the AI that started it: the player stopped the analysis. Go over the game again only when the player asks, with analyse_game first.";
+    const analyst = context.helpers !== undefined ? "The table's analyst ends with one word." : "An analyst agent ends with one line for the AI that started it: the player stopped the analysis.";
+    return `Stop now: the player stopped the analysis of ${game} on the board page; what was written of its review stays. Nothing changed. ${analyst} Go over the `
+        + "game again only when the player asks, with analyse_game first.";
 }
 
 /** The helper of one of Chesspal's agents, by its name. */

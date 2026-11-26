@@ -88,15 +88,32 @@ export function instructionsFile(name: string): string
 const instructionTexts = new Map<string, string>();
 
 /**
- * A helper's instructions for the chat the table opens for it: its agent's, with the table's own lines (`<role>-table.md`) in place of those that speak of
- * the AI that started it: the last line, and the first too when the table's has two.
+ * Instructions as the chats the table opens read them: the file's, with the lines its `<name>-table.md` replaces. That file holds pairs of lines: `~ ` and
+ * the opening of the line to replace, then the line that takes its place.
  */
+export function atTableInstructions(name: string): string
+{
+    const lines = instructionsFile(name).split("\n");
+    const changes = instructionsFile(`${name}-table`).split("\n");
+
+    for (let index = 0; index < changes.length; index += 2) {
+        const opening = changes[index]!.replace(/^~ /, "");
+        const found = lines.flatMap((line, at) => (line.startsWith(opening) ? [at] : []));
+
+        if (!changes[index]!.startsWith("~ ") || changes[index + 1] === undefined || found.length !== 1) {
+            throw new Error(`${name}-table.md: "${opening}" must open exactly one line of ${name}.md, and be followed by the line that replaces it.`);
+        }
+
+        lines[found[0]!] = changes[index + 1]!;
+    }
+
+    return lines.join("\n");
+}
+
+/** A helper's instructions for the chat the table opens for it: its agent's, as the table has them. */
 export function tableHelperInstructions(role: "ponder" | "coach" | "analyst"): string
 {
-    const agent = instructionsFile(role === "analyst" ? "analyst-agent" : role).split("\n");
-    const own = instructionsFile(`${role}-table`).split("\n");
-    const text = [own.length > 1 ? own[0]! : agent[0]!, ...agent.slice(1, -1), own.at(-1)!].join("\n");
-    return role === "analyst" ? `${text}\n${instructionsFile("analysis")}` : text;
+    return role === "analyst" ? `${atTableInstructions("analyst-agent")}\n${instructionsFile("analysis")}` : atTableInstructions(role);
 }
 
 /** An agent as init writes it, with its model in each host: the AI's own unless one is given. */

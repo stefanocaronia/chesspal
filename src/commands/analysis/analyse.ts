@@ -29,7 +29,7 @@ import {
     withLead,
 } from "../../core/index.ts";
 import { gameInAnalysis, isGameName, keepToStudy, lastChatStart, planOf, rewriteGame, startAnalysis, stoppedAnalysis } from "../../games/index.ts";
-import { analystAgent, instructionsFile } from "../../host-files/index.ts";
+import { analystAgent, atTableInstructions, instructionsFile } from "../../host-files/index.ts";
 import { activeProfile, gameFolder, type PlayerProfile } from "../../profiles/index.ts";
 import { pointsAtSite, siteGameName, siteOfGameName } from "../../sites/index.ts";
 import {
@@ -134,6 +134,11 @@ interface Replay
     outcome: Outcome;
 }
 
+const analyseInput = z.object({
+    game: z.string().optional().describe("a game's name, as past_games, study_games, site_games or analyse_game writes it"),
+    pgn: z.string().optional().describe("a game played elsewhere, in PGN: its tags and its moves, with their [%clk] and a review exported from the board page if it has them; other comments and evals can go"),
+});
+
 /**
  * A game over move by move, for the analyst (D-68): the current one, one of the archive or kept to study, one the player brings as a PGN, or one of their latest
  * on the sites (D-110), kept to study.
@@ -146,67 +151,81 @@ export const analyseGame = defineCommand({
         + "only: the judgment is yours. Without game or pgn, the game just over, or else the last one played; game: a name as past_games, study_games or "
         + "site_games writes it; pgn: a game the player brings from elsewhere, kept to study in the profile. Never while a game goes on. The first time in a chat "
         + "it also says how to analyse. annotate_game then keeps your badges and notes for the board page. Example: analyse_game {}.",
-    input: z.object({
-        game: z.string().optional().describe("a game's name, as past_games, study_games, site_games or analyse_game writes it"),
-        pgn: z.string().optional().describe("a game played elsewhere, in PGN: its tags and its moves, with their [%clk] and a review exported from the board page if it has them; other comments and evals can go"),
-    }),
+    input: analyseInput,
     sharedWith: [analystAgent],
     openWorld: true,
-    run: async ({ game, pgn }, context): Promise<Analysis> => {
-        if (game !== undefined && pgn !== undefined) {
-            throw new Error("Give game or pgn, not both: game names a game of the archive, pgn brings one played elsewhere.");
-        }
-
-        const given = game?.trim();
-
-        // A link, or a name of a site's game that site_games does not write, is no game Chesspal can find (D-110).
-        if ([given, pgn].some((text) => text !== undefined && pointsAtSite(text))) {
-            throw new Error("Chesspal takes no link: site_games lists the player's latest games on Lichess and Chess.com; give the name it writes, as game.");
-        }
-
-        // A game's name given as pgn, as an AI often gives it, is that game (Priya).
-        const fromSite = siteGameName(given ?? pgn ?? "");
-        const named = pgn !== undefined && isGameName(pgn) ? pgn.trim() : given;
-        const studied = fromSite !== undefined
-            ? importedGame(context, await siteGamePgn(context, fromSite))
-            : pgn === undefined || named !== given
-            ? gameToStudy(context, named)
-            : importedGame(context, pgn);
-
-        if (context.agent === analystAgent) {
-            oneAnalyst(context, studied);
-        }
-
-        const analysis = analysisOf(studied, activeProfile(context.home()));
-
-        if (studied.name !== undefined) {
-            markBook(context, { record: studied.record, name: studied.name });
-            startAnalysis(gameFolder(context.home()), studied.name, context.now());
-        }
-
-        const byTable = tableAnalyst(context, studied);
-
-        // The analyst's agent has its instructions in its own file, and the player's language in its prompt or, when Chesspal knows it, here (D-89);
-        // who the player is, which the chat reads in status, here too, so that it writes for their level.
-        if (context.agent === analystAgent) {
-            const speech = speechOf(gameFolder(context.home()), context.language);
-            const profile = playerLine(context);
-            return { ...analysis, ...(speech === undefined ? {} : { speech: speechLine(speech) }), ...(profile === undefined ? {} : { profile }) };
-        }
-
-        const told = analystInstructions(context);
-        return { ...(told === undefined ? {} : { instructions: told }), ...(byTable ? { byTable: byTableLine } : {}), ...analysis };
-    },
-    format: (analysis) =>
-        [
-            ...(analysis.instructions === undefined ? [] : [analysis.instructions, ""]),
-            ...(analysis.byTable === undefined ? [] : [analysis.byTable]),
-            ...(analysis.speech === undefined ? [] : [analysis.speech]),
-            ...(analysis.profile === undefined ? [] : [analysis.profile]),
-            ...analysisHead(analysis),
-            ...analysis.moves.map(moveLine),
-        ].join("\n"),
+    run: (input, context) => analysed(input, context, false),
+    format: analysisText,
 });
+
+/** analyse_game as the opponent at the table's place has it, with `review`: the table's analyst writes the review on the player's yes alone. */
+export const tableAnalyseGame = defineCommand({
+    ...analyseGame,
+    description: `${analyseGame.description} review: true only when the player said yes to a review: the table's analyst then writes it on the board page.`,
+    input: analyseInput.extend({ review: z.boolean().optional().describe("true only on the player's yes to a review, which the table's analyst then writes") }),
+    run: ({ review, ...input }, context) => analysed(input, context, review === true),
+});
+
+/** The analysis of the game asked for; with `review`, the table's analyst takes it, where the table runs one. */
+async function analysed({ game, pgn }: z.infer<typeof analyseInput>, context: Context, review: boolean): Promise<Analysis>
+{
+    if (game !== undefined && pgn !== undefined) {
+        throw new Error("Give game or pgn, not both: game names a game of the archive, pgn brings one played elsewhere.");
+    }
+
+    const given = game?.trim();
+
+    // A link, or a name of a site's game that site_games does not write, is no game Chesspal can find (D-110).
+    if ([given, pgn].some((text) => text !== undefined && pointsAtSite(text))) {
+        throw new Error("Chesspal takes no link: site_games lists the player's latest games on Lichess and Chess.com; give the name it writes, as game.");
+    }
+
+    // A game's name given as pgn, as an AI often gives it, is that game (Priya).
+    const fromSite = siteGameName(given ?? pgn ?? "");
+    const named = pgn !== undefined && isGameName(pgn) ? pgn.trim() : given;
+    const studied = fromSite !== undefined
+        ? importedGame(context, await siteGamePgn(context, fromSite))
+        : pgn === undefined || named !== given
+        ? gameToStudy(context, named)
+        : importedGame(context, pgn);
+
+    if (context.agent === analystAgent) {
+        oneAnalyst(context, studied);
+    }
+
+    const analysis = analysisOf(studied, activeProfile(context.home()));
+
+    if (studied.name !== undefined) {
+        markBook(context, { record: studied.record, name: studied.name });
+        startAnalysis(gameFolder(context.home()), studied.name, context.now());
+    }
+
+    const byTable = review && tableAnalyst(context, studied);
+
+    // The analyst's agent has its instructions in its own file, and the player's language in its prompt or, when Chesspal knows it, here (D-89);
+    // who the player is, which the chat reads in status, here too, so that it writes for their level.
+    if (context.agent === analystAgent) {
+        const speech = speechOf(gameFolder(context.home()), context.language);
+        const profile = playerLine(context);
+        return { ...analysis, ...(speech === undefined ? {} : { speech: speechLine(speech) }), ...(profile === undefined ? {} : { profile }) };
+    }
+
+    const told = analystInstructions(context);
+    return { ...(told === undefined ? {} : { instructions: told }), ...(byTable ? { byTable: byTableLine } : {}), ...analysis };
+}
+
+/** The analysis as the tool writes it. */
+function analysisText(analysis: Analysis): string
+{
+    return [
+        ...(analysis.instructions === undefined ? [] : [analysis.instructions, ""]),
+        ...(analysis.byTable === undefined ? [] : [analysis.byTable]),
+        ...(analysis.speech === undefined ? [] : [analysis.speech]),
+        ...(analysis.profile === undefined ? [] : [analysis.profile]),
+        ...analysisHead(analysis),
+        ...analysis.moves.map(moveLine),
+    ].join("\n");
+}
 
 /**
  * One analyst a game: one started on a game reviewed already, or that another analyst has taken, stops, and the chat goes over that review (Stefano); the
@@ -221,7 +240,7 @@ function oneAnalyst(context: Context, studied: Studied): void
     const heldWhenStopped = name === undefined ? undefined : stoppedAnalysis(gameFolder(context.home()))?.analyst;
 
     if (name !== undefined && heldWhenStopped?.game === name && heldWhenStopped.run === context.agentRun) {
-        throw new Error(analysisStopped(name));
+        throw new Error(analysisStopped(name, context));
     }
 
     if (holder !== undefined && holder === context.agentRun) {
@@ -229,11 +248,12 @@ function oneAnalyst(context: Context, studied: Studied): void
     }
 
     if (isReviewed(studied.record)) {
-        throw new Error("Stop now: this game has its review already. End with one line for the AI that started you: go over that review with the player.");
+        const end = context.helpers !== undefined ? "End with one word: the table tells the opponent, which goes over it with the player." : "End with one line for the AI that started you: go over that review with the player.";
+        throw new Error(`Stop now: this game has its review already. ${end}`);
     }
 
     if (holder !== undefined) {
-        throw new Error(anotherAnalyst);
+        throw new Error(anotherAnalyst(context));
     }
 
     if (name !== undefined && context.agentRun !== undefined) {
@@ -241,7 +261,7 @@ function oneAnalyst(context: Context, studied: Studied): void
         startAnalysis(folder, name, context.now(), { analyst: { game: name, run: context.agentRun, since: context.now().toISOString() } });
 
         if (gameInAnalysis(folder)?.analyst?.run !== context.agentRun) {
-            throw new Error(anotherAnalyst);
+            throw new Error(anotherAnalyst(context));
         }
     }
 }
@@ -504,7 +524,9 @@ function analystInstructions(context: Context): string | undefined
     }
 
     context.told.add(key);
-    return `${instructionsFile("analyst")}\n${instructionsFile("analysis")}`;
+    // Where the table runs the analyst, the opponent only talks the game over: the review is the analyst's.
+    const own = context.helpers?.runs("analyst") === true ? atTableInstructions("analyst") : instructionsFile("analyst");
+    return `${own}\n${instructionsFile("analysis")}`;
 }
 
 /** Who is ahead after a move, as the AI estimated it with annotate_game or the coach during the game (D-90). */

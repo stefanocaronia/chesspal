@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { randomBytes } from "node:crypto";
 import type { Socket } from "node:net";
 import { PassThrough } from "node:stream";
-import { type AnyCommand, commands, type Context } from "../../commands/index.ts";
+import { type AnyCommand, commands, type Context, tableAnalyseGame } from "../../commands/index.ts";
 import { agentTools, analystAgent, coachAgent, ownModelPonderAgent } from "../../host-files/index.ts";
 import { version } from "../../version.ts";
 import { type Door, openDoor } from "../door/index.ts";
@@ -181,8 +181,9 @@ function openPlace(role: ChatRole, context: Context, chat: Partial<Context>, run
  */
 function toolsOf(role: ChatRole): AnyCommand[]
 {
+    // The opponent's analyse_game takes `review`, which has the table's analyst write the review.
     if (role === "opponent") {
-        return commands.filter((command) => command.byAgents === undefined);
+        return commands.filter((command) => command.byAgents === undefined).map((command) => (command.name === tableAnalyseGame.name ? tableAnalyseGame : command));
     }
 
     const own = agentTools(agentOfRole[role]) ?? [];

@@ -942,7 +942,7 @@ describe("the opening of a chat the table drives", () => {
 
         const reviewing = gate();
         ai.helpers.analyst = async () => await reviewing.passed;
-        chat.turns.push(async (client) => void chat.answers.push(await call(client, "analyse_game", { game: kept })));
+        chat.turns.push(async (client) => void chat.answers.push(await call(client, "analyse_game", { game: kept, review: true })));
         await posted(table.url, "/api/message", { text: "Go over it, please.", game: kept, at: 3 });
         await until(() => chat.answers.length === 1 && chat.idle());
         expect(chat.answers[0]!.text).toContain("The table's analyst is writing its review of this game on the board page");

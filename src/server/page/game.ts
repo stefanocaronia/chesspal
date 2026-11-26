@@ -544,7 +544,7 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
     }
 
     // The table's analyst goes over it where the table runs one; else the chat is rung for it.
-    if (brought && !hold && served.table?.chats?.analyse?.(name) !== true) {
+    if (brought && !hold && served.table?.chats?.analyse?.(name, redo) !== true) {
         served.bell.ring();
     }
 
