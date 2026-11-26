@@ -99,6 +99,8 @@ The board page opens in your browser, and you can close this terminal. The first
 
 Now press **New game**: choose your colour, the clock and the AI's level, and play on the board. Talk with the AI on the board page or in its terminal.
 
+Experimental: in the board page's settings, **The chat with the AI in the page, without a terminal** has the AI play and talk right in the page, with no window of its own, and a Stop button in its card while it works. It is off by default; it works with all four agents, and is still being tried.
+
 **If a command fails:**
 
 - "npm is not recognized" or "command not found": close the terminal and open a new one; if it still fails, install Node.js again.
