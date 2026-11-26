@@ -73,7 +73,10 @@ export interface Context
     drivenByTable?: true;
     /** The player's lines given to a chat the table drives in a tool's answer since its last words: still to answer, though written before them. */
     readonly givenSinceWords?: Set<string>;
-    /** Told with a tool's result, before its answer goes to the chat: a table that drives the chat ends its turn when the result asks nothing more. */
+    /**
+     * Told with a tool's result, before its answer goes to the chat, the chat's own and at a place of the table's every one: a table that drives the chat ends
+     * its turn when the result asks nothing more, and counts its helpers' turns that came too late.
+     */
     answered?: (tool: string, result: unknown) => void;
     /** The helpers the table runs itself beside a chat at its place, and its helpers' own chats, in place of a host's agents: none for every other chat. */
     helpers?: TableHelpers;

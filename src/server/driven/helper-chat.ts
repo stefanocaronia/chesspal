@@ -1,5 +1,5 @@
-// A helper's chat the table opens beside the opponent's: Claude Code in a folder of its role's, at a place of that role, given one turn at a time; a prompt
-// asked while a turn runs waits, and only the latest asked is sent.
+// A helper's chat the table opens beside the opponent's: Claude Code in a folder of its role's, at a place of that role. It may be opened ahead, its program
+// started and waiting with no word sent, so no request made; a prompt asked before its program has started is sent once it has.
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Caller, Context, HelperRole, TableHelpers } from "../../commands/index.ts";
@@ -7,7 +7,7 @@ import { makeFolder } from "../../games/index.ts";
 import { tableHelperInstructions } from "../../host-files/index.ts";
 import type { HostChat, HostDriver, HostEvent } from "../../hosts/index.ts";
 import type { Place, TablePlaces } from "../places/index.ts";
-import { chatEnvironment } from "./environment.ts";
+import { chatEnvironment, chatTrace } from "./environment.ts";
 import { failureCode } from "./failure.ts";
 import type { Starts } from "./starts.ts";
 
@@ -28,7 +28,7 @@ export interface HelperChatOptions
     readonly chesspal: readonly string[];
     readonly environment: NodeJS.ProcessEnv;
     readonly log: (line: string) => void;
-    /** The starts of the table's programs, one at a time. */
+    /** The starts of the table's programs, one at a time, each after the program before of its role exited. */
     readonly starts: Starts;
 }
 
@@ -41,11 +41,18 @@ export type HelperEnd =
     | { readonly reason: "interrupted"; }
     | { readonly reason: "failed"; readonly why: string; readonly signin: boolean; };
 
+/** What the table hears of a helper's chat: each turn that ends and the failure that closes it, and each tool's result at its place. */
+export interface HelperHeard
+{
+    ended(end: HelperEnd): void;
+    answered?(tool: string, result: unknown): void;
+}
+
 /** A helper's chat, as the table drives it. */
 export interface HelperChat
 {
-    /** Gives the chat a turn: at once when it is at rest, else once its turn ends, in place of any other prompt waiting; `sent` hears when it goes. */
-    ask(prompt: string, sent?: () => void): void;
+    /** Gives the chat a turn: at once when its program has started, else once it has; one asked before and not sent yet is replaced. */
+    ask(prompt: string): void;
     /** Stops the turn running, and lets the prompt waiting go. */
     interrupt(): void;
     /** Ends the chat gently, its turn stopped first: nothing is told after. */
@@ -56,14 +63,14 @@ export interface HelperChat
     turnSince(): Date | undefined;
 }
 
-/** Opens the chat of `role` in `<home>/chats/<role>`; `ended` hears each turn that ends and the failure that closes it. */
-export function openHelperChat(role: HelperRole, model: HelperModel, options: HelperChatOptions, ended: (end: HelperEnd) => void): HelperChat
+/** Opens the chat of `role` in `<home>/chats/<role>`. */
+export function openHelperChat(role: HelperRole, model: HelperModel, options: HelperChatOptions, heard: HelperHeard): HelperChat
 {
     const { context } = options;
     const folder = join(context.home(), "chats", role);
     let chat: HostChat | undefined;
     let place: Place | undefined;
-    let pending: { prompt: string; sent?: (() => void) | undefined; } | undefined;
+    let pending: string | undefined;
     let since: Date | undefined;
     let closed = false;
     let prose: string[] = [];
@@ -75,13 +82,12 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
             return;
         }
 
-        const { prompt, sent } = pending;
+        const prompt = pending;
         pending = undefined;
         prose = [];
 
         if (chat.send(prompt)) {
             since = context.now();
-            sent?.();
         }
     };
 
@@ -110,10 +116,10 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
 
         close();
         options.log(`helper ${role} failed: ${why}`);
-        ended({ reason: "failed", why, signin: signin || failureCode(why) === "not-signed-in" });
+        heard.ended({ reason: "failed", why, signin: signin || failureCode(why) === "not-signed-in" });
     };
 
-    const heard = (event: HostEvent): void => {
+    const told = (event: HostEvent): void => {
         if (closed) {
             return;
         }
@@ -132,7 +138,7 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
                 return;
             }
 
-            ended(event.reason === "done" ? { reason: "done", text: lastBlock(prose) } : { reason: "interrupted" });
+            heard.ended(event.reason === "done" ? { reason: "done", text: lastBlock(prose) } : { reason: "interrupted" });
             send();
         } else if (event.type === "ended") {
             fail(event.why, event.code === "signin");
@@ -149,8 +155,15 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
 
         makeFolder(folder);
         const caller = (): Promise<Caller | undefined> => Promise.resolve({ annotator: runs.model, ...(runs.effort === undefined ? {} : { effort: runs.effort }) });
-        place = await (await options.places()).offer(role, folder, { caller, helpers: options.helpers });
-        const turn = await options.starts.next();
+
+        const answered = (tool: string, result: unknown): void => {
+            if (!closed) {
+                heard.answered?.(tool, result);
+            }
+        };
+
+        place = await (await options.places()).offer(role, folder, { caller, helpers: options.helpers, answered });
+        const turn = await options.starts.next(role);
         started = () => turn.opened();
 
         if (closed) {
@@ -159,8 +172,11 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
             return;
         }
 
+        // A chat opened ahead says which chat it is only at its first words: its server sat at its place says its program is up.
+        void place.seated.then(started);
         const [command, ...args] = options.chesspal;
         const choice = { ...(model.model === "" ? {} : { model: model.model }), ...(model.effort === undefined ? {} : { effort: model.effort }) };
+        const trace = chatTrace(options.environment, role, context.now());
         runs = { model: model.model === "" ? driver.model : model.model, effort: model.effort };
         chat = driver.open({
             folder,
@@ -172,17 +188,19 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
             server: { name: "chesspal", command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...place.environment } },
             instructions: tableHelperInstructions(role),
             log: options.log,
+            start: options.starts.starter(role),
+            ...(trace === undefined ? {} : { trace }),
         });
-        chat.onEvent(heard);
+        chat.onEvent(told);
         send();
     };
 
     void open().catch((error: unknown) => fail((error as Error).message, false));
 
     return {
-        ask: (prompt, sent) => {
+        ask: (prompt) => {
             if (!closed) {
-                pending = { prompt, sent };
+                pending = prompt;
                 send();
             }
         },

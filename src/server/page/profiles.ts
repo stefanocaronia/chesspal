@@ -213,7 +213,10 @@ function sendImage(request: IncomingMessage, response: ServerResponse, served: S
     send(response, 200, imageTypes[image.type], image.bytes, { "Cache-Control": "max-age=31536000, immutable" });
 }
 
-/** The page's settings, kept in the profile the page shows so that they follow the player (D-56). */
+/**
+ * The page's settings, kept in the profile the page shows so that they follow the player (D-56): those the body names over those kept, so that a body of a
+ * few settings, as a page of an older version sends, never wipes the others, as the switch of the chat the table drives.
+ */
 async function settingsFromPage(request: IncomingMessage, response: ServerResponse, served: Served, url: URL): Promise<void>
 {
     const settings = settingsOf(isJson(request) ? jsonOf(await bodyOf(request)) : undefined);
@@ -228,7 +231,9 @@ async function settingsFromPage(request: IncomingMessage, response: ServerRespon
         return;
     }
 
-    saveProfileSettings(served.context.home(), profile.id, settings);
+    const home = served.context.home();
+    const merged = { ...profileSettings(home, profile.id), ...settings };
+    saveProfileSettings(home, profile.id, settingsOf(merged) ?? settings);
     sendJson(response, 200, { saved: true });
 }
 

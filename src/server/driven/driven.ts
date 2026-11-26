@@ -6,19 +6,19 @@ import { aiActedSince, type Caller, type Context, positionIn, sayProse, type See
 import { endOf, loadGame, makeFolder, saveChatStart } from "../../games/index.ts";
 import { samePath, tableFolder } from "../../home/index.ts";
 import { drivenStartInstructions } from "../../host-files/index.ts";
-import type { HostChat, HostDriver, HostEvent } from "../../hosts/index.ts";
+import { type HostChat, type HostDriver, type HostEvent, startLineProcess } from "../../hosts/index.ts";
 import { activeProfile, gameFolder, profileSettings } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
 import { bellLineIn, type BellListener, gameBellLine, noteBell } from "../bell/index.ts";
 import type { ChatFailure, ChatSeat, HeldChat, TableChats } from "../page/index.ts";
 import type { Place, TablePlaces } from "../places/index.ts";
 import { chatStart } from "../table/index.ts";
-import { chatEnvironment } from "./environment.ts";
+import { chatEnvironment, chatTrace } from "./environment.ts";
 import { failureOf } from "./failure.ts";
 import { tableHelpers } from "./helpers.ts";
 import { keepChat, keptChat } from "./kept.ts";
 import { moveEndsTurn } from "./move-ends-turn.ts";
-import { oneByOne } from "./starts.ts";
+import { oneByOne, type ProgramStart } from "./starts.ts";
 
 /** What the chats the table drives run with besides the table's context; the tests inject them. */
 export interface DrivenOptions
@@ -35,6 +35,8 @@ export interface DrivenOptions
     readonly environment?: NodeJS.ProcessEnv;
     /** Where the helpers' failures are told: the table's bell log unless given. */
     readonly log?: (line: string) => void;
+    /** How the programs of its chats start: as a line process unless given. */
+    readonly start?: ProgramStart;
 }
 
 /** The setting of the profile that has the table drive Claude Code's chat itself, without a terminal; off unless the player turns it on. */
@@ -65,7 +67,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
     const driver = options.driver ?? claudeDriver;
     const environment = options.environment ?? process.env;
     const placesOpen = (): Promise<TablePlaces> => (places ??= Promise.resolve(options.places()));
-    const starts = oneByOne();
+    const starts = oneByOne({ start: options.start ?? startLineProcess });
 
     const helpers = tableHelpers(context, {
         places: placesOpen,
@@ -93,12 +95,13 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         keepChat(chats, { host, session: state?.session, game: state?.game, closed });
     };
 
-    // The chat leaves the table and its place. Its program ends by itself, its input closed, as one renewing the player's sign-in must: stopped, with all
-    // it started, only where it is still there after the driver's grace.
+    // The chat leaves the table and its place. Its turn at work is stopped first, so that it asks the host nothing more; then its program ends by itself,
+    // its input closed, as one renewing the player's sign-in must: stopped, with all it started, only where it is still there after the driver's grace.
     const close = (state: Driven): void => {
         state.closing = true;
         state.started?.();
         state.gone?.();
+        state.chat?.interrupt();
         state.chat?.close(true);
         helpers.opponentLeft();
 
@@ -113,6 +116,14 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         if (driven === state) {
             driven = undefined;
         }
+    };
+
+    // A chat in a terminal, of another host or with the switch off, opens once the program of the chat the table drove has exited.
+    const terminalOpen = (name: string): void => {
+        void starts.next("opponent").then((turn) => {
+            turn.opened();
+            return terminal.open(name);
+        });
     };
 
     const attach = (state: Driven): void => {
@@ -342,8 +353,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 return false;
             }
 
-            // One program starts at a time: the helpers' wait for this one to open, and it for theirs.
-            const turn = await starts.next();
+            // One program starts at a time, once the one before at its place has exited: the helpers' wait for this one to open, and it for theirs.
+            const turn = await starts.next("opponent");
             state.started = () => turn.opened();
 
             if (state.closing) {
@@ -352,6 +363,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             }
 
             const [command, ...args] = options.chesspal;
+            const trace = chatTrace(environment, "opponent", context.now());
             state.chat = claude.open({
                 folder,
                 program,
@@ -362,6 +374,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 environment: chatEnvironment(claude, environment, start.choice),
                 server: { name: "chesspal", command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...state.place.environment } },
                 instructions: drivenStartInstructions(),
+                start: starts.starter("opponent"),
+                ...(trace === undefined ? {} : { trace }),
             });
         } catch (error) {
             failed((error as Error).message);
@@ -419,12 +433,12 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 keep({ ...state, session: undefined }, false);
             } else if (name !== undefined && name !== host) {
                 keep(state, true);
-                void terminal.open(name);
+                terminalOpen(name);
             } else if (switchedOn(context)) {
                 void open(undefined);
             } else {
                 keep(state, true);
-                void terminal.open(host);
+                terminalOpen(host);
             }
 
             return true;

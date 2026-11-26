@@ -25,6 +25,8 @@ export interface Place
      * does not mean stopped: a command still running then goes on to its end, as a move written or a ponder that waits for the player.
      */
     readonly left: Promise<void>;
+    /** Settled once its chat's server first sits at the place: its host's program is up. */
+    readonly seated: Promise<void>;
     /**
      * Withdraws the place: its server, if connected, is sent away, and its key is good no more. A command of its chat still running is not stopped: it
      * ends by itself, with no one to hear its answer.
@@ -81,6 +83,7 @@ export function tablePlaces(context: Context, options: PlacesOptions = {}): Tabl
             return;
         }
 
+        place.sat();
         void sit(place, socket, rest).catch(() => socket.destroy());
     };
 
@@ -119,6 +122,7 @@ export function tablePlaces(context: Context, options: PlacesOptions = {}): Tabl
                 ended = done;
             });
             const place = openPlace(role, { ...context, folder }, chat, `table-${bytes(8).toString("hex")}`);
+            const sitting = new Promise<void>((done) => (place.sat = done));
             places.set(key, place);
             lefts.set(key, left);
             void left.then(() => lefts.delete(key));
@@ -130,7 +134,7 @@ export function tablePlaces(context: Context, options: PlacesOptions = {}): Tabl
                 }
             };
 
-            return { role, environment, context: place.context, left, withdraw: place.withdraw };
+            return { role, environment, context: place.context, left, seated: sitting, withdraw: place.withdraw };
         },
         close: async () => {
             closing = true;
@@ -151,6 +155,8 @@ interface OpenPlace
     server?: McpServer;
     servers: McpServer[];
     withdraw: () => void;
+    /** Told when a server sits at the place. */
+    sat: () => void;
 }
 
 /** The agent of each helper's role, by the name its tools are kept under. */
@@ -160,7 +166,7 @@ function openPlace(role: ChatRole, context: Context, chat: Partial<Context>, run
 {
     const agent = role === "opponent" ? undefined : agentOfRole[role];
     const seat = agent === undefined ? { caller: chat.caller } : { agent, run, caller: chat.caller };
-    const place: OpenPlace = { role, context, seat, servers: [], withdraw: () => undefined };
+    const place: OpenPlace = { role, context, seat, servers: [], withdraw: () => undefined, sat: () => undefined };
     // The chat's own state, as a server started anew has it; its host, as its server's client names itself.
     place.context = {
         ...context,

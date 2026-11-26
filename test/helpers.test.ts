@@ -4,14 +4,13 @@ import { basename, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { analysisStopped, anotherAnalyst } from "../src/commands/answers/index.ts";
 import type { TableHelpers } from "../src/commands/index.ts";
-import { gameInAnalysis } from "../src/games/index.ts";
+import { gameInAnalysis, loadGame, notePondering, thoughtKey } from "../src/games/index.ts";
 import { agentFiles } from "../src/host-files/agents.ts";
 import { atTableInstructions, instructionsFile, opponentInstructions, tableHelperInstructions } from "../src/host-files/index.ts";
-import type { HostEvent } from "../src/hosts/index.ts";
 import { activeProfile, gameFolder, type PageSettings, saveProfileSettings } from "../src/profiles/index.ts";
 import { chatInPage } from "../src/server/driven/index.ts";
 import { testContext } from "./commands.ts";
-import { call, cleanUp, drivenTable, type FakeChat, type FakeDriver, fakeDriver, gate, movingContext, opened, pageListening, pause, posted, raw, temporary, until } from "./driven-fakes.ts";
+import { call, cleanUp, drivenTable, type FakeChat, type FakeDriver, fakeDriver, gate, movingContext, opened, pageListening, pause, posted, raw, shown, temporary, until } from "./driven-fakes.ts";
 
 afterEach(cleanUp);
 
@@ -36,8 +35,9 @@ describe("the instructions of the chats the table opens", () => {
             expect(text).not.toMatch(/started you|the AI you think for|are not for you|and again while it says/);
         }
 
-        expect(tableHelperInstructions("ponder").split("\n").at(-1)).toContain("start again from `ponder {}`");
-        expect(tableHelperInstructions("coach")).toContain("start again from `coach {}`");
+        // A chat of the table's lives one turn: nothing tells it of turns before.
+        expect(tableHelperInstructions("ponder")).not.toMatch(/start again|new position/);
+        expect(tableHelperInstructions("coach")).not.toMatch(/start again|new move to judge/);
         expect(tableHelperInstructions("analyst")).toContain("Your last message goes to the opponent");
         expect(tableHelperInstructions("analyst")).toContain(instructionsFile("analysis"));
         expect(agentFiles("folder").map((file) => file.text).join("\n")).not.toMatch(/the table hears you|nobody reads/);
@@ -86,8 +86,11 @@ describe("the opponent's helpers the table runs itself", () => {
 
         opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: "d5", plan: "Centre." })));
         await posted(table.url, "/api/move", { move: "d4" });
-        await until(() => opponent.sent.length === 4 && opponent.idle() && ponder.sent.length === 2);
+        await until(() => opponent.sent.length === 4 && opponent.idle() && turnsOf(ai, "ponder").length === 2);
         expect(opponent.sent[3]).toContain("Thought on their time by your model (legal, not checked): d5, The centre.");
+        // Each turn on a chat of its own, the one before closed.
+        expect(turnsOf(ai, "ponder").map((chat) => chat.sent)).toEqual([["Ponder."], ["Ponder."]]);
+        expect(ponder.closed).toBe(true);
         expect(settingsOf(home)).toMatchObject({ [chatInPage]: true });
     }, 30_000);
 
@@ -105,38 +108,75 @@ describe("the opponent's helpers the table runs itself", () => {
         expect(opponent.sent[3]).toContain("Thought on their time by a quicker model (legal, not checked): d5, The centre.");
     }, 30_000);
 
-    it("stops the thinking at the player's move, keeping its chat, closes it at the game's end, and opens a fresh one for a new game", async () => {
+    it("stops the thinking at the player's move, its thought kept and given, and starts the next turn from ponder {} on the chat waiting ahead", async () => {
         const { table, ai } = await playing({ level: "strong" });
-        ai.helpers.ponder = async () => await gate().passed;
+        let kept = 0;
+
+        // The first turn keeps a thought, then thinks on until the player's move stops it; the next ones think on one reply.
+        ai.helpers.ponder = async (client, _prompt, chat) => {
+            const position = Number(/^Position (\d+)/.exec((await call(client, "ponder")).text)?.[1]);
+            await call(client, "ponder", { position, reply: "g4", move: "Qh4", why: "Mate." });
+            kept += 1;
+
+            if (turnsOf(ai, "ponder")[0] === chat) {
+                await gate().passed;
+            }
+        };
+
         const opponent = ai.chats[0]!;
-        const replying = gate();
         opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Centre." })));
-        opponent.turns.push(async (client) => {
-            await replying.passed;
-            await call(client, "ai_move", { move: "Qh4", plan: "Mate." });
-        });
         await posted(table.url, "/api/move", { move: "f3" });
-        await until(() => helperOf(ai, "ponder")?.idle() === false);
-        const ponder = helperOf(ai, "ponder")!;
+        await until(() => kept === 1);
+        const first = turnsOf(ai, "ponder")[0]!;
 
-        // The player's move, while the AI has not answered: the thinking stops, its chat stays for the next.
+        // The player's move: the turn is stopped and its chat closed, gently; a chat waits ahead with nothing sent.
+        opponent.turns.push(async (client) => void opponent.answers.push(await call(client, "ai_move", { move: "Nc6", plan: "Develop." })));
         await posted(table.url, "/api/move", { move: "g4" });
-        await until(() => ponder.ends.includes("interrupted"));
-        expect(ponder.closed).toBe(false);
+        await until(() => first.closed && opponent.answers.length === 1 && opponent.idle());
+        expect(first.ends).toEqual(["interrupted"]);
+        expect(first.closes).toEqual([true]);
+        expect(opponent.sent[3]).toContain("Thought on their time by your model (legal, not checked): Qh4#, Mate.");
 
-        // The AI's move that ends the game ends the thinking's chat.
-        replying.open();
-        await until(() => ponder.closed && opponent.idle());
-        expect(ponder.closes).toEqual([true]);
-        expect(ponder.sent).toEqual(["Ponder."]);
+        // The next turn, after an interruption, runs on another chat, which starts from ponder {}.
+        await until(() => turnsOf(ai, "ponder")[1]?.ends.includes("done") === true);
+        const next = turnsOf(ai, "ponder")[1]!;
+        expect(next.sent).toEqual(["Ponder."]);
+        expect(next.calls[0]).toBe("ponder");
+        await until(() => next.closed && waitingAhead(ai, "ponder") !== undefined);
+        expect(waitingAhead(ai, "ponder")!.sent).toEqual([]);
+        expect(ai.helperChats.filter((chat) => role(chat) === "ponder").every((chat) => chat.sent.length <= 1)).toBe(true);
 
-        const sentBefore = opponent.sent.length;
+        // The game's end closes the one waiting, which made no request; a new game opens one for it.
+        await posted(table.url, "/api/resign", {});
+        await until(() => ai.helperChats.every((chat) => chat.closed));
         await posted(table.url, "/api/new", { ai_colour: "black", level: "strong" });
-        await until(() => (ai.chats.length > 1 || opponent.sent.length > sentBefore) && ai.chats.at(-1)!.idle());
-        const next = ai.chats.at(-1)!;
-        next.turns.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Centre." })));
+        await until(() => waitingAhead(ai, "ponder") !== undefined);
+    }, 30_000);
+
+    it("shows the sign of the thinking only while a turn of the one that thinks is at work: gone with its chat, and at the table's start", async () => {
+        const { table, home, ai, context } = await playing({ level: "strong" });
+
+        ai.helpers.ponder = async (client) => {
+            await call(client, "ponder");
+            await gate().passed;
+        };
+
+        const opponent = ai.chats[0]!;
+        opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Centre." })));
         await posted(table.url, "/api/move", { move: "e4" });
-        await until(() => ai.helperChats.filter((chat) => role(chat) === "ponder").length === 2);
+        await until(async () => (await shown(table.url)).thinking === "ponder");
+
+        // The opponent started again with another effort: the thinking goes with it, and so does its sign.
+        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: true, claudeEffort: "high" });
+        await posted(table.url, "/api/table/restart", { host: "claude" });
+        await until(() => turnsOf(ai, "ponder")[0]!.closed);
+        await until(async () => (await shown(table.url)).thinking === undefined);
+
+        // A sign left by a table that closed in the thinking: the next table takes it away before any chat thinks.
+        await table.close();
+        notePondering(gameFolder(home), thoughtKey(loadGame(gameFolder(home))!), true, new Date());
+        const again = await drivenTable(home, fakeDriver(), context);
+        expect((await shown(again.table.url)).thinking).toBeUndefined();
     }, 30_000);
 
     it("closes the thinking at once and the coach after its turn when the player resigns", async () => {
@@ -173,32 +213,33 @@ describe("the opponent's helpers the table runs itself", () => {
         await posted(off.table.url, "/api/move", { move: "e4" });
         await until(() => off.ai.chats[0]!.sent.length === 3 && off.ai.chats[0]!.idle());
         await pause(100);
-        expect(off.ai.helperChats.map(role)).toEqual(["ponder"]);
+        expect(off.ai.helperChats.map(role).every((name) => name === "ponder")).toBe(true);
 
         const { table, home, ai } = await playing({ level: "strong", helps: true, white: "f3" }, (driver) => {
             driver.helpers.coach = coaching;
         });
         const opponent = ai.chats[0]!;
         await until(() => helperOf(ai, "coach")?.ends.length === 1);
-        const coach = helperOf(ai, "coach")!;
-        expect(coach.options.model).toBe(opponent.options.model);
+        expect(helperOf(ai, "coach")!.options.model).toBe(opponent.options.model);
 
         opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: "g4", plan: "Attack." })));
         await posted(table.url, "/api/move", { move: "e5" });
-        await until(() => opponent.sent.length === 3 && opponent.idle() && coach.ends.length === 2);
+        await until(() => opponent.sent.length === 3 && opponent.idle() && turnsOf(ai, "coach")[1]?.ends.length === 1);
         await posted(table.url, "/api/move", { move: "Qh4" });
-        await until(() => coach.closed);
-        expect(coach.sent).toEqual(["Coach.", "Coach.", "Coach."]);
-        expect(coach.ends).toEqual(["done", "done", "done"]);
+        await until(() => turnsOf(ai, "coach").length === 3 && ai.helperChats.every((chat) => chat.closed));
+        // A turn a chat, each closed after it.
+        expect(turnsOf(ai, "coach").map((chat) => [chat.sent, chat.ends, chat.closes])).toEqual(Array(3).fill([["Coach."], ["done"], [true]]));
         expect(readFileSync(archived(home), "utf8")).toMatch(/2\.\.\. Qh4# \{\[%badge best\]\s+\[%review\s+Well\s+played\.\]\}/);
 
         // A word after the end asks the coach nothing more.
         await posted(table.url, "/api/message", { text: "Good game." });
         await until(() => opponent.sent.length === 5 && opponent.idle());
-        expect(ai.helperChats.filter((chat) => role(chat) === "coach")).toHaveLength(1);
+        await pause(100);
+        expect(turnsOf(ai, "coach")).toHaveLength(3);
+        expect(ai.helperChats.every((chat) => chat.closed)).toBe(true);
     }, 30_000);
 
-    it("asks the coach one turn at a time, and logs a turn replaced before it went or sent after the player moved", async () => {
+    it("asks the coach one turn at a time, a chat each, and logs a turn replaced before it went", async () => {
         const judging = gate();
         const { table, ai } = await playing({ level: "strong", helps: true, white: "f3" }, (driver) => {
             driver.helpers.coach = async (client) => {
@@ -218,13 +259,47 @@ describe("the opponent's helpers the table runs itself", () => {
         await until(() => opponent.sent.length === 4 && opponent.idle());
         expect(ai.logged).toContain("coach turn for ply 3 replaced before it was sent, by ply 5");
 
-        opponent.turns.push(async (client) => await gate().passed);
-        await posted(table.url, "/api/move", { move: "Nc6" });
-        await until(() => opponent.sent.length === 5);
         judging.open();
-        await until(() => coach.ends.length === 2);
-        expect(coach.sent).toEqual(["Coach.", "Coach."]);
-        expect(ai.logged).toContain("coach turn for ply 5 sent after the player moved, at ply 6");
+        await until(() => turnsOf(ai, "coach").length === 2 && turnsOf(ai, "coach")[1]!.ends.length === 1);
+        expect(coach.closed).toBe(true);
+        expect(turnsOf(ai, "coach").map((chat) => chat.sent)).toEqual([["Coach."], ["Coach."]]);
+        expect(ai.helperChats.filter((chat) => role(chat) === "coach" && !chat.closed).length).toBeLessThanOrEqual(1);
+    }, 30_000);
+
+    it("judges a move after two turns its tool answered too late, each on a fresh chat, and counts those it skipped from coach's answer", async () => {
+        const late = [gate(), gate()];
+        const { table, ai } = await playing({ level: "strong", helps: true, white: "e4" }, (driver) => {
+            driver.helpers.coach = async (client, _prompt, chat) => {
+                await late[turnsOf(driver, "coach").indexOf(chat)]?.passed;
+                await coaching(client);
+            };
+        });
+        const opponent = ai.chats[0]!;
+
+        // Twice the player moves before the coach has looked, and it looks while the opponent thinks: coach {} says stop.
+        for (const [index, [player, reply]] of ([["e5", "Nf3"], ["Nc6", "Bb5"]] as const).entries()) {
+            await until(() => turnsOf(ai, "coach")[index]?.idle() === false);
+            const thinking = gate();
+            opponent.turns.push(async (client) => {
+                await thinking.passed;
+                await call(client, "ai_move", { move: reply, plan: "Develop." });
+            });
+            await posted(table.url, "/api/move", { move: player });
+            await until(() => !opponent.idle());
+            late[index]!.open();
+            await until(() => turnsOf(ai, "coach")[index]!.closed);
+            thinking.open();
+            await until(() => opponent.idle());
+        }
+
+        await until(() => turnsOf(ai, "coach")[2]?.ends.includes("done") === true);
+        expect(turnsOf(ai, "coach").map((chat) => chat.calls)).toEqual([["coach"], ["coach"], ["coach", "coach", "coach", "coach"]]);
+        expect(ai.logged.filter((line) => /^coach turn for ply \d+ skipped/.test(line))).toEqual([
+            "coach turn for ply 1 skipped: coach {} answered that the player had moved, at ply 2 (1 skipped)",
+            "coach turn for ply 3 skipped: coach {} answered that the player had moved, at ply 4 (2 skipped)",
+        ]);
+        const { coach } = (await raw(table.url)).game as { coach: { judgments: { ply: number; }[]; }; };
+        expect(coach.judgments.map((judged) => judged.ply)).toEqual([4]);
     }, 30_000);
 
     it("runs no helper with the switch off, and closes them when it goes off in a game, the AI told of no agent", async () => {
@@ -234,14 +309,22 @@ describe("the opponent's helpers the table runs itself", () => {
         const opponent = ai.chats[0]!;
         opponent.turns.push(async (client) => void opponent.answers.push(await call(client, "ai_move", { move: "e5", plan: "Centre." })));
         await posted(table.url, "/api/move", { move: "e4" });
-        await until(() => opponent.answers.length === 1 && opponent.idle() && ai.helperChats.length === 2);
+        await until(() => opponent.answers.length === 1 && opponent.idle() && turnsOf(ai, "ponder").length === 1 && turnsOf(ai, "coach")[0]?.closed === true);
 
         saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: false, helps: true });
         opponent.turns.push(async (client) => void opponent.answers.push(await call(client, "ai_move", { move: "Nc6", plan: "Develop." })));
         await posted(table.url, "/api/move", { move: "Nf3" });
         await until(() => opponent.answers.length === 2 && opponent.idle());
         await until(() => ai.helperChats.every((chat) => chat.closed));
-        expect(ai.helperChats).toHaveLength(2);
+
+        // Off, the AI's next move gives no helper a turn, nor opens one ahead.
+        const before = ai.helperChats.length;
+        opponent.turns.push(async (client) => void opponent.answers.push(await call(client, "ai_move", { move: "Nf6", plan: "Develop." })));
+        await posted(table.url, "/api/move", { move: "d3" });
+        await until(() => opponent.answers.length === 3 && opponent.idle());
+        await pause(200);
+        expect(ai.helperChats).toHaveLength(before);
+        expect(ai.helperChats.every((chat) => chat.closed)).toBe(true);
         expect(opponent.answers[1]!.text).not.toMatch(/agent|spawn/i);
 
         const free = await drivenTable(undefined, undefined, undefined, false);
@@ -253,34 +336,45 @@ describe("the opponent's helpers the table runs itself", () => {
         expect(free.ai.helperChats).toEqual([]);
     }, 30_000);
 
-    it("starts one program at a time, the next once the one before said which chat it is", async () => {
+    it("starts one program at a time, each once the one before sat, and once the program before of its role exited", async () => {
         const { table, ai } = await playing({ level: "strong", helps: true });
-        const order: string[] = [];
-        const open = ai.driver.open.bind(ai.driver);
-
-        ai.driver.open = (options) => {
-            const name = basename(options.folder);
-            order.push(`open ${name}`);
-            const chat = open(options);
-            const onEvent = chat.onEvent.bind(chat);
-            chat.onEvent = (listener) =>
-                onEvent((event: HostEvent) => {
-                    if (event.type === "session") {
-                        order.push(`session ${name}`);
-                    }
-
-                    listener(event);
-                });
-            return chat;
-        };
-
+        ai.exitAfter = 150;
         ai.helpers.ponder = pondering("d4", "d5");
         ai.helpers.coach = coaching;
         const opponent = ai.chats[0]!;
-        opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Centre." })));
-        await posted(table.url, "/api/move", { move: "e4" });
-        await until(() => order.length === 4);
-        expect(order).toEqual(["open ponder", "session ponder", "open coach", "session coach"]);
+
+        for (const [player, reply] of [["e4", "e5"], ["Nf3", "Nc6"]] as const) {
+            const before = opponent.sent.length;
+            opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: reply, plan: "Develop." })));
+            await posted(table.url, "/api/move", { move: player });
+            await until(() => opponent.sent.length === before + 1 && opponent.idle());
+        }
+
+        await until(() => turnsOf(ai, "ponder").length === 2 && turnsOf(ai, "coach").length === 2 && waitingAhead(ai, "ponder") !== undefined && waitingAhead(ai, "coach") !== undefined);
+        await until(() => ai.timeline.filter((entry) => entry.startsWith("sat") && !entry.endsWith(" opponent")).length === 6);
+        const helpers = ai.timeline.filter((entry) => !entry.endsWith(" opponent"));
+        expect(helpers.filter((entry) => entry.startsWith("start"))).toHaveLength(6);
+
+        // A role never has two programs alive, and a start waits for the one before to sit at its place.
+        const alive = new Map<string, number>();
+        let sitting: string | undefined;
+
+        for (const entry of helpers) {
+            const [step, name] = entry.split(" ") as [string, string];
+
+            if (step === "start") {
+                expect(sitting).toBeUndefined();
+                expect(alive.get(name) ?? 0).toBe(0);
+                sitting = name;
+            }
+
+            alive.set(name, (alive.get(name) ?? 0) + (step === "start" ? 1 : step === "exit" ? -1 : 0));
+            sitting = step === "sat" && sitting === name ? undefined : sitting;
+        }
+
+        // Each turn on a chat that had none before; the ones waiting have been sent nothing.
+        expect(ai.helperChats.every((chat) => chat.sent.length <= 1)).toBe(true);
+        expect([waitingAhead(ai, "ponder")!.sent, waitingAhead(ai, "coach")!.sent]).toEqual([[], []]);
     }, 30_000);
 
     it("stills a helper that fell twice in a row, logged once, until the opponent's chat opens again", async () => {
@@ -298,7 +392,8 @@ describe("the opponent's helpers the table runs itself", () => {
             await pause(150);
         }
 
-        expect(ai.helperChats).toHaveLength(3);
+        // The chats of four turns, none opened after the second fall in a row.
+        expect(ai.helperChats).toHaveLength(4);
         expect(ai.logged.filter((line) => line.startsWith("helper ponder failed:"))).toHaveLength(3);
         expect(ai.logged.filter((line) => line.startsWith("helper ponder stopped:"))).toHaveLength(1);
 
@@ -307,7 +402,7 @@ describe("the opponent's helpers the table runs itself", () => {
         await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
         ai.chats[1]!.turns.push(async (client) => void (await call(client, "ai_move", { move: "O-O", plan: "Safe." })));
         await posted(table.url, "/api/move", { move: "Nbd2" });
-        await until(() => ai.helperChats.length === 4);
+        await until(() => turnsOf(ai, "ponder").length === 5);
     }, 30_000);
 
     it("stops every helper at once when the host says the player is not signed in", async () => {
@@ -632,7 +727,7 @@ describe("the opponent's helpers the table runs itself", () => {
         await study(left.table.url, { pgn: brought });
         await until(() => analysts(left.ai)[0]?.calls.length === 1);
         await posted(left.table.url, "/api/table/restart", { host: "codex" });
-        await until(() => analysts(left.ai)[0]!.closed);
+        await until(() => analysts(left.ai)[0]!.closed && left.terminal.opened.length === 1);
         expect(left.terminal.opened).toEqual(["codex"]);
         expect(gameInAnalysis(gameFolder(left.home))?.analyst).toBeUndefined();
 
@@ -725,9 +820,22 @@ function role(chat: FakeChat): string
     return basename(chat.options.folder);
 }
 
+/** The last chat of a role given a turn. */
 function helperOf(ai: FakeDriver, name: string): FakeChat | undefined
 {
-    return ai.helperChats.findLast((chat) => role(chat) === name);
+    return turnsOf(ai, name).at(-1);
+}
+
+/** The chats of a role given a turn, in order: one a turn. */
+function turnsOf(ai: FakeDriver, name: string): FakeChat[]
+{
+    return ai.helperChats.filter((chat) => role(chat) === name && chat.sent.length > 0);
+}
+
+/** The chat of a role waiting ahead, open and sent nothing. */
+function waitingAhead(ai: FakeDriver, name: string): FakeChat | undefined
+{
+    return ai.helperChats.find((chat) => role(chat) === name && !chat.closed && chat.sent.length === 0);
 }
 
 function analysts(ai: FakeDriver): FakeChat[]

@@ -908,10 +908,17 @@ describe("the profiles on the page (D-23, D-45)", () => {
         expect((await served()).settings).toEqual({ theme: "dark", dots: false });
         expect((await post(page, "/api/settings?profile=anna", [1])).status).toBe(400);
 
+        // A body that names some settings keeps the others, as the switch of the chat the table drives; the page's whole settings replace them all.
+        expect(await post(page, "/api/settings?profile=anna", { chatInPage: true })).toMatchObject({ status: 200 });
+        expect(await post(page, "/api/settings?profile=anna", { helps: true })).toMatchObject({ status: 200 });
+        expect((await served()).settings).toEqual({ theme: "dark", dots: false, chatInPage: true, helps: true });
+        expect(await post(page, "/api/settings?profile=anna", { theme: "dark", dots: false, chatInPage: false, helps: true })).toMatchObject({ status: 200 });
+        expect((await served()).settings).toEqual({ theme: "dark", dots: false, chatInPage: false, helps: true });
+
         // A page that has not yet heard of another profile put in use elsewhere never writes in it.
         expect(await post(page, "/api/settings?profile=bruno", { theme: "light" })).toMatchObject({ status: 409, body: expect.stringContaining("anna is in use now") });
         expect((await post(page, "/api/profile/avatar", { avatar: "cat" })).status).toBe(409);
-        expect((await served()).settings).toEqual({ theme: "dark", dots: false });
+        expect((await served()).settings).toEqual({ theme: "dark", dots: false, chatInPage: false, helps: true });
     });
 
     it("says where the profiles are, as the file manager walks there from the player's own folder, and opens it there", async () => {

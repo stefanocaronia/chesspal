@@ -1,6 +1,6 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { existsSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { newGame, startNewGame } from "../src/commands/game/new.ts";
 import { type Context, PositionChanged } from "../src/commands/index.ts";
@@ -266,7 +266,8 @@ describe("the chat the table drives", () => {
         await posted(table.url, "/api/table/stop", {});
         await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
         expect(chat.closed).toBe(true);
-        expect(withdrawn).toEqual(["opponent"]);
+        // The helpers' places, of the chats waiting ahead for the game, go too.
+        expect(withdrawn.filter((role) => role === "opponent")).toEqual(["opponent"]);
         expect(sans(home)).toEqual([]);
 
         // An update asks the page for the chat of the table's folder again (D-108): it closes, and the table started next opens a clean one.
@@ -276,7 +277,7 @@ describe("the chat the table drives", () => {
         expect(ai.chats[1]!.closed).toBe(true);
         // Started again clean, and closed for the update: each time its program was let go to end by itself, never stopped at once.
         expect([...chat.closes, ...ai.chats[1]!.closes]).toEqual([true, true]);
-        expect(withdrawn).toEqual(["opponent", "opponent"]);
+        expect(withdrawn.filter((role) => role === "opponent")).toEqual(["opponent", "opponent"]);
         expect(ai.chats).toHaveLength(2);
         expect(keptChat(join(home, "chats"))).toMatchObject({ closed: false, session: undefined });
     }, 30_000);
@@ -372,6 +373,60 @@ describe("the chat the table drives", () => {
         ai.chats[0]!.emit({ type: "ended", why: "the host's program ended (exit code 1)" });
         await until(() => ai.chats[0]!.closed);
         expect(ai.chats[0]!.closes).toEqual([true]);
+    }, 30_000);
+
+    it("starts the next chat only once the program of the one before has exited, as it starts again with another effort or in another host", async () => {
+        const { table, home, ai, terminal } = await drivenTable();
+        ai.exitAfter = 300;
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+
+        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: true, claudeEffort: "high" });
+        await posted(table.url, "/api/table/restart", { host: "claude" });
+        await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
+        expect(ai.timeline.filter((entry) => entry.endsWith(" opponent"))).toEqual(["start opponent", "sat opponent", "exit opponent", "start opponent", "sat opponent"]);
+
+        await posted(table.url, "/api/table/restart", { host: "codex" });
+        expect(terminal.opened).toEqual([]);
+        await until(() => terminal.opened.length === 1);
+        expect(ai.timeline.at(-1)).toBe("exit opponent");
+    }, 30_000);
+
+    it("stops the turn at work before it lets the chat's program go, as the table closes", async () => {
+        const { table, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+        chat.turns.push(async () => await gate().passed);
+        await posted(table.url, "/api/message", { text: "Think it over." });
+        await until(() => !chat.idle());
+
+        await table.close();
+        expect(chat.steps).toEqual(["interrupt", "close"]);
+        expect(chat.closes).toEqual([true]);
+    }, 30_000);
+
+    it("has every chat it opens write its trace in the folder the table's environment names, one file a chat by its role and start; none without it", async () => {
+        const plain = await drivenTable();
+        await opened(plain.table.url);
+        await until(() => plain.ai.chats.length === 1 && plain.ai.chats[0]!.idle());
+        expect(plain.ai.chats[0]!.options.trace).toBeUndefined();
+
+        const traces = join(temporary(), "traces");
+        const ai = fakeDriver();
+        ai.environment = { CHESSPAL_HOST_TRACE: traces };
+        const { table } = await drivenTable(undefined, ai);
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        await posted(table.url, "/api/new", { ai_colour: "black" });
+        await until(() => ai.helperChats.length === 1);
+        const opponent = ai.chats[0]!.options.trace!;
+        const ponder = ai.helperChats[0]!.options.trace!;
+        expect(dirname(opponent)).toBe(traces);
+        expect(existsSync(traces)).toBe(true);
+        expect(basename(opponent)).toMatch(/^opponent-\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z\.jsonl$/);
+        expect(dirname(ponder)).toBe(traces);
+        expect(basename(ponder)).toMatch(/^ponder-.+\.jsonl$/);
     }, 30_000);
 });
 

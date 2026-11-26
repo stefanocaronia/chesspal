@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import type { Context, HelperRole } from "../src/commands/index.ts";
 import { loadGame } from "../src/games/index.ts";
-import type { ChatOptions, HostChat, HostDriver, HostEvent } from "../src/hosts/index.ts";
+import type { ChatOptions, HostChat, HostDriver, HostEvent, LineProcess } from "../src/hosts/index.ts";
 import { activeProfile, gameFolder, saveProfileSettings } from "../src/profiles/index.ts";
 import { chatInPage, drivenChats } from "../src/server/driven/index.ts";
 import type { TableChats } from "../src/server/page/index.ts";
@@ -45,6 +45,8 @@ export interface FakeChat
     closed: boolean;
     /** How each close asked its program to end: let go to end by itself (true), or stopped at once. */
     readonly closes: boolean[];
+    /** The table's interrupts and closes, in order. */
+    readonly steps: ("interrupt" | "close")[];
     idle(): boolean;
     emit(event: HostEvent): void;
     /** A turn the host begins by itself, with no words of the table's, which ends once `play` has. */
@@ -64,6 +66,14 @@ export interface FakeDriver
     helpers: Partial<Record<HelperRole, (client: Client, prompt: string, chat: FakeChat) => Promise<void | "failed">>>;
     /** What the table told its log: the helpers' failures. */
     logged: string[];
+    /** The programs the table started through its start, by their chat's role, as they started, sat at their place and exited: "start ponder", "sat ponder", "exit ponder". */
+    timeline: string[];
+    /** How long a program let go takes to exit, in ms. */
+    exitAfter: number;
+    /** The table's environment, empty unless the test gives one. */
+    environment: NodeJS.ProcessEnv;
+    /** How the table starts its programs: a fake process, which exits `exitAfter` ms after its input is closed. */
+    start: (command: string, args: string[], options: { cwd: string; }) => LineProcess;
     failFirst: boolean;
     missing: boolean;
     loading?: Promise<void>;
@@ -78,14 +88,15 @@ export function fakeDriver(): FakeDriver
     const driver: HostDriver = {
         open: (options) => {
             const role = basename(options.folder);
+            const program = options.start?.(options.program.command, options.program.args, { cwd: options.folder, env: options.environment });
 
             if (role !== "opponent") {
-                const helper = fakeChat(options, `${role}-session-${helperChats.length + 1}`, made, role as HelperRole);
+                const helper = fakeChat(options, `${role}-session-${helperChats.length + 1}`, made, program, role as HelperRole);
                 helperChats.push(helper.chat);
                 return helper.host;
             }
 
-            const fake = fakeChat(options, `session-${chats.length + 1}`, made);
+            const fake = fakeChat(options, `session-${chats.length + 1}`, made, program);
             fake.chat.turns.push(...made.queued.splice(0));
             chats.push(fake.chat);
             return fake.host;
@@ -97,11 +108,41 @@ export function fakeDriver(): FakeDriver
         model: "opus",
         efforts: ["low", "medium", "high"],
     };
-    const made: FakeDriver = { driver, chats, helperChats, helpers: {}, logged: [], failFirst: false, missing: false, queued: [] };
+    const timeline: string[] = [];
+    const start = (_command: string, _args: string[], options: { cwd: string; }): LineProcess => fakeProgram(basename(options.cwd), made);
+    const made: FakeDriver = { driver, chats, helperChats, helpers: {}, logged: [], timeline, exitAfter: 0, environment: {}, start, failFirst: false, missing: false, queued: [] };
     return made;
 }
 
-function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver, role?: HelperRole): { chat: FakeChat; host: HostChat; }
+/** A program of a chat's role: it starts at once, and exits once its input is closed, `exitAfter` ms later, or at once when stopped. */
+function fakeProgram(role: string, ai: FakeDriver): LineProcess
+{
+    let ended: ((reason: string) => void) | undefined;
+    let gone = false;
+    ai.timeline.push(`start ${role}`);
+
+    const exit = (reason: string): void => {
+        if (!gone) {
+            gone = true;
+            ai.timeline.push(`exit ${role}`);
+            ended?.(reason);
+        }
+    };
+
+    return {
+        pid: undefined,
+        write: () => undefined,
+        onLine: () => undefined,
+        onEnd: (listener) => (ended = listener),
+        closeInput: () => void setTimeout(() => exit("exit code 0"), ai.exitAfter),
+        stop: () => {
+            ended = undefined;
+            exit("stopped");
+        },
+    };
+}
+
+function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver, program: LineProcess | undefined, role?: HelperRole): { chat: FakeChat; host: HostChat; }
 {
     let listener: ((event: HostEvent) => void) | undefined;
     const waiting: HostEvent[] = [];
@@ -132,7 +173,13 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver, role
         emit({ type: "turnEnd", reason: "done" });
     };
 
-    const chat: FakeChat = { options, session, sent: [], calls: [], answers: [], ends: [], turns: [], closed: false, closes: [], idle: () => !busy, emit, ownTurn };
+    const chat: FakeChat = { options, session, sent: [], calls: [], answers: [], ends: [], turns: [], closed: false, closes: [], steps: [], idle: () => !busy, emit, ownTurn };
+    // A helper's program starts its server at once, as Claude Code does before its first words: the table hears it sit at its place.
+    const sit = (): Promise<Client> => (client ??= sitAt(options.server!.environment, (made) => void clients.push(made)));
+
+    if (role !== undefined) {
+        void sit().catch(() => undefined);
+    }
 
     const turn = async (text: string): Promise<void> => {
         // A host that cannot sign in fails its first turn before it says which chat it is.
@@ -156,8 +203,7 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver, role
             wasStopped = true;
             done("interrupted");
         }));
-        client ??= sitAt(options.server!.environment, (made) => void clients.push(made));
-        const sitting = await client;
+        const sitting = await sit();
         const traced = tracing(sitting, chat);
         // A clean chat's first words are the table's start message.
         const starting = options.session === undefined && chat.sent.length === 1 && text === chat.sent[0];
@@ -196,8 +242,17 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver, role
             listener = heard;
             waiting.splice(0).forEach(heard);
         },
-        interrupt: () => stopTurn?.(),
+        interrupt: () => {
+            chat.steps.push("interrupt");
+            stopTurn?.();
+        },
         close: (gently) => {
+            if (!chat.closed) {
+                chat.steps.push("close");
+                // Let go, its program ends by itself once its input is closed; else it is stopped at once.
+                program?.[gently === true ? "closeInput" : "stop"]();
+            }
+
             chat.closed = true;
             chat.closes.push(gently === true);
             void client?.then((sitting) => sitting.close()).catch(() => undefined);
@@ -249,8 +304,8 @@ function terminalChats(): { chats: TableChats; opened: string[]; }
     return { chats, opened };
 }
 
-/** The table's places, the roles of those withdrawn noted in `withdrawn`. */
-function watchedPlaces(context: Context, withdrawn: string[]): TablePlaces
+/** The table's places, the roles of those withdrawn noted in `withdrawn`, and in `timeline` each chat's server as it sits, before the table hears it. */
+function watchedPlaces(context: Context, withdrawn: string[], timeline: string[]): TablePlaces
 {
     const places = tablePlaces(context, { leaveWait: 500 });
     return {
@@ -258,6 +313,7 @@ function watchedPlaces(context: Context, withdrawn: string[]): TablePlaces
             const place = await places.offer(role, folder, chat);
             return {
                 ...place,
+                seated: place.seated.then(() => void timeline.push(`sat ${role}`)),
                 withdraw: () => {
                     withdrawn.push(place.role);
                     place.withdraw();
@@ -292,7 +348,15 @@ export async function drivenTable(
             return ai.driver;
         };
 
-        const chats = drivenChats(context, { terminal: terminal.chats, places: () => watchedPlaces(context, withdrawn), driver, chesspal: ["node", "cli.js"], environment: {}, log: (line) => void ai.logged.push(line) });
+        const chats = drivenChats(context, {
+            terminal: terminal.chats,
+            places: () => watchedPlaces(context, withdrawn, ai.timeline),
+            driver,
+            chesspal: ["node", "cli.js"],
+            environment: ai.environment,
+            log: (line) => void ai.logged.push(line),
+            start: ai.start,
+        });
         const table = await startTable(context, times, chats, undefined, programsEnded);
 
         if (table === undefined) {

@@ -320,7 +320,8 @@ async function runTool(
         // A game another process changed under the call is read again, and the call made once more.
         const result: unknown = await rerunIfChanged(() => command.run(checkedInput(command, input), { ...context, home, caller, ...who }));
 
-        if (chat) {
+        // At a seat of the table's, the table hears every result, its helpers' too.
+        if (chat || seated !== undefined) {
             context.answered?.(command.name, result);
         }
 
