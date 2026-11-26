@@ -473,13 +473,13 @@
 .thread > .writing > .say {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     height: calc(1.45em + 20px);
 }
 
 .writing .dot {
-    width: 7px;
-    height: 7px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: currentColor;
     opacity: 0.35;
@@ -504,7 +504,7 @@
 
     40% {
         opacity: 1;
-        transform: translateY(-3px);
+        transform: translateY(-2px);
     }
 }
 
