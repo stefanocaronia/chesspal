@@ -10,7 +10,7 @@ import { agentFiles } from "../src/host-files/agents.ts";
 import { atTableInstructions, instructionsFile, opponentInstructions, tableHelperInstructions } from "../src/host-files/index.ts";
 import { activeProfile, gameFolder, type PageSettings, saveProfileSettings } from "../src/profiles/index.ts";
 import { doorVariable, keyVariable } from "../src/server/door/index.ts";
-import { chatInPage } from "../src/server/driven/index.ts";
+import { pageChat } from "../src/server/driven/index.ts";
 import { testContext } from "./commands.ts";
 import { call, cleanUp, drivenTable, type FakeChat, type FakeDriver, fakeDriver, gate, movingContext, opened, pageListening, pause, posted, raw, shown, temporary, until } from "./driven-fakes.ts";
 
@@ -94,7 +94,7 @@ describe("the opponent's helpers the table runs itself", () => {
         // Each turn on a chat of its own, the one before closed.
         expect(turnsOf(ai, "ponder").map((chat) => chat.sent.map(firstLine))).toEqual([["Ponder."], ["Ponder."]]);
         expect(ponder.closed).toBe(true);
-        expect(settingsOf(home)).toMatchObject({ [chatInPage]: true });
+        expect(settingsOf(home)).toMatchObject({ [pageChat]: true });
     }, 30_000);
 
     it("thinks on the quick model at a low level, as the opponent's next turn says", async () => {
@@ -240,7 +240,7 @@ describe("the opponent's helpers the table runs itself", () => {
         await until(async () => (await shown(table.url)).thinking === "ponder");
 
         // The opponent started again with another effort: the thinking goes with it, and so does its sign.
-        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: true, claudeEffort: "high" });
+        saveProfileSettings(home, activeProfile(home).id, { [pageChat]: true, claudeEffort: "high" });
         await posted(table.url, "/api/table/restart", { host: "claude" });
         await until(() => turnsOf(ai, "ponder")[0]!.closed);
         await until(async () => (await shown(table.url)).thinking === undefined);
@@ -447,7 +447,7 @@ describe("the opponent's helpers the table runs itself", () => {
         await posted(table.url, "/api/move", { move: "e4" });
         await until(() => opponent.answers.length === 1 && opponent.idle() && turnsOf(ai, "ponder").length === 1 && turnsOf(ai, "coach")[0]?.closed === true);
 
-        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: false, helps: true });
+        saveProfileSettings(home, activeProfile(home).id, { [pageChat]: false, helps: true });
         opponent.turns.push(async (client) => void opponent.answers.push(await call(client, "ai_move", { move: "Nc6", plan: "Develop." })));
         await posted(table.url, "/api/move", { move: "Nf3" });
         await until(() => opponent.answers.length === 2 && opponent.idle());
@@ -573,13 +573,13 @@ describe("the opponent's helpers the table runs itself", () => {
 
     it("has no analyst with no chat at the table: the analyst starts with the opponent's chat, on the model the window chose", async () => {
         const { table, home, ai } = await drivenTable();
-        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: true, claudeModel: "sonnet" });
+        saveProfileSettings(home, activeProfile(home).id, { [pageChat]: true, claudeModel: "sonnet" });
         ai.helpers.analyst = analysing(gate(), "");
         const game = await study(table.url, { pgn: brought });
         await pause(200);
         expect(ai.helperChats).toEqual([]);
 
-        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: true, claudeModel: "opus", claudeEffort: "high" });
+        saveProfileSettings(home, activeProfile(home).id, { [pageChat]: true, claudeModel: "opus", claudeEffort: "high" });
         await opened(table.url);
         await until(() => analysts(ai).length === 1 && analysts(ai)[0]!.calls.length === 1);
         expect(analysts(ai)[0]!.sent).toEqual([`Analyse ${game}. The player speaks English.`]);
@@ -590,7 +590,7 @@ describe("the opponent's helpers the table runs itself", () => {
 
     it("goes over a game brought with the opponent at the table, rings it at the end with where the review is, and tells the pages", async () => {
         const { table, home, ai } = await drivenTable();
-        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: true, claudeModel: "sonnet", claudeEffort: "high" });
+        saveProfileSettings(home, activeProfile(home).id, { [pageChat]: true, claudeModel: "sonnet", claudeEffort: "high" });
         await opened(table.url);
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
         const opponent = ai.chats[0]!;
@@ -865,7 +865,7 @@ describe("the opponent's helpers the table runs itself", () => {
         await study(left.table.url, { pgn: brought });
         await until(() => analysts(left.ai)[0]?.calls.length === 1);
         // The opponent leaves for a chat in a terminal, with the switch off.
-        saveProfileSettings(left.home, activeProfile(left.home).id, { [chatInPage]: false });
+        saveProfileSettings(left.home, activeProfile(left.home).id, { [pageChat]: false });
         await posted(left.table.url, "/api/table/restart", { host: "antigravity" });
         await until(() => analysts(left.ai)[0]!.closed && left.terminal.opened.length === 1);
         expect(left.terminal.opened).toEqual(["antigravity"]);
@@ -877,7 +877,7 @@ describe("the opponent's helpers the table runs itself", () => {
         gone.ai.chats[0]!.turns.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Centre." })));
         await posted(gone.table.url, "/api/move", { move: "e4" });
         await until(() => working === 4);
-        saveProfileSettings(gone.home, activeProfile(gone.home).id, { [chatInPage]: false });
+        saveProfileSettings(gone.home, activeProfile(gone.home).id, { [pageChat]: false });
         await posted(gone.table.url, "/api/table/restart", { host: "antigravity" });
         await until(() => gone.ai.helperChats.every((chat) => chat.closed));
     }, 30_000);
@@ -904,7 +904,7 @@ async function playing(
     // OpenCode's models as the table keeps them once read: OpenCode offers none before.
     writeFileSync(join(tableFolder(driven.home), "opencode-models.json"), `${JSON.stringify({ models: ["ollama/gpt-oss:20b"], model: "ollama/gpt-oss:20b" })}\n`);
     const chosen = { ...(model === undefined ? {} : { [`${host}Model`]: model }), ...(effort === undefined ? {} : { [`${host}Effort`]: effort }) };
-    saveProfileSettings(driven.home, activeProfile(driven.home).id, { [chatInPage]: true, ...(helps ? { helps: true } : {}), ...chosen });
+    saveProfileSettings(driven.home, activeProfile(driven.home).id, { [pageChat]: true, ...(helps ? { helps: true } : {}), ...chosen });
     set(driven.ai);
     await opened(driven.table.url, host);
     await until(() => driven.ai.chats.length === 1 && driven.ai.chats[0]!.idle());

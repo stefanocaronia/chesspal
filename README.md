@@ -91,15 +91,15 @@ chesspal
 
 The board page opens in your browser, and you can close this terminal. The first time, Chesspal offers an icon on your desktop and in your menu of programs: accept it, and from then on you open the board with a double click on it, with no terminal.
 
-**5. Start the AI.** The first time, the board page asks who you are: fill it in and press **Start playing**. Then press **Claude Code**, **Codex**, **Antigravity** or **OpenCode**: the AI opens in a terminal of its own. Keep that window open while you play. The first time it asks some questions:
+**5. Start the AI.** The first time, the board page asks who you are: fill it in and press **Start playing**. Then press **Claude Code**, **Codex**, **Antigravity** or **OpenCode**: the AI plays and talks right in the page, with no window of its own, and a Stop button in its card while it works.
+
+If you would rather have the AI in a terminal of its own, turn off **The chat with the AI in the page, without a terminal** in the board page's settings: the AI then opens in a window of its own, which you keep open while you play. The first time it asks some questions:
 
 - whether you trust the folder: choose **Yes** with the arrow keys and press Enter;
 - with Codex, about Chesspal's two hooks, the small programs that tell the AI when you move on the board: choose **Trust all and continue**;
 - with Codex on Windows, whether to set up its sandbox, a safe space where it works: choose the first option, and answer yes when Windows asks for permission.
 
 Now press **New game**: choose your colour, the clock and the AI's level, and play on the board. Talk with the AI on the board page or in its terminal.
-
-Experimental: in the board page's settings, **The chat with the AI in the page, without a terminal** has the AI play and talk right in the page, with no window of its own, and a Stop button in its card while it works. It is off by default; it works with all four agents, and is still being tried.
 
 **If a command fails:**
 

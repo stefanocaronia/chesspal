@@ -42,11 +42,14 @@ export interface DrivenOptions
     readonly staleTurn?: number;
 }
 
-/** The setting of the profile that has the table drive the chat itself, without a terminal, in a host it drives; off unless the player turns it on. */
-export const chatInPage = "chatInPage";
+/**
+ * The setting of the profile that has the table drive the chat itself, without a terminal, in a host it drives: on unless the player turns it off (D-127). A
+ * new name for the old `chatInPage`, off unless turned on, so that every profile finds it on.
+ */
+export const pageChat = "pageChat";
 
 /**
- * The chats of a table that drives the chat itself, in a host it drives, when the profile in use says so (`chatInPage`), the terminal's for every other
+ * The chats of a table that drives the chat itself, in a host it drives, when the profile in use says so (`pageChat`), the terminal's for every other
  * host. The chat's folder is `chats/opponent` in the data folder, outside the table's, whose files init wrote for a chat in a terminal; its place is the opponent's. The
  * chat it drove is kept across the table's restarts, and taken up again with its session while the game it played goes on. Beside it the table runs the
  * opponent's helpers, a chat each, in `chats/<role>`.
@@ -292,13 +295,14 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         }
     };
 
-    // Opens the chat in `host`, clean or taking up `session`: whether it started; "missing" when the host's program is not where its driver looks.
-    const open = async (host: DrivenHost, session: string | undefined): Promise<boolean | "missing"> => {
+    // Opens the chat in `host`, clean or taking up `session`, for what `review` says when the page said it: whether it started; "missing" when the host's
+    // program is not where its driver looks.
+    const open = async (host: DrivenHost, session: string | undefined, review?: boolean): Promise<boolean | "missing"> => {
         if (seat === undefined || driven !== undefined || !seat.free()) {
             return false;
         }
 
-        const start = chatStart(context, host.name);
+        const start = chatStart(context, host.name, undefined, review);
         const state: Driven = {
             host,
             seat: ++seats,
@@ -412,10 +416,10 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
 
     // The chat the page asks for in `host`: the one kept, taken up again while its game goes on in that host, else a clean one; the terminal's where the
     // host's program is not where its driver looks for it, as one installed by npm alone.
-    const asked = async (host: DrivenHost): Promise<boolean> => {
+    const asked = async (host: DrivenHost, review: boolean | undefined): Promise<boolean> => {
         const kept = keptChat(chats);
-        const opened = await open(host, kept !== undefined && !kept.closed && kept.host === host.name && keptGameGoesOn(context, kept.game) ? kept.session : undefined);
-        return opened === "missing" ? terminal.open(host.name) : opened;
+        const opened = await open(host, kept !== undefined && !kept.closed && kept.host === host.name && keptGameGoesOn(context, kept.game) ? kept.session : undefined, review);
+        return opened === "missing" ? terminal.open(host.name, review) : opened;
     };
 
     // The host the table drives by that name, while the switch is on; none for a chat in a terminal.
@@ -425,9 +429,9 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         hosts: () => terminal.hosts(),
         ...(terminal.watch === undefined ? {} : { watch: (changed: () => void) => terminal.watch!(changed) }),
         ...(terminal.ollama === undefined ? {} : { ollama: () => terminal.ollama!() }),
-        open: (name) => {
+        open: (name, review) => {
             const host = driving(name);
-            return host === undefined ? terminal.open(name) : asked(host);
+            return host === undefined ? terminal.open(name, review) : asked(host, review);
         },
         held: (folderAsked) => (answersFor(folderAsked) ? heldOf(driven!) : terminal.held(folderAsked)),
         relaunch: (folderAsked, name, updated) => {
@@ -647,14 +651,14 @@ function positionNow(context: Context): SeenPosition | undefined
     }
 }
 
-/** Whether the profile in use has the table drive the chat itself: read at each opening, off when it cannot be read. */
+/** Whether the profile in use has the table drive the chat itself: read at each opening, on unless the player turned it off, or it cannot be read. */
 function switchedOn(context: Context): boolean
 {
     try {
         const home = context.home();
-        return profileSettings(home, activeProfile(home).id)?.[chatInPage] === true;
+        return profileSettings(home, activeProfile(home).id)?.[pageChat] !== false;
     } catch {
-        return false;
+        return true;
     }
 }
 

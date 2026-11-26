@@ -103,7 +103,7 @@ export function SettingsPanel({ open, settings, analysing, atTable, onChange, on
                     {atTable
                         ? (
                             <Section title={text.table.inPage.experimental} icon={experimentIcon}>
-                                <Switch on={settings.chatInPage} onSwitch={(on) => set("chatInPage", on)} note={text.table.inPage.switchNote}>{text.table.inPage.switch}</Switch>
+                                <Switch on={settings.pageChat} onSwitch={(on) => set("pageChat", on)} note={text.table.inPage.switchNote}>{text.table.inPage.switch}</Switch>
                             </Section>
                         )
                         : null}

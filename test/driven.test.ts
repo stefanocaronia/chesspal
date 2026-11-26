@@ -11,7 +11,7 @@ import { analystAgent } from "../src/host-files/index.ts";
 import { activeProfile, gameFolder, saveProfileSettings } from "../src/profiles/index.ts";
 import { Bell, type BellListener } from "../src/server/bell/index.ts";
 import { doorVariable, keyVariable } from "../src/server/door/index.ts";
-import { chatInPage, failureCode, failureOf, keepChat, keptChat } from "../src/server/driven/index.ts";
+import { failureCode, failureOf, keepChat, keptChat, pageChat } from "../src/server/driven/index.ts";
 import { hostNames } from "../src/server/table/hosts/hosts.ts";
 import type { Table } from "../src/server/table/index.ts";
 import { playedHere } from "./commands.ts";
@@ -216,7 +216,7 @@ describe("the chat the table drives", () => {
         await until(async () => (await shown(table.url)).table?.chat === true);
 
         // The player chooses another model on the page, and the chat starts again with it.
-        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: true, claudeModel: "opus", claudeEffort: "high" });
+        saveProfileSettings(home, activeProfile(home).id, { [pageChat]: true, claudeModel: "opus", claudeEffort: "high" });
         expect(await posted(table.url, "/api/table/restart", { host: "claude" })).toEqual({ status: 200, text: JSON.stringify({ restarting: true }) });
         await until(() => ai.chats.length === 3 && ai.chats[2]!.idle());
         expect(ai.chats[2]!.options).toMatchObject({ model: "opus", effort: "high" });
@@ -386,13 +386,13 @@ describe("the chat the table drives", () => {
         await opened(table.url);
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
 
-        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: true, claudeEffort: "high" });
+        saveProfileSettings(home, activeProfile(home).id, { [pageChat]: true, claudeEffort: "high" });
         await posted(table.url, "/api/table/restart", { host: "claude" });
         await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
         expect(ai.timeline.filter((entry) => entry.endsWith(" opponent"))).toEqual(["start opponent", "sat opponent", "exit opponent", "start opponent", "sat opponent"]);
 
         // In a terminal, with the switch off.
-        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: false });
+        saveProfileSettings(home, activeProfile(home).id, { [pageChat]: false });
         await posted(table.url, "/api/table/restart", { host: "antigravity" });
         expect(terminal.opened).toEqual([]);
         await until(() => terminal.opened.length === 1);
@@ -1108,7 +1108,7 @@ describe("the opening of a chat the table drives", () => {
         expect((await shown(table.url)).table).toMatchObject({ opening: "chat", openingDriven: true });
 
         // The player turns the switch off and chooses Antigravity, in a terminal, while Claude Code is still opening.
-        saveProfileSettings(home, activeProfile(home).id, { [chatInPage]: false });
+        saveProfileSettings(home, activeProfile(home).id, { [pageChat]: false });
         expect(chats.relaunch(tableFolder(home), "antigravity")).toBe(true);
         loaded.open();
         await asked;
@@ -1140,6 +1140,15 @@ describe("the opening of a chat the table drives", () => {
         } finally {
             page.destroy();
         }
+    }, 30_000);
+
+    it("opens the chat to play when the page asks it for a new game, though the page still shows the game in analysis", async () => {
+        const { table, ai } = await drivenTable();
+        await posted(table.url, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *' });
+        await opened(table.url, "claude", false);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+
+        expect(ai.chats[0]!.sent[0]).toBe("Let's play!");
     }, 30_000);
 
     it("shows the game in analysis reviewed only while the table's analyst goes over it, never while the chat only answers the player about it", async () => {

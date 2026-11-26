@@ -8,7 +8,7 @@ import type { Context, HelperRole } from "../src/commands/index.ts";
 import { loadGame } from "../src/games/index.ts";
 import { type ChatOptions, type HostChat, type HostDriver, type HostEvent, type HostId, hosts, type LineProcess } from "../src/hosts/index.ts";
 import { activeProfile, gameFolder, saveProfileSettings } from "../src/profiles/index.ts";
-import { chatInPage, drivenChats } from "../src/server/driven/index.ts";
+import { drivenChats, pageChat } from "../src/server/driven/index.ts";
 import type { TableChats } from "../src/server/page/index.ts";
 import { type TablePlaces, tablePlaces } from "../src/server/places/index.ts";
 import { startTable, type Table, type TableTimes } from "../src/server/table/index.ts";
@@ -355,7 +355,7 @@ export async function drivenTable(
 {
     const start = async (folder: string) => {
         const context = given ?? homeContext(folder);
-        saveProfileSettings(folder, activeProfile(context.home()).id, { [chatInPage]: switched });
+        saveProfileSettings(folder, activeProfile(context.home()).id, { [pageChat]: switched });
         const terminal = terminalChats();
         const withdrawn: string[] = [];
 
@@ -429,9 +429,9 @@ export function posted(url: string, path: string, body: object): Promise<{ statu
     return sent(new URL(path, url), { method: "POST", headers: { "Content-Type": "application/json", Origin: new URL(url).origin }, body: JSON.stringify(body) });
 }
 
-export function opened(url: string, host = "claude"): Promise<{ status: number; text: string; }>
+export function opened(url: string, host = "claude", review?: boolean): Promise<{ status: number; text: string; }>
 {
-    return posted(url, "/api/table/chat", { host });
+    return posted(url, "/api/table/chat", { host, ...(review === undefined ? {} : { review }) });
 }
 
 export interface Shown

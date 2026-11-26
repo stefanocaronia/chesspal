@@ -36,9 +36,10 @@ export interface HostLaunch
  * Runs the host in the table's folder, in this terminal, until it ends: its exit code; started again, clean, when the table asks for a new game (D-57),
  * or for another model or host, which then takes its place (D-107); after an update, by the Chesspal installed (D-108). Claude Code closed at its
  * start with an error, as when the player keeps No at its question on the folder, is told how to answer and started once more. Ctrl+C is the host's:
- * this process ignores it, or the terminal would close with the chat.
+ * this process ignores it, or the terminal would close with the chat. `review` says what its first start is for, as the page asked: the game in analysis,
+ * or, false, a new game, whatever the page shows meanwhile; the starts after, and one typed by hand, go by what the page shows.
  */
-export async function playHost(context: Context, host: HostName): Promise<number>
+export async function playHost(context: Context, host: HostName, review?: boolean): Promise<number>
 {
     const folder = tableFolder(context.home());
     takeSeat(folder, { pid: process.pid, host });
@@ -58,6 +59,7 @@ export async function playHost(context: Context, host: HostName): Promise<number
     let updated = false;
     // Claude Code was started once more after it closed at its start.
     let startedOnceMore = false;
+    let firstFor = review;
 
     const asked = (): boolean => {
         if (Date.now() - refreshed >= seatTimes.refresh) {
@@ -76,7 +78,9 @@ export async function playHost(context: Context, host: HostName): Promise<number
             // A request left from a second click while the host before was ending is not for this one.
             askedAgain(folder, process.pid);
             const startedAt = context.now();
-            const ran = await started(context, playing, asked).catch((error: unknown) => {
+            const forReview = firstFor;
+            firstFor = undefined;
+            const ran = await started(context, playing, asked, forReview).catch((error: unknown) => {
                 if (before === undefined) {
                     throw error;
                 }
@@ -169,7 +173,7 @@ export function runHost(launch: HostLaunch, again: () => boolean, platform: stri
  * How the host starts for the profile in use: found on the PATH, or where its installer puts it, with its choice among those the table offers; it throws,
  * saying how to install it, when it is not there, and for OpenCode, what it needs, when it offers no model.
  */
-export function hostLaunch(context: Context, host: HostName, env: NodeJS.ProcessEnv = process.env, exists?: (path: string) => boolean): HostLaunch
+export function hostLaunch(context: Context, host: HostName, env: NodeJS.ProcessEnv = process.env, exists?: (path: string) => boolean, review?: boolean): HostLaunch
 {
     const home = context.home();
     const folder = tableFolder(home);
@@ -190,7 +194,7 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     // Codex's hooks written, by this play or by the table before it: the note is for Codex's chat, and waits for it.
     const news = host === "codex" ? takeHooksNews(folder) : undefined;
     const hooks = news === undefined ? {} : { hooks: news };
-    const { choice, message, analysis } = chatStart(context, host, choices);
+    const { choice, message, analysis } = chatStart(context, host, choices, review);
     const args = hostArgs(host, message, choice, folder, choices);
     // The seat this play holds, by which its chat's server tells the table it is the chat held, and not another opened in the same folder; spawn leaves out
     // a variable that is undefined.
@@ -206,14 +210,20 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
 
 /**
  * How a chat the table opens starts, for the profile in use: the model and effort the player chose on the page for the host, among its `choices`, the
- * start message in the player's language, and whether it is for the game in analysis the page shows.
+ * start message in the player's language, and whether it is for the game in analysis the page shows: as `review` says when the page said it, since a chat
+ * opened for a new game opens while the page still shows the analysis; else as the page shows.
  */
-export function chatStart(context: Context, host: HostName, choices: HostChoices = tableChoices(tableFolder(context.home()), host)): { choice: HostChoice; message: string; analysis: boolean; }
+export function chatStart(
+    context: Context,
+    host: HostName,
+    choices: HostChoices = tableChoices(tableFolder(context.home()), host),
+    review?: boolean,
+): { choice: HostChoice; message: string; analysis: boolean; }
 {
     const home = context.home();
     const choice = choiceIn(profileSettings(home, activeProfile(home).id), host, choices);
     const games = gameFolder(home);
-    const analysis = analysisAsked(games);
+    const analysis = review ?? analysisAsked(games);
     return { choice, message: startMessage(languageIn(games, context.language), analysis), analysis };
 }
 
@@ -250,9 +260,9 @@ const closedAtStartWords = {
 };
 
 // Runs the host as runHost does, the seat noting the model and effort it is given, and whether for the analysis; one not installed, or that could not start, fails saying so.
-async function started(context: Context, host: HostName, again: () => boolean): Promise<{ code: number; again: boolean; }>
+async function started(context: Context, host: HostName, again: () => boolean, review: boolean | undefined): Promise<{ code: number; again: boolean; }>
 {
-    const launch = hostLaunch(context, host);
+    const launch = hostLaunch(context, host, process.env, undefined, review);
     takeSeat(launch.folder, { pid: process.pid, host, ...launch.choice, ...(launch.analysis ? { analysis: true } : {}) });
 
     // Codex asks the player to trust the hooks Chesspal wrote: said here, above its question, as init says it.

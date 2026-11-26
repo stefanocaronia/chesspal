@@ -85,7 +85,7 @@ export function terminalChats(
             modelsTimer ??= setInterval(readOpenCode, lookAgain).unref();
             return ollama.state();
         },
-        open: async (host) => isHostName(host) && await openTerminal(tableFolder(context.home()), playCommand(chesspal, host, env), context.platform, env),
+        open: async (host, review) => isHostName(host) && await openTerminal(tableFolder(context.home()), playCommand(chesspal, host, env, review), context.platform, env),
         // Only a chat in the table's folder can be the one chesspal play holds.
         held: (folder) => {
             const seat = samePath(folder, tableFolder(context.home())) ? seatHeld(folder, context.now()) : undefined;
@@ -96,13 +96,14 @@ export function terminalChats(
 }
 
 /**
- * What the terminal runs: `chesspal play <host>`, with the table's data folder when it has one of its own, as a playtest's: Terminal.app and Windows
- * Terminal start the chat without the table's environment.
+ * What the terminal runs: `chesspal play <host>`, `--review` for the game in analysis or `--game` to play when the page said which, with the table's data
+ * folder when it has one of its own, as a playtest's: Terminal.app and Windows Terminal start the chat without the table's environment.
  */
-export function playCommand(chesspal: readonly string[], host: string, env: NodeJS.ProcessEnv): string[]
+export function playCommand(chesspal: readonly string[], host: string, env: NodeJS.ProcessEnv, review?: boolean): string[]
 {
     const home = env.CHESSPAL_HOME?.trim();
-    return [...chesspal, "play", host, ...(home ? ["--home", home] : [])];
+    const purpose = review === undefined ? [] : [review ? "--review" : "--game"];
+    return [...chesspal, "play", host, ...purpose, ...(home ? ["--home", home] : [])];
 }
 
 // Looking on the PATH takes a few milliseconds, and the page asks at every change of the game.

@@ -30,7 +30,8 @@ export interface ChatHost
 export interface TableChats
 {
     hosts(): readonly ChatHost[];
-    open(host: string): Promise<boolean>;
+    /** Opens a chat in the host, to review the game in analysis or, `review` false, to play, whatever the page shows meanwhile; without it, as the page shows. */
+    open(host: string, review?: boolean): Promise<boolean>;
     held(folder: string): HeldChat | undefined;
     /** Asks for the chat again: with another host, or `updated`, from the Chesspal just installed (D-108). */
     relaunch(folder: string, host?: string, updated?: boolean): boolean;
@@ -334,7 +335,8 @@ const openingFor = 30_000;
  */
 async function openChat(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
 {
-    const offered = hostOffered(served, jsonOf(await bodyOf(request))?.host);
+    const asked = jsonOf(await bodyOf(request));
+    const offered = hostOffered(served, asked?.host);
 
     if (!fromTablePage(request, served)) {
         sendJson(response, 403, { error: "Only the table's own page opens a chat." });
@@ -344,7 +346,9 @@ async function openChat(request: IncomingMessage, response: ServerResponse, serv
         sendJson(response, 409, { error: "A chat is at the table, or opening: play there." });
     } else {
         const opened = noteOpening(served, "chat");
-        const started = await served.table.chats.open(offered.name);
+        // A chat opened for a new game plays, though the page still shows the game in analysis; a request that does not say goes by what the page shows.
+        const review = asked?.review;
+        const started = await served.table.chats.open(offered.name, typeof review === "boolean" ? review : undefined);
 
         if (!started && served.chatOpened === opened) {
             served.chatOpened = undefined;

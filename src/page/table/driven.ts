@@ -46,9 +46,9 @@ export const drivenHosts: Readonly<Record<string, string>> = { claude: "Claude C
  * Whether the window's button opens the chat in the page, with no terminal: in a host the table drives, with the switch on, and never in place of a chat
  * in a terminal, which starts again where it is.
  */
-export function opensInPage(table: DrivenTable, settings: Pick<Settings, "chatInPage">, host: string | undefined): boolean
+export function opensInPage(table: DrivenTable, settings: Pick<Settings, "pageChat">, host: string | undefined): boolean
 {
-    return settings.chatInPage && host !== undefined && Object.hasOwn(drivenHosts, host) && (!table.chat || table.driven === true);
+    return settings.pageChat && host !== undefined && Object.hasOwn(drivenHosts, host) && (!table.chat || table.driven === true);
 }
 
 /** The name for the player of a host the table drives: Claude Code's where the host is not one of them, as a failure told by an older table. */

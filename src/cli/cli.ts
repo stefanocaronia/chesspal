@@ -17,13 +17,15 @@ if (args.length === 0) {
 } else if (args.length === 2 && args[0] === "icon" && args[1] === "--remove") {
     const [{ defaultContext }, { iconsRemoved }] = await Promise.all([import("../commands/index.ts"), import("./icon.ts")]);
     console.log(iconsRemoved(defaultContext()));
-} else if (args[0] === "play" && (args.length === 2 || (args.length === 4 && args[2] === "--home")) && !args[1]!.startsWith("-")) {
+} else if (args[0] === "play" && playArgs(args.slice(1)) !== undefined) {
+    const play = playArgs(args.slice(1))!;
+
     // The data folder of a table started with CHESSPAL_HOME, which a terminal the table opens may not pass on (Terminal.app): the chat and its server read it.
-    if (args[3] !== undefined) {
-        process.env.CHESSPAL_HOME = args[3];
+    if (play.home !== undefined) {
+        process.env.CHESSPAL_HOME = play.home;
     }
 
-    await playHere(args[1]!);
+    await playHere(play.host, play.review);
 } else if (args.length === 1 && args[0] === "mcp") {
     await serveMcp();
 } else if (args[0] === "listen" && (args.length === 1 || (args.length === 2 && listenFlags.has(args[1]!)))) {
@@ -89,8 +91,25 @@ async function putIconHere(): Promise<void>
     }
 }
 
+/**
+ * What `chesspal play` is given: its host, then, from the table's buttons, `--review` or `--game`, what its chat is for, and `--home` with the data folder;
+ * undefined for anything else, which the help refuses.
+ */
+function playArgs(args: readonly string[]): { host: string; review?: boolean; home?: string; } | undefined
+{
+    const [host, ...rest] = args;
+    const purpose = rest[0] === "--review" || rest[0] === "--game" ? rest.shift() : undefined;
+    const home = rest[0] === "--home" && rest.length === 2 ? rest[1] : undefined;
+
+    if (host === undefined || host.startsWith("-") || (rest.length > 0 && home === undefined)) {
+        return undefined;
+    }
+
+    return { host, ...(purpose === undefined ? {} : { review: purpose === "--review" }), ...(home === undefined ? {} : { home }) };
+}
+
 /** A chat at the table in this terminal, in the host named, until it ends: what the table's buttons run. */
-async function playHere(host: string): Promise<void>
+async function playHere(host: string, review?: boolean): Promise<void>
 {
     const [{ isHostName, playHost }, { defaultContext }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts")]);
 
@@ -101,7 +120,7 @@ async function playHere(host: string): Promise<void>
     }
 
     try {
-        process.exitCode = await playHost(defaultContext(), host);
+        process.exitCode = await playHost(defaultContext(), host, review);
     } catch (error) {
         console.error((error as Error).message);
         process.exitCode = 1;

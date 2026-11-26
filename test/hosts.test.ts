@@ -94,6 +94,9 @@ describe("a chat the table opens", () => {
         startAnalysis(gameFolder(home), "2026-11-13-192013.pgn", context.now());
         expect(hostLaunch(context, "claude", { PATH: "/usr/bin" }, there).args[0]).toBe("Let's analyse the game!");
 
+        // Opened from New game, the chat plays, though the page still shows the analysis.
+        expect(hostLaunch(context, "claude", { PATH: "/usr/bin" }, there, false)).toMatchObject({ analysis: false, args: expect.arrayContaining(["Let's play!"]) });
+
         await commands.find((command) => command.name === "new_game")!.run({ ai_colour: "black" }, context);
         expect(hostLaunch(context, "claude", { PATH: "/usr/bin" }, there).args[0]).toBe("Let's play!");
     });
@@ -236,6 +239,9 @@ describe("a chat the table opens", () => {
     it("names the table's own data folder to the chat it opens, which a terminal may start without the table's environment", () => {
         expect(playCommand(["node", "cli.js"], "claude", {})).toEqual(["node", "cli.js", "play", "claude"]);
         expect(playCommand(["node", "cli.js"], "codex", { CHESSPAL_HOME: "/runs/home" })).toEqual(["node", "cli.js", "play", "codex", "--home", "/runs/home"]);
+        // What the chat is for, when the page said it: to review the game in analysis, or to play.
+        expect(playCommand(["node", "cli.js"], "codex", { CHESSPAL_HOME: "/runs/home" }, false)).toEqual(["node", "cli.js", "play", "codex", "--game", "--home", "/runs/home"]);
+        expect(playCommand(["node", "cli.js"], "claude", {}, true)).toEqual(["node", "cli.js", "play", "claude", "--review"]);
     });
 
     it("keeps each host's choice in the page's settings, a word alone", () => {

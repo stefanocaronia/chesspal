@@ -10,8 +10,8 @@ const driven: DrivenTable = { chat: true, driven: true };
 const atWork: DrivenTable = { ...driven, atWork: true };
 const inTerminal: DrivenTable = { chat: true };
 const failed = { why: "exit code 1", code: "program-ended", number: 2 };
-const on = settingsFrom({ chatInPage: true, chatHost: "claude" });
-const off = settingsFrom({ chatHost: "claude" });
+const on = settingsFrom({ chatHost: "claude" });
+const off = settingsFrom({ pageChat: false, chatHost: "claude" });
 const languages = [textFor(["it"]), textFor(["en"])];
 // The words that send the player to the host's own window, in either language.
 const terminal = /terminal|finestra dove|window where|\/clear, then|scrivi \/clear|chesspal play|trust|fid/i;
@@ -25,10 +25,11 @@ describe("the page with a chat the table drives", () => {
         expect(drivenHosts).toEqual(served);
     });
 
-    it("keeps the switch off until the player turns it on", () => {
-        expect(settingsFrom({}).chatInPage).toBe(false);
-        expect(settingsFrom({ chatInPage: "yes" }).chatInPage).toBe(false);
-        expect(on.chatInPage).toBe(true);
+    it("keeps the switch on until the player turns it off, whatever the old switch, off by default, said", () => {
+        expect(settingsFrom({}).pageChat).toBe(true);
+        expect(settingsFrom({ pageChat: "no" }).pageChat).toBe(true);
+        expect(settingsFrom({ chatInPage: false }).pageChat).toBe(true);
+        expect(off.pageChat).toBe(false);
     });
 
     it("opens the chat in the page in every host the table offers, with the switch on, and never in place of a chat in a terminal", () => {

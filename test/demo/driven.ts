@@ -13,7 +13,7 @@ import { type Context, defaultContext, withProfile } from "../../src/commands/re
 import { endOf, loadGame } from "../../src/games/index.ts";
 import type { ChatOptions, HostChat, HostDriver, HostEvent } from "../../src/hosts/index.ts";
 import { activeProfile, gameFolder, saveProfileSettings } from "../../src/profiles/index.ts";
-import { chatInPage, drivenChats } from "../../src/server/driven/index.ts";
+import { drivenChats, pageChat } from "../../src/server/driven/index.ts";
 import type { TableChats } from "../../src/server/page/index.ts";
 import { tablePlaces } from "../../src/server/places/index.ts";
 import { hostChoices } from "../../src/server/table/hosts/hosts.ts";
@@ -77,7 +77,7 @@ if (activeProfile(context.home()).new === true) {
     newProfile.run(newProfile.input.parse({ name: "Demo", level: "regular" }), context);
 }
 
-saveProfileSettings(context.home(), activeProfile(context.home()).id, { [chatInPage]: !process.argv.includes("--off") });
+saveProfileSettings(context.home(), activeProfile(context.home()).id, { [pageChat]: !process.argv.includes("--off") });
 
 const chats: FakeChat[] = [];
 const table = await startTable(

@@ -285,7 +285,7 @@ function ChatForm({ review, onKeep, table, settings, onChange, name, onStarted, 
             return;
         }
 
-        const done = table.chat ? await restartChat(host.name) : await openChat(host.name);
+        const done = table.chat ? await restartChat(host.name) : await openChat(host.name, review);
         setSending(false);
 
         if (done) {
@@ -397,10 +397,10 @@ function shortName(value: string): string
     return value.replace(/^gpt-/, "");
 }
 
-/** Asks the table to open a terminal with a chat in the host: whether it did. */
-function openChat(host: string): Promise<boolean>
+/** Asks the table to open a chat in the host, to review the game in analysis or else to play: whether it did. */
+function openChat(host: string, review: boolean): Promise<boolean>
 {
-    return asked("/api/table/chat", { host }, (answer) => answer.opened === true);
+    return asked("/api/table/chat", { host, review }, (answer) => answer.opened === true);
 }
 
 /** Asks the table to start at once the chat or the new game that waits, cutting the chat's answer, or to let the request go. */

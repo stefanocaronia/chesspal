@@ -45,8 +45,8 @@ export interface Settings
     readonly antigravityEffort: string;
     readonly opencodeModel: string;
     readonly opencodeEffort: string;
-    /** Whether the table drives Claude Code's chat itself, without a terminal: off until the player turns it on; the table reads it at each opening. */
-    readonly chatInPage: boolean;
+    /** Whether the table drives the chat itself, in the page, without a terminal: on until the player turns it off; the table reads it at each opening. */
+    readonly pageChat: boolean;
 }
 
 /** The settings this browser remembers, each one it does not know taking its default; the theme and the sounds chosen before the panel come along. */
@@ -85,7 +85,7 @@ export function settingsFrom(value: unknown, defaults: Pick<Settings, "theme" | 
         antigravityEffort: word(stored.antigravityEffort),
         opencodeModel: modelName(stored.opencodeModel),
         opencodeEffort: word(stored.opencodeEffort),
-        chatInPage: typeof stored.chatInPage === "boolean" ? stored.chatInPage : false,
+        pageChat: typeof stored.pageChat === "boolean" ? stored.pageChat : true,
     };
 }
 
