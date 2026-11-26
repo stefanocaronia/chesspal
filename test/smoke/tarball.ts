@@ -45,10 +45,23 @@ try {
     removeTemporary();
 }
 
+interface Packed
+{
+    readonly filename: string;
+    readonly files: { readonly path: string; }[];
+}
+
 /** The package packed as npm publishes it, with the files a player needs and none of the repository's own. */
 function packed(): string
 {
-    const [pack] = JSON.parse(npm(["pack", "--json", "--pack-destination", temporary], repository)) as [{ filename: string; files: { path: string; }[]; }];
+    // npm up to 11 gives a list of the packages packed; npm 12 an object by their names.
+    const packs = JSON.parse(npm(["pack", "--json", "--pack-destination", temporary], repository)) as Packed[] | Record<string, Packed>;
+    const [pack] = Array.isArray(packs) ? packs : Object.values(packs);
+
+    if (pack === undefined) {
+        throw new Error("npm pack gave no package: run it by hand to see why");
+    }
+
     const files = pack.files.map(({ path }) => path.replaceAll("\\", "/"));
     check(`npm pack: ${pack.filename}, ${files.length} files`, files.length > 0);
     check("the package holds the command line and the opponent's instructions", files.includes("dist/cli/cli.js") && files.includes("instructions/opponent.md") && files.includes("instructions/start.md"));
