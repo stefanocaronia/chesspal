@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { settingsFrom } from "../src/page/profile/settings.ts";
-import { canStop, drivenAsleep, type DrivenTable, failuresSaid, failuresSaidAtLoad, failureToSay, opensDriven, opensInPage, stoppedOnMove } from "../src/page/table/driven.ts";
+import { canStop, drivenAsleep, type DrivenTable, failureCodes, failuresSaid, failuresSaidAtLoad, failureToSay, opensInPage, stalledOnMove, workShown } from "../src/page/table/driven.ts";
 import { type Text, textFor, withoutTerminal } from "../src/page/text.ts";
 
 const none: DrivenTable = { chat: false };
 const driven: DrivenTable = { chat: true, driven: true };
+const atWork: DrivenTable = { ...driven, atWork: true };
 const inTerminal: DrivenTable = { chat: true };
-const failed = { why: "the host's program ended (exit code 1)", number: 2 };
+const failed = { why: "The chat's program stopped by itself: open the chat again from the board page. (exit code 1)", code: "program-ended", number: 2 };
 const on = settingsFrom({ chatInPage: true, chatHost: "claude" });
 const off = settingsFrom({ chatHost: "claude" });
 const languages = [textFor(["it"]), textFor(["en"])];
@@ -29,36 +30,44 @@ describe("the page with a chat the table drives", () => {
         expect(opensInPage(none, on, undefined)).toBe(false);
     });
 
-    it("takes the chat opening for one in the page by the switch and the host the window last opened, until the table says", () => {
-        expect(opensDriven({ ...none, opening: "chat" }, on)).toBe(true);
-        expect(opensDriven({ ...none, opening: "chat" }, off)).toBe(false);
-        expect(opensDriven({ ...none, opening: "chat" }, settingsFrom({ chatInPage: true, chatHost: "codex" }))).toBe(false);
-        expect(opensDriven(none, on)).toBe(false);
+    it("shows the mark that stops the AI while a turn of the chat the table drives runs, whatever it is for", () => {
+        expect(canStop(atWork)).toBe(true);
+        expect(canStop(driven)).toBe(false);
+        expect(canStop({ ...inTerminal, atWork: true })).toBe(false);
+        expect(canStop(none)).toBe(false);
+        expect(canStop(undefined)).toBe(false);
     });
 
-    it("shows the mark that stops the AI only with a chat the table drives, while the AI thinks on its move", () => {
-        expect(canStop(driven, "move")).toBe(true);
-        expect(canStop(driven, undefined)).toBe(false);
-        expect(canStop(driven, "ponder")).toBe(false);
-        expect(canStop(inTerminal, "move")).toBe(false);
-        expect(canStop(none, "move")).toBe(false);
-        expect(canStop(undefined, "move")).toBe(false);
+    it("shows the thought cloud the table tells, and an answer's with a chat at work on anything else, so that the mark never stands alone", () => {
+        expect(workShown(atWork, "move")).toBe("move");
+        expect(workShown(atWork, undefined)).toBe("answer");
+        expect(workShown(driven, undefined)).toBeUndefined();
+        expect(workShown(inTerminal, "ponder")).toBe("ponder");
+        expect(workShown(undefined, undefined)).toBeUndefined();
     });
 
-    it("says the player stopped the AI at the position they did, while it is still to move there and thinks no more", () => {
-        expect(stoppedOnMove("game 3", "game 3", true, undefined)).toBe(true);
-        expect(stoppedOnMove("game 3", "game 3", true, "move")).toBe(false);
-        expect(stoppedOnMove("game 3", "game 4", true, undefined)).toBe(false);
-        expect(stoppedOnMove("game 3", "game 3", false, undefined)).toBe(false);
-        expect(stoppedOnMove(undefined, "game 3", true, undefined)).toBe(false);
+    it("says the AI at rest on its move, stopped by the player or with its turns ended without moving, as the table tells every page", () => {
+        expect(stalledOnMove({ ...driven, stopped: true }, true)).toBe("stopped");
+        expect(stalledOnMove({ ...driven, noMove: true }, true)).toBe("noMove");
+        // Stopped on the player's move, or between games, there is nothing the player need do.
+        expect(stalledOnMove({ ...driven, stopped: true }, false)).toBeUndefined();
+        expect(stalledOnMove({ ...atWork, stopped: true }, true)).toBeUndefined();
+        expect(stalledOnMove(driven, true)).toBeUndefined();
+        expect(stalledOnMove({ ...inTerminal, stopped: true }, true)).toBeUndefined();
+        expect(stalledOnMove(undefined, true)).toBeUndefined();
     });
 
     it("says the failure of the chat that left the table, and of a turn of the chat still at it, never another chat's nor while one opens", () => {
-        expect(failureToSay({ ...none, failed }, 0)).toEqual({ kind: "closed", why: failed.why });
-        expect(failureToSay({ ...driven, failed }, 0)).toEqual({ kind: "turn", why: failed.why });
+        expect(failureToSay({ ...none, failed }, 0)).toEqual({ kind: "closed", code: "program-ended", why: failed.why });
+        expect(failureToSay({ ...driven, failed }, 0)).toEqual({ kind: "turn", code: "program-ended", why: failed.why });
         expect(failureToSay({ ...inTerminal, failed }, 0)).toBeUndefined();
         expect(failureToSay({ ...none, opening: "chat", failed }, 0)).toBeUndefined();
         expect(failureToSay(none, 0)).toBeUndefined();
+    });
+
+    it("says a failure whose code it does not know, or that has none, as any other", () => {
+        expect(failureToSay({ ...none, failed: { ...failed, code: "from-a-newer-table" } }, 0)?.code).toBe("other");
+        expect(failureToSay({ ...none, failed: { why: "Something else.", number: 1 } }, 0)?.code).toBe("other");
     });
 
     it("says each failure once: not the one said or closed, the next one again", () => {
@@ -81,9 +90,27 @@ describe("the page with a chat the table drives", () => {
 
     it("offers to start the chat again when it does not listen, in place of sending the player to a window it does not have", () => {
         expect(drivenAsleep(driven, false)).toBe(true);
+        // In its first turn, before any tool, the doorbell does not know it yet: it is at work, and hears the player at the turn's end.
+        expect(drivenAsleep(atWork, false)).toBe(false);
         expect(drivenAsleep(driven, true)).toBe(false);
         expect(drivenAsleep(driven, undefined)).toBe(false);
         expect(drivenAsleep(inTerminal, false)).toBe(false);
+    });
+
+    it("has a line of its own for each failure the table tells apart, of a chat that left and of a turn, naming the host, in both languages", () => {
+        for (const text of languages) {
+            const { closed, turnFailed } = text.table.inPage;
+            expect(Object.keys(closed).sort()).toEqual([...failureCodes].sort());
+            expect(Object.keys(turnFailed).sort()).toEqual([...failureCodes].sort());
+            expect(new Set(failureCodes.map((code) => closed[code]("Claude Code"))).size).toBe(failureCodes.length);
+            expect(closed["not-signed-in"]("Claude Code")).toContain("Claude Code");
+            expect(turnFailed["usage-limit"]("Claude", "Claude Code")).toContain("Claude Code");
+            // A turn that failed for no reason the player can act on says only to write again.
+            expect(turnFailed["program-ended"]("Claude", "Claude Code")).toBe(turnFailed.other("Claude", "Claude Code"));
+        }
+
+        expect(languages[0]!.table.inPage.closed["not-signed-in"]("Claude Code")).toBe("Claude Code non è entrato nel tuo account. Apri Claude Code una volta, fuori da Chesspal, ed entra; poi riapri la chat da qui.");
+        expect(languages[1]!.table.inPage.closed["usage-limit"]("Claude Code")).toBe("You have reached the usage limit of your Claude Code account: open the chat again later, or choose another.");
     });
 
     it("never names the terminal, the host's window, /clear to type or chesspal play in the words of a chat in the page, in both languages", () => {
@@ -115,14 +142,16 @@ describe("the page with a chat the table drives", () => {
         expect(italian!.switchNote).toBe("Per ora solo con Claude Code. Vale dalla prossima chat.");
         expect(english!.switchNote).toBe("Only with Claude Code for now. It applies from the next chat.");
         expect(english!.stop("Claude")).toBe("Stop Claude");
+        expect(languages[0]!.thinking.answer).toBe("Sta rispondendo");
     });
 });
 
 /** Everything the page says of a chat in the page, but the switch's own label, which names what it does without. */
 function saidInPage(text: Text): string[]
 {
-    const { switch: label, ...words } = text.table.inPage;
+    const { switch: label, closed, turnFailed, noMove, ...words } = text.table.inPage;
     const kept = withoutTerminal(text);
     const said = Object.values(words).map((one) => typeof one === "function" ? one("Claude") : one);
-    return [...said, kept.clearChat("Claude"), kept.commandHere("Claude"), kept.offline("Claude"), kept.refused["clear-chat"](0, "Claude")];
+    const failures = failureCodes.flatMap((code) => [closed[code]("Claude Code"), turnFailed[code]("Claude", "Claude Code")]);
+    return [...said, ...failures, ...noMove("Claude"), kept.clearChat("Claude"), kept.commandHere("Claude"), kept.offline("Claude"), kept.refused["clear-chat"](0, "Claude")];
 }

@@ -5,6 +5,7 @@ import type { Step } from "./game/browse.ts";
 import type { HowEnded } from "./game/ending.ts";
 import type { StrategyRow, Tone } from "./helps/view.ts";
 import type { AvatarId, Level, Speed } from "./profile/profile.ts";
+import type { FailureCode } from "./table/driven.ts";
 
 /** The words of the page in one language. */
 export interface Text
@@ -217,8 +218,8 @@ export interface Text
         readonly typeIt: string;
         /**
          * A chat the table drives in the page, with no terminal (D-125): the switch in the settings; the window's notes on the host that plays in the
-         * page; the mark that stops the AI and what the page says once it is stopped; the host's failure, whose own words follow; and what stands in
-         * place of the words that send the player to the host's window.
+         * page; the mark that stops the AI and what the page says of the AI at rest on its move; the host's failure, whose own words follow; and what
+         * stands in place of the words that send the player to the host's window.
          */
         readonly inPage: {
             readonly experimental: string;
@@ -231,18 +232,22 @@ export interface Text
             readonly notOpened: string;
             readonly notRestarted: string;
             stop(name: string): string;
+            /** The AI at rest on its move, its clock held: the player stopped it; or it ended its turns without moving, the last words opening the chat's window. */
             stopped(name: string): string;
-            /** Lines that open the chat's window: the chat left the table; it does not listen. */
-            readonly closed: string;
+            noMove(name: string): readonly [words: string, restart: string];
+            /** The host's failure by the table's code, the host named: of the chat that left the table or never opened, and of a turn of the chat still at it. */
+            readonly closed: Readonly<Record<FailureCode, (host: string) => string>>;
+            readonly turnFailed: Readonly<Record<FailureCode, (name: string, host: string) => string>>;
+            /** Lines that open the chat's window: under the failure of a chat that left; and of a chat that does not listen. */
+            readonly reopen: string;
             asleep(name: string): string;
-            turnFailed(name: string): string;
             clearChat(name: string): string;
             commandHere(name: string): string;
             offline(name: string): string;
         };
     };
-    /** The thought cloud on the Torretta, by what the AI thinks on: its move, or on the player's time (D-72). */
-    thinking: { readonly move: string; readonly ponder: string; };
+    /** The thought cloud on the Torretta, by what the AI thinks on: its move, or on the player's time (D-72); and a chat the table drives at work on an answer. */
+    thinking: { readonly move: string; readonly ponder: string; readonly answer: string; };
     /** The button that starts the clocks, which wait for the player from the game's start. */
     readonly startClocks: string;
     /** A command such as /clear written in the page's talk, which is for the host's window. */
@@ -799,7 +804,7 @@ const english: Text = {
     },
     offline: (name) => `${name} is not connected. Write it a message in the window where you opened ${name}, not in this page's chat: the page connects again by itself.`,
     startClocks: "Start",
-    thinking: { move: "Thinking about its move", ponder: "Thinking while you play" },
+    thinking: { move: "Thinking about its move", ponder: "Thinking while you play", answer: "Answering" },
     asleep: (name) => `${name} is not listening: write a message, such as "hi", in the window where you opened ${name}, not here. Its clock waits until it answers.`,
     asleepInAnalysis: (name) => `${name} is not listening: write to it in the window where you opened it, not here.`,
     table: {
@@ -846,9 +851,23 @@ const english: Text = {
             notRestarted: "The chat did not start again: try once more.",
             stop: (name) => `Stop ${name}`,
             stopped: (name) => `You stopped ${name}, and it is still its move: write to it to have it go on.`,
-            closed: "The chat has closed: open it again",
+            noMove: (name) => [`${name} ended its turn without moving, and its clock waits: write to it that it is its move, or`, "start it again"],
+            closed: {
+                "not-signed-in": (host) => `${host} is not signed in to your account. Open ${host} once, outside Chesspal, and sign in; then open the chat again from here.`,
+                "program-missing": (host) => `I cannot find ${host}'s program on this computer: install it, then open the chat again.`,
+                "usage-limit": (host) => `You have reached the usage limit of your ${host} account: open the chat again later, or choose another.`,
+                "program-ended": (host) => `${host}'s program closed by itself.`,
+                other: () => "The chat has closed.",
+            },
+            turnFailed: {
+                "not-signed-in": (name, host) => `${host} is no longer signed in to your account. Open ${host} once, outside Chesspal, and sign in; then write to ${name}.`,
+                "program-missing": (name) => english.table.inPage.turnFailed.other(name, ""),
+                "usage-limit": (name, host) => `You have reached the usage limit of your ${host} account: write to ${name} later, or choose another chat.`,
+                "program-ended": (name) => english.table.inPage.turnFailed.other(name, ""),
+                other: (name) => `${name} could not answer: write to it to have it try again.`,
+            },
+            reopen: "Open the chat again",
             asleep: (name) => `${name} is not listening yet: if it stays so, start it again`,
-            turnFailed: (name) => `${name} could not answer: write to it to have it try again.`,
             clearChat: (name) => `Before a new game the chat with ${name} must start again clean: restart it from the chat's window, on ${name}'s name.`,
             commandHere: (name) => `With the chat in the page, /clear and the other commands are not needed: for a clean chat or another model, restart it from ${name}'s name.`,
             offline: (name) => `Chesspal has closed. Open it again: the page connects again by itself, and the chat with ${name} goes on.`,
@@ -1287,7 +1306,7 @@ const italian: Text = {
     },
     offline: (name) => `${name} è scollegato. Scrivigli un messaggio nella finestra dove hai aperto ${name}, non nella chat di questa pagina: la pagina si ricollega da sola.`,
     startClocks: "Inizia",
-    thinking: { move: "Sta pensando alla sua mossa", ponder: "Pensa mentre giochi tu" },
+    thinking: { move: "Sta pensando alla sua mossa", ponder: "Pensa mentre giochi tu", answer: "Sta rispondendo" },
     asleep: (name) => `${name} non ti sta ascoltando: scrivi un messaggio, per esempio "ciao", nella finestra dove hai aperto ${name}, non qui. Il suo orologio aspetta che risponda.`,
     asleepInAnalysis: (name) => `${name} non ti sta ascoltando: scrivigli nella finestra dove l'hai aperto, non qui.`,
     table: {
@@ -1335,9 +1354,23 @@ const italian: Text = {
             notRestarted: "La chat non è ripartita: riprova.",
             stop: (name) => `Ferma ${name}`,
             stopped: (name) => `Hai fermato ${name}, e tocca ancora a lui: scrivigli per farlo riprendere.`,
-            closed: "La chat si è chiusa: riaprila",
+            noMove: (name) => [`${name} ha chiuso il turno senza muovere, e il suo orologio aspetta: scrivigli che tocca a lui, o`, "riavvialo"],
+            closed: {
+                "not-signed-in": (host) => `${host} non è entrato nel tuo account. Apri ${host} una volta, fuori da Chesspal, ed entra; poi riapri la chat da qui.`,
+                "program-missing": (host) => `Non trovo il programma di ${host} su questo computer: installalo, poi riapri la chat.`,
+                "usage-limit": (host) => `Hai raggiunto il limite d'uso del tuo account di ${host}: riapri la chat più tardi, o scegline un'altra.`,
+                "program-ended": (host) => `Il programma di ${host} si è chiuso da solo.`,
+                other: () => "La chat si è chiusa.",
+            },
+            turnFailed: {
+                "not-signed-in": (name, host) => `${host} non è più dentro il tuo account. Apri ${host} una volta, fuori da Chesspal, ed entra; poi scrivi a ${name}.`,
+                "program-missing": (name) => italian.table.inPage.turnFailed.other(name, ""),
+                "usage-limit": (name, host) => `Hai raggiunto il limite d'uso del tuo account di ${host}: scrivi a ${name} più tardi, o scegli un'altra chat.`,
+                "program-ended": (name) => italian.table.inPage.turnFailed.other(name, ""),
+                other: (name) => `${name} non è riuscito a rispondere: scrivigli per farlo riprovare.`,
+            },
+            reopen: "Riapri la chat",
             asleep: (name) => `${name} non ti sta ancora ascoltando: se resta fermo, riavvialo`,
-            turnFailed: (name) => `${name} non è riuscito a rispondere: scrivigli per farlo riprovare.`,
             clearChat: (name) => `Prima di una nuova partita la chat con ${name} deve ripartire pulita: riavviala dalla finestra della chat, sul nome di ${name}.`,
             commandHere: (name) => `Con la chat nella pagina /clear e gli altri comandi non servono: per una chat pulita o un altro modello, riavviala dal nome di ${name}.`,
             offline: (name) => `Chesspal si è chiuso. Riaprilo: la pagina si ricollega da sola e la chat con ${name} riprende.`,

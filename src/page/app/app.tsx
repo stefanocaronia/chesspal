@@ -65,7 +65,7 @@ import { keepSettings, type ProfileShown } from "../profile/profile.ts";
 import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "../profile/settings.ts";
 import { endSoundOf, playSound, soundOf, wakeSounds } from "../sounds/sounds.ts";
 import { holdsChoice, withStartedChoice } from "../table/action.ts";
-import { canStop, drivenAsleep, failuresSaid, failuresSaidAtLoad, failureToSay, opensDriven, stoppedOnMove } from "../table/driven.ts";
+import { canStop, drivenAsleep, failuresSaid, failuresSaidAtLoad, failureToSay, stalledOnMove, workShown } from "../table/driven.ts";
 import { UpdateDialog, UpdateNotice } from "../table/update.tsx";
 import { AiNameButton, ChatDialog, type DrivenNotes, StopButton, tableNote } from "../table/window.tsx";
 import { AiNote, Compose, PointSquare, TalkFaces, Thread } from "../talk/talk.tsx";
@@ -227,13 +227,6 @@ export function App({ start }: { start: Settings; })
             setFailuresTold((told) => told === undefined ? failuresSaidAtLoad(served.table) : failuresSaid(served.table, told));
         }
     }, [served === undefined, failedNumber]);
-    // The position the player stopped the AI at, on its move, with a chat the table drives: the page says so until the AI thinks again.
-    const [stoppedAt, setStoppedAt] = useState<string | undefined>(undefined);
-    useEffect(() => {
-        if (served?.thinking !== undefined) {
-            setStoppedAt(undefined);
-        }
-    }, [served?.thinking]);
 
     // The game is replayed from its PGN once for each one the server sends, not at every click. Once no game goes on, the game in analysis shows in its place
     // (D-69), with the AI's badges and notes: replayed again only when its review changed.
@@ -574,12 +567,19 @@ export function App({ start }: { start: Settings; })
         : undefined;
     // The clocks only in a game going on: between games the player's card holds the next one in their place (D-77).
     const clock = going ? game?.clock : undefined;
-    // No chat hears the player: the page says where to wake it, and the AI's clock waits, as the server holds it.
-    const asleep = served.listening === false && !offline;
+    // No chat hears the player: the page says where to wake it, and the AI's clock waits, as the server holds it. A chat the table drives hears them at
+    // the end of the turn it is in, its first too, before any tool of it has told the doorbell.
+    const asleep = served.listening === false && !offline && served.table?.atWork !== true;
+    // On the table, what its chat is doing stands on the page (D-107), and a chat the table drives is stopped from it (D-125).
+    const table = offline ? undefined : served.table;
     // What the AI thinks on, a cloud at the Torretta's corner (Zoe): only in a game going on, and never while no chat hears the player, which the note says.
     const thinking = going && !asleep && !offline && studied === undefined ? served.thinking : undefined;
+    // A chat the table drives shows the cloud at any work of its own, between games too: the mark that stops it never stands alone.
+    const working = studied === undefined && !asleep ? workShown(table, thinking) : thinking;
+    // The AI at rest on its move, with a chat the table drives: the player stopped it, or it ended its turns without moving. Its clock is held.
+    const stalled = stalledOnMove(table, going && !ended && live.position.turn === ai);
     const thinker = (size: number): ComponentChildren => (
-        <Thinker thinking={thinking} words={text.thinking}>
+        <Thinker thinking={working} words={text.thinking}>
             <Torretta size={size} mood={mood} bust />
         </Thinker>
     );
@@ -591,20 +591,27 @@ export function App({ start }: { start: Settings; })
                 clock={clock}
                 side={side}
                 toMove={!ended && live.position.turn === side}
-                held={pending !== undefined || (asleep && side === ai)}
+                held={pending !== undefined || ((asleep || stalled !== undefined) && side === ai)}
                 onFlag={reload}
                 text={text}
             />
         );
     // Where to wake the chat, under the AI's card (over the board when the talk is folded); the button that starts the clocks, under the player's (Zoe).
     // On the table, what its chat is doing stands there, and in a game with no chat at it a line that opens the chat's window (D-107).
-    const table = offline ? undefined : served.table;
+    // With a chat the table drives (D-125), the mark that stops the AI while a turn of it runs: beside its clock, over the box in analysis, and under the
+    // tab of the talk folded away. In analysis no Torretta thinks: the cloud of its answer stands by the mark.
+    const stop = canStop(table) ? <StopButton name={name} text={text} /> : null;
     // In analysis the chat that answers stands over the box: its name opens its window, as on the AI's card in a game.
-    const chatName = table === undefined ? undefined : <AiNameButton name={name} table={table} onOpen={askChat} text={text} />;
-    // With a chat the table drives (D-125): the mark that stops the AI while it thinks on its move, beside its clock; and in the note's place the chat that
-    // opens in the page, its failure still to say, the chat that does not listen, and the AI the player stopped on its move.
-    const position = `${game?.started ?? ""} ${total}`;
-    const stop = canStop(table, thinking) ? <StopButton name={name} onStopped={() => setStoppedAt(position)} text={text} /> : null;
+    const chatButton = table === undefined ? undefined : <AiNameButton name={name} table={table} onOpen={askChat} text={text} />;
+    const chatName = table?.driven === true
+        ? (
+            <div class="chat-who">
+                {chatButton}
+                {stop === null ? null : <Thought thinking="answer" words={text.thinking} />}
+                {stop}
+            </div>
+        )
+        : chatButton;
     const failure = table === undefined || failuresTold === undefined ? undefined : failureToSay(table, failuresTold);
     const closeFailure = (): void => setFailuresTold(table?.failed?.number ?? 0);
 
@@ -615,10 +622,10 @@ export function App({ start }: { start: Settings; })
         }
     };
 
+    // In the note's place, of a chat the table drives: its failure still to say, the chat that does not listen, and the AI at rest on its move.
     const drivenNotes: DrivenNotes | undefined = table === undefined ? undefined : {
-        opening: opensDriven(table, settings),
         asleep: drivenAsleep(table, served.listening),
-        stopped: table.driven === true && stoppedOnMove(stoppedAt, position, going && !playerToMove, thinking),
+        ...(stalled === undefined ? {} : { stalled }),
         ...(failure === undefined ? {} : { failure, onClose: closeFailure }),
     };
     const atTable = table === undefined ? null : tableNote({ table, name, inGame: going, ...(drivenNotes === undefined ? {} : { driven: drivenNotes }), onOpen: askChat, text });
@@ -957,9 +964,10 @@ export function App({ start }: { start: Settings; })
                     <FoldTab
                         column="talk"
                         folded={folds.talk === "folded"}
-                        label={thinking === undefined || folds.talk !== "folded" ? text.talk : `${text.talk}: ${text.thinking[thinking]}`}
+                        label={working === undefined || folds.talk !== "folded" ? text.talk : `${text.talk}: ${text.thinking[working]}`}
                         unread={(unread || asleep) && folds.talk === "folded"}
-                        {...(thinking === undefined || folds.talk !== "folded" ? {} : { mark: <Thought thinking={thinking} words={text.thinking} /> })}
+                        {...(working === undefined || folds.talk !== "folded" ? {} : { mark: <Thought thinking={working} words={text.thinking} /> })}
+                        {...(stop === null || folds.talk === "open" ? {} : { beside: stop })}
                         onFold={fold}
                     />
                     <FoldTab column="game" folded={folds.game === "folded"} label={text.game} onFold={fold} />
@@ -1028,7 +1036,7 @@ export function App({ start }: { start: Settings; })
                                             {...(idle ? {} : { level: text.start.levels[level] })}
                                             taken={material.taken[ai]}
                                             ahead={ahead(ai)}
-                                            clock={going && table?.driven === true ? <span class="beside-clock">{stop}{clockOf(ai)}</span> : clockOf(ai)}
+                                            clock={table?.driven === true ? <span class="beside-clock">{stop}{clockOf(ai)}</span> : clockOf(ai)}
                                             text={text}
                                         />
                                         {asleepNote}

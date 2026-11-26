@@ -199,14 +199,61 @@
     cursor: pointer;
 }
 
-/* With a chat the table drives (D-125), the mark that stops the AI beside its clock, while it thinks: a full square, as on any player; the clock keeps
-   its place at the card's edge */
+/* With a chat the table drives (D-125), the mark that stops the AI beside its clock, while a turn of it runs: a full square, as on any player; the clock
+   keeps its place at the card's edge. Between games, with no clock, the mark stands in the middle of the card's height, as the name does */
 .player-line > .beside-clock {
     grid-column: 3;
     grid-row: 1;
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.player-line > .beside-clock:not(:has(.clock)) {
+    align-self: center;
+}
+
+/* In analysis the chat's name over the box, and the mark beside it: a line as tall as the mark, the height the name alone takes, so nothing moves */
+.chat-who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    margin-left: 12px;
+}
+
+.chat-who .ai-name {
+    color: var(--soft);
+    font-size: 0.875rem;
+}
+
+.chat-who .thought {
+    position: static;
+    flex: none;
+}
+
+.chat-who .thought circle.cloud {
+    display: none;
+}
+
+/* With the talk narrowed or folded away the AI's card is out of sight: the mark stands under the column's tab, below the thought cloud, its right edge
+   on the tab's, clear of the board and of the two faces. A button of its own, not the tab's: each of the tab's looks is taken back */
+.fold-tab.of-talk > .stop-ai,
+.fold-tab.of-talk.folded > .stop-ai {
+    position: absolute;
+    top: calc(100% + 14px);
+    right: 0;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--ink);
+}
+
+.fold-tab.of-talk.folded > .stop-ai {
+    right: var(--tuck);
 }
 
 .stop-ai {
@@ -240,6 +287,11 @@
 
 .chat-failed {
     align-items: flex-start;
+}
+
+/* Under them, the line that opens the chat's window */
+.chat-failed .no-chat-line {
+    margin-top: 6px;
 }
 
 /* No chat at the table: a hollow ring before the AI's name, and before the line that says so */

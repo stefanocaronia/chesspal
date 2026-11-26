@@ -1,14 +1,11 @@
 // The table's page with a chat the table drives, a fake one, to look at each of its states while the page is built: npm run driven. The chat's AI is a
-// script that plays through its place as a real one does; the control page says what it does next: think without end, fail, end, open slowly or not at
-// all. The data folder is CHESSPAL_HOME, or tmp/driven, never the player's own; the table's ports are moved away from a real table's.
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { ReadBuffer, serializeMessage } from "@modelcontextprotocol/sdk/shared/stdio.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
+// script that plays through its place as a real one does; the control page says what it does next: think without end, answer without moving, fail or end
+// in each way the table tells apart, open slowly or not at all. The data folder is CHESSPAL_HOME, or tmp/driven, never the player's own; the table's
+// ports are moved away from a real table's.
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { mkdirSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
-import { PassThrough } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { newProfile } from "../../src/commands/profiles/profiles.ts";
@@ -16,37 +13,54 @@ import { type Context, defaultContext, withProfile } from "../../src/commands/re
 import { endOf, loadGame } from "../../src/games/index.ts";
 import type { ChatOptions, HostChat, HostDriver, HostEvent } from "../../src/hosts/index.ts";
 import { activeProfile, gameFolder, saveProfileSettings } from "../../src/profiles/index.ts";
-import { doorVariable, keyVariable, pipeToTable } from "../../src/server/door/index.ts";
 import { chatInPage, drivenChats } from "../../src/server/driven/index.ts";
 import type { TableChats } from "../../src/server/page/index.ts";
 import { tablePlaces } from "../../src/server/places/index.ts";
 import { hostChoices } from "../../src/server/table/hosts/hosts.ts";
 import { startTable } from "../../src/server/table/index.ts";
-import { version } from "../../src/version.ts";
+import { sitAt } from "../place-client.ts";
 
 /** What the fake AI does next, set from the control page. */
 interface Script
 {
-    /** How a chat opens: as it should, with a host that cannot sign in, or with no program of the host's on the computer. */
+    /** How a chat opens: as it should, with a host that cannot sign in, or with no program of the host's where the driver looks, which opens a terminal's. */
     opening: "ok" | "login" | "missing";
     /** How long the host takes to say which chat it is, while the page shows the chat opening; and then to call its first tool, in milliseconds. */
     hold: number;
     mute: number;
-    /** A turn the bell wakes: the AI moves or answers, thinks without end, or fails. */
-    turn: "play" | "think" | "fail";
+    /** A turn the bell wakes: the AI moves or answers, thinks without end, answers without ever moving, or fails once, in the host's words `why`. */
+    turn: "play" | "think" | "quiet" | "fail";
+    why: string;
 }
 
-const script: Script = { opening: "ok", hold: 1500, mute: 0, turn: "play" };
+const script: Script = { opening: "ok", hold: 1500, mute: 0, turn: "play", why: "" };
+
+// What a host says of each failure the table tells apart, as Claude Code words them.
+const hostWords = {
+    overloaded: "API Error: 529 Overloaded. Try again in a few minutes.",
+    limit: "You've hit your usage limit · resets 3am",
+    login: "Not logged in · Please run /login",
+    ended: "the host's program ended (exit code 1)",
+    missing: "spawn claude ENOENT",
+};
+
+const fails = (why: string) => (): void => void Object.assign(script, { turn: "fail", why });
+const ends = (why: string) => (): void => chats.at(-1)?.emit({ type: "ended", why });
 const scenes: Readonly<Record<string, { label: string; set: () => void; }>> = {
     play: { label: "The AI answers each turn", set: () => void (script.turn = "play") },
     think: { label: "The AI thinks without end (stop it from the page)", set: () => void (script.turn = "think") },
-    "turn-fails": { label: "The next turn fails", set: () => void (script.turn = "fail") },
-    end: { label: "The host's program ends now", set: () => chats.at(-1)?.emit({ type: "ended", why: "the host's program ended (exit code 1)" }) },
+    quiet: { label: "The AI answers, and never moves", set: () => void (script.turn = "quiet") },
+    "turn-fails": { label: "The next turn fails: the host is overloaded", set: fails(hostWords.overloaded) },
+    "turn-limit": { label: "The next turn fails: the account's limit", set: fails(hostWords.limit) },
+    "turn-login": { label: "The next turn fails: not signed in any more", set: fails(hostWords.login) },
+    end: { label: "The host's program ends now", set: ends(hostWords.ended) },
+    "end-limit": { label: "The host's program ends now: the account's limit", set: ends(`${hostWords.ended}: ${hostWords.limit}`) },
+    "end-missing": { label: "The host's program ends now: it is not found", set: ends(hostWords.missing) },
     "open-ok": { label: "A chat opens in a second and a half", set: () => Object.assign(script, { opening: "ok", hold: 1500, mute: 0 }) },
     "open-slow": { label: "A chat takes a minute to open", set: () => Object.assign(script, { opening: "ok", hold: 60_000, mute: 0 }) },
     "open-mute": { label: "A chat opens, and calls its first tool a minute later", set: () => Object.assign(script, { opening: "ok", hold: 500, mute: 60_000 }) },
     "open-login": { label: "A chat cannot sign in", set: () => void (script.opening = "login") },
-    "open-missing": { label: "Claude Code is not on the computer", set: () => void (script.opening = "missing") },
+    "open-missing": { label: "Claude Code is not where the driver looks: a terminal's chat opens, which here opens nothing", set: () => void (script.opening = "missing") },
 };
 
 process.env.CHESSPAL_PORT_SHIFT ??= "500";
@@ -148,7 +162,7 @@ function fakeChat(options: ChatOptions, ownSession: string): HostChat
         // A host that cannot sign in fails its first turn before it says which chat it is.
         if (opening === "login") {
             await delay(hold);
-            end({ type: "turnEnd", reason: "failed", why: "Not logged in · Please run /login" });
+            end({ type: "turnEnd", reason: "failed", why: hostWords.login });
             return;
         }
 
@@ -162,13 +176,13 @@ function fakeChat(options: ChatOptions, ownSession: string): HostChat
         if (!first && script.turn === "fail") {
             script.turn = "play";
             await delay(300);
-            end({ type: "turnEnd", reason: "failed", why: "API Error: 529 Overloaded. Try again in a few minutes." });
+            end({ type: "turnEnd", reason: "failed", why: script.why });
             return;
         }
 
         client ??= sitAt(options.server!.environment);
         const sitting = await client;
-        const work = first ? startTurn(sitting) : script.turn === "think" ? new Promise<void>(() => undefined) : answerTurn(sitting);
+        const work = first ? startTurn(sitting) : script.turn === "think" ? new Promise<void>(() => undefined) : answerTurn(sitting, script.turn === "quiet");
         const done = work.then(() => "done" as const, (error: unknown) => {
             console.log(`The fake AI's turn failed: ${String(error)}`);
             return "done" as const;
@@ -208,53 +222,18 @@ async function startTurn(client: Client): Promise<void>
     await call(client, "ai_say", { text: "Eccomi. Quando vuoi, cominciamo." });
 }
 
-/** A turn the bell woke: on its move the AI plays the first legal one, after a while; else it answers the player. */
-async function answerTurn(client: Client): Promise<void>
+/** A turn the bell woke: on its move the AI plays the first legal one, after a while, unless `quiet`; else it answers the player. */
+async function answerTurn(client: Client, quiet: boolean): Promise<void>
 {
     const current = loadGame(gameFolder(context.home()));
     await delay(1200);
 
-    if (current !== undefined && endOf(current.game) === undefined && current.game.position.turn === current.ai) {
+    if (!quiet && current !== undefined && endOf(current.game) === undefined && current.game.position.turn === current.ai) {
         const move = current.game.legalMoves()[0]!.san;
         await call(client, "ai_move", { move, plan: "Play the first legal move, as a demo does.", comment: `Gioco ${move}.` });
     } else {
         await call(client, "ai_say", { text: "Ti ascolto." });
     }
-}
-
-/** A host's client at the place the environment names, through the door, as `chesspal mcp` pipes it. */
-async function sitAt(environment: Record<string, string>): Promise<Client>
-{
-    const input = new PassThrough();
-    const output = new PassThrough();
-    void pipeToTable(input, output, { door: environment[doorVariable]!, key: environment[keyVariable]!, version });
-    const client = new Client({ name: "claude-code", version: "1.0.0" });
-    await client.connect(linesTransport(input, output));
-    return client;
-}
-
-function linesTransport(input: PassThrough, output: PassThrough): Transport
-{
-    const buffer = new ReadBuffer();
-    const transport: Transport = {
-        start: async () => {
-            output.on("data", (chunk: Buffer) => {
-                buffer.append(chunk);
-
-                for (let message = buffer.readMessage(); message !== null; message = buffer.readMessage()) {
-                    transport.onmessage?.(message);
-                }
-            });
-            output.on("end", () => transport.onclose?.());
-        },
-        send: async (message: JSONRPCMessage) => {
-            input.write(serializeMessage(message));
-        },
-        close: async () => {
-            input.end();
-        },
-    };
-    return transport;
 }
 
 async function call(client: Client, name: string, args: Record<string, unknown> = {}): Promise<void>

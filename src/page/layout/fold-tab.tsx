@@ -4,14 +4,15 @@ import { type Column, foldKeys } from "./folds.ts";
 
 /**
  * The tab of a column: open, on the column's outer edge; folded, peeking out from under the board, with a dot when the AI spoke meanwhile, and a mark in the
- * other corner, as the AI's thought cloud.
+ * other corner, as the AI's thought cloud; `beside` it, under the tab, a mark of its own to press, as the one that stops the AI.
  */
-export function FoldTab({ column, folded, label, unread = false, mark, onFold }: {
+export function FoldTab({ column, folded, label, unread = false, mark, beside, onFold }: {
     column: Column;
     folded: boolean;
     label: string;
     unread?: boolean;
     mark?: ComponentChildren;
+    beside?: ComponentChildren;
     onFold: (column: Column) => void;
 })
 {
@@ -36,6 +37,7 @@ export function FoldTab({ column, folded, label, unread = false, mark, onFold }:
                 </svg>
                 {mark}
             </button>
+            {beside}
         </div>
     );
 }

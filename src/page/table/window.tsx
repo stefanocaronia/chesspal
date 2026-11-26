@@ -10,7 +10,7 @@ import { checkIcon } from "../dialogs/profiles.tsx";
 import type { Settings } from "../profile/settings.ts";
 import type { Text } from "../text.ts";
 import { canAct, chatAction, choiceKeys, chosen, effortsOf, firstHost, offeredHosts, ollamaTroubleOf, startedWith } from "./action.ts";
-import { type FailureSaid, opensDriven, opensInPage } from "./driven.ts";
+import { failureCodes, type FailureSaid, opensInPage, type Stalled } from "./driven.ts";
 
 /**
  * The chat's window: `onStarted` once a chat opens or starts again, the page then saying where it stands; `onClose` when the player closes it without;
@@ -52,22 +52,18 @@ export function AiNameButton({ name, table, onOpen, text }: { name: string; tabl
 }
 
 /**
- * The mark that stops the AI's answer, beside its clock while it thinks, with a chat the table drives: the place of Esc in a terminal. `onStopped` once
- * the table has stopped it; an answer that ended meanwhile leaves nothing to stop, and nothing to say.
+ * The mark that stops the AI, while a turn of the chat the table drives runs: beside the AI's clock, over the box in analysis, and under the tab of the
+ * talk folded away. The place of Esc in a terminal. The table tells every page what came of it; a turn that ended meanwhile leaves nothing to stop.
  */
-export function StopButton({ name, onStopped, text }: { name: string; onStopped: () => void; text: Text; })
+export function StopButton({ name, text }: { name: string; text: Text; })
 {
     const [sending, setSending] = useState(false);
     const title = text.table.inPage.stop(name);
 
     const stop = async (): Promise<void> => {
         setSending(true);
-        const stopped = await asked("/api/table/stop", {}, (answer) => answer.stopping === true);
+        await asked("/api/table/stop", {}, (answer) => answer.stopping === true);
         setSending(false);
-
-        if (stopped) {
-            onStopped();
-        }
     };
 
     return (
@@ -80,28 +76,27 @@ export function StopButton({ name, onStopped, text }: { name: string; onStopped:
 }
 
 /**
- * What the note says of a chat the table drives (D-125): whether the chat opening is one; its failure still to say, with the × that closes it; whether
- * it does not listen; and whether the player stopped it on its move.
+ * What the note says of a chat the table drives (D-125): its failure still to say, with the × that closes it; whether it does not listen; and the AI at
+ * rest on its move, stopped by the player or with its turns ended without moving.
  */
 export interface DrivenNotes
 {
-    readonly opening: boolean;
     readonly failure?: FailureSaid;
     readonly onClose?: () => void;
     readonly asleep: boolean;
-    readonly stopped: boolean;
+    readonly stalled?: Stalled;
 }
 
 /**
  * The note on the chat at the table where the asleep note stands: one opening or starting again; one waiting to, or a new game waiting for it, with a ↻
  * that starts it at once and a × that lets the request go; in a game with no chat at the table, a line that opens the chat's window. Of a chat the table
- * `driven`: its failure, in the host's words under the page's own, once; a line that opens the chat's window when it does not listen; and what to do once
- * it was stopped on its move. None otherwise.
+ * `driven`: its failure, in the host's words under the page's own, once; a line that opens the chat's window when it does not listen; and what to do with
+ * the AI at rest on its move. None otherwise.
  */
 export function tableNote({ table, name, inGame, driven, onOpen, text }: { table: TableShown; name: string; inGame: boolean; driven?: DrivenNotes; onOpen: () => void; text: Text; }): VNode | null
 {
     const words = text.table;
-    const state = chatState(table, name, text, driven?.opening);
+    const state = chatState(table, name, text);
 
     if (table.waiting !== undefined) {
         const newGame = table.waiting === "new-game";
@@ -133,19 +128,20 @@ export function tableNote({ table, name, inGame, driven, onOpen, text }: { table
     }
 
     if (driven?.failure !== undefined) {
-        const { kind, why } = driven.failure;
+        const { kind, code, why } = driven.failure;
         return (
             <p class="asleep table-note chat-failed" role="alert">
                 <span>
+                    {kind === "closed" ? words.inPage.closed[code](drivenHost) : words.inPage.turnFailed[code](name, drivenHost)}
+                    <code class="host-words" lang="en">{why}</code>
                     {kind === "closed"
                         ? (
                             <button class="no-chat-line" type="button" aria-haspopup="dialog" onClick={onOpen}>
                                 <span class="no-chat" aria-hidden="true" />
-                                {words.inPage.closed}
+                                {words.inPage.reopen}
                             </button>
                         )
-                        : words.inPage.turnFailed(name)}
-                    <code class="host-words" lang="en">{why}</code>
+                        : null}
                 </span>
                 <button class="icon-button" type="button" title={text.close} aria-label={text.close} onClick={driven.onClose}>
                     {closeIcon}
@@ -177,14 +173,23 @@ export function tableNote({ table, name, inGame, driven, onOpen, text }: { table
         );
     }
 
-    return driven?.stopped === true ? <p class="asleep" role="status">{words.inPage.stopped(name)}</p> : null;
+    if (driven?.stalled === "noMove") {
+        const [said, restart] = words.inPage.noMove(name);
+        return (
+            <p class="asleep" role="status">
+                {said} <button class="no-chat-line" type="button" aria-haspopup="dialog" onClick={onOpen}>{restart}</button>.
+            </p>
+        );
+    }
+
+    return driven?.stalled === "stopped" ? <p class="asleep" role="status">{words.inPage.stopped(name)}</p> : null;
 }
 
 /**
- * What the page says of the chat at the table: one opening, starting again, or waiting to, for a new game too; nothing else. One that opens `inPage` has
- * no terminal to send the player to.
+ * What the page says of the chat at the table: one opening, starting again, or waiting to, for a new game too; nothing else. One the table drives has no
+ * terminal to send the player to.
  */
-export function chatState(table: TableShown, name: string, text: Text, inPage = false): string | undefined
+export function chatState(table: TableShown, name: string, text: Text): string | undefined
 {
     const words = text.table;
 
@@ -192,11 +197,14 @@ export function chatState(table: TableShown, name: string, text: Text, inPage = 
         return table.waiting === "new-game" ? words.newGameWaiting(name) : words.waiting(name);
     }
 
-    const opening = inPage ? words.inPage.opening : words.opening;
+    const opening = table.openingDriven === true ? words.inPage.opening : words.opening;
     return table.opening === "chat" ? opening : table.opening === "again" ? words.again(name) : table.opening === "restart" ? words.restart : undefined;
 }
 
 const hostTitles: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity", opencode: "OpenCode" };
+
+/** The host of the chats the table drives, as the page names it in their failures: Claude Code alone for now. */
+const drivenHost = "Claude Code";
 
 /** The ↻ of a chat that starts again. */
 const restartIcon = (
@@ -243,12 +251,15 @@ function ChatForm({ review, onKeep, table, settings, onChange, name, onStarted, 
     const inPage = opensInPage(table, settings, host?.name);
     const chooseNote = review ? (inPage ? words.inPage.reviewChoose : words.reviewChoose) : inPage ? words.inPage.choose : words.choose;
     const chatNote = choosing ? words.reviewKeep(name) : table.driven === true ? words.inPage.restartHint : words.restartHint;
-    const state = busy ? chatState(table, name, text, opensDriven(table, settings)) : undefined;
+    const state = busy ? chatState(table, name, text) : undefined;
     const note = installed.length === 0 ? words.install(name) : busy ? state ?? chooseNote : byHand ? words.byHand(name) : table.chat ? chatNote : chooseNote;
     const restarted = table.chat && action !== "keep";
-    const problem = !failed ? null : restarted ? (inPage ? words.inPage.notRestarted : words.notRestarted) : inPage ? words.inPage.notOpened : words.failed;
-    // Why the chat in the page did not open, in the host's words, under the page's own.
-    const why = failed && inPage && !table.chat ? table.failed?.why : undefined;
+    // Why the chat in the page did not open: the page's line for the table's code, and the host's words under it.
+    const notOpened = failed && inPage && !table.chat ? table.failed : undefined;
+    const notOpenedCode = failureCodes.find((code) => code === notOpened?.code) ?? "other";
+    const unopened = notOpened === undefined || notOpenedCode === "other" ? words.inPage.notOpened : words.inPage.closed[notOpenedCode](drivenHost);
+    const problem = !failed ? null : restarted ? (inPage ? words.inPage.notRestarted : words.notRestarted) : inPage ? unopened : words.failed;
+    const why = notOpened?.why;
     // What the chat held started with, marked among the choices of its host.
     const started = (kind: "model" | "effort"): string | undefined => (host !== undefined && table.held && table.host === host.name ? startedWith(table, host, kind) : undefined);
     // OpenCode with a model of Ollama's says what would stop it before the chat starts (D-117).

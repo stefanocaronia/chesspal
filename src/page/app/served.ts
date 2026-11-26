@@ -128,8 +128,15 @@ export interface TableShown
     readonly ollama?: OllamaShown;
     /** The chat at the table is one the table drives itself, without a terminal: the page can stop it, and never sends the player to its window. */
     readonly driven?: true;
-    /** Why the last chat the table drove failed or ended by itself, in the host's words, numbered so that the page says it once. */
+    /** Why the last chat the table drove failed or ended by itself, in the host's words and by the table's code, numbered so that the page says it once. */
     readonly failed?: ChatFailure;
+    /** The chat opening is one the table drives: no terminal asks the player anything. */
+    readonly openingDriven?: true;
+    /** A turn of the chat the table drives is running, for a move or anything else: the page can stop it. */
+    readonly atWork?: true;
+    /** The player stopped the chat the table drives, and nothing woke it since; or it ended its turns without the AI's move. The AI's clock is held. */
+    readonly stopped?: true;
+    readonly noMove?: true;
 }
 
 /** A refusal as the server sends it: its words, and the code of one the page says in the player's language, with the characters left for words too long. */
