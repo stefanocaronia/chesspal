@@ -70,9 +70,9 @@ export function answerGame(request: IncomingMessage, response: ServerResponse, u
     }
 
     runRoute(response, () => {
-        // What the page asks reads the AI's clock where it stood while the chat the table drives stalled, whatever comes of it.
+        // What the page asks reads the AI's clock where it stood while it was held, whatever comes of it.
         if (request.method === "POST") {
-            stalledTimeBack(served);
+            heldTimeBack(served);
         }
 
         return route(request, response, served);
@@ -133,6 +133,25 @@ export function stalledTimeBack(served: Served): void
 
     if (current !== undefined && aiHeld(served, current)) {
         rerunIfChanged(() => giveHeldTime(served, folder, since));
+    }
+}
+
+/**
+ * The time the AI's clock has been held is given back before the page's request, the hold going on: while the chat the table drives stalled, or while
+ * nobody heard the player, its flag never falls, and resigning or a draw after a long hold is not a loss on time.
+ */
+function heldTimeBack(served: Served): void
+{
+    if (served.stalled !== undefined) {
+        stalledTimeBack(served);
+        return;
+    }
+
+    const folder = gameFolder(served.context.home());
+    const current = loadGame(folder);
+
+    if (current !== undefined && aiHeld(served, current)) {
+        rerunIfChanged(() => giveHeldTime(served, folder));
     }
 }
 

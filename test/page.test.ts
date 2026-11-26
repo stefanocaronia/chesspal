@@ -1175,6 +1175,31 @@ describe("the doorbell of the chat", () => {
         expect((await served()).game.clock).toMatchObject({ since: new Date(start + 65_000).toISOString(), left: { black: 300_000 } });
     });
 
+    it("lets the player resign while the AI's clock is held as nobody hears them, longer than the AI's whole time: a resignation, never a loss on time", async () => {
+        const folder = playerFolder();
+        const base = testContext(folder);
+        const start = base.now().getTime();
+        let seconds = 0;
+        const context = { ...base, now: () => new Date(start + seconds * 1000) };
+        const page = await open(folder, undefined, context);
+        const game = async (): Promise<{ pgn: string; clock: { left: { black: number; }; }; }> => JSON.parse((await get(page, "/api/game")).body).game;
+
+        expect(await post(page, "/api/new", { ai_colour: "black", clock: "5+0" })).toMatchObject({ status: 200 });
+        page.chatCalls();
+        await run(folder, "status", {}, context);
+        seconds = 5;
+        expect(await post(page, "/api/move", { move: "e4" })).toMatchObject({ status: 200 });
+
+        // A word written while nobody hears, long after the AI's time would have run out: its clock still stands whole.
+        seconds = 400;
+        expect(await post(page, "/api/message", { text: "Are you there?" })).toMatchObject({ status: 200 });
+        expect((await game()).clock.left.black).toBe(300_000);
+
+        seconds = 800;
+        expect(await post(page, "/api/resign", {})).toMatchObject({ status: 200, body: '{"resigned":true}' });
+        expect((await game()).pgn).toContain('[Termination "White resigns"]');
+    });
+
     it("ends the turn of a chat stopped in it, which runs no hook, once a ring waits for it and the host says so; never that of a chat merely at work", () => {
         vi.useFakeTimers();
 
