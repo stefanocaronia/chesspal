@@ -1015,7 +1015,7 @@ async function newGameAt(url: string): Promise<number>
 async function tableOn(home?: string, chats?: TableChats): Promise<{ home: string; table: Table; }>
 {
     const start = async (folder: string): Promise<{ home: string; table: Table; }> => {
-        const table = await startTable(homeContext(folder), { idle: 60_000, every: 10 }, chats);
+        const table = await startTable(homeContext(folder), { idle: 60_000, gone: 60_000, every: 10 }, chats);
 
         if (table === undefined) {
             throw new Error("The table did not start: another one holds its ports.");

@@ -17,15 +17,16 @@ export interface Table
     close(): Promise<void>;
 }
 
-/** How long the table stays unused before it closes, and how often it looks, in milliseconds. */
+/** How long the table stays unused before it closes, before any page came and once the last one has gone, and how often it looks, in milliseconds. */
 export interface TableTimes
 {
     readonly idle: number;
+    readonly gone: number;
     readonly every: number;
 }
 
-/** Five minutes with no browser and no chat, looked at every fifteen seconds (D-104). */
-export const tableTimes: TableTimes = { idle: 5 * 60_000, every: 15_000 };
+/** Half a minute for the first page to come, three seconds once its window has closed, looked at every second (D-128). */
+export const tableTimes: TableTimes = { idle: 30_000, gone: 3_000, every: 1_000 };
 
 /**
  * How long `chesspal table`, once closed, waits for the programs it started to end by themselves before its exit stops them: on Windows at once, which can
@@ -46,7 +47,7 @@ export interface TableFound
 /**
  * Starts the table on the context's data folder, its folder set up as init does, its page opening chats through `chats`: undefined when another table
  * started at the same time took a lower port, since a table's ports are its lock. It closes once no page has been open, no chat attached and no request
- * come, for `times.idle`; with `updater`, its page updates Chesspal, and a new table starts from it once this one has closed (D-108). It has closed only
+ * come, for `times.idle`, or for `times.gone` once it has been used; with `updater`, its page updates Chesspal, and a new table starts from it once this one has closed (D-108). It has closed only
  * once `programsEnded` settled, which `chesspal table` gives as the wait for the programs it started, the new table started after it.
  */
 export async function startTable(
@@ -182,14 +183,17 @@ async function lostTo(url: string, folder: string): Promise<boolean>
 
 /**
  * Looks every `times.every` whether a browser has the page open or a chat is attached, which uses the table, and quits once it has been unused for
- * `times.idle`: the page that `chesspal` opens counts from its first request. The timer keeps the process alive till then.
+ * `times.idle`, or for `times.gone` once it has been used: closing its window ends it. The timer keeps the process alive till then.
  */
 function closeWhenIdle(page: Page, unusedFor: () => number, used: () => void, times: TableTimes, quit: () => void): NodeJS.Timeout
 {
+    let wasUsed = false;
+
     return setInterval(() => {
         if (page.inUse()) {
+            wasUsed = true;
             used();
-        } else if (unusedFor() >= times.idle) {
+        } else if (unusedFor() >= (wasUsed ? times.gone : times.idle)) {
             quit();
         }
     }, times.every);

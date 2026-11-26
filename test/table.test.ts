@@ -16,8 +16,9 @@ import { onFreePorts } from "./ports.ts";
 const folders: string[] = [];
 const tables: Table[] = [];
 // A table that never closes by itself while a test runs, and one that closes soon with no page open.
-const patient: TableTimes = { idle: 60_000, every: 10 };
-const hasty: TableTimes = { idle: 200, every: 10 };
+const patient: TableTimes = { idle: 60_000, gone: 60_000, every: 10 };
+const hasty: TableTimes = { idle: 200, gone: 200, every: 10 };
+const leaving: TableTimes = { idle: 60_000, gone: 200, every: 10 };
 
 afterEach(async () => {
     await Promise.all(tables.splice(0).map((table) => table.close()));
@@ -48,6 +49,23 @@ describe("the table", () => {
 
         // Unless another test's page left a port below the first one's meanwhile, where the second one rightly stays.
         expect(second === undefined || portOf(second.url) < portOf(table.url)).toBe(true);
+    });
+
+    it("closes soon once the last window with its page has closed, though it would wait long for a first one", async () => {
+        const { table } = await freshTable(leaving);
+        const events = await listening(table.url);
+        await new Promise((done) => setTimeout(done, 400));
+
+        expect(await pageAt(portOf(table.url))).toMatchObject({ open: true });
+        events.destroy();
+        await table.closed;
+        expect(await pageAt(portOf(table.url))).toBeUndefined();
+    });
+
+    it("closes by itself when no browser comes to its page", async () => {
+        const { table } = await freshTable(hasty);
+        await table.closed;
+        expect(await pageAt(portOf(table.url))).toBeUndefined();
     });
 
     it("closes by itself once no browser has had the page open for a while, and stays while one has", async () => {

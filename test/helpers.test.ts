@@ -809,7 +809,7 @@ describe("the opponent's helpers the table runs itself", () => {
     it("keeps the table in use while a helper works with no page open, for the longest turn at most", async () => {
         const home = temporary();
         const { context, ahead } = movingContext(home);
-        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 300, every: 50 });
+        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 300, gone: 300, every: 50 });
         let closed = false;
         void table.closed.then(() => (closed = true));
         await opened(table.url);

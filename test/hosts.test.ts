@@ -156,7 +156,7 @@ describe("a chat the table opens", () => {
         const found = (path: string): boolean => path === "/usr/bin/codex";
 
         // A first table writes Codex's hooks where there were none: the next Codex play says they are new; Claude Code's play leaves it to Codex's.
-        const table = await onFreePorts(() => startTable(context, { idle: 60_000, every: 1_000 }, fakeChats().chats));
+        const table = await onFreePorts(() => startTable(context, { idle: 60_000, gone: 60_000, every: 1_000 }, fakeChats().chats));
         tables.push(table!);
         expect(existsSync(join(folder, hooksNote))).toBe(true);
         hostLaunch(context, "claude", env, (path) => path === "/usr/bin/claude");
@@ -164,14 +164,14 @@ describe("a chat the table opens", () => {
         await table!.close();
 
         // A table that writes none leaves no note.
-        const same = await onFreePorts(() => startTable(context, { idle: 60_000, every: 1_000 }, fakeChats().chats));
+        const same = await onFreePorts(() => startTable(context, { idle: 60_000, gone: 60_000, every: 1_000 }, fakeChats().chats));
         tables.push(same!);
         expect(existsSync(join(folder, hooksNote))).toBe(false);
         await same!.close();
 
         // Older hooks the table writes again: the next play says they changed, once, and takes the note.
         writeFileSync(join(folder, ".codex", "hooks.json"), "{}\n");
-        const again = await onFreePorts(() => startTable(context, { idle: 60_000, every: 1_000 }, fakeChats().chats));
+        const again = await onFreePorts(() => startTable(context, { idle: 60_000, gone: 60_000, every: 1_000 }, fakeChats().chats));
         tables.push(again!);
         expect(hostLaunch(context, "codex", env, found).hooks).toBe("changed");
         expect(existsSync(join(folder, hooksNote))).toBe(false);
@@ -473,7 +473,7 @@ async function tableOpening(analysis: boolean | undefined): Promise<{ context: C
         takeSeat(folder, { pid: process.pid, host: "claude", ...launch.choice, ...(launch.analysis ? { analysis: true } : {}) });
     }
 
-    const table = await onFreePorts(() => startTable(context, { idle: 60_000, every: 1_000 }, terminalChats(context, ["node", "cli.js"], { PATH: "/nowhere" })));
+    const table = await onFreePorts(() => startTable(context, { idle: 60_000, gone: 60_000, every: 1_000 }, terminalChats(context, ["node", "cli.js"], { PATH: "/nowhere" })));
 
     if (table === undefined) {
         throw new Error("The table did not start: another one holds its ports.");
@@ -504,7 +504,7 @@ function fakeChats(opens = true, held = false): { chats: TableChats; opened: str
 
 async function tableWith({ chats, opened }: { chats: TableChats; opened: string[]; }): Promise<{ table: Table; opened: string[]; }>
 {
-    const table = await onFreePorts(() => startTable(homeContext("linux"), { idle: 60_000, every: 1_000 }, chats));
+    const table = await onFreePorts(() => startTable(homeContext("linux"), { idle: 60_000, gone: 60_000, every: 1_000 }, chats));
 
     if (table === undefined) {
         throw new Error("The table did not start: another one holds its ports.");

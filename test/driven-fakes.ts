@@ -349,7 +349,7 @@ export async function drivenTable(
     ai = fakeDriver(),
     given?: Context,
     switched = true,
-    times: TableTimes = { idle: 60_000, every: 10 },
+    times: TableTimes = { idle: 60_000, gone: 60_000, every: 10 },
     programsEnded?: () => Promise<unknown>,
 ): Promise<{ table: Table; home: string; ai: FakeDriver; terminal: ReturnType<typeof terminalChats>; context: Context; chats: TableChats; withdrawn: string[]; }>
 {

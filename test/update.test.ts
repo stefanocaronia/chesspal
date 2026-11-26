@@ -204,7 +204,7 @@ async function tableWith(installed: boolean | Promise<boolean>, latest = "99.0.0
     };
     return onFreePorts(async () => {
         const context = homeContext(npm({ version: latest }));
-        const table = await startTable(context, { idle: 60_000, every: 10 }, undefined, updater, programsEnded);
+        const table = await startTable(context, { idle: 60_000, gone: 60_000, every: 10 }, undefined, updater, programsEnded);
 
         if (table === undefined) {
             throw new Error("The table did not start: another one holds its ports.");

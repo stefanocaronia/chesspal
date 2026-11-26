@@ -18,7 +18,7 @@ const listenDescription =
     "Wait for the player's move on the board page and wake the chat. Claude Code starts it at the end of each turn, Codex with --codex, Antigravity with --antigravity and OpenCode's plugin with --opencode, as init sets them up.";
 const chatDescription = "Note how the chat started: new, cleared, resumed or compacted. Claude Code, Codex, Antigravity and OpenCode run it when a chat starts, as init sets them up.";
 const promptDescription = "Play the move the player wrote alone in the chat, before the AI reads it, and tell the AI the position. Claude Code runs it on each message, as init sets it up.";
-const tableDescription = "Serve the board page with no chat, until no browser has had it open for five minutes. `chesspal` alone starts it apart and opens the page.";
+const tableDescription = "Serve the board page with no chat, until its last window closes. `chesspal` alone starts it apart and opens the page.";
 const openDescription = "Open the board page as `chesspal` alone does, without asking about the icon: what the icon runs.";
 const iconDescription = "Put Chesspal's icon on the desktop and in the menu: it opens the board page as `chesspal` alone does, with no terminal. `chesspal icon --remove` takes it away.";
 const playDescription = "Start the AI in this terminal, in Claude Code, Codex, Antigravity or OpenCode, as the page's buttons do. It plays with the model and effort chosen on the page; New game there starts the chat again, clean.";

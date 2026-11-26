@@ -82,7 +82,7 @@ saveProfileSettings(context.home(), activeProfile(context.home()).id, { [pageCha
 const chats: FakeChat[] = [];
 const table = await startTable(
     context,
-    { idle: 24 * 60 * 60_000, every: 15_000 },
+    { idle: 24 * 60 * 60_000, gone: 24 * 60 * 60_000, every: 15_000 },
     drivenChats(context, { terminal: terminalChats(), places: () => tablePlaces(context), driver: () => Promise.resolve(fakeDriver()), chesspal: ["node", "cli.js"], environment: {} }),
 );
 

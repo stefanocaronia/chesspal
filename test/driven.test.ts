@@ -338,7 +338,7 @@ describe("the chat the table drives", () => {
     }, 30_000);
 
     it("lets the table close when no browser uses it, closing the chat, which it keeps for its next start", async () => {
-        const { table, home, ai } = await drivenTable(undefined, undefined, undefined, true, { idle: 300, every: 50 });
+        const { table, home, ai } = await drivenTable(undefined, undefined, undefined, true, { idle: 300, gone: 300, every: 50 });
         await opened(table.url);
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
         let closed = false;
@@ -739,7 +739,7 @@ describe("the turns of the chat the table drives", () => {
         const home = temporary();
         const { context, ahead } = movingContext(home);
         // The clock moves an hour ahead, which a table with no browser would take for idle time.
-        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 3_600_000, every: 10 });
+        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 3_600_000, gone: 3_600_000, every: 10 });
         await opened(table.url);
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
         const chat = ai.chats[0]!;
@@ -1188,7 +1188,7 @@ describe("the stalls and the words of the chat the table drives", () => {
     {
         const home = temporary();
         const { context, ahead } = movingContext(home);
-        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 3_600_000, every: 10 });
+        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 3_600_000, gone: 3_600_000, every: 10 });
         await opened(table.url);
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
         const chat = ai.chats[0]!;
@@ -1346,7 +1346,7 @@ describe("the stalls and the words of the chat the table drives", () => {
     it("keeps the AI's move made as the player stops the turn, and holds no clock for it: the player's next move wakes the chat", async () => {
         const home = temporary();
         const { context, ahead } = movingContext(home);
-        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 3_600_000, every: 10 });
+        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 3_600_000, gone: 3_600_000, every: 10 });
         await opened(table.url);
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
         const chat = ai.chats[0]!;
@@ -1429,7 +1429,7 @@ describe("the stalls and the words of the chat the table drives", () => {
     it("keeps the table in use with no browser while a turn of its chat is at work, for thirty minutes at most", async () => {
         const home = temporary();
         const { context, ahead } = movingContext(home);
-        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 60_000, every: 10 });
+        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 60_000, gone: 60_000, every: 10 });
         await opened(table.url);
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
         let closed = false;

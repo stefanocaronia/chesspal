@@ -120,12 +120,12 @@ const english: LaunchWords = {
     opened: (url) => `Chesspal's table is open: ${url}`,
     notOpened: (url) => `Chesspal's table is at ${url}: open it in your browser.`,
     notStarted: "Chesspal's table did not start within ten seconds: run `chesspal table` to see why.",
-    notQuit: (url) => `The table of another Chesspal version, at ${url}, did not close: close its pages in the browser and wait five minutes, then run chesspal again.`,
+    notQuit: (url) => `The table of another Chesspal version, at ${url}, did not close: close its pages in the browser, then run chesspal again.`,
 };
 
 const italian: LaunchWords = {
     opened: (url) => `Il tavolo di Chesspal è aperto: ${url}`,
     notOpened: (url) => `Il tavolo di Chesspal è su ${url}: aprilo nel browser.`,
     notStarted: "Il tavolo di Chesspal non è partito in dieci secondi: lancia `chesspal table` per vedere perché.",
-    notQuit: (url) => `Il tavolo di un'altra versione di Chesspal, su ${url}, non si è chiuso: chiudi le sue pagine nel browser, aspetta cinque minuti e lancia di nuovo chesspal.`,
+    notQuit: (url) => `Il tavolo di un'altra versione di Chesspal, su ${url}, non si è chiuso: chiudi le sue pagine nel browser e lancia di nuovo chesspal.`,
 };
