@@ -18,9 +18,15 @@ export interface Place
     readonly role: ChatRole;
     /** The two variables of the chat's server configuration, which send its `chesspal mcp` to this place. */
     readonly environment: Readonly<Record<string, string>>;
-    /** Settled once the place is withdrawn, or the places closed, and its server has left. */
+    /**
+     * Settled once the place is withdrawn, or the places closed, and its calls still running have answered or the places' `leaveWait` has passed. It
+     * does not mean stopped: a command still running then goes on to its end, as a move written or a ponder that waits for the player.
+     */
     readonly left: Promise<void>;
-    /** Withdraws the place: its server, if connected, is sent away, and its key is good no more. */
+    /**
+     * Withdraws the place: its server, if connected, is sent away, and its key is good no more. A command of its chat still running is not stopped: it
+     * ends by itself, with no one to hear its answer.
+     */
     withdraw(): void;
 }
 
@@ -28,11 +34,12 @@ export interface Place
 export interface TablePlaces
 {
     /**
-     * A place for a chat of `role`, its context the table's with the chat's own state, and what `chat` overrides there (the page's hooks, the caller);
-     * the door opens at the first offer.
+     * A place for a chat of `role` that runs in `folder`, the folder its host is started in, where the commands read the host's files (its agents, its
+     * chats' notes): its context the table's, with that folder, the chat's own state, and what `chat` overrides there (the page's hooks, the caller). The
+     * door opens at the first offer; one that could not open is tried again at the next.
      */
-    offer(role: ChatRole, chat?: Partial<Context>): Promise<Place>;
-    /** Withdraws every place and closes the door. */
+    offer(role: ChatRole, folder: string, chat?: Partial<Context>): Promise<Place>;
+    /** Withdraws every place and closes the door: settled once every place has left, whether the door had opened or not. */
     close(): Promise<void>;
 }
 
@@ -43,19 +50,22 @@ export interface PlacesOptions
     version?: string;
     /** The operating system, as process.platform names it: a named pipe on Windows, a socket file elsewhere. */
     platform?: string;
-    /** The folder of the door's socket file, off Windows. */
+    /** Where the folder of the door's socket file is made, off Windows. */
     socketFolder?: string;
     /** Random bytes: the keys, the door's name, the runs of the agents. */
     bytes?: (size: number) => Buffer;
-    /** How long a server that lost its connection waits for its calls still running, in ms. */
+    /** How long a withdrawn place, or the places closing, wait for its calls still running before `left` settles, in ms. */
     leaveWait?: number;
+    /** How long a server that comes back waits for its earlier connection to close, in ms. */
+    busyWait?: number;
 }
 
 /** The places of a table serving `context`. */
 export function tablePlaces(context: Context, options: PlacesOptions = {}): TablePlaces
 {
     const places = new Map<string, OpenPlace>();
-    const lefts: Promise<void>[] = [];
+    // The open places' `left`: each goes once settled.
+    const lefts = new Map<string, Promise<void>>();
     const bytes = options.bytes ?? randomBytes;
     const leaveWait = options.leaveWait ?? 5_000;
     let door: Promise<Door> | undefined;
@@ -69,17 +79,36 @@ export function tablePlaces(context: Context, options: PlacesOptions = {}): Tabl
             return;
         }
 
-        void sit(place, socket, rest, leaveWait).catch(() => socket.destroy());
+        void sit(place, socket, rest).catch(() => socket.destroy());
     };
 
-    const doorOpen = (): Promise<Door> => door ??= openDoor({ version: options.version ?? version, seated, bytes, ...doorPlace(options) });
+    const doorOpen = (): Promise<Door> => {
+        if (door === undefined) {
+            const opening = openDoor({ version: options.version ?? version, seated, bytes, ...doorPlace(options) });
+            door = opening;
+            // A door that could not open is opened anew at the next offer.
+            opening.catch(() => {
+                if (door === opening) {
+                    door = undefined;
+                }
+            });
+        }
+
+        return door;
+    };
 
     return {
-        offer: async (role, chat = {}) => {
+        offer: async (role, folder, chat = {}) => {
+            const refused = "The table is closing, and opens no more chats: open the chat again once the table is open again.";
+
+            if (closing) {
+                throw new Error(refused);
+            }
+
             const open = await doorOpen();
 
             if (closing) {
-                throw new Error("The table is closing, and opens no more chats: open the chat again once the table is open again.");
+                throw new Error(refused);
             }
 
             const { key, environment } = open.offer();
@@ -87,37 +116,38 @@ export function tablePlaces(context: Context, options: PlacesOptions = {}): Tabl
             const left = new Promise<void>((done) => {
                 ended = done;
             });
-            const place = openPlace(role, context, chat, `table-${bytes(8).toString("hex")}`);
+            const place = openPlace(role, { ...context, folder }, chat, `table-${bytes(8).toString("hex")}`);
             places.set(key, place);
-            lefts.push(left);
+            lefts.set(key, left);
+            void left.then(() => lefts.delete(key));
 
-            const withdraw = (): void => {
+            place.withdraw = () => {
                 if (places.delete(key)) {
                     open.withdraw(key);
-                    void leave(place, place.server, leaveWait).then(ended);
+                    void callsOfPlace(place, leaveWait).then(ended);
                 }
             };
 
-            place.withdraw = withdraw;
-            return { role, environment, left, withdraw };
+            return { role, environment, left, withdraw: place.withdraw };
         },
         close: async () => {
             closing = true;
             [...places.values()].forEach((place) => place.withdraw());
-            await (await door)?.close();
-            await Promise.all(lefts);
+            const open = await door?.catch(() => undefined);
+            await open?.close();
+            await Promise.all(lefts.values());
         },
     };
 }
 
-/** A place as the table keeps it: its chat's context, who calls there, and its server while one is connected. */
+/** A place as the table keeps it: its chat's context, who calls there, its server while one is connected, and every server it had. */
 interface OpenPlace
 {
     role: ChatRole;
     context: Context;
     seat: { agent?: string; run?: string; caller?: Context["caller"]; };
     server?: McpServer;
-    leaving?: Promise<void>;
+    servers: McpServer[];
     withdraw: () => void;
 }
 
@@ -127,7 +157,8 @@ const agentOfRole: Readonly<Record<Exclude<ChatRole, "opponent">, string>> = { p
 function openPlace(role: ChatRole, context: Context, chat: Partial<Context>, run: string): OpenPlace
 {
     const agent = role === "opponent" ? undefined : agentOfRole[role];
-    const place: OpenPlace = { role, context, seat: agent === undefined ? { caller: chat.caller } : { agent, run, caller: chat.caller }, withdraw: () => undefined };
+    const seat = agent === undefined ? { caller: chat.caller } : { agent, run, caller: chat.caller };
+    const place: OpenPlace = { role, context, seat, servers: [], withdraw: () => undefined };
     // The chat's own state, as a server started anew has it; its host, as its server's client names itself.
     place.context = {
         ...context,
@@ -163,10 +194,12 @@ function forEveryHost(command: AnyCommand): AnyCommand
     return offered;
 }
 
-/** A chat seated at its place: an MCP server over the rest of its socket, once the server of its earlier connection has left. */
-async function sit(place: OpenPlace, socket: Socket, rest: Buffer, leaveWait: number): Promise<void>
+/**
+ * A chat seated at its place: an MCP server over the rest of its socket, at once, whatever calls of an earlier server still run. When the socket closes, its
+ * server closes at once: a call still running ends with no one to hear its answer.
+ */
+async function sit(place: OpenPlace, socket: Socket, rest: Buffer): Promise<void>
 {
-    await place.leaving;
     const { createMcpServer, StdioServerTransport } = await serverModules();
 
     // Gone while the server loaded.
@@ -176,34 +209,31 @@ async function sit(place: OpenPlace, socket: Socket, rest: Buffer, leaveWait: nu
 
     const server = createMcpServer(place.context, toolsOf(place.role), undefined, place.seat);
     place.server = server;
+    place.servers.push(server);
     // A transport the SDK closes, as after a line too long, closes the socket.
     server.server.onclose = () => socket.destroy();
-    socket.once("close", () => void leave(place, server, leaveWait));
+    socket.once("close", () => {
+        if (place.server === server) {
+            place.server = undefined;
+        }
+
+        void server.close().catch(() => undefined);
+    });
     const input = new PassThrough();
     input.write(rest);
     socket.pipe(input);
     await server.connect(new StdioServerTransport(input, socket));
 }
 
-/** A server of the place closed, once its calls still running have answered or `leaveWait` has passed: the place's state stays for its next connection. */
-function leave(place: OpenPlace, server: McpServer | undefined, leaveWait: number): Promise<void>
+/** Settles once the calls still running of every server the place had have answered, or after `leaveWait` ms. */
+async function callsOfPlace(place: OpenPlace, leaveWait: number): Promise<void>
 {
-    if (server === undefined || place.server !== server) {
-        return place.leaving ?? Promise.resolve();
+    if (place.servers.length === 0) {
+        return;
     }
 
-    place.leaving ??= (async () => {
-        const { callsAnswered } = await serverModules();
-        await callsAnswered(server, leaveWait);
-        await server.close().catch(() => undefined);
-
-        if (place.server === server) {
-            place.server = undefined;
-        }
-
-        place.leaving = undefined;
-    })();
-    return place.leaving;
+    const { callsAnswered } = await serverModules();
+    await Promise.all(place.servers.map((server) => callsAnswered(server, leaveWait)));
 }
 
 // The MCP server and its SDK, loaded at the first chat that sits: the table starts without them.
@@ -226,8 +256,12 @@ function serverModules(): Promise<ServerModules>
     return loading;
 }
 
-/** The door's platform and folder, as given: the door's own defaults otherwise. */
-function doorPlace(options: PlacesOptions): { platform?: string; folder?: string; }
+/** The door's platform, folder and wait for a server that comes back, as given: the door's own defaults otherwise. */
+function doorPlace(options: PlacesOptions): { platform?: string; folder?: string; busyWait?: number; }
 {
-    return { ...(options.platform === undefined ? {} : { platform: options.platform }), ...(options.socketFolder === undefined ? {} : { folder: options.socketFolder }) };
+    return {
+        ...(options.platform === undefined ? {} : { platform: options.platform }),
+        ...(options.socketFolder === undefined ? {} : { folder: options.socketFolder }),
+        ...(options.busyWait === undefined ? {} : { busyWait: options.busyWait }),
+    };
 }

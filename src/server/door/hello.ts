@@ -47,25 +47,28 @@ export function readAnswer(line: string): HelloAnswer | undefined
     return refusals.includes(read?.refused as Refusal) ? { refused: read?.refused as Refusal } : undefined;
 }
 
+/** A first line not given: the socket closed first, nothing came in time, or the line grew too long. */
+export type NoLine = "closed" | "slow" | "long";
+
 /**
- * The first line a socket gives, without its end of line, and the bytes after it, which belong to what follows; undefined when none comes within `wait` ms,
- * the socket ends first, or the line grows past `most` bytes. The socket is left paused, with none of these listeners.
+ * The first line a socket gives, without its end of line, and the bytes after it, which belong to what follows; or why none came: the socket ended first,
+ * nothing within `wait` ms, or a line past `most` bytes. The socket is left paused, with none of these listeners.
  */
-export function firstLine(socket: Socket, wait: number, most: number): Promise<{ line: string; rest: Buffer; } | undefined>
+export function firstLine(socket: Socket, wait: number, most: number): Promise<{ line: string; rest: Buffer; } | NoLine>
 {
     return new Promise((done) => {
         let read = Buffer.alloc(0);
 
-        const finish = (found: { line: string; rest: Buffer; } | undefined): void => {
+        const finish = (found: { line: string; rest: Buffer; } | NoLine): void => {
             clearTimeout(timer);
             socket.pause();
             socket.off("data", take);
-            socket.off("end", none);
-            socket.off("close", none);
+            socket.off("end", closed);
+            socket.off("close", closed);
             done(found);
         };
 
-        const none = (): void => finish(undefined);
+        const closed = (): void => finish("closed");
 
         const take = (chunk: Buffer): void => {
             read = Buffer.concat([read, chunk]);
@@ -74,14 +77,14 @@ export function firstLine(socket: Socket, wait: number, most: number): Promise<{
             if (end !== -1 && end <= most) {
                 finish({ line: read.subarray(0, end).toString("utf8").replace(/\r$/, ""), rest: read.subarray(end + 1) });
             } else if (end !== -1 || read.length > most) {
-                finish(undefined);
+                finish("long");
             }
         };
 
-        const timer = setTimeout(none, wait);
+        const timer = setTimeout(() => finish("slow"), wait);
         socket.on("data", take);
-        socket.once("end", none);
-        socket.once("close", none);
+        socket.once("end", closed);
+        socket.once("close", closed);
     });
 }
 

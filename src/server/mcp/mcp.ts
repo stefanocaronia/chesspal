@@ -256,7 +256,9 @@ async function callTool(
 /** Settles once the server's tool calls still running have answered, or after `most` ms: a tool stuck on something that never ends is not waited for. */
 export async function callsAnswered(server: McpServer, most: number): Promise<void>
 {
-    await Promise.race([Promise.allSettled(running.get(server) ?? []), new Promise((done) => setTimeout(done, most))]);
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([Promise.allSettled(running.get(server) ?? []), new Promise((done) => (timer = setTimeout(done, most)))]);
+    clearTimeout(timer);
 }
 
 // The tool calls still running, by server, which a server waits for before it leaves.

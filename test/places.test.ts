@@ -5,7 +5,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { type JSONRPCMessage, LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { commands, version } from "chesspal";
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -18,7 +18,7 @@ import { agentTools, analystAgent, coachAgent, ownModelPonderAgent } from "../sr
 import { gameFolder } from "../src/profiles/index.ts";
 import { pipeToTable } from "../src/server/door/index.ts";
 import { createMcpServer } from "../src/server/mcp/index.ts";
-import { type ChatRole, type Place, type TablePlaces, tablePlaces } from "../src/server/places/index.ts";
+import { type ChatRole, type Place, type PlacesOptions, type TablePlaces, tablePlaces } from "../src/server/places/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -38,10 +38,19 @@ function temporaryFolder(): string
     return folder;
 }
 
-/** The places of a table on a data folder of its own. */
-function placesOf(context: Context = testContext(temporaryFolder())): { places: TablePlaces; context: Context; }
+const start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+// What status says once a chat, until the chat has read the opponent's instructions.
+const unread = "Call `instructions` before you answer the player";
+
+function sleep(milliseconds: number): Promise<void>
 {
-    const places = tablePlaces(context, { socketFolder: temporaryFolder(), leaveWait: 500 });
+    return new Promise((done) => setTimeout(done, milliseconds));
+}
+
+/** The places of a table on a data folder of its own. */
+function placesOf(context: Context = testContext(temporaryFolder()), options: PlacesOptions = {}): { places: TablePlaces; context: Context; }
+{
+    const places = tablePlaces(context, { socketFolder: temporaryFolder(), leaveWait: 500, ...options });
     opened.push(places);
     return { places, context };
 }
@@ -105,7 +114,7 @@ describe("the places of the chats the table opens", () => {
         };
 
         for (const role of ["opponent", "ponder", "coach", "analyst"] as const) {
-            const { client } = await sitAt(await places.offer(role));
+            const { client } = await sitAt(await places.offer(role, temporaryFolder()));
             expect(await toolsAt(client), role).toEqual(expected[role].sort());
         }
 
@@ -118,14 +127,14 @@ describe("the places of the chats the table opens", () => {
         const { places } = placesOf();
 
         for (const role of ["ponder", "coach"] as const) {
-            const { client } = await sitAt(await places.offer(role), "antigravity-client");
+            const { client } = await sitAt(await places.offer(role, temporaryFolder()), "antigravity-client");
             expect(await toolsAt(client), role).toEqual([role]);
         }
     });
 
     it("runs the opponent's commands on the table's data folder, where the table reads the game they change", async () => {
         const { places, context } = placesOf();
-        const { client } = await sitAt(await places.offer("opponent"));
+        const { client } = await sitAt(await places.offer("opponent", temporaryFolder()));
 
         expect((await call(client, "status")).isError).toBe(false);
         expect(await call(client, "new_game", { ai_colour: "white", from: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" })).toMatchObject({ isError: false });
@@ -138,9 +147,9 @@ describe("the places of the chats the table opens", () => {
     it("keeps each place's own state: two places at once share no position seen, and a helper's calls are not the chat's", async () => {
         const { places } = placesOf();
         const toolEnded = { first: 0, second: 0, ponder: 0 };
-        const first = await sitAt(await places.offer("opponent", { toolEnded: () => void toolEnded.first++ }));
-        const second = await sitAt(await places.offer("opponent", { toolEnded: () => void toolEnded.second++ }));
-        const ponder = await sitAt(await places.offer("ponder", { toolEnded: () => void toolEnded.ponder++ }));
+        const first = await sitAt(await places.offer("opponent", temporaryFolder(), { toolEnded: () => void toolEnded.first++ }));
+        const second = await sitAt(await places.offer("opponent", temporaryFolder(), { toolEnded: () => void toolEnded.second++ }));
+        const ponder = await sitAt(await places.offer("ponder", temporaryFolder(), { toolEnded: () => void toolEnded.ponder++ }));
 
         await call(first.client, "new_game", { ai_colour: "white", from: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" });
         // The second chat has seen no position: its move is refused, with the game as it is now.
@@ -157,7 +166,7 @@ describe("the places of the chats the table opens", () => {
 
     it("keeps a place's state across its server's reconnection, sends it away once withdrawn, and settles left", async () => {
         const { places } = placesOf();
-        const place = await places.offer("opponent");
+        const place = await places.offer("opponent", temporaryFolder());
         const first = await sitAt(place);
         await call(first.client, "new_game", { ai_colour: "white", from: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" });
         await first.client.close();
@@ -170,6 +179,118 @@ describe("the places of the chats the table opens", () => {
         place.withdraw();
         await place.left;
         expect(await again.piped).toBe(1);
+    });
+
+    it("tells each place once to call instructions, apart from the other places and the table's own context, and not again after a reconnection", async () => {
+        // A table whose own context keeps what it told, as the page's may: a place that shared it would hear nothing.
+        const { places } = placesOf({ ...testContext(temporaryFolder()), told: new Set() });
+        const place = await places.offer("opponent", temporaryFolder());
+        const first = await sitAt(place);
+        const other = await sitAt(await places.offer("opponent", temporaryFolder()));
+
+        expect((await call(first.client, "status")).text).toContain(unread);
+        await call(first.client, "instructions");
+        expect((await call(first.client, "status")).text).not.toContain(unread);
+        expect((await call(other.client, "status")).text).toContain(unread);
+
+        await first.client.close();
+        await first.piped;
+        const again = await sitAt(place);
+        expect((await call(again.client, "status")).text).not.toContain(unread);
+    });
+
+    it("gives the player's words once to each place", async () => {
+        const { places, context } = placesOf();
+        const first = await sitAt(await places.offer("opponent", temporaryFolder()));
+        const other = await sitAt(await places.offer("opponent", temporaryFolder()));
+        await call(first.client, "new_game", { ai_colour: "black", from: start });
+        await call(other.client, "status");
+        await commands.find((command) => command.name === "player_say")!.run({ text: "Play faster, please." }, context);
+
+        expect((await call(first.client, "look")).text).toContain("Play faster, please.");
+        expect((await call(first.client, "look")).text).not.toContain("Play faster, please.");
+        expect((await call(other.client, "look")).text).toContain("Play faster, please.");
+    });
+
+    it("runs the commands in the chat's own folder, where they read the host's files, not in the table's", async () => {
+        const { places } = placesOf();
+        const withAgent = temporaryFolder();
+        mkdirSync(join(withAgent, ".claude", "agents"), { recursive: true });
+        writeFileSync(join(withAgent, ".claude", "agents", "chesspal-ponder.md"), "---\nname: chesspal-ponder\n---\n");
+
+        const moved = async (folder: string): Promise<string> => {
+            const { client } = await sitAt(await places.offer("opponent", folder));
+            await call(client, "new_game", { ai_colour: "white", from: start });
+            return (await call(client, "ai_move", { move: "e4", plan: "The centre." })).text;
+        };
+
+        expect(await moved(withAgent)).toContain("start the chesspal-ponder agent");
+        expect(await moved(temporaryFolder())).not.toContain("chesspal-ponder");
+    });
+
+    it("serves a server that comes back at once, while a long call of the earlier one still runs", async () => {
+        const { places } = placesOf(undefined, { leaveWait: 3_000 });
+        const place = await places.offer("opponent", temporaryFolder(), { calls: () => sleep(1_500) });
+        const first = await sitAt(place);
+        void call(first.client, "status").catch(() => undefined);
+        await sleep(50);
+        await first.client.close();
+        expect(await first.piped).toBe(0);
+
+        const started = Date.now();
+        await sitAt(place);
+        expect(Date.now() - started).toBeLessThan(1_000);
+    });
+
+    it("seats a third server after a second came and went, while a long call of the first still runs", async () => {
+        const { places } = placesOf(undefined, { leaveWait: 3_000 });
+        const place = await places.offer("opponent", temporaryFolder(), { calls: () => sleep(1_500) });
+        const first = await sitAt(place);
+        void call(first.client, "status").catch(() => undefined);
+        await sleep(50);
+        await first.client.close();
+        await first.piped;
+
+        const input = new PassThrough();
+        const second = pipeToTable(input, new PassThrough(), { door: place.environment.CHESSPAL_TABLE_DOOR!, key: place.environment.CHESSPAL_TABLE_KEY!, version });
+        input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} })}\n`);
+        await sleep(100);
+        input.end();
+        expect(await second).toBe(0);
+
+        const started = Date.now();
+        const third = await sitAt(place);
+        expect(Date.now() - started).toBeLessThan(1_000);
+        expect(await call(third.client, "instructions")).toMatchObject({ isError: false });
+    });
+
+    it("opens no door for an offer after close, and refuses it", async () => {
+        const servers = (): number => (process as unknown as { _getActiveHandles(): { constructor: { name: string; }; }[]; })._getActiveHandles().filter((handle) => handle.constructor.name === "Server").length;
+        const before = servers();
+        const { places } = placesOf();
+        await places.close();
+
+        await expect(places.offer("opponent", temporaryFolder())).rejects.toThrow("The table is closing, and opens no more chats");
+        expect(servers()).toBe(before);
+    });
+
+    it("tries a door that could not open again at the next offer, and closes all the same", async () => {
+        const missing = join(temporaryFolder(), "missing");
+        const places = tablePlaces(testContext(temporaryFolder()), { platform: "linux", socketFolder: missing });
+        opened.push(places);
+        const first = await places.offer("opponent", temporaryFolder()).then(() => "offered", (error: Error) => error.message);
+        expect(first).toMatch(/^Chesspal's table could not open its door for the chats it opens at .*ENOENT.*: start the table again\.$/);
+
+        // Its folder made, the door opens off Windows; on Windows a socket file cannot listen, and the next offer says so for itself.
+        mkdirSync(missing);
+        const second = await places.offer("opponent", temporaryFolder()).then(() => "offered", (error: Error) => error.message);
+        expect(second).not.toBe(first);
+
+        if (process.platform !== "win32") {
+            expect(second).toBe("offered");
+        }
+
+        await expect(places.close()).resolves.toBeUndefined();
     });
 });
 
@@ -233,7 +354,7 @@ describe("chesspal mcp in a chat the table opened", () => {
 
     it("pipes to its place at the table without loading the MCP SDK, the server or the commands", async () => {
         const { places } = placesOf();
-        const place = await places.offer("opponent");
+        const place = await places.offer("opponent", temporaryFolder());
         const chat = chesspalMcp(place.environment);
         chat.send(initialize);
         await vi.waitFor(() => expect(chat.out(), chat.err()).toContain('"id":1'), { timeout: 15_000 });
@@ -249,7 +370,7 @@ describe("chesspal mcp in a chat the table opened", () => {
 
     it("says why and exits with 1, serving nothing itself, when its table is gone", async () => {
         const { places } = placesOf();
-        const place = await places.offer("opponent");
+        const place = await places.offer("opponent", temporaryFolder());
         await places.close();
         const chat = chesspalMcp(place.environment);
         chat.send(initialize);
@@ -258,5 +379,38 @@ describe("chesspal mcp in a chat the table opened", () => {
         expect(chat.out()).toBe("");
         expect(chat.err()).toContain("chesspal mcp: Chesspal's table, which opened this chat, is not there any more: open the chat again from the board page.");
         expect(chat.err()).not.toContain("loaded");
+    }, 30_000);
+
+    it("sits when the host starts its server again at once, the earlier one's input just closed", async () => {
+        const { places } = placesOf();
+        const place = await places.offer("opponent", temporaryFolder());
+        const old = chesspalMcp(place.environment);
+        old.send(initialize);
+        await vi.waitFor(() => expect(old.out(), old.err()).toContain('"id":1'), { timeout: 15_000 });
+
+        old.end();
+        const fresh = chesspalMcp(place.environment);
+        fresh.send(initialize);
+        await vi.waitFor(() => expect(fresh.out(), fresh.err()).toContain('"id":1'), { timeout: 15_000 });
+        fresh.end();
+
+        expect(await old.exited).toBe(0);
+        expect(await fresh.exited).toBe(0);
+        expect(fresh.err()).toBe("");
+    }, 30_000);
+
+    it("with one of the two variables alone, says which is missing and exits with 1, never serving the chat itself", async () => {
+        const { places } = placesOf();
+        const place = await places.offer("opponent", temporaryFolder());
+
+        for (const [variable, other] of [["CHESSPAL_TABLE_DOOR", "CHESSPAL_TABLE_KEY"], ["CHESSPAL_TABLE_KEY", "CHESSPAL_TABLE_DOOR"]] as const) {
+            const chat = chesspalMcp({ [variable]: place.environment[variable]!, [other]: "" });
+            chat.send(initialize);
+
+            expect(await chat.exited).toBe(1);
+            expect(chat.out()).toBe("");
+            expect(chat.err()).toContain(`chesspal mcp: ${other} is missing beside ${variable}, which the table sets together for a chat it opens: open the chat again from the board page.`);
+            expect(chat.err()).not.toContain("loaded");
+        }
     }, 30_000);
 });

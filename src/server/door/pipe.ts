@@ -13,7 +13,7 @@ export interface PipeOptions
     /** The key the table made for this chat. */
     key: string;
     version: string;
-    /** How long the table may take to let the chat sit, in ms: about a second. */
+    /** How long the table may take to let the chat sit, in ms: ten seconds, for a slow disk or an antivirus. */
     wait?: number;
     now?: () => number;
     /** What went wrong, a line for the host's log of the server's stderr. */
@@ -32,14 +32,22 @@ const closeWait = 2_000;
  */
 export async function pipeHere(input: Readable, output: Writable, environment: Record<string, string | undefined>): Promise<number | undefined>
 {
-    const door = environment[doorVariable];
-    const key = environment[keyVariable];
+    const door = environment[doorVariable] ?? "";
+    const key = environment[keyVariable] ?? "";
+    const log = (line: string): void => void process.stderr.write(`${line}\n`);
 
-    if (door === undefined || door === "" || key === undefined || key === "") {
+    if (door === "" && key === "") {
         return undefined;
     }
 
-    return await pipeToTable(input, output, { door, key, version: ownVersion, log: (line) => process.stderr.write(`${line}\n`) });
+    // Half the table's variables: the chat is never served here in silence, as if the table had not opened it.
+    if (door === "" || key === "") {
+        const [missing, given] = door === "" ? [doorVariable, keyVariable] : [keyVariable, doorVariable];
+        log(`chesspal mcp: ${missing} is missing beside ${given}, which the table sets together for a chat it opens: ${again}`);
+        return 1;
+    }
+
+    return await pipeToTable(input, output, { door, key, version: ownVersion, log });
 }
 
 /**
@@ -49,8 +57,10 @@ export async function pipeHere(input: Readable, output: Writable, environment: R
 export async function pipeToTable(input: Readable, output: Writable, options: PipeOptions): Promise<number>
 {
     const log = options.log ?? (() => undefined);
-    const wait = options.wait ?? 1_000;
+    const wait = options.wait ?? 10_000;
     const now = options.now ?? Date.now;
+    // A failing input, as a broken pipe, is the host gone: never an exception nobody catches.
+    input.on("error", () => undefined);
     const started = now();
     const knocked = await knock(options.door, wait);
 
@@ -62,20 +72,22 @@ export async function pipeToTable(input: Readable, output: Writable, options: Pi
     knocked.on("error", () => undefined);
     knocked.write(helloLine({ key: options.key, version: options.version }));
     const first = await firstLine(knocked, Math.max(1, wait - (now() - started)), mostHello);
-    const answer = first === undefined ? undefined : readAnswer(first.line);
+    const answer = typeof first === "string" ? undefined : readAnswer(first.line);
 
-    if (first !== undefined && answer !== undefined && "ok" in answer) {
+    if (typeof first !== "string" && answer !== undefined && "ok" in answer) {
         return await piped(knocked, first.rest, input, output, log);
     }
 
     knocked.destroy();
-    log(`chesspal mcp: ${answer !== undefined && "refused" in answer ? refusedWhy[answer.refused] : slowTable}`);
+    // A door that closes as the chat knocks may close the knock without a word.
+    const why = answer !== undefined && "refused" in answer ? refusedWhy[answer.refused] : first === "closed" ? noTable : slowTable;
+    log(`chesspal mcp: ${why}`);
     return 1;
 }
 
 const again = "open the chat again from the board page.";
 const noTable = `Chesspal's table, which opened this chat, is not there any more: ${again}`;
-const slowTable = `Chesspal's table, which opened this chat, did not answer within a second: ${again}`;
+const slowTable = `Chesspal's table, which opened this chat, did not answer in time: ${again}`;
 const refusedWhy: Readonly<Record<Refusal, string>> = {
     key: `Chesspal's table no longer knows this chat, which it closed: ${again}`,
     version: `Chesspal's table runs another version than this chat's server, as after an update: ${again}`,

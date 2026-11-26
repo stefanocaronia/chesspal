@@ -1,5 +1,4 @@
 // Where the table's door is: a named pipe on Windows, a socket file elsewhere, with a random name made at each opening; and the knock at it.
-import { rmSync } from "node:fs";
 import { connect, type Socket } from "node:net";
 import { join } from "node:path";
 
@@ -13,14 +12,6 @@ export const keyVariable = "CHESSPAL_TABLE_KEY";
 export function doorPath(name: string, platform: string, folder: string): string
 {
     return platform === "win32" ? `\\\\.\\pipe\\chesspal-table-${name}` : join(folder, `chesspal-table-${name}.sock`);
-}
-
-/** Takes away the door's socket file; a named pipe goes with its server. */
-export function removeSocketFile(path: string, platform: string): void
-{
-    if (platform !== "win32") {
-        rmSync(path, { force: true });
-    }
 }
 
 /** Knocks at the door: the connection, "nobody" where nothing listens there, "slow" where it did not answer within `wait` ms. */

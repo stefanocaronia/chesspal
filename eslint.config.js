@@ -17,7 +17,14 @@ const boundaries = [
 const aboveCommands = "^(?:\\.\\./)+(?:commands|server|cli)/";
 
 // no-restricted-imports does not see import(), with which the command line loads each module late: the same boundaries, through the syntax.
-const lateBoundaries = boundaries.map(({ regex, message }) => ({ selector: `ImportExpression[source.value=/${regex.replaceAll("/", "\\x2F")}/]`, message }));
+const late = (rules) => rules.map(({ regex, message }) => ({ selector: `ImportExpression[source.value=/${regex.replaceAll("/", "\\x2F")}/]`, message }));
+const lateBoundaries = late(boundaries);
+
+// The table never imports server/places, which imports server/mcp, which imports the table.
+const tableNotPlaces = {
+    regex: "^(?:\\.\\./)+places/",
+    message: "The table never imports server/places, which imports server/mcp, which imports the table: take the places as a parameter.",
+};
 
 // The commands' folders by steps, from the bottom: each imports only the folders of a lower step, never one of its own step or above, nor commands/index.ts.
 const commandsSteps = [["registry"], ["answers"], ["setup", "profiles", "talk"], ["game", "analysis"]];
@@ -184,15 +191,12 @@ export default [
         },
     },
     // The table never imports the places of the chats it opens: they import the MCP server, which imports the table; the command line hands them over.
+    // The rule is in both the imports and the syntax, as import() is seen only there.
     {
         files: ["src/server/table/**/*.ts"],
         rules: {
-            "no-restricted-imports": ["error", {
-                patterns: [
-                    { regex: "^(?:\\.\\./)+places/", message: "The table never imports server/places, which imports server/mcp, which imports the table: take the places as a parameter." },
-                    ...boundaries,
-                ],
-            }],
+            "no-restricted-imports": ["error", { patterns: [tableNotPlaces, ...boundaries] }],
+            "no-restricted-syntax": ["error", ...lateBoundaries, ...late([tableNotPlaces])],
         },
     },
     // The door between the table and the chats it opens imports Node and the version alone: the process of a chat that only pipes its lines starts light.

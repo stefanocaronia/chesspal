@@ -1,9 +1,11 @@
 // The table's door, where the `chesspal mcp` of each chat the table opened knocks: it sits with the key the table made for it, or is told why not.
 import { randomBytes } from "node:crypto";
-import { createServer, type Socket } from "node:net";
+import { mkdtempSync, rmSync } from "node:fs";
+import { createServer, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { answerLine, firstLine, type Hello, mostHello, readHello, type Refusal } from "./hello.ts";
-import { doorPath, doorVariable, keyVariable, removeSocketFile } from "./socket.ts";
+import { doorPath, doorVariable, keyVariable } from "./socket.ts";
 
 export interface DoorOptions
 {
@@ -13,12 +15,14 @@ export interface DoorOptions
     seated: (key: string, socket: Socket, rest: Buffer) => void;
     /** The operating system, as process.platform names it: a named pipe on Windows, a socket file elsewhere. */
     platform?: string;
-    /** The folder of the socket file, off Windows: the system's temporary folder unless given. */
+    /** Where the folder of the socket file is made, off Windows: the system's temporary folder unless given. */
     folder?: string;
     /** Random bytes, for the keys and the door's name. */
     bytes?: (size: number) => Buffer;
     /** How long a knock may take to say hello, in ms. */
     helloWait?: number;
+    /** How long a key's new server waits for its earlier connection to close before it is refused as busy, in ms: a host that starts its server again. */
+    busyWait?: number;
 }
 
 /** The door open, listening at `path`. */
@@ -29,16 +33,18 @@ export interface Door
     offer(): { key: string; environment: Record<string, string>; };
     /** Forgets a key: the chat sitting with it is sent away, and it sits no more. */
     withdraw(key: string): void;
-    /** Refuses every knock from now on, sends away who sits or knocks, and takes the socket file away. */
+    /** Refuses every knock from now on, sends away who sits or knocks, and takes the socket file and its folder away. */
     close(): Promise<void>;
 }
 
-/** Opens a door on a fresh socket: settled once it listens, so that a chat started after it finds it. */
+/** Opens a door on a fresh socket: settled once it listens, so that a chat started after it finds it; it throws, saying why, when it cannot listen. */
 export async function openDoor(options: DoorOptions): Promise<Door>
 {
     const platform = options.platform ?? process.platform;
     const bytes = options.bytes ?? randomBytes;
-    const path = doorPath(bytes(8).toString("hex"), platform, options.folder ?? tmpdir());
+    const name = bytes(8).toString("hex");
+    let folder: string | undefined;
+    let path = doorPath(name, platform, options.folder ?? tmpdir());
     const keys = new Set<string>();
     const sitting = new Map<string, Socket>();
     const knocking = new Set<Socket>();
@@ -76,17 +82,22 @@ export async function openDoor(options: DoorOptions): Promise<Door>
             return;
         }
 
-        const hello = first === undefined ? undefined : readHello(first.line);
+        const hello = typeof first === "string" ? undefined : readHello(first.line);
 
-        if (first === undefined || hello === undefined) {
+        if (typeof first === "string" || hello === undefined) {
             socket.destroy();
             return;
         }
 
+        // A host that starts its server again: the earlier connection is often still closing.
+        if (refusal(hello) === "busy") {
+            await closedWithin(sitting.get(hello.key)!, options.busyWait ?? 500);
+        }
+
         const refused = refusal(hello);
 
-        if (refused !== undefined) {
-            refuse(socket, refused);
+        if (refused !== undefined || socket.destroyed) {
+            refuse(socket, refused ?? "ending");
             return;
         }
 
@@ -101,7 +112,16 @@ export async function openDoor(options: DoorOptions): Promise<Door>
     };
 
     const server = createServer((socket) => void welcome(socket));
-    await listen(server, path);
+
+    try {
+        // Off Windows the socket file sits in a folder of its own, for the player alone (mkdtemp makes it 0700).
+        folder = platform === "win32" ? undefined : mkdtempSync(join(options.folder ?? tmpdir(), "chesspal-door-"));
+        path = doorPath(name, platform, folder ?? "");
+        await listen(server, path);
+    } catch (error) {
+        removeFolder(folder);
+        throw new Error(`Chesspal's table could not open its door for the chats it opens at ${path} (${(error as Error).message}): start the table again.`);
+    }
 
     return {
         path,
@@ -121,7 +141,7 @@ export async function openDoor(options: DoorOptions): Promise<Door>
             knocking.clear();
             sitting.forEach((socket) => socket.destroy());
             await closed;
-            removeSocketFile(path, platform);
+            removeFolder(folder);
         },
     };
 }
@@ -132,7 +152,30 @@ function refuse(socket: Socket, refused: Refusal): void
     socket.end(answerLine({ refused }), () => socket.destroy());
 }
 
-function listen(server: ReturnType<typeof createServer>, path: string): Promise<void>
+/** Settles once the socket has closed, or after `wait` ms. */
+function closedWithin(socket: Socket, wait: number): Promise<void>
+{
+    return new Promise((done) => {
+        const timer = setTimeout(finish, wait);
+        socket.once("close", finish);
+
+        function finish(): void
+        {
+            clearTimeout(timer);
+            socket.off("close", finish);
+            done();
+        }
+    });
+}
+
+function removeFolder(folder: string | undefined): void
+{
+    if (folder !== undefined) {
+        rmSync(folder, { recursive: true, force: true });
+    }
+}
+
+function listen(server: Server, path: string): Promise<void>
 {
     return new Promise((done, failed) => {
         server.once("error", failed);

@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { connect, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type Door, doorPath, doorVariable, helloLine, keyVariable, openDoor, pipeToTable, readAnswer, readHello, tableEnded } from "../src/server/door/index.ts";
@@ -24,7 +24,7 @@ function socketFolder(): string
 }
 
 /** A door whose chats that sit are kept, with what came after their hello. */
-async function door(options: { bytes?: (size: number) => Buffer; } = {}): Promise<{ door: Door; seated: { key: string; socket: Socket; rest: string; }[]; }>
+async function door(options: { bytes?: (size: number) => Buffer; busyWait?: number; } = {}): Promise<{ door: Door; seated: { key: string; socket: Socket; rest: string; }[]; }>
 {
     const seated: { key: string; socket: Socket; rest: string; }[] = [];
     const opened = await openDoor({ version, folder: socketFolder(), seated: (key, socket, rest) => void seated.push({ key, socket, rest: rest.toString("utf8") }), ...options });
@@ -91,7 +91,7 @@ describe("the table's door", () => {
     });
 
     it("refuses a wrong key, another version, a key already sitting and a closing door, each with its reason, and closes them", async () => {
-        const { door: opened, seated } = await door();
+        const { door: opened, seated } = await door({ busyWait: 100 });
         const { key } = opened.offer();
 
         const refusedWith = async (hello: string): Promise<string[]> => {
@@ -117,10 +117,48 @@ describe("the table's door", () => {
         expect(late.lines).toEqual(['{"refused":"ending"}']);
         await vi.waitFor(() => expect(first.closed()).toBe(true));
         expect(seated).toHaveLength(1);
+    });
 
-        if (process.platform !== "win32") {
-            expect(existsSync(opened.path)).toBe(false);
-        }
+    it("lets a key's new server sit once its earlier connection closes within a moment, and refuses it busy only after that moment", async () => {
+        const { door: opened, seated } = await door({ busyWait: 300 });
+        const { key } = opened.offer();
+        const first = await knockAt(opened.path);
+        first.socket.write(helloLine({ key, version }));
+        await vi.waitFor(() => expect(seated).toHaveLength(1));
+
+        // The host starts the server again while the earlier connection still closes.
+        const again = await knockAt(opened.path);
+        again.socket.write(helloLine({ key, version }));
+        await new Promise((done) => setTimeout(done, 100));
+        expect(again.lines).toEqual([]);
+        first.socket.destroy();
+        await vi.waitFor(() => expect(again.lines).toEqual(['{"ok":true}']));
+        expect(seated).toHaveLength(2);
+
+        const third = await knockAt(opened.path);
+        const started = Date.now();
+        third.socket.write(helloLine({ key, version }));
+        await vi.waitFor(() => expect(third.closed()).toBe(true));
+        expect(third.lines).toEqual(['{"refused":"busy"}']);
+        expect(Date.now() - started).toBeGreaterThanOrEqual(250);
+    });
+
+    it.skipIf(process.platform === "win32")("keeps the socket file in a folder of its own, for the player alone, and takes it away as it closes", async () => {
+        const { door: opened } = await door();
+        const folder = dirname(opened.path);
+
+        expect(statSync(folder).mode & 0o777).toBe(0o700);
+        expect(existsSync(opened.path)).toBe(true);
+        await opened.close();
+        expect(existsSync(folder)).toBe(false);
+    });
+
+    it("says why it cannot open, and leaves no folder behind", async () => {
+        const missing = join(socketFolder(), "missing");
+        const failed = await openDoor({ version, platform: "linux", folder: missing, seated: () => undefined }).then(() => "opened", (error: Error) => error.message);
+
+        expect(failed).toMatch(/^Chesspal's table could not open its door for the chats it opens at .*: start the table again\.$/);
+        expect(existsSync(missing)).toBe(false);
     });
 
     it("closes without a word what says no hello, or a line too long", async () => {
@@ -268,10 +306,54 @@ describe("chesspal mcp in a chat the table opened", () => {
         try {
             const started = Date.now();
             const slow = await failed(silentPath, "k", 200);
-            expect(slow).toEqual({ code: 1, said: ["chesspal mcp: Chesspal's table, which opened this chat, did not answer within a second: open the chat again from the board page."], untouched: true });
+            expect(slow).toEqual({ code: 1, said: ["chesspal mcp: Chesspal's table, which opened this chat, did not answer in time: open the chat again from the board page."], untouched: true });
             expect(Date.now() - started).toBeLessThan(2_000);
         } finally {
             silent.close();
         }
+    });
+
+    it("waits ten seconds for the table by default, for a slow disk or an antivirus", async () => {
+        const silent = createServer(() => undefined);
+        const silentPath = doorPath(randomBytes(8).toString("hex"), process.platform, socketFolder());
+        await new Promise<void>((done) => silent.listen(silentPath, done));
+        const knocks: Socket[] = [];
+        silent.on("connection", (socket) => knocks.push(socket));
+        let settled = false;
+        void pipeToTable(new PassThrough(), new PassThrough(), { door: silentPath, key: "k", version }).then(() => (settled = true));
+
+        try {
+            // Past the second the chat once waited, it still waits.
+            await new Promise((done) => setTimeout(done, 1_500));
+            expect(settled).toBe(false);
+        } finally {
+            knocks.forEach((socket) => socket.destroy());
+            silent.close();
+        }
+    });
+
+    it("says the table is not there, not that it was slow, when the door closes a knock without a word", async () => {
+        // A socket that closes every knock at once, as a door closing may.
+        const closing = createServer((socket) => socket.destroy());
+        const path = doorPath(randomBytes(8).toString("hex"), process.platform, socketFolder());
+        await new Promise<void>((done) => closing.listen(path, done));
+        const said: string[] = [];
+
+        try {
+            expect(await pipeToTable(new PassThrough(), new PassThrough(), { door: path, key: "k", version, log: (line) => said.push(line) })).toBe(1);
+            expect(said).toEqual(["chesspal mcp: Chesspal's table, which opened this chat, is not there any more: open the chat again from the board page."]);
+        } finally {
+            closing.close();
+        }
+    });
+
+    it("takes an error of the host's input as the host gone: exit 0, nothing thrown", async () => {
+        const table = await echoTable();
+        const input = new PassThrough();
+        const piping = pipeToTable(input, new PassThrough(), { door: table.door.path, key: table.key, version });
+        await vi.waitFor(() => expect(table.sockets).toHaveLength(1));
+        input.destroy(new Error("read ECONNRESET"));
+
+        expect(await piping).toBe(0);
     });
 });
