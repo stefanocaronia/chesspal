@@ -94,6 +94,8 @@ export interface PageData
     readonly aiModel?: AiModel;
     /** Whether a chat hears the player: in a turn, or waiting for the doorbell. */
     readonly listening?: boolean;
+    /** The chat is in a turn, as the doorbell knows: its answer to a line it read is coming. */
+    readonly inTurn?: true;
     /** What the AI thinks on now: its move, or on the player's time (D-72); none else. */
     readonly thinking?: Thinking;
     /** The player's folder was set up by an older Chesspal: init must run there again. */

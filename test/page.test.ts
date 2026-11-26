@@ -1278,11 +1278,12 @@ describe("the doorbell of the chat", () => {
         expect(await hook.heard).toBe(false);
         record("busy");
         expect(await post(page, "/api/move", { move: "e4" })).toMatchObject({ status: 200 });
-        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ listening: true });
+        expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ listening: true, inTurn: true });
 
         // Esc before the AI's first word: no line in the transcript, but Claude Code says the chat is idle, and the doorbell, looking again, finds it.
         record("idle");
         await vi.waitFor(async () => expect(JSON.parse((await get(page, "/api/game")).body)).toMatchObject({ listening: false }), { timeout: 2 * stopCheck, interval: 100 });
+        expect(JSON.parse((await get(page, "/api/game")).body)).not.toHaveProperty("inTurn");
     });
 
     it("tells the page nobody hears the player when Codex's transcript ends with the turn aborted, not when another turn started after it", async () => {

@@ -11,14 +11,17 @@ import { ReviewProgress } from "../game/review-progress.tsx";
 import { signature } from "../players/model-name.ts";
 import type { Text } from "../text.ts";
 import { hasVoice, hush, onReading, type Reading, reading, skip, speak, type Voice } from "./voice.ts";
+import { aiWrites, type ChatAtWork } from "./writing.ts";
 
 /**
  * The talk as one thread, as a chat app shows it: the AI's bubbles on the left, the player's on the right, the newest at the foot, each group's last with a
  * tail; in the corner the move the words go with, when it changes, and how far the player's last line got. It follows the newest unless the player scrolled up
- * to read; then a button takes them down. In analysis each line of the player's names in its corner the move it was written on instead (D-101).
+ * to read; then a button takes them down. In analysis each line of the player's names in its corner the move it was written on instead (D-101). While the
+ * AI answers a line it read, its bubble at the foot writes, with three dots.
  */
-export function Thread({ items, voice, name, about, text }: {
+export function Thread({ items, chat, voice, name, about, text }: {
     items: readonly ThreadItem[];
+    chat: ChatAtWork;
     /** The voice that reads aloud the AI's words added while the page is open, when the player wants it. */
     voice?: Voice;
     name: string;
@@ -30,7 +33,8 @@ export function Thread({ items, voice, name, about, text }: {
     const said = items.filter((item) => item.who === "ai").map((item) => item.text);
     useSpokenNews(said, voice);
     const read = useReading(voice);
-    const { moreAbove, moreBelow, away, unseen, toNewest } = useNewestInSight(list, items);
+    const writes = aiWrites(items, chat);
+    const { moreAbove, moreBelow, away, unseen, toNewest } = useNewestInSight(list, items, writes);
     const lastWritten = items.findLastIndex((item) => item.who === "player");
     let spoken = -1;
 
@@ -38,7 +42,8 @@ export function Thread({ items, voice, name, about, text }: {
         <div class="thread-box">
             <ol ref={list} class={`thread${moreAbove ? " more-above" : ""}${moreBelow ? " more-below" : ""}`} aria-live="polite">
                 {items.map((item, index) => {
-                    const last = items[index + 1]?.who !== item.who;
+                    // Before the AI's bubble that writes, an AI's bubble is not its group's last.
+                    const last = (items[index + 1]?.who ?? (writes ? "ai" : undefined)) !== item.who;
                     const corner = (
                         <Corner
                             place={cornerPlace(item, about, text)}
@@ -68,6 +73,7 @@ export function Thread({ items, voice, name, about, text }: {
                         </li>
                     );
                 })}
+                {writes ? <Writing words={text.thinking.answer} /> : null}
             </ol>
             {away
                 ? (
@@ -589,7 +595,7 @@ function SkipReading({ at, read, voice }: { at: string; read: string | undefined
  * Keeps the newest bubble in sight: on a new one, or when the column changes height, the thread goes to its foot, unless the player has scrolled up to read;
  * then the button that takes them down shows, with a dot once a new bubble came meanwhile. Says too whether there is more above and below, for the fades.
  */
-function useNewestInSight(list: RefObject<HTMLElement>, items: readonly ThreadItem[]): {
+function useNewestInSight(list: RefObject<HTMLElement>, items: readonly ThreadItem[], writes: boolean): {
     moreAbove: boolean;
     moreBelow: boolean;
     away: boolean;
@@ -666,6 +672,15 @@ function useNewestInSight(list: RefObject<HTMLElement>, items: readonly ThreadIt
         measure();
     }, [items.length, newest?.text]);
 
+    // The AI's bubble that writes is followed as the newest is, but is no news: it leaves no dot.
+    useLayoutEffect(() => {
+        if (!awayNow.current) {
+            toNewest();
+        }
+
+        measure();
+    }, [writes]);
+
     return { moreAbove, moreBelow, away, unseen, toNewest };
 }
 
@@ -706,6 +721,20 @@ function useMoreBelow(box: RefObject<HTMLElement>): boolean
 
 /** How far above its foot the player may have scrolled the thread and still follow the newest, in pixels. */
 const awayBy = 48;
+
+/** The AI's bubble at the thread's foot while it answers: three dots, as in a chat app, its words as title; still where the player wants no motion. */
+function Writing({ words }: { words: string; })
+{
+    return (
+        <li class="from-ai last writing">
+            <p class="say" role="status" title={words} aria-label={words}>
+                <span class="dot" aria-hidden="true" />
+                <span class="dot" aria-hidden="true" />
+                <span class="dot" aria-hidden="true" />
+            </p>
+        </li>
+    );
+}
 
 /**
  * Under the player's last line, a mark with its words as title: one check once written, two once the AI has read it; once it has answered, its answer says it and

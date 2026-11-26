@@ -648,6 +648,8 @@ function sendGame(response: ServerResponse, served: Served): void
         opponent: served.opponent(),
         ...(aiModel === undefined ? {} : { aiModel }),
         listening: served.bell.listening,
+        // The chat is in a turn: the page shows the AI writing under a line of the player's it read.
+        ...(served.bell.inTurn ? { inTurn: true } : {}),
         ...thinking,
         ...(served.outdated ? { outdated: true } : {}),
         ...updateShown(served),

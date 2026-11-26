@@ -69,6 +69,7 @@ import { canStop, drivenAsleep, failuresSaid, failuresSaidAtLoad, failureToSay, 
 import { UpdateDialog, UpdateNotice } from "../table/update.tsx";
 import { AiNameButton, ChatDialog, type DrivenNotes, StopButton, tableNote } from "../table/window.tsx";
 import { AiNote, Compose, PointSquare, TalkFaces, Thread } from "../talk/talk.tsx";
+import type { ChatAtWork } from "../talk/writing.ts";
 import { textFor, withoutTerminal } from "../text.ts";
 import { anchorName, type LinkIgnored, useAnchor } from "./anchor.ts";
 import { useBrowseKeys, useEscapeKey, useFoldKeys, useHushKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
@@ -575,6 +576,8 @@ export function App({ start }: { start: Settings; })
     const thinking = going && !asleep && !offline && studied === undefined ? served.thinking : undefined;
     // A chat the table drives shows the cloud at any work of its own, between games too: the mark that stops it never stands alone.
     const working = studied === undefined && !asleep ? workShown(table, thinking) : thinking;
+    // The chat at work, in a game and in analysis: the AI writes under a line of the player's it read until it answers.
+    const chatAtWork: ChatAtWork = { asleep, inTurn: !offline && served.inTurn === true, atWork: table?.atWork === true };
     // The AI at rest on its move, with a chat the table drives: the player stopped it, or it ended its turns without moving. Its clock is held.
     const stalled = stalledOnMove(table, going && !ended && live.position.turn === ai);
     const thinker = (size: number): ComponentChildren => (
@@ -997,6 +1000,7 @@ export function App({ start }: { start: Settings; })
                                             // Another game in analysis starts the thread afresh: the voice reads only the answers that come after.
                                             key={studied.name}
                                             items={analysisTalk(talk, studied.name).map(threadItem)}
+                                            chat={chatAtWork}
                                             {...(voiced ? { voice: text } : {})}
                                             name={name}
                                             about={about}
@@ -1041,7 +1045,7 @@ export function App({ start }: { start: Settings; })
                                         {asleepNote}
                                     </section>
                                     <section class="chat" aria-label={text.talk}>
-                                        <Thread items={talkThread(plies, ai, talk)} {...(voiced ? { voice: text } : {})} name={name} text={text} />
+                                        <Thread items={talkThread(plies, ai, talk)} chat={chatAtWork} {...(voiced ? { voice: text } : {})} name={name} text={text} />
                                         <Compose
                                             // Between games, and before the first, the player writes freely, a line at a time, as the AI does (D-74, D-77).
                                             spent={going ? playerSpent(plies, ai, talk) : 0}
