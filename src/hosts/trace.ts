@@ -22,16 +22,20 @@ export function traceTo(file: string | undefined): (way: "in" | "out" | "err", l
     };
 }
 
-/** The mark that stands in the trace for the value of a variable of an MCP server's environment. */
+/** The mark that stands in the trace for the value of a variable of an MCP server's environment, and for the account's email and ids. */
 export const hiddenValue = "<hidden>";
 
+// The fields that name the player's account, as Codex's account/read answers them.
+const accountFields = ["email", "userId", "chatgptAccountId"];
+
 /**
- * A line written to the host as the trace keeps it: the value of every variable of an `env`, as a server given in a request carries its key, replaced by a
- * mark, its name kept; a line that is no JSON, or holds no `env`, as it is.
+ * A line between the table and the host as the trace keeps it: the value of every variable of an `env`, as a server given in a request carries its key and
+ * the host's configuration the player's servers' own, replaced by a mark, its name kept, and so the account's email and ids; a line that is no JSON, or
+ * holds none of them, as it is.
  */
 export function withoutSecrets(line: string): string
 {
-    if (!line.includes('"env"')) {
+    if (!line.includes('"env"') && !accountFields.some((field) => line.includes(`"${field}"`))) {
         return line;
     }
 
@@ -42,7 +46,7 @@ export function withoutSecrets(line: string): string
     }
 }
 
-/** The host's process, every line written to it ("in"), its servers' secrets hidden, and read from it ("out") added to the trace first. */
+/** The host's process, every line written to it ("in") and read from it ("out") added to the trace first, its secrets hidden. */
 export function tracedProcess(host: LineProcess, traced: (way: "in" | "out", line: string) => void): LineProcess
 {
     return {
@@ -56,7 +60,7 @@ export function tracedProcess(host: LineProcess, traced: (way: "in" | "out", lin
         },
         onLine: (listener) =>
             host.onLine((line) => {
-                traced("out", line);
+                traced("out", withoutSecrets(line));
                 listener(line);
             }),
         onEnd: (listener) => host.onEnd(listener),
@@ -65,9 +69,13 @@ export function tracedProcess(host: LineProcess, traced: (way: "in" | "out", lin
     };
 }
 
-// A value with every `env` in it hidden: an object's values, or a list's entries of name and value, as ACP gives them.
+// A value with every `env` in it hidden, an object's values or a list's entries of name and value, as ACP gives them; and the account's fields.
 function hidden(value: unknown, key?: string): unknown
 {
+    if (key !== undefined && accountFields.includes(key) && typeof value === "string") {
+        return hiddenValue;
+    }
+
     if (key === "env" && Array.isArray(value)) {
         return value.map((entry: unknown) => (typeof entry === "object" && entry !== null && "value" in entry ? { ...entry, value: hiddenValue } : entry));
     }

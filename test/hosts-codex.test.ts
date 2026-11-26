@@ -55,6 +55,8 @@ describe("the chat in Codex", () => {
                 "features.shell_tool=false",
                 "-c",
                 "features.view_image=false",
+                "-c",
+                "agents.enabled=false",
             ]);
             expect(host.started?.options.cwd).toBe(folder);
             expect(host.started?.options.env).toEqual({ HOME: "/home/player" });
@@ -78,19 +80,22 @@ describe("the chat in Codex", () => {
                 "features.shell_tool=false",
                 "-c",
                 "features.view_image=false",
+                "-c",
+                "agents.enabled=false",
             ]);
         });
 
-        it("keeps its shell and its look at a picture only where the kinds allowed hold them", () => {
+        it("keeps its shell, its look at a picture and its subagents only where the kinds allowed hold them", () => {
             const started = (allowed: ChatOptions["allowed"]): string[] => {
                 const host = fakeCodex([]);
                 codex.open({ ...options(host), allowed });
-                return (host.started?.args ?? []).filter((arg) => arg.startsWith("features.shell_tool") || arg.startsWith("features.view_image"));
+                return (host.started?.args ?? []).filter((arg) => /^(features\.shell_tool|features\.view_image|agents\.enabled)/.test(arg));
             };
 
             expect(started(tableKinds)).toEqual(["features.shell_tool=false", "features.view_image=false"]);
-            expect(started(["chesspal", "shell"])).toEqual(["features.view_image=false"]);
-            expect(started(["chesspal", "read"])).toEqual(["features.shell_tool=false"]);
+            expect(started(["chesspal", "shell"])).toEqual(["features.view_image=false", "agents.enabled=false"]);
+            expect(started(["chesspal", "read"])).toEqual(["features.shell_tool=false", "agents.enabled=false"]);
+            expect(started(["chesspal"])).toEqual(["features.shell_tool=false", "features.view_image=false", "agents.enabled=false"]);
         });
 
         it("begins the protocol as the table, reads its configuration and the account, then opens a thread with the model, the effort, its approvals, its sandbox and no web search", async () => {
@@ -99,7 +104,14 @@ describe("the chat in Codex", () => {
             expect(host.written.map((message) => message.method)).toEqual(["initialize", "initialized", "config/read", "account/read", "thread/start"]);
             expect(host.written[0]!.params).toMatchObject({ clientInfo: { name: "chesspal", title: "Chesspal" }, capabilities: { experimentalApi: true } });
             expect(host.written[2]!.params).toEqual({ cwd: folder });
-            expect(host.written[4]!.params).toEqual({ cwd: folder, model, approvalPolicy: "on-request", sandbox: "read-only", config: { model_reasoning_effort: "low", web_search: "disabled" } });
+            expect(host.written[4]!.params).toEqual({
+                cwd: folder,
+                model,
+                approvalPolicy: "on-request",
+                sandbox: "read-only",
+                config: { model_reasoning_effort: "low", web_search: "disabled" },
+                experimentalRawEvents: true,
+            });
         });
 
         it("opens the thread with the player's own MCP servers turned off, chesspal alone left on", async () => {
@@ -136,14 +148,22 @@ describe("the chat in Codex", () => {
         const server = { name: "table", command: "node", args: ["cli.js", "mcp"], environment: { CHESSPAL_DOOR: "door-1", CHESSPAL_KEY: key } };
         const instructions = "You play chess at the table.";
         const given = { server, instructions };
-        const own = { table: { command: "node", args: ["cli.js", "mcp"], env: { CHESSPAL_DOOR: "door-1", CHESSPAL_KEY: key } } };
+        const own = { table: { command: "node", args: ["cli.js", "mcp"], env: { CHESSPAL_DOOR: "door-1", CHESSPAL_KEY: key }, default_tools_approval_mode: "approve" } };
 
         it("sets the server, its key in its own environment, and the instructions after Codex's own, on the new thread", async () => {
             const { host, until } = play([...begin(), ...threadStart()], given, { servers: {} });
             await until(() => host.written.some(isThreadRequest));
             const asked = host.written.find(isThreadRequest);
             expect(asked?.method).toBe("thread/start");
-            expect(asked?.params).toEqual({ cwd: folder, model, approvalPolicy: "on-request", sandbox: "read-only", config: { web_search: "disabled", mcp_servers: own }, developerInstructions: instructions });
+            expect(asked?.params).toEqual({
+                cwd: folder,
+                model,
+                approvalPolicy: "on-request",
+                sandbox: "read-only",
+                config: { web_search: "disabled", mcp_servers: own },
+                developerInstructions: instructions,
+                experimentalRawEvents: true,
+            });
         });
 
         it("sets them again on the thread taken up, as its server's key is new", async () => {
@@ -173,6 +193,21 @@ describe("the chat in Codex", () => {
                 expect(traced).not.toContain(key);
                 expect(traced).toContain("CHESSPAL_KEY");
                 expect(traced).toContain("<hidden>");
+            }
+        });
+
+        it("never writes in the chat's trace the environment of the player's own servers, which Codex says, nor the account's email and ids", async () => {
+            const trace = join(makeTempFolder(), "trace.jsonl");
+            const account = { account: { type: "chatgpt", email: "player@example.com", planType: "plus" }, userId: "user-secret", workspaceRouting: { chatgptAccountId: "account-secret" } };
+            const servers = { notes: { command: "notes-mcp", env: { NOTES_TOKEN: "token-secret" } } };
+            const { host, until } = play([...begin(account), ...threadStart()], { ...given, trace }, { servers });
+            await until(() => host.written.some(isThreadRequest));
+            const traced = readFileSync(trace, "utf8");
+            expect(traced).toContain("NOTES_TOKEN");
+            expect(traced).toContain("planType");
+
+            for (const secret of ["token-secret", "player@example.com", "user-secret", "account-secret"]) {
+                expect(traced).not.toContain(secret);
             }
         });
 
@@ -301,18 +336,38 @@ describe("the chat in Codex", () => {
     });
 
     describe("the AI's prose and tools", () => {
-        it("tells Chesspal's commands by their own names, started and done, and nothing of Codex's warnings", async () => {
+        it("tells Chesspal's commands by their own names, started and done, at the turn's end where Codex told no output of their code, and nothing of its warnings", async () => {
             const flow = loadFlow("codex/new");
             const { chat, events, until } = play(flow, { allowed: ["chesspal"] });
             chat.send(turnWords(flow)[0]!);
             await until(() => turnEnds(events).length === 1);
             expect(events.filter((event) => event.type === "tool")).toEqual([
                 { type: "tool", id: "exec-00000000-0000-0000-0000-000000000004", name: "instructions", kind: "chesspal", state: "started" },
-                { type: "tool", id: "exec-00000000-0000-0000-0000-000000000004", name: "instructions", kind: "chesspal", state: "done" },
                 { type: "tool", id: "exec-00000000-0000-0000-0000-000000000005", name: "status", kind: "chesspal", state: "started" },
+                { type: "tool", id: "exec-00000000-0000-0000-0000-000000000004", name: "instructions", kind: "chesspal", state: "done" },
                 { type: "tool", id: "exec-00000000-0000-0000-0000-000000000005", name: "status", kind: "chesspal", state: "done" },
             ]);
             expect(events.filter((event) => event.type === "text").every((event) => event.type === "text" && !event.text.includes("deprecated"))).toBe(true);
+        });
+
+        it("tells a command its code called done only once Codex gives the code's output to the AI, which a new thread asks for; any other tool at its end", async () => {
+            const call = (phase: "started" | "completed", id: string, tool: string): FlowEntry => item(phase, { type: "mcpToolCall", id, server: "chesspal", tool, status: phase === "started" ? "inProgress" : "completed" });
+            const output = notice("rawResponseItem/completed", { turnId: "turn_1", item: { type: "custom_tool_call_output", call_id: "call_9", output: "Played." } });
+            const flow = [
+                ...begin(),
+                ...threadStart(),
+                ...turn("Hello", call("started", "exec-1", "ai_move"), call("completed", "exec-1", "ai_move"), delta("Between"), output, call("started", "call_2", "status"), call("completed", "call_2", "status")),
+            ];
+            const { chat, host, events, until } = play(flow);
+            chat.send("Hello");
+            await until(() => turnEnds(events).length === 1);
+            const told = events.map((event) => (event.type === "tool" ? `${event.name} ${event.state}` : event.type === "text" ? event.text : undefined)).filter((one) => one !== undefined);
+            expect(told).toEqual(["ai_move started", "Between", "ai_move done", "status started", "status done"]);
+            expect(host.written.find(isThreadRequest)?.params).toMatchObject({ experimentalRawEvents: true });
+
+            const resumed = play([...begin(), ...threadStart()], { session: thread });
+            await resumed.until(() => resumed.host.written.some(isThreadRequest));
+            expect(resumed.host.written.find(isThreadRequest)?.params).not.toHaveProperty("experimentalRawEvents");
         });
 
         it("numbers a new block for each message and after a tool, and tells a message's whole text where none came in pieces", async () => {
@@ -439,14 +494,15 @@ describe("the chat in Codex", () => {
             const told = events.filter((event) => event.type === "text").map((event) => event.type === "text" && event.text).join("");
             expect(told).not.toContain("Keeps");
             expect(told).toContain("Bertoldo incrocia le braccia");
+            // The commands its code called end with the turn, as this Codex told no output of the code.
             expect(events.filter((event) => event.type === "tool" && event.state === "done").map((event) => event.type === "tool" && `${event.name}:${event.kind}`)).toEqual([
+                "subAgentActivity:agent",
+                "collabAgentToolCall:agent",
                 "instructions:chesspal",
                 "status:chesspal",
                 "find:chesspal",
                 "show:chesspal",
                 "scene:chesspal",
-                "subAgentActivity:agent",
-                "collabAgentToolCall:agent",
             ]);
             expect(host.problems).toEqual([]);
         });
@@ -593,6 +649,35 @@ describe("the chat in Codex", () => {
             waiting.chat.send("Hello");
             waiting.chat.interrupt();
             expect(turnEnds(waiting.events)).toEqual([{ type: "turnEnd", reason: "interrupted" }]);
+        });
+
+        it("asks Codex to stop a turn only once Codex says it started, as it refuses a stop sent before and the turn runs on", async () => {
+            const host = fakeCodex([...begin(), ...threadStart(), ...turn("Hello", delta("leaked"))]);
+            let chat: HostChat | undefined;
+
+            // The player stops the turn as its words go, before Codex answers them.
+            const start: ChatOptions["start"] = (command, args, startOptions) => {
+                const process = host.start(command, args, startOptions);
+
+                const write = (line: string): void => {
+                    process.write(line);
+
+                    if (line.includes('"turn/start"')) {
+                        chat?.interrupt();
+                    }
+                };
+
+                return { ...process, write };
+            };
+
+            chat = codex.open({ ...options(host), start });
+            const { events, until } = listen(chat);
+            chat.send("Hello");
+            await until(() => turnEnds(events).length === 1);
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "interrupted" }]);
+            expect(events.some((event) => event.type === "text")).toBe(false);
+            expect(host.written.filter((message) => message.method === "turn/interrupt")).toHaveLength(1);
+            expect(host.problems).toEqual([]);
         });
 
         it("fails the turn and ends the chat when the process ends, with its last lines on stderr", async () => {
@@ -762,7 +847,7 @@ function threadStart(): FlowEntry[]
 // The recorded ids of the turns' requests, apart from the driver's.
 let turns = 0;
 
-/** A turn: the player's words, Codex's answer naming the turn, its notifications, and its end, completed or as given. */
+/** A turn: the player's words, Codex's answer naming the turn, its start, its notifications, and its end, completed or as given. */
 function turn(words: string, ...then: (FlowEntry | Message)[]): FlowEntry[]
 {
     turns += 1;
@@ -771,6 +856,7 @@ function turn(words: string, ...then: (FlowEntry | Message)[]): FlowEntry[]
     return [
         { dir: "in", msg: { id, method: "turn/start", params: { threadId: thread, input: [{ type: "text", text: words, text_elements: [] }] } } },
         { dir: "out", msg: { id, result: { turn: { id: "turn_1", items: [], status: "inProgress", error: null } } } },
+        notice("turn/started", { turn: { id: "turn_1", items: [], status: "inProgress", error: null } }),
         ...then.filter((one): one is FlowEntry => "dir" in one),
         notice("turn/completed", { turn: { id: "turn_1", items: [], ...end } }),
     ];

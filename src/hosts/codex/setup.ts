@@ -2,7 +2,7 @@
 import { failureOf, isObject, type Message, notification, wordsOf } from "../lines.ts";
 import { chatReady, endTurn, modelChanged, refused, tell, write } from "../state.ts";
 import { initializeParams } from "./protocol.ts";
-import { sendInterrupt, type State, type Turn } from "./state.ts";
+import { sendInterrupt, type State, tellCodeEnds, type Turn } from "./state.ts";
 
 // How long Codex may take to get ready: its program started, its account read, its thread opened; and to say its configuration, which never holds the rest.
 const readyWait = 60_000;
@@ -84,7 +84,7 @@ export function writeWords(state: State, turn: Turn, text: string): void
     state.requests.ask("turn/start", params, (answer) => turnStarted(state, turn, answer));
 }
 
-/** The turn's end as Codex tells it: done, interrupted when the table asked it or Codex says so, else failed with why. */
+/** The turn's end as Codex tells it, after the ends of its tools still held: done, interrupted when the table asked it or Codex says so, else failed with why. */
 export function turnCompleted(state: State, params: Message): void
 {
     const turn = state.turn;
@@ -93,6 +93,8 @@ export function turnCompleted(state: State, params: Message): void
     if (turn === undefined || turn.held !== undefined || (turn.id !== undefined && completed.id !== turn.id)) {
         return;
     }
+
+    tellCodeEnds(state, turn);
 
     if (turn.failure !== undefined) {
         endTurn(state, "failed", turn.failure);
@@ -132,8 +134,9 @@ function openThread(state: State): void
     const options = { cwd: state.folder, model: state.model.asked, approvalPolicy: "on-request", sandbox: "read-only", config, ...instructions };
     const resumed = state.resumed;
 
+    // A new thread tells each item of the AI's history, as a tool's output, which a thread taken up cannot ask.
     if (resumed === undefined) {
-        state.requests.ask("thread/start", options, (answer) => threadOpened(state, answer));
+        state.requests.ask("thread/start", { ...options, experimentalRawEvents: true }, (answer) => threadOpened(state, answer));
     } else {
         state.requests.ask("thread/resume", { threadId: resumed, ...options, excludeTurns: true }, (answer) => threadOpened(state, answer));
     }
@@ -141,12 +144,14 @@ function openThread(state: State): void
 
 /**
  * The thread's MCP servers: the player's own turned off by name, as one Codex does not know would fail the thread; and the server given, with its
- * environment, which holds its key, in its own configuration: Codex gives an MCP server none of its process's.
+ * environment, which holds its key, in its own configuration: Codex gives an MCP server none of its process's. Its tools run without asking where the table
+ * allows them.
  */
 function serversOf(state: State): { mcp_servers?: Record<string, unknown>; }
 {
     const off = state.others.map((name) => [name, { enabled: false }]);
-    const given = state.given === undefined ? [] : [[state.given.name, { command: state.given.command, args: state.given.args, env: state.given.environment }]];
+    const approve = state.allowed.includes("chesspal") ? { default_tools_approval_mode: "approve" } : {};
+    const given = state.given === undefined ? [] : [[state.given.name, { command: state.given.command, args: state.given.args, env: state.given.environment, ...approve }]];
     const servers = [...off, ...given];
     return servers.length === 0 ? {} : { mcp_servers: Object.fromEntries(servers) as Record<string, unknown> };
 }

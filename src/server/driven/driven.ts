@@ -376,7 +376,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 ...(session === undefined ? {} : { session }),
                 allowed: [...host.allowed],
                 environment: chatEnvironment(hostDriver, environment, host.name, start.choice),
-                server: { name: "chesspal", command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...state.place.environment } },
+                server: { name: host.server, command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...state.place.environment } },
                 instructions: drivenStartInstructions(),
                 start: starts.starter("opponent"),
                 ...(trace === undefined ? {} : { trace }),

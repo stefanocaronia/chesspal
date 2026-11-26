@@ -438,7 +438,7 @@ describe("the chat the table drives", () => {
 });
 
 describe("the chat the table drives in Codex", () => {
-    it("opens Codex in the page with the switch on, by Codex's driver, with Chesspal's commands and Codex's own reads alone, never a subagent", async () => {
+    it("opens Codex in the page with the switch on, by Codex's driver, with Chesspal's commands alone, by a server's name no player's own can take", async () => {
         const { table, home, ai, terminal } = await drivenTable();
         expect(await opened(table.url, "codex")).toEqual({ status: 200, text: JSON.stringify({ opened: true }) });
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
@@ -446,9 +446,8 @@ describe("the chat the table drives in Codex", () => {
 
         expect(ai.asked).toEqual(["codex"]);
         expect(terminal.opened).toEqual([]);
-        expect(chat.options).toMatchObject({ model: "gpt-6.1-terra", effort: "medium", allowed: ["chesspal", "read"], folder: join(home, "chats", "opponent") });
-        expect(chat.options.allowed).not.toContain("agent");
-        expect(chat.options.server).toMatchObject({ name: "chesspal", command: "node", args: ["cli.js", "mcp"] });
+        expect(chat.options).toMatchObject({ model: "gpt-6.1-terra", effort: "medium", allowed: ["chesspal"], folder: join(home, "chats", "opponent") });
+        expect(chat.options.server).toMatchObject({ name: "chesspal_table", command: "node", args: ["cli.js", "mcp"] });
         expect(Object.keys(chat.options.server!.environment).sort()).toEqual([doorVariable, keyVariable].sort());
         expect(chat.options.instructions).toContain("open the chat again from the board page");
         expect(chat.sent).toEqual(["Let's play!"]);
@@ -464,7 +463,7 @@ describe("the chat the table drives in Codex", () => {
         await posted(table.url, "/api/table/restart", { host: "codex" });
         await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
         expect(ai.asked).toEqual(["claudeCode", "codex"]);
-        expect(ai.chats[1]!.options).toMatchObject({ model: "gpt-6.1-terra", allowed: ["chesspal", "read"] });
+        expect(ai.chats[1]!.options).toMatchObject({ model: "gpt-6.1-terra", allowed: ["chesspal"] });
         expect(ai.chats[1]!.options.session).toBeUndefined();
 
         ai.chats[1]!.emit({ type: "ended", why: "Codex is not signed in on this computer: sign in to Codex, then open the chat again" });
@@ -490,7 +489,7 @@ describe("the chat the table drives in Codex", () => {
         try {
             await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
             expect(new Set(ai.asked)).toEqual(new Set(["codex"]));
-            expect(ai.chats[1]!.options).toMatchObject({ session: ai.chats[0]!.session, model: "gpt-6.1-terra", allowed: ["chesspal", "read"] });
+            expect(ai.chats[1]!.options).toMatchObject({ session: ai.chats[0]!.session, model: "gpt-6.1-terra", allowed: ["chesspal"] });
             expect((await shown(again.table.url)).table).toMatchObject({ chat: true, host: "codex", driven: true });
         } finally {
             page.destroy();

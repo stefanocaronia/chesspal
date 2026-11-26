@@ -109,7 +109,7 @@ describe("the opponent's helpers the table runs itself", () => {
         expect(opponent.sent[3]).toContain("Thought on their time by a quicker model (legal, not checked): d5, The centre.");
     }, 30_000);
 
-    it("runs the helpers of a chat in Codex on Codex: the one that thinks on Codex's quick model at a low level, as the opponent's next turn says", async () => {
+    it("runs the helpers of a chat in Codex on Codex: the one that thinks on Codex's quick model at low effort at a low level, told its tool's name", async () => {
         const { table, ai } = await playing({ level: "club", host: "codex" });
         ai.helpers.ponder = pondering("d4", "d5");
         const opponent = ai.chats[0]!;
@@ -117,9 +117,9 @@ describe("the opponent's helpers the table runs itself", () => {
         await posted(table.url, "/api/move", { move: "e4" });
         await until(() => helperOf(ai, "ponder")?.ends.includes("done") === true);
         const ponder = helperOf(ai, "ponder")!;
-        expect(ponder.options).toMatchObject({ model: "gpt-6-luna", allowed: ["chesspal", "read"] });
-        expect(ponder.options.effort).toBeUndefined();
-        expect(ponder.options.server?.name).toBe("chesspal");
+        expect(ponder.options).toMatchObject({ model: "gpt-6-luna", effort: "low", allowed: ["chesspal"] });
+        expect(ponder.options.server?.name).toBe("chesspal_table");
+        expect(ponder.sent).toEqual(["Ponder. Your tool: tools.mcp__chesspal_table__ponder."]);
         expect(new Set(ai.asked)).toEqual(new Set(["codex"]));
 
         await posted(table.url, "/api/move", { move: "d4" });
@@ -138,8 +138,8 @@ describe("the opponent's helpers the table runs itself", () => {
         await until(() => helperOf(ai, "ponder")?.ends.includes("done") === true && helperOf(ai, "coach")?.ends.includes("done") === true);
 
         for (const role of ["ponder", "coach"] as const) {
-            expect(helperOf(ai, role)!.options).toMatchObject({ model: "gpt-6-astra", effort: "high", allowed: ["chesspal", "read"] });
-            expect(helperOf(ai, role)!.options.allowed).not.toContain("agent");
+            expect(helperOf(ai, role)!.options).toMatchObject({ model: "gpt-6-astra", effort: "high", allowed: ["chesspal"] });
+            expect(helperOf(ai, role)!.sent).toEqual([`${role === "ponder" ? "Ponder." : "Coach."} Your tool: tools.mcp__chesspal_table__${role}.`]);
         }
 
         expect(new Set(ai.asked)).toEqual(new Set(["codex"]));
@@ -166,6 +166,7 @@ describe("the opponent's helpers the table runs itself", () => {
                 expect(helperOf(ai, role)!.options, `${host} ${role}`).toMatchObject({ model, allowed: ["chesspal"] });
                 expect(helperOf(ai, role)!.options.effort, `${host} ${role}`).toBe(effort);
                 expect(helperOf(ai, role)!.options.server?.name, `${host} ${role}`).toBe("chesspal");
+                expect(helperOf(ai, role)!.sent, `${host} ${role}`).toEqual([role === "ponder" ? "Ponder." : "Coach."]);
             }
 
             expect(new Set(ai.asked), host).toEqual(new Set([driver]));

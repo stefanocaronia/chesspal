@@ -3,8 +3,12 @@ import { error, isObject, type Message, result } from "../lines.ts";
 import { inside } from "../paths.ts";
 import { askToStop, nextBlock, playing, tell, write } from "../state.ts";
 import { changeSettled, turnCompleted } from "./setup.ts";
-import { sendInterrupt, type State, type Turn } from "./state.ts";
+import { sendInterrupt, type State, tellCodeEnds, type Turn } from "./state.ts";
 import { approvalAnswer, type CodexTool, toolOfItem, toolOfRequest } from "./tools.ts";
+
+// How Codex's ids begin for a tool called from its code, a JavaScript cell of its exec; and the kinds of the items that give a tool's output to the AI.
+const codeCall = "exec-";
+const outputs = ["custom_tool_call_output", "function_call_output"];
 
 /** One line of Codex, an object: an answer, a request of Codex's, or a notification of the thread or of a subagent's. */
 export function readMessage(state: State, message: Message): void
@@ -66,6 +70,8 @@ function readNotification(state: State, method: string, params: Message): void
             return readTurnStarted(state, params);
         case "turn/completed":
             return turnCompleted(state, params);
+        case "rawResponseItem/completed":
+            return readOutput(state, params.item);
         case "thread/settings/updated":
             return readSettings(state, isObject(params.threadSettings) ? params.threadSettings : {});
         case "model/rerouted":
@@ -124,7 +130,20 @@ function readItem(state: State, item: unknown, completed: boolean, own = true): 
     }
 
     if (completed) {
-        toolEnded(state, turn, id, tool, itemRan(item), own);
+        toolEnded(state, turn, id, tool, itemRan(item), own, item.type === "mcpToolCall" && id.startsWith(codeCall));
+    }
+}
+
+/**
+ * An item as the AI's history keeps it: a tool's output, its code's among them, is what the AI reads of its tools; the tools its code called are told
+ * ended now, as the table may stop the turn at their end, which before the code returned would leave the AI only the stop.
+ */
+function readOutput(state: State, item: unknown): void
+{
+    const turn = playing(state);
+
+    if (turn !== undefined && isObject(item) && outputs.includes(String(item.type))) {
+        tellCodeEnds(state, turn);
     }
 }
 
@@ -138,13 +157,19 @@ function itemRan(item: Message): boolean
     return item.status === undefined || item.status === "completed";
 }
 
-/** A tool's end, told where it is the AI's own; one that ran, which the table does not allow and was never asked, stops the turn, which fails saying so. */
-function toolEnded(state: State, turn: Turn, id: string, tool: CodexTool, ran: boolean, own: boolean): void
+/**
+ * A tool's end, told where it is the AI's own, and held until its code returned where its code called it; one that ran, which the table does not allow and
+ * was never asked, stops the turn, which fails saying so.
+ */
+function toolEnded(state: State, turn: Turn, id: string, tool: CodexTool, ran: boolean, own: boolean, fromCode: boolean): void
 {
     turn.ended.add(id);
+    const end = { type: "tool" as const, id, name: tool.name, kind: tool.kind, state: ran ? "done" as const : "failed" as const };
 
-    if (own) {
-        tell(state, { type: "tool", id, name: tool.name, kind: tool.kind, state: ran ? "done" : "failed" });
+    if (own && fromCode) {
+        turn.codeEnds.push(end);
+    } else if (own) {
+        tell(state, end);
     }
 
     const mayUse = state.allowed.includes(tool.kind) && (tool.kind !== "read" || pathOutside(state, tool) === undefined);
@@ -158,14 +183,15 @@ function toolEnded(state: State, turn: Turn, id: string, tool: CodexTool, ran: b
     }
 }
 
-/** Codex names the turn as it starts it: a stop asked before is told now. */
+/** Codex names the turn as it starts it: a stop asked before is told now, as Codex refuses one sent before. */
 function readTurnStarted(state: State, params: Message): void
 {
     const turn = state.turn;
     const started = isObject(params.turn) ? params.turn.id : undefined;
 
-    if (turn !== undefined && turn.held === undefined && turn.id === undefined && typeof started === "string") {
+    if (turn !== undefined && turn.held === undefined && typeof started === "string" && (turn.id === undefined || turn.id === started)) {
         turn.id = started;
+        turn.started = true;
         sendInterrupt(state, turn);
     }
 }

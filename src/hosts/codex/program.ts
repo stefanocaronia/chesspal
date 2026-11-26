@@ -23,7 +23,7 @@ export function codexProgram(environment: NodeJS.ProcessEnv, platform: string): 
  * The program's arguments after its own for a chat: the app-server on stdio, and the chat's folder trusted for this process alone, so that Codex reads
  * the folder's .codex/config.toml, which starts the chesspal server. A key of -c is cut at its dots: a folder with a dot is named in the value instead, as a
  * table of projects holding this folder alone, which for this process takes the place of the player's. The player's apps and plugins stay out of the chat,
- * and Codex's shell and its look at a picture on the computer where the kinds allowed hold neither.
+ * and Codex's shell, its look at a picture on the computer and its subagents where the kinds allowed hold none of them.
  */
 export function serverArguments(folder: string, allowed: ToolKind[]): string[]
 {
@@ -31,7 +31,8 @@ export function serverArguments(folder: string, allowed: ToolKind[]): string[]
     const trust = folder.includes(".") ? `projects={${JSON.stringify(folder)}={trust_level="trusted"}}` : `projects.${folder}.trust_level="trusted"`;
     const shell = allowed.includes("shell") ? [] : ["-c", "features.shell_tool=false"];
     const pictures = allowed.includes("read") ? [] : ["-c", "features.view_image=false"];
-    return ["app-server", "-c", trust, "-c", "check_for_update_on_startup=false", "-c", "features.apps=false", "-c", "features.plugins=false", ...shell, ...pictures];
+    const agents = allowed.includes("agent") ? [] : ["-c", "agents.enabled=false"];
+    return ["app-server", "-c", trust, "-c", "check_for_update_on_startup=false", "-c", "features.apps=false", "-c", "features.plugins=false", ...shell, ...pictures, ...agents];
 }
 
 /** The environment of Codex started by the table: the table's own, which is the player's, without what belongs to a Codex thread it may run in. */

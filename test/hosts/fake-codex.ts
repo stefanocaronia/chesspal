@@ -30,6 +30,8 @@ export function fakeCodex(flow: FlowEntry[], options: FakeCodexOptions = {}): Fa
     let scheduled = false;
     // A thread asked and not answered yet: the player's words must wait for its answer.
     let threadPending = false;
+    // Whether Codex said a turn started and not yet that it completed: it refuses to stop one before.
+    let turnLive = false;
     const threadAnswers = new Set<FlowEntry>();
     let lineListener: ((line: string) => void) | undefined;
     let endListener: ((reason: string) => void) | undefined;
@@ -40,6 +42,7 @@ export function fakeCodex(flow: FlowEntry[], options: FakeCodexOptions = {}): Fa
         for (let count = 0; count < linesPerTick && !fake.stopped && entries[position]?.dir === "out"; count++) {
             const entry = entries[position++]!;
             threadPending &&= !threadAnswers.has(entry);
+            turnLive = entry.msg.method === "turn/started" || (turnLive && entry.msg.method !== "turn/completed");
             lineListener?.(entry.raw ?? JSON.stringify(entry.msg));
         }
 
@@ -105,8 +108,13 @@ export function fakeCodex(flow: FlowEntry[], options: FakeCodexOptions = {}): Fa
         threadAnswers.add(say({ id: message.id, result: { ...template, thread, model: options.models?.[model] ?? model, reasoningEffort } }));
     };
 
-    /** An interrupt: what Codex had left to say of the turn is dropped, and the turn completes interrupted. */
+    /** An interrupt: what Codex had left to say of the turn is dropped, and the turn completes interrupted; before Codex said the turn started, refused. */
     const interrupted = (message: Message): void => {
+        if (!turnLive) {
+            say({ id: message.id, error: { code: -32600, message: "no active turn to interrupt" } });
+            return;
+        }
+
         const completed = entries.findIndex((entry, index) => index >= position && entry.dir === "out" && entry.msg.method === "turn/completed");
 
         if (completed < 0) {

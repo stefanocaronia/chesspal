@@ -53,6 +53,8 @@ export interface HelperHeard
 /** A helper's chat, as the table drives it. */
 export interface HelperChat
 {
+    /** The host the chat runs in. */
+    readonly host: DrivenHost;
     /** Gives the chat a turn: at once when its program has started, else once it has; one asked before and not sent yet is replaced. */
     ask(prompt: string): void;
     /** Stops the turn running, and lets the prompt waiting go. */
@@ -187,7 +189,7 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
             ...(model.effort === undefined ? {} : { effort: model.effort }),
             allowed: [...model.host.allowed],
             environment: chatEnvironment(driver, options.environment, model.host.name, choice),
-            server: { name: "chesspal", command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...place.environment } },
+            server: { name: model.host.server, command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...place.environment } },
             instructions: tableHelperInstructions(role),
             log: options.log,
             start: options.starts.starter(role),
@@ -200,6 +202,7 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
     void open().catch((error: unknown) => fail((error as Error).message, false));
 
     return {
+        host: model.host,
         ask: (prompt) => {
             if (!closed) {
                 pending = prompt;

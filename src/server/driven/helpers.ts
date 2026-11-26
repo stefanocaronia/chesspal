@@ -7,6 +7,7 @@ import { type CurrentGame, endOf, forgetAnalyst, gameInAnalysis, loadGame, noteP
 import { onQuickModel } from "../../host-files/index.ts";
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
 import { type HelperChat, type HelperChatOptions, type HelperEnd, type HelperHeard, type HelperModel, openHelperChat } from "./helper-chat.ts";
+import type { DrivenHost } from "./hosts.ts";
 
 /** What the helpers run with besides the table's context: how a chat opens, and what the table knows of the opponent's. */
 export interface HelpersOptions extends Omit<HelperChatOptions, "context" | "helpers">
@@ -148,7 +149,9 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
         }
 
         const quickModel = shift.role === "ponder" && onQuickModel(levelOf(current.game.record), opponent.host.client) ? opponent.host.quickModel : undefined;
-        const model = quickModel === undefined ? opponent : { host: opponent.host, model: quickModel };
+        const chosen = quickModel === undefined ? opponent : { host: opponent.host, model: quickModel };
+        const effort = shift.role === "ponder" ? chosen.effort ?? opponent.host.ponderEffort : chosen.effort;
+        const model = { host: chosen.host, model: chosen.model, ...(effort === undefined ? {} : { effort }) };
         const chat: HelperChat = open(shift.role, model, {
             ended: () => shiftEnded(shift, chat),
             answered: (tool, result) => toolAnswered(shift, chat, tool, result),
@@ -195,7 +198,7 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
 
         if (chat !== undefined) {
             shift.working = { chat, plies, answered: false };
-            chat.ask(prompts[shift.role]);
+            chat.ask(promptOf(shift.role, chat.host));
         }
     };
 
@@ -426,6 +429,12 @@ interface Shift
 
 /** What each role is told at its turn: its tool gives it all the rest. */
 const prompts: Readonly<Record<TurnRole, string>> = { ponder: "Ponder.", coach: "Coach." };
+
+/** A role's turn, naming the tool to call where the host's model would search its tools for it first: the tool is named as the role. */
+function promptOf(role: TurnRole, host: DrivenHost): string
+{
+    return host.helperTool === undefined ? prompts[role] : `${prompts[role]} Your tool: ${host.helperTool(role)}.`;
+}
 
 /** Whether a tool's result says the player had moved, or the game is over: its turn came too late. */
 function playerMoved(result: unknown): boolean
