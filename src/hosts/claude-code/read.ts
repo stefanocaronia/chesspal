@@ -115,6 +115,10 @@ function readStreamEvent(state: State, message: Message): void
 
     if (event.type === "message_start" && isObject(event.message) && typeof event.message.id === "string") {
         turn.message = event.message.id;
+
+        if (isObject(event.message.usage)) {
+            turn.lastRequest = inputOf(event.message.usage);
+        }
     } else if (event.type === "content_block_start" && isObject(event.content_block) && event.content_block.type === "text") {
         nextBlock(turn);
     } else if (event.type === "content_block_delta" && isObject(event.delta) && event.delta.type === "text_delta" && typeof event.delta.text === "string" && event.delta.text !== "") {
@@ -208,7 +212,7 @@ function readResult(state: State, message: Message): void
         return;
     }
 
-    const usage = usageOf(message.usage);
+    const usage = usageOf(message, turn.lastRequest);
 
     if (turn.failure !== undefined) {
         endTurn(state, "failed", turn.failure, usage);
@@ -223,17 +227,35 @@ function readResult(state: State, message: Message): void
 
 /**
  * The turn's tokens as its result reports them, summed over its requests, the cache's written and read counted in the input; and the input of its last
- * request, the last of `iterations`, where it lists them. Undefined where it reports none.
+ * request, the last of `iterations`, else the last the stream showed (`lastRequest`). A turn interrupted reports all zeros in its usage: its tokens are
+ * then those used since the last result, by model. Undefined where it reports none.
  */
-function usageOf(usage: unknown): TurnUsage | undefined
+function usageOf(result: Message, lastRequest: number | undefined): TurnUsage | undefined
 {
+    const { usage } = result;
+
     if (!isObject(usage) || typeof usage.input_tokens !== "number" || typeof usage.output_tokens !== "number") {
         return undefined;
     }
 
     const last = Array.isArray(usage.iterations) ? usage.iterations.at(-1) : undefined;
-    const context = isObject(last) && typeof last.input_tokens === "number" ? inputOf(last) : undefined;
-    return { input: inputOf(usage), output: usage.output_tokens, ...(context === undefined ? {} : { context }) };
+    const context = isObject(last) && typeof last.input_tokens === "number" ? inputOf(last) : lastRequest;
+    const counted = inputOf(usage) + usage.output_tokens > 0 ? { input: inputOf(usage), output: usage.output_tokens } : usageSinceLastResult(result.model_usage_since_last_result);
+    return { ...counted, ...(context === undefined ? {} : { context }) };
+}
+
+/** The tokens Claude Code counts by model since its last result, summed, the cache's counted in the input: zeros where it gives none. */
+function usageSinceLastResult(byModel: unknown): { input: number; output: number; }
+{
+    const count = (field: unknown): number => (typeof field === "number" ? field : 0);
+    const sum = { input: 0, output: 0 };
+
+    for (const model of isObject(byModel) ? Object.values(byModel).filter(isObject) : []) {
+        sum.input += count(model.inputTokens) + count(model.cacheCreationInputTokens) + count(model.cacheReadInputTokens);
+        sum.output += count(model.outputTokens);
+    }
+
+    return sum;
 }
 
 /** A request's input tokens, the cache's written and read counted. */

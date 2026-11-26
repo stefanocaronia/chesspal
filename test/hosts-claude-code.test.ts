@@ -658,6 +658,29 @@ describe("the chat in Claude Code given its server and instructions", () => {
         expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done", usage: { input: 25_196, output: 526, context: 12_847 } }]);
     });
 
+    it("tells the tokens of a turn cut short from those since the last result, and its context from the last request it streamed", async () => {
+        // Lines of a real turn interrupted after its first request: its result's usage is all zeros, with no iterations.
+        const usage = { input_tokens: 2, cache_creation_input_tokens: 9344, cache_read_input_tokens: 0, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 9344 }, output_tokens: 1 };
+        const start = out({
+            type: "stream_event",
+            parent_tool_use_id: null,
+            event: { type: "message_start", message: { model: "claude-haiku-5-5", id: "msg_1", type: "message", role: "assistant", content: [], stop_reason: null, usage } },
+        });
+        const byModel = {
+            "claude-haiku-5-5": { inputTokens: 2, outputTokens: 25, cacheReadInputTokens: 0, cacheCreationInputTokens: 9344, webSearchRequests: 0, contextWindow: 1_000_000, maxOutputTokens: 128_000 },
+        };
+        const cut = result("error_during_execution", {
+            usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0, iterations: [] },
+            terminal_reason: "aborted_streaming",
+            num_turns: 3,
+            model_usage_since_last_result: byModel,
+        });
+        const { chat, events, until } = play([said("Hello"), init(), start, cut]);
+        chat.send("Hello");
+        await until((all) => turnEnds(all).length === 1);
+        expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "failed", why: "error_during_execution", usage: { input: 9_346, output: 25, context: 9_346 } }]);
+    });
+
     it("tells no effort and no tokens where it was started with none and the host reports none", async () => {
         const { chat, events, until } = play(turn("Hello", delta("Hi")));
         chat.send("Hello");

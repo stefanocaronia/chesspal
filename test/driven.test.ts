@@ -589,7 +589,7 @@ describe("the turns of the chat the table drives", () => {
         expect((await shown(table.url)).game?.talk?.map((line) => line.text)).toEqual(["Hi.", "Shall we play the Sicilian?", "Hello!", "Yes, the Sicilian."]);
     }, 30_000);
 
-    it("shows on the page what the AI wrote outside its tools when no tool of the turn spoke, once", async () => {
+    it("shows on the page what the AI wrote outside its tools only when in its turn no tool spoke and it did not move, once", async () => {
         const { table, home, ai } = await drivenTable();
         await opened(table.url);
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
@@ -617,6 +617,20 @@ describe("the turns of the chat the table drives", () => {
         await until(() => chat.sent.length === 5 && chat.idle());
         await pause(200);
         expect(aiLines()).toEqual(["There is a game going on. Shall we go on?", "Of course."]);
+
+        // Its reasoning before a move without a comment is never shown: the turn moved.
+        const reasoning = "Nf6 attacks e4; e5 is met by Ng5 ideas... Nf6 is fine (Bxf7+ isn't a threat to fear).";
+        chat.turns.push(async (client) => {
+            chat.emit({ type: "text", block: 0, text: reasoning });
+            chat.answers.push(await call(client, "ai_move", { move: "Nf6", plan: "Develop." }));
+        });
+        await posted(table.url, "/api/move", { move: "e4" });
+        await until(() => chat.answers.length === 1 && chat.idle());
+        await pause(200);
+        expect(chat.answers[0]!.isError).toBe(false);
+        expect(sans(home)).toEqual(["e4", "Nf6"]);
+        expect(aiLines()).toEqual(["There is a game going on. Shall we go on?", "Of course."]);
+        expect(JSON.stringify(await raw(table.url))).not.toContain("Ng5 ideas");
     }, 30_000);
 
     it("listens from its attach, in the first turn the table sent it, before it calls any tool", async () => {
@@ -688,6 +702,34 @@ describe("the turns of the chat the table drives", () => {
         own.open();
         await until(() => chat.sent.length === 3 && chat.idle());
         expect(chat.sent[2]).toMatch(/^The player acted on the board page\./);
+        expect(sans(home)).toEqual(["e4", "e5"]);
+    }, 30_000);
+
+    it("refuses the AI's words with the game when the player moved while it thought on them, and takes its move on it with no call between", async () => {
+        const { table, home, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+        await posted(table.url, "/api/new", { ai_colour: "black" });
+        await until(() => chat.sent.length === 2 && chat.idle());
+
+        const thinking = gate();
+        chat.turns.push(async (client) => {
+            await thinking.passed;
+            chat.answers.push(await call(client, "ai_say", { text: "Hello to you!" }));
+            chat.answers.push(await call(client, "ai_move", { move: "e5", plan: "Hold the centre.", comment: "Hello to you!" }));
+        });
+        await posted(table.url, "/api/message", { text: "Hello!" });
+        await until(() => chat.sent.length === 3 && !chat.idle());
+        await posted(table.url, "/api/move", { move: "e4" });
+        const calls = chat.calls.length;
+        thinking.open();
+        await until(() => chat.answers.length === 2);
+
+        expect(chat.answers.map((one) => one.isError)).toEqual([true, false]);
+        expect(chat.answers[0]!.text.startsWith("It is your move: here is the game now. Decide on it, and speak in ai_move's comment. Nothing changed.\n")).toBe(true);
+        expect(chat.answers[0]!.text).toContain("1.e4");
+        expect(chat.calls.slice(calls)).toEqual(["ai_say", "ai_move"]);
         expect(sans(home)).toEqual(["e4", "e5"]);
     }, 30_000);
 

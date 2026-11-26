@@ -64,6 +64,15 @@ export class WordsRefused extends Error
     }
 }
 
+/** The AI's words refused while its move waits: it speaks in the move's comment then. */
+export class AiToMove extends Error
+{
+    constructor()
+    {
+        super("It is your move: speak in ai_move's comment. Nothing changed.");
+    }
+}
+
 /** Whether the player's last line wakes the chat: the first of a move, and between games the first since the AI last spoke (D-54, D-74). */
 export function wakesTheChat(current: Talk): boolean
 {
@@ -131,7 +140,7 @@ function refuseAiWords(current: CurrentGame, byAgent: boolean, answersEachLine: 
     }
 
     if (game.position.turn === ai) {
-        throw new Error("It is your move: speak in ai_move's comment. Nothing changed.");
+        throw new AiToMove();
     }
 
     const spoken = current.talk.filter((line) => line.who === "ai" && line.ply >= since);

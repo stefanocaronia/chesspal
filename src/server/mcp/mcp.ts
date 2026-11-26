@@ -329,7 +329,7 @@ async function runTool(
         // A chat refused for a position it had not seen gets the game as it is now with the refusal, and has seen it: no status call between.
         const view = chat && error instanceof PositionChanged ? await gameNow(context, home, caller, calling) : undefined;
         showed = view !== undefined || (showed && !(error instanceof PositionChanged));
-        const text = view === undefined ? (error instanceof Error ? error.message : String(error)) : `${positionChangedShown(command.name)}\n${view}`;
+        const text = view === undefined ? (error instanceof Error ? error.message : String(error)) : `${(error as PositionChanged).shown ?? positionChangedShown(command.name)}\n${view}`;
         return { content: [{ type: "text", text }], isError: true };
     } finally {
         // What the tool read or wrote, the chat has seen: the doorbell rings it only for what changes after, and it may move on the game a tool showed it,

@@ -26,6 +26,8 @@ export interface Turn extends SharedTurn
     /** The tools started, with why the table would not let the AI use one, and those ended. */
     tools: Map<string, { name: string; kind: ToolKind; refused?: string; }>;
     ended: Set<string>;
+    /** The input of the last request the host made in the turn, as its message's start says it, the cache's counted. */
+    lastRequest?: number;
 }
 
 export function newTurn(): Turn

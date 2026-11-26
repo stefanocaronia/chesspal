@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { moods } from "../../core/index.ts";
-import { archivedName, talkLimits } from "../../games/index.ts";
+import { AiToMove, archivedName, type Talk, talkLimits } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import {
     analystLine,
@@ -12,6 +12,7 @@ import {
     give,
     newGameStep,
     nextStep,
+    PositionChanged,
     refuseOtherGame,
     reviewedLine,
     say,
@@ -52,7 +53,8 @@ export const aiSay = defineCommand({
         const waiting = waitingWords(context);
         // A chat the table drives answers each line of the player's, those given to it since its last words too.
         const owed = context.givenSinceWords;
-        const current = say(folder, "ai", text, context.now(), mood, undefined, doorbellOf(context) === "table" ? { owed: (owed?.size ?? 0) > 0 } : false);
+        const driven = doorbellOf(context) === "table";
+        const current = sayOrMove(() => say(folder, "ai", text, context.now(), mood, undefined, driven ? { owed: (owed?.size ?? 0) > 0 } : false), driven);
         owed?.clear();
         const words = give(context, waiting);
 
@@ -91,4 +93,21 @@ function afterWords(game: GameSummary | undefined, words: readonly Written[], do
     }
 
     return nextStep(game, words, false, doorbell);
+}
+
+/**
+ * The AI's words, refused while its move waits; for a chat the table drives, with the game as it is now, as a move on a position not seen is, as when
+ * the player moved while it thought: it moves on the game given, with no call between.
+ */
+function sayOrMove(said: () => Talk, driven: boolean): Talk
+{
+    try {
+        return said();
+    } catch (error) {
+        if (driven && error instanceof AiToMove) {
+            throw new PositionChanged(error.message, "It is your move: here is the game now. Decide on it, and speak in ai_move's comment. Nothing changed.");
+        }
+
+        throw error;
+    }
 }

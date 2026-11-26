@@ -68,10 +68,11 @@ export function sayProse(folder: string, text: string, at: Date): string | undef
 }
 
 /**
- * Whether the AI spoke to the player through its tools since `since`, `from` being the game as it was then: a line of its own on the board page, or a
- * comment on a move it played after `from`.
+ * Whether the AI spoke through its tools or moved since `since`, `from` being the game as it was then: a line of its own on the board page, or a move it
+ * played after `from`, with a comment or none. The text a turn writes outside the tools is shown only when the AI did neither in it: its words before a move
+ * are its reasoning, never the player's to read.
  */
-export function aiSpokeSince(folder: string, since: Date, from: SeenPosition | undefined): boolean
+export function aiActedSince(folder: string, since: Date, from: SeenPosition | undefined): boolean
 {
     const current = loadGame(folder);
     const talk = current?.talk ?? loadTableTalk(folder).talk;
@@ -87,13 +88,7 @@ export function aiSpokeSince(folder: string, since: Date, from: SeenPosition | u
     const first = from?.started === current.started ? from.plies : 0;
     // The AI's moves are those that leave the player to move: the last when it is the player's turn, and every other one before it.
     const aiParity = (current.game.record.moves.length - (current.game.position.turn === current.ai ? 0 : 1)) % 2;
-    return current.game.record.moves.some((move, index) => index >= first && index % 2 === aiParity && spokenIn(move.comment));
-}
-
-/** The words of a move's comment, without the draw's mark and the clock's tags. */
-function spokenIn(comment: string | undefined): boolean
-{
-    return (comment ?? "").replace(/\[%[^\]]*\]/g, "").replace(/\(=\)/g, "").trim() !== "";
+    return current.game.record.moves.some((_move, index) => index >= first && index % 2 === aiParity);
 }
 
 /** Prose made one line of the talk: its blank lines and spaces as one, cut at the last end of a sentence within the longest line, or at a word's end. */

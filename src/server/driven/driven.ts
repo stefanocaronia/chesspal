@@ -2,7 +2,7 @@
 // in the table's process, and its turns given by the doorbell. To the page it is a chat at the table as any other, which the table plays the hooks of.
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { aiSpokeSince, type Caller, type Context, positionIn, sayProse, type SeenPosition, speechOf } from "../../commands/index.ts";
+import { aiActedSince, type Caller, type Context, positionIn, sayProse, type SeenPosition, speechOf } from "../../commands/index.ts";
 import { endOf, loadGame, makeFolder, saveChatStart } from "../../games/index.ts";
 import { samePath, tableFolder } from "../../home/index.ts";
 import { drivenStartInstructions } from "../../host-files/index.ts";
@@ -473,7 +473,7 @@ function showProse(context: Context, state: Driven): void
     try {
         const games = gameFolder(context.home());
 
-        if (!aiSpokeSince(games, from.at, from.position) && sayProse(games, text, context.now()) !== undefined) {
+        if (!aiActedSince(games, from.at, from.position) && sayProse(games, text, context.now()) !== undefined) {
             state.place?.context.heard?.();
         }
     } catch {

@@ -92,12 +92,24 @@ export function playMove(
     return result;
 }
 
-/** A chat's move, resignation or game replaced on a position it has not seen (D-71): it was decided on another. */
+/**
+ * A chat's move, resignation or game replaced on a position it has not seen (D-71): it was decided on another. The MCP server gives the chat the game
+ * with it, after `shown` when the refusal says it in words of its own; the message alone when it cannot.
+ */
 export class PositionChanged extends Error
 {
-    constructor()
+    readonly shown?: string;
+
+    constructor(
+        message = "The game may have changed since you last saw it, in another chat or on the board page: call status to see it, then decide. Nothing changed.",
+        shown?: string,
+    )
     {
-        super("The game may have changed since you last saw it, in another chat or on the board page: call status to see it, then decide. Nothing changed.");
+        super(message);
+
+        if (shown !== undefined) {
+            this.shown = shown;
+        }
     }
 }
 

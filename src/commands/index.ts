@@ -9,7 +9,7 @@ import { aiSay, playerSay } from "./talk/index.ts";
 // What the server and the command line use besides the list: the context, the reading of an input, and the operations the page shares with the tools.
 export { analyseGame, deleteReview, siteGames, SiteGamesRefused } from "./analysis/index.ts";
 export {
-    aiSpokeSince,
+    aiActedSince,
     analystOf,
     analystQuietAt,
     bookOpening,

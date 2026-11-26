@@ -8,7 +8,7 @@ export { closingLines, type Doorbell, doorbellOf, headLines, lastMoveText, moveL
 export { bookOpening, bookPlace, bookPlies, knownMoves, openingLine, openingName } from "./opening-book.ts";
 export { openingTags } from "./opening-tags.ts";
 export { playMove, PositionChanged, positionChangedShown, positionIn, refuseOtherGame, refuseUnseenPosition, samePosition } from "./play-move.ts";
-export { aiSpokeSince, give, newWords, say, sayProse, unansweredWords, waitingWords, type Written } from "./say.ts";
+export { aiActedSince, give, newWords, say, sayProse, unansweredWords, waitingWords, type Written } from "./say.ts";
 export { type Speech, speechLine, speechOf } from "./speech.ts";
 export { gameShown, gameToStudy, knownTag, moveIndex, moveNumbers, namedGame, noGameGoingOn, positionAfter, positionAfterLine, positionLine, shownPosition, type Studied, studyInput, type VariationInput } from "./study.ts";
 export { endText, gameGoingOn, type GameSummary, lastMoves, type MovePlayed, summaryOf, withThought } from "./summary.ts";
