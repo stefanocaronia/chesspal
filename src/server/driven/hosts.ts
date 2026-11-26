@@ -26,6 +26,8 @@ export interface DrivenHost
     readonly helperTool?: (tool: string) => string;
     /** The effort the ponderer thinks with where none is chosen; none where the host's own is quick enough. */
     readonly ponderEffort?: string;
+    /** The ponderer's turn carries its position, a request sooner than ponder {}: where a request costs seconds; Claude Code's quick model reasons longer on it. */
+    readonly ponderInMessage?: true;
     /** The host loads the player's own chesspal server in every chat, whatever server it is given: that one takes the place, through the program's environment. */
     readonly ownServer?: true;
 }
@@ -59,6 +61,7 @@ const driven: readonly DrivenHost[] = [
         server: codexServer,
         helperTool: (tool) => `tools.mcp__${codexServer}__${tool}`,
         ponderEffort: "low",
+        ponderInMessage: true,
     },
     { name: "antigravity", driver: "antigravity", title: hosts.antigravity.name, allowed: ["chesspal"], client: hosts.antigravity.client, endsTurnAtMove: false, server: "chesspal", ownServer: true },
     { name: "opencode", driver: "openCode", title: hosts.openCode.name, allowed: ["chesspal"], client: hosts.openCode.client, endsTurnAtMove: true, server: "chesspal" },

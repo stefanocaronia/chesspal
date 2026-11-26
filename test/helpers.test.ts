@@ -79,9 +79,8 @@ describe("the opponent's helpers the table runs itself", () => {
         await until(() => helperOf(ai, "ponder")?.ends.includes("done") === true);
         const ponder = helperOf(ai, "ponder")!;
 
-        // Its turn's message gives the position ponder {} would, to look at one reply at a time.
-        expect(ponder.sent.map(firstLine)).toEqual(["Ponder."]);
-        expect(ponder.sent[0]).toMatch(/^Ponder\.\nPosition 2: the player \(White\) to move[\s\S]*One reply at a time, the likeliest first: /);
+        // In Claude Code its turn's message is the word alone: ponder {} gives it the position.
+        expect(ponder.sent).toEqual(["Ponder."]);
         // What the opponent was opened with, not the name its host gives the model.
         expect(ponder.options).toMatchObject({ model: "sonnet", effort: "high", allowed: ["chesspal"] });
         expect(ponder.options.instructions).toContain("the table hears you through `ponder` alone");
@@ -122,7 +121,9 @@ describe("the opponent's helpers the table runs itself", () => {
         const ponder = helperOf(ai, "ponder")!;
         expect(ponder.options).toMatchObject({ model: "gpt-6-luna", effort: "low", allowed: ["chesspal"] });
         expect(ponder.options.server?.name).toBe("chesspal_table");
+        // In Codex, where a request costs seconds, its turn's message gives the position ponder {} would, to look at one reply at a time.
         expect(ponder.sent.map(firstLine)).toEqual(["Ponder. Your tool: tools.mcp__chesspal_table__ponder."]);
+        expect(ponder.sent[0]).toMatch(/\nPosition 2: the player \(White\) to move[\s\S]*One reply at a time, the likeliest first: /);
         expect(new Set(ai.asked)).toEqual(new Set(["codex"]));
 
         await posted(table.url, "/api/move", { move: "d4" });

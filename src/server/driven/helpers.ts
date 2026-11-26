@@ -205,8 +205,7 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
 
         if (chat !== undefined) {
             shift.working = { chat, plies, answered: false };
-            // The one that thinks starts from the position in its turn's message, a request sooner than from ponder {}.
-            const start = shift.role === "ponder" ? ponderStart(context) : undefined;
+            const start = shift.role === "ponder" && chat.host.ponderInMessage === true ? ponderStart(context) : undefined;
             chat.ask(start === undefined ? promptOf(shift.role, chat.host) : `${promptOf(shift.role, chat.host)}\n${start}`);
         }
     };
