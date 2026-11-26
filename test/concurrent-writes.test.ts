@@ -18,7 +18,7 @@ describe("two processes writing the same game", () => {
     it("loses no save: one made on a game another process changed since is refused, and made again on the game read anew", async () => {
         const folder = await gameOnDisk();
         const lines = 60;
-        // The two start together, however long each takes to load.
+        // Each reads the game for its first line and waits at the gate for the other to read it too: their first saves are made on the same game.
         const gate = mkdtempSync(join(tmpdir(), "chesspal-gate-"));
         folders.push(gate);
         const refused = await Promise.all(["white", "black"].map((name) => writer(folder, name, lines, [gate, "2"])));
@@ -26,7 +26,7 @@ describe("two processes writing the same game", () => {
 
         expect(talk).toHaveLength(2 * lines);
         expect(new Set(talk).size).toBe(2 * lines);
-        // A save was refused at least once, or the two never wrote together and the test proves nothing.
+        // The first save of one of them was refused, and made again on the game read anew.
         expect(refused[0]! + refused[1]!).toBeGreaterThan(0);
     });
 
@@ -61,7 +61,7 @@ async function gameOnDisk(): Promise<string>
     return gameFolder(context.home());
 }
 
-/** Runs a writer in a process of its own, at a gate shared with the others when given: how many of its saves were refused before they were made. */
+/** Runs a writer in a process of its own, with a gate shared with the others when given: how many of its saves were refused before they were made. */
 function writer(folder: string, name: string, lines: number, gate: string[] = []): Promise<number>
 {
     const script = join(import.meta.dirname, "concurrent", "talk-writer.ts");

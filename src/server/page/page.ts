@@ -1,11 +1,11 @@
 // The page on localhost (D-8, D-47): served on a port of its own, its requests sent where they belong (its files, the game, the profiles), and the pages open
 // kept up to date as the game changes; the doorbell wakes the chat when the player acts there.
-import { type FSWatcher, watch } from "node:fs";
+import { type FSWatcher, readdirSync, watch } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { basename, join } from "node:path";
 import { analystQuietAt, type Context, gameAtRing, positionIn, samePosition, type SeenPosition } from "../../commands/index.ts";
 import { aiNameOf } from "../../core/index.ts";
-import { forgetAnalyst, gameStamp, notePositionShown, tableTalkStamp } from "../../games/index.ts";
+import { forgetAnalyst, gameStamp, notePositionShown, stampOf, tableTalkStamp } from "../../games/index.ts";
 import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { Bell, chatInterrupted, forgetPagePort, noteBell, notePagePort } from "../bell/index.ts";
@@ -418,6 +418,7 @@ function watchGame(served: Served): () => void
 {
     let waiting: NodeJS.Timeout | undefined;
     let quiet: NodeJS.Timeout | undefined;
+    let settled: NodeJS.Timeout | undefined;
     let watching: FSWatcher[] = [];
     let game: string | undefined;
 
@@ -436,7 +437,11 @@ function watchGame(served: Served): () => void
         watching.forEach((watcher) => watcher.close());
         const folders = watchedFolders(served);
         game = folders.length === 0 ? undefined : basename(folders.at(-1)!);
+        // On macOS a watch starts listening a moment after it is made, and misses what is written meanwhile: the files are looked at once it surely listens.
+        const before = filesIn(folders);
         watching = folders.flatMap((folder) => watchFolder(folder, heard));
+        clearTimeout(settled);
+        settled = setTimeout(() => changedFiles(before, filesIn(folders)).forEach((name) => heard(name, "rename")), settleTime).unref();
         analystGoesQuiet();
     };
 
@@ -475,6 +480,7 @@ function watchGame(served: Served): () => void
     return () => {
         clearTimeout(waiting);
         clearTimeout(quiet);
+        clearTimeout(settled);
         watching.forEach((watcher) => watcher.close());
     };
 }
@@ -512,6 +518,36 @@ function watchFolder(folder: string, heard: (name: string | null, event: string)
     } catch {
         return [];
     }
+}
+
+// How long after a watch is made the files it watches are looked at, for what it may have missed before it listened.
+const settleTime = 200;
+
+// The files of the folders that a watch would hear, each with a stamp that changes when it is written; a folder in them only by its name.
+function filesIn(folders: readonly string[]): Map<string, string>
+{
+    const files = new Map<string, string>();
+
+    for (const folder of folders) {
+        try {
+            for (const entry of readdirSync(folder, { withFileTypes: true })) {
+                if (watched.test(entry.name)) {
+                    files.set(join(folder, entry.name), entry.isDirectory() ? "folder" : stampOf(join(folder, entry.name)) ?? "gone");
+                }
+            }
+        } catch {
+            // A folder that is not there yet, or cannot be read, has no files to hear.
+        }
+    }
+
+    return files;
+}
+
+// The names of the files made, written or removed between two looks.
+function changedFiles(before: Map<string, string>, after: Map<string, string>): string[]
+{
+    const paths = new Set([...before.keys(), ...after.keys()]);
+    return [...paths].filter((path) => before.get(path) !== after.get(path)).map((path) => basename(path));
 }
 
 // The current game, what the coach wrote on it, whether the AI thinks on the player's time, the talk before the first, the game in analysis, the profile

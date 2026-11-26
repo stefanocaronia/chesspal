@@ -8,7 +8,7 @@ import { PositionChanged } from "../src/commands/answers/play-move.ts";
 import { status } from "../src/commands/game/status.ts";
 import { commands } from "../src/commands/index.ts";
 import { type Context, withProfile } from "../src/commands/registry/context.ts";
-import { archivedGames, gameInAnalysis, keepThought, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
+import { archivedGames, gameInAnalysis, gameStamp, keepThought, noteAiModel, notePondering, saveChatStart, startAnalysis } from "../src/games/index.ts";
 import { anchorName } from "../src/page/app/anchor.ts";
 import { createProfile, gameFolder } from "../src/profiles/index.ts";
 import { Bell, bellHeard, bellLine, codexBellAnswer, noteBell, notePagePort, stopCheck, waitForBell } from "../src/server/bell/bell.ts";
@@ -794,15 +794,16 @@ describe("the player's moves on the page", () => {
         const folder = playerFolder();
         const page = await open(folder);
         await run(folder, "new_game", { ai_colour: "black" });
+        const served = async (): Promise<{ pgn: string; talk: { text: string; }[]; }> => JSON.parse((await get(page, "/api/game")).body).game;
         const events = listenTo(page);
 
         await events.next();
         await post(page, "/api/move", { move: "e4" });
-        expect(await events.next()).toBe("data: changed");
+        await toldOf(events, async () => (await served()).pgn.includes("1. e4"));
         await run(folder, "ai_move", { move: "e5", plan: "A plan.", comment: "Symmetry." });
-        expect(await events.next()).toBe("data: changed");
+        await toldOf(events, async () => (await served()).pgn.includes("1. e4 e5"));
         await post(page, "/api/message", { text: "Why e5?" });
-        expect(await events.next()).toBe("data: changed");
+        await toldOf(events, async () => (await served()).talk.some((line) => line.text === "Why e5?"));
         events.close();
     });
 
@@ -810,7 +811,13 @@ describe("the player's moves on the page", () => {
         const folder = playerFolder();
         const chat = testContext(folder);
         const page = await open(folder, undefined, chat);
-        chat.heard = page.heard;
+        let told = 0;
+
+        chat.heard = () => {
+            told++;
+            page.heard();
+        };
+
         await run(folder, "new_game", { ai_colour: "black" }, chat);
         const game = async (): Promise<{ started: string; talk: { heard?: string; }[]; }> => JSON.parse((await get(page, "/api/game")).body).game;
         const events = listenTo(page);
@@ -818,12 +825,15 @@ describe("the player's moves on the page", () => {
         await events.next();
         expect((await game()).started).toBe(new Date(2026, 10, 2, 15, 30, 12).toISOString());
         await post(page, "/api/message", { text: "Ready?" });
-        expect(await events.next()).toBe("data: changed");
+        await toldOf(events, async () => (await game()).talk.length === 1);
         expect((await game()).talk.map((line) => line.heard)).toEqual(["sent"]);
-        // The chat reads the words: no file changes, but the pages hear of it.
+        // The chat reads the words: no file changes, but the chat tells the pages.
+        const saved = gameStamp(gameFolder(chat.home()));
+        told = 0;
         await run(folder, "look", {}, chat);
-        expect(await events.next()).toBe("data: changed");
-        expect((await game()).talk.map((line) => line.heard)).toEqual(["read"]);
+        expect(told).toBeGreaterThan(0);
+        await toldOf(events, async () => (await game()).talk[0]?.heard === "read");
+        expect(gameStamp(gameFolder(chat.home()))).toBe(saved);
         await run(folder, "ai_say", { text: "Always." }, chat);
         expect((await game()).talk.map((line) => line.heard)).toEqual(["answered", undefined]);
         events.close();
@@ -1347,18 +1357,15 @@ describe("the doorbell of the chat", () => {
 
         await events.next();
         await run(folder, "new_game", { ai_colour: "black" }, context);
-        expect(await events.next()).toBe("data: changed");
+        await toldOf(events, async () => JSON.parse((await get(page, "/api/game")).body).game !== null);
         const key = `${JSON.parse((await get(page, "/api/game")).body).game.started as string}#0`;
 
         notePondering(games, key, true, context.now());
-        expect(await events.next()).toBe("data: changed");
-        expect(await thinking()).toBe("ponder");
+        await toldOf(events, async () => await thinking() === "ponder");
         notePondering(games, key, false, context.now());
-        expect(await events.next()).toBe("data: changed");
-        expect(await thinking()).toBeUndefined();
+        await toldOf(events, async () => await thinking() === undefined);
         notePondering(games, key, true, context.now());
-        expect(await events.next()).toBe("data: changed");
-        expect(await thinking()).toBe("ponder");
+        await toldOf(events, async () => await thinking() === "ponder");
 
         // A thought rewrites the file, and the sign stays: the pages hear nothing.
         keepThought(games, key, { reply: "e4", move: "e5", why: "Symmetry." }, context.now());
@@ -1429,7 +1436,14 @@ describe("the doorbell of the chat", () => {
 
         await events.next();
         expect(page.askNewGame()).toBe(true);
-        expect(await events.next()).toBe("data: new-game");
+        // Past any news of the files the page wrote as it opened.
+        let event = await events.next();
+
+        while (event === "data: changed") {
+            event = await events.next();
+        }
+
+        expect(event).toBe("data: new-game");
         events.close();
     });
 
@@ -1879,6 +1893,19 @@ function shortly(waiting: Promise<boolean>): Promise<boolean | string>
 function post(page: Page, path: string, value: unknown, headers: Record<string, string> = {}): ReturnType<typeof get>
 {
     return get(page, path, { "content-type": "application/json", ...headers }, "POST", JSON.stringify(value));
+}
+
+/**
+ * Waits until the page tells of a change after which it serves what `shows` waits for, however the changes before it were told: one at a time, gathered into
+ * one, or late, as file events come on macOS. A change the page never tells of fails the test by its timeout.
+ */
+async function toldOf(events: ReturnType<typeof listenTo>, shows: () => Promise<boolean>): Promise<void>
+{
+    let told = false;
+
+    while (!told) {
+        told = await events.next() === "data: changed" && await shows();
+    }
 }
 
 /** The events a page hears, one at a time, from the first: the server's greeting, then each change. */
