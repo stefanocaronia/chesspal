@@ -342,6 +342,7 @@ describe("Antigravity with the server and the instructions of who opens the chat
             call("c4", { name: "call_mcp_tool", kind: "other", rawInput: { ServerName: "t361", ToolName: "coach" } }),
             call("c5", { name: "read_file", kind: "read", rawInput: { Path: "C:\\Users\\player\\.gemini\\antigravity-cli\\mcp\\t361\\advance.json" } }),
             call("c5b", { name: "read_file", kind: "read", rawInput: { Path: "C:\\Users\\player\\.gemini\\antigravity-cli\\mcp\\t361_db2ed3c2\\advance.json" } }),
+            call("c5c", { name: "update_steps", kind: "other", rawInput: {} }),
             call("c6", { name: "call_mcp_tool", kind: "other", rawInput: { ServerName: "chesspal", ToolName: "status" } }),
         ].flat();
         const { chat, events, until } = play([...handshake, ...newSession(), ...turn("Hello", ...tools)], { server: given });
@@ -354,6 +355,7 @@ describe("Antigravity with the server and the instructions of who opens the chat
             ["coach", "chesspal"],
             ["read_file", "chesspal"],
             ["read_file", "chesspal"],
+            ["update_steps", "chesspal"],
             ["call_mcp_tool", "other"],
         ]);
         expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use call_mcp_tool" }]);

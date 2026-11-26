@@ -27,6 +27,8 @@ const actingKinds = ["execute", "edit", "delete", "move"];
 // read_url_content, a page of the web read, is so named by its fields, never seen in a recorded turn: to be confirmed.
 const builtInKinds: Record<string, ToolKind> = { run_command: "shell", write_file: "write", write_to_file: "write", read_url_content: "fetch" };
 const inputTools = ["call_mcp_tool", "invoke_subagent", "manage_subagents", "manage_task", "schedule", "read_file"];
+// Antigravity's own plan of the turn, which it updates by itself after a move, as agy 1.5.18 was seen to: it changes nothing outside the chat.
+const ownPlan = ["update_steps"];
 
 // What the AI may do with the subagents it started; any subagent it starts is of kind agent, whatever its name.
 const agentActions = ["list", "kill"];
@@ -88,6 +90,10 @@ function toolOf(call: Record<string, unknown>, session: string | undefined, serv
 
     if (typeof call.name === "string" && inputTools.includes(call.name)) {
         return toolOfInput(call.name, call, session, server);
+    }
+
+    if (typeof call.name === "string" && ownPlan.includes(call.name)) {
+        return { name: call.name, kind: "chesspal" };
     }
 
     if (typeof call.kind === "string" && actingKinds.includes(call.kind)) {
