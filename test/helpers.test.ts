@@ -336,9 +336,11 @@ describe("the opponent's helpers the table runs itself", () => {
         expect(free.ai.helperChats).toEqual([]);
     }, 30_000);
 
-    it("starts one program at a time, each once the one before sat, and once the program before of its role exited", async () => {
+    it("starts one program at a time, each once the one before sat or said which chat it is, and once the program before of its role exited", async () => {
         const { table, ai } = await playing({ level: "strong", helps: true });
         ai.exitAfter = 150;
+        // Servers slow to sit: a chat sent its turn as it opens says which chat it is first, and that lets the next start.
+        ai.sitAfter = 100;
         ai.helpers.ponder = pondering("d4", "d5");
         ai.helpers.coach = coaching;
         const opponent = ai.chats[0]!;
@@ -355,7 +357,7 @@ describe("the opponent's helpers the table runs itself", () => {
         const helpers = ai.timeline.filter((entry) => !entry.endsWith(" opponent"));
         expect(helpers.filter((entry) => entry.startsWith("start"))).toHaveLength(6);
 
-        // A role never has two programs alive, and a start waits for the one before to sit at its place.
+        // A role never has two programs alive, and a start waits for the one before to have opened: sat at its place, or said which chat it is.
         const alive = new Map<string, number>();
         let sitting: string | undefined;
 
@@ -369,7 +371,7 @@ describe("the opponent's helpers the table runs itself", () => {
             }
 
             alive.set(name, (alive.get(name) ?? 0) + (step === "start" ? 1 : step === "exit" ? -1 : 0));
-            sitting = step === "sat" && sitting === name ? undefined : sitting;
+            sitting = (step === "sat" || step === "said") && sitting === name ? undefined : sitting;
         }
 
         // Each turn on a chat that had none before; the ones waiting have been sent nothing.

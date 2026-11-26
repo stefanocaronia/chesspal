@@ -66,10 +66,15 @@ export interface FakeDriver
     helpers: Partial<Record<HelperRole, (client: Client, prompt: string, chat: FakeChat) => Promise<void | "failed">>>;
     /** What the table told its log: the helpers' failures. */
     logged: string[];
-    /** The programs the table started through its start, by their chat's role, as they started, sat at their place and exited: "start ponder", "sat ponder", "exit ponder". */
+    /**
+     * The programs the table started through its start, by their chat's role, as they started, sat at their place, said which chat they are (helpers only) and
+     * exited: "start ponder", "sat ponder", "said ponder", "exit ponder".
+     */
     timeline: string[];
     /** How long a program let go takes to exit, in ms. */
     exitAfter: number;
+    /** How long a helper's server takes to sit at its place, in ms: a helper sent its first words meanwhile says which chat it is before it sits. */
+    sitAfter: number;
     /** The table's environment, empty unless the test gives one. */
     environment: NodeJS.ProcessEnv;
     /** How the table starts its programs: a fake process, which exits `exitAfter` ms after its input is closed. */
@@ -110,7 +115,7 @@ export function fakeDriver(): FakeDriver
     };
     const timeline: string[] = [];
     const start = (_command: string, _args: string[], options: { cwd: string; }): LineProcess => fakeProgram(basename(options.cwd), made);
-    const made: FakeDriver = { driver, chats, helperChats, helpers: {}, logged: [], timeline, exitAfter: 0, environment: {}, start, failFirst: false, missing: false, queued: [] };
+    const made: FakeDriver = { driver, chats, helperChats, helpers: {}, logged: [], timeline, exitAfter: 0, sitAfter: 0, environment: {}, start, failFirst: false, missing: false, queued: [] };
     return made;
 }
 
@@ -175,7 +180,7 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver, prog
 
     const chat: FakeChat = { options, session, sent: [], calls: [], answers: [], ends: [], turns: [], closed: false, closes: [], steps: [], idle: () => !busy, emit, ownTurn };
     // A helper's program starts its server at once, as Claude Code does before its first words: the table hears it sit at its place.
-    const sit = (): Promise<Client> => (client ??= sitAt(options.server!.environment, (made) => void clients.push(made)));
+    const sit = (): Promise<Client> => (client ??= pause(role === undefined ? 0 : ai.sitAfter).then(() => sitAt(options.server!.environment, (made) => void clients.push(made))));
 
     if (role !== undefined) {
         void sit().catch(() => undefined);
@@ -194,6 +199,11 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver, prog
 
         if (!told) {
             told = true;
+
+            if (role !== undefined) {
+                ai.timeline.push(`said ${role}`);
+            }
+
             emit({ type: "session", session, model: `claude-${options.model}`, ...(options.effort === undefined ? {} : { effort: options.effort }) });
         }
 
