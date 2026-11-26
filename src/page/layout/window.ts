@@ -1,12 +1,14 @@
 // The table's window as it opens (D-104): 16:9, 1600×900 or what the screen has, centred, every time the table opens it. Chrome and Edge keep one size for
 // every application window on 127.0.0.1, whatever its port, so the size they would give is any page's, often half a screen (Stefano).
 // One window of the table alone: the newest it opened stays, the older ones close themselves (server/page/windows.ts).
-// The mark the table puts on the address of the window it opens, with its opening (server/table/browser.ts), kept by the window for its reloads.
+// The mark the table puts on the address of the window it opens, with its opening (server/table/browser.ts), kept by the window for its reloads; and the one
+// it adds where PowerShell placed the window on Windows, which the page then leaves as it is (server/table/window.ts, the same size: change both together).
 const mark = "opened";
+const placedMark = "placed";
 const kept = "chesspal-opening";
 const wanted = { width: 1600, height: 900 };
 
-/** Sizes the window the table opened and takes the mark off the address, so that a reload keeps the size the player gave it; the window keeps its opening. */
+/** Sizes the window the table opened, unless it was placed already, and takes the marks off the address, so that a reload keeps the size the player gave it; the window keeps its opening. */
 export function fitOpenedWindow(): void
 {
     const address = new URL(window.location.href);
@@ -16,8 +18,15 @@ export function fitOpenedWindow(): void
     }
 
     keepOpening(Number(address.searchParams.get(mark)));
+    const placed = address.searchParams.has(placedMark);
     address.searchParams.delete(mark);
+    address.searchParams.delete(placedMark);
     window.history.replaceState(window.history.state, "", address.pathname + address.search + address.hash);
+
+    if (placed) {
+        return;
+    }
+
     const place = windowPlace(window.screen.availWidth, window.screen.availHeight);
     // Chrome and Edge say where the window's screen starts: on a second screen the window stays there (Zoe).
     const { availLeft = 0, availTop = 0 } = window.screen as Screen & { availLeft?: number; availTop?: number; };

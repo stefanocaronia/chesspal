@@ -65,6 +65,7 @@ const html = [
     '<meta name="google" content="notranslate">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     '<meta name="color-scheme" content="light dark">',
+    // The title with no game shown, which the table's window script knows ours by (server/table/window.ts).
     "<title>Chesspal</title>",
     '<link rel="icon" type="image/svg+xml" href="/page/layout/favicon.svg">',
     '<link rel="stylesheet" href="/page/style.css">',

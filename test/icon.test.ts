@@ -8,7 +8,24 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCommandLine } from "../src/cli/command-line.ts";
 import { iconsRemoved, offerIcon, type Terminal } from "../src/cli/icon.ts";
 import { closesForNewer, eventsAddress, fitOpenedWindow, windowPlace } from "../src/page/layout/window.ts";
-import { appBrowser, type BrowserSystem, iconAsked, type IconCommand, iconCommand, iconToRemake, makeIcons, noteIconAsked, noteIconMade, openedAddress } from "../src/server/table/index.ts";
+import {
+    appBrowser,
+    type BrowserSystem,
+    iconAsked,
+    type IconCommand,
+    iconCommand,
+    iconToRemake,
+    makeIcons,
+    noteIconAsked,
+    noteIconMade,
+    openedAddress,
+    openInBrowser,
+    placeCommand,
+    readPlaced,
+    windowProfile,
+    type WindowSystem,
+    windowTitles,
+} from "../src/server/table/index.ts";
 import { testContext } from "./commands.ts";
 
 const folders: string[] = [];
@@ -77,6 +94,67 @@ describe("the table's window", () => {
         expect(windowPlace(1920, 1040)).toEqual({ width: 1600, height: 900, left: 160, top: 70 });
         expect(windowPlace(1366, 728)).toEqual({ width: 1366, height: 728, left: 0, top: 0 });
     });
+
+    // A Windows with Chrome, whose PowerShell prints what is given and ends, or not; what it ran and started, noted.
+    const windows = (printed: string, ended = true): WindowSystem & { ran: Record<string, string>[]; started: string[][]; } => {
+        const ran: Record<string, string>[] = [];
+        const started: string[][] = [];
+        return {
+            ...system([chrome]),
+            ran,
+            started,
+            start: (command, args) => Promise.resolve(started.push([command, ...args]) > 0),
+            run: (_, __, variables) => Promise.resolve(ran.push(variables) > 0 ? { printed, ended } : { printed: "", ended }),
+        };
+    };
+
+    it("opens on Windows by PowerShell, at its place at once from a browser profile of Chesspal's own, the address marked as placed, and starts no second browser", async () => {
+        const placed = windows("placed 1600x900 at 160,70\r\n");
+
+        expect(await openInBrowser("http://127.0.0.1:5876/", "win32", 1763028000000, env, placed)).toBe("window");
+        expect(placed.started).toEqual([]);
+        expect(placed.ran[0]?.CHESSPAL_WINDOW_BROWSER).toBe(chrome);
+        expect(placed.ran[0]?.CHESSPAL_WINDOW_ARGUMENTS?.split("\n")).toEqual([
+            "--user-data-dir=C:\\Users\\ann\\AppData\\Local\\Chesspal\\window\\chrome",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-features=Translate",
+            "--app=http://127.0.0.1:5876/?opened=1763028000000&placed=",
+        ]);
+        expect(placed.ran[0]?.CHESSPAL_WINDOW_ADDRESS).toBe("127.0.0.1:5876");
+
+        // A window the browser opened and the script could not place, or a script cut short at its time, had started the browser already.
+        expect(await openInBrowser("http://127.0.0.1:5876/", "win32", 1, env, windows("opened"))).toBe("window");
+        const cut = windows("", false);
+        expect(await openInBrowser("http://127.0.0.1:5876/", "win32", 1, env, cut)).toBe("window");
+        expect(cut.started).toEqual([]);
+    });
+
+    it("starts the browser itself, the address marked for the page to size it, where PowerShell did not, and on the other systems", async () => {
+        const failed = windows("Add-Type failed");
+
+        expect(await openInBrowser("http://127.0.0.1:5876/", "win32", 1, env, failed)).toBe("window");
+        expect(failed.started).toEqual([[chrome, "--app=http://127.0.0.1:5876/?opened=1"]]);
+
+        const mac = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+        const macSystem = { ...windows(""), ...system([mac]) };
+        const started: string[][] = [];
+        macSystem.start = (command, args) => Promise.resolve(started.push([command, ...args]) > 0);
+        expect(await openInBrowser("http://127.0.0.1:5876/", "darwin", 2, { HOME: "/Users/ann" }, macSystem)).toBe("window");
+        expect(started).toEqual([[mac, "--app=http://127.0.0.1:5876/?opened=2"]]);
+    });
+
+    it("knows the window by Chesspal's titles or its address, reads where the script placed it, and keeps no profile where Windows gives no local data", () => {
+        const command = placeCommand(chrome, ["--app=http://127.0.0.1:5876/"], "C:\\Windows", windowTitles("http://127.0.0.1:5876/"));
+
+        expect(command.file).toBe("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+        expect(command.env).toEqual(expect.objectContaining({ CHESSPAL_WINDOW_WIDTH: "1600", CHESSPAL_WINDOW_HEIGHT: "900", CHESSPAL_WINDOW_TITLES: "Chesspal", CHESSPAL_WINDOW_ENDINGS: " · Chesspal" }));
+        expect(command.input).toContain("[Chesspal.AppWindow]::Open(");
+        expect(readPlaced("Add-Type...\nplaced 1600x900 at -1760,70\n")).toEqual({ width: 1600, height: 900, left: -1760, top: 70 });
+        expect(readPlaced("opened\r\n")).toBe("opened");
+        expect(readPlaced("")).toBeUndefined();
+        expect(windowProfile(chrome, {})).toEqual([]);
+    });
 });
 
 describe("the window the table opened", () => {
@@ -91,6 +169,19 @@ describe("the window the table opened", () => {
         expect(page.closed()).toBe(false);
         expect(closesForNewer("window 1763028000500")).toBe(true);
         expect(page.closed()).toBe(true);
+    });
+
+    it("leaves as it is a window PowerShell placed, its marks taken off the address", () => {
+        const page = browserWindow("http://127.0.0.1:5876/?opened=1763028000000&placed=");
+
+        fitOpenedWindow();
+        expect(page.address()).toBe("/");
+        expect(page.resized()).toBe(false);
+        expect(eventsAddress()).toBe("/api/events?window=1763028000000");
+
+        browserWindow("http://127.0.0.1:5876/?opened=1763028000000");
+        fitOpenedWindow();
+        expect(page.resized()).toBe(false);
     });
 
     it("never closes when the player opened it by hand", () => {
@@ -271,10 +362,11 @@ function folderIn(parent: string, name: string): string
 }
 
 /** A browser's window at an address, as the page's start sees it: its address after the start, and whether it was closed. */
-function browserWindow(href: string): { address: () => string; closed: () => boolean; }
+function browserWindow(href: string): { address: () => string; closed: () => boolean; resized: () => boolean; }
 {
     let address = href;
     let closed = false;
+    let resized = false;
     const kept = new Map<string, string>();
     vi.stubGlobal("window", {
         location: {
@@ -286,9 +378,9 @@ function browserWindow(href: string): { address: () => string; closed: () => boo
         history: { state: null, replaceState: (_: unknown, __: string, to: string) => void (address = to) },
         screen: { availWidth: 1920, availHeight: 1040 },
         sessionStorage: { getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => void kept.set(key, value) },
-        resizeTo: () => undefined,
+        resizeTo: () => void (resized = true),
         moveTo: () => undefined,
         close: () => void (closed = true),
     });
-    return { address: () => address, closed: () => closed };
+    return { address: () => address, closed: () => closed, resized: () => resized };
 }
