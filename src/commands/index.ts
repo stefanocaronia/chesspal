@@ -30,7 +30,7 @@ export {
     speechOf,
     type VariationInput,
 } from "./answers/index.ts";
-export { aiMove, answerDraw, ChatNotClear, DrawRefused, endGame, type GameAtRing, gameAtRing, type MoveSentAlone, newGame, offerDraw, playMoveSentAlone, pliesBeforeClearing, startNewGame, status } from "./game/index.ts";
+export { aiMove, answerDraw, ChatNotClear, DrawRefused, endGame, type GameAtRing, gameAtRing, type MoveSentAlone, newGame, offerDraw, playMoveSentAlone, pliesBeforeClearing, ponderStart, startNewGame, status } from "./game/index.ts";
 export { chooseDrawnAvatar, deleteGame, editProfile, GameGoingOn, newProfile, ratingsAge, refreshRatings, useProfile } from "./profiles/index.ts";
 export {
     type AnyCommand,

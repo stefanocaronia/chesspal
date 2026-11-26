@@ -79,7 +79,9 @@ describe("the opponent's helpers the table runs itself", () => {
         await until(() => helperOf(ai, "ponder")?.ends.includes("done") === true);
         const ponder = helperOf(ai, "ponder")!;
 
-        expect(ponder.sent).toEqual(["Ponder."]);
+        // Its turn's message gives the position ponder {} would, to look at one reply at a time.
+        expect(ponder.sent.map(firstLine)).toEqual(["Ponder."]);
+        expect(ponder.sent[0]).toMatch(/^Ponder\.\nPosition 2: the player \(White\) to move[\s\S]*One reply at a time, the likeliest first: /);
         // What the opponent was opened with, not the name its host gives the model.
         expect(ponder.options).toMatchObject({ model: "sonnet", effort: "high", allowed: ["chesspal"] });
         expect(ponder.options.instructions).toContain("the table hears you through `ponder` alone");
@@ -91,7 +93,7 @@ describe("the opponent's helpers the table runs itself", () => {
         await until(() => opponent.sent.length === 4 && opponent.idle() && turnsOf(ai, "ponder").length === 2);
         expect(opponent.sent[3]).toContain("Thought on their time by your model (legal, not checked): d5, The centre.");
         // Each turn on a chat of its own, the one before closed.
-        expect(turnsOf(ai, "ponder").map((chat) => chat.sent)).toEqual([["Ponder."], ["Ponder."]]);
+        expect(turnsOf(ai, "ponder").map((chat) => chat.sent.map(firstLine))).toEqual([["Ponder."], ["Ponder."]]);
         expect(ponder.closed).toBe(true);
         expect(settingsOf(home)).toMatchObject({ [chatInPage]: true });
     }, 30_000);
@@ -120,7 +122,7 @@ describe("the opponent's helpers the table runs itself", () => {
         const ponder = helperOf(ai, "ponder")!;
         expect(ponder.options).toMatchObject({ model: "gpt-6-luna", effort: "low", allowed: ["chesspal"] });
         expect(ponder.options.server?.name).toBe("chesspal_table");
-        expect(ponder.sent).toEqual(["Ponder. Your tool: tools.mcp__chesspal_table__ponder."]);
+        expect(ponder.sent.map(firstLine)).toEqual(["Ponder. Your tool: tools.mcp__chesspal_table__ponder."]);
         expect(new Set(ai.asked)).toEqual(new Set(["codex"]));
 
         await posted(table.url, "/api/move", { move: "d4" });
@@ -140,7 +142,7 @@ describe("the opponent's helpers the table runs itself", () => {
 
         for (const role of ["ponder", "coach"] as const) {
             expect(helperOf(ai, role)!.options).toMatchObject({ model: "gpt-6-astra", effort: "high", allowed: ["chesspal"] });
-            expect(helperOf(ai, role)!.sent).toEqual([`${role === "ponder" ? "Ponder." : "Coach."} Your tool: tools.mcp__chesspal_table__${role}.`]);
+            expect(helperOf(ai, role)!.sent.map(firstLine)).toEqual([`${role === "ponder" ? "Ponder." : "Coach."} Your tool: tools.mcp__chesspal_table__${role}.`]);
         }
 
         expect(new Set(ai.asked)).toEqual(new Set(["codex"]));
@@ -168,7 +170,7 @@ describe("the opponent's helpers the table runs itself", () => {
                 expect(helperOf(ai, role)!.options.effort, `${host} ${role}`).toBe(effort);
                 const server = helperOf(ai, role)!.options.server;
                 expect(server === undefined ? Object.keys(helperOf(ai, role)!.options.environment) : server.name, `${host} ${role}`).toEqual(host === "antigravity" ? expect.arrayContaining([doorVariable, keyVariable]) : "chesspal");
-                expect(helperOf(ai, role)!.sent, `${host} ${role}`).toEqual([role === "ponder" ? "Ponder." : "Coach."]);
+                expect(helperOf(ai, role)!.sent.map(firstLine), `${host} ${role}`).toEqual([role === "ponder" ? "Ponder." : "Coach."]);
             }
 
             expect(new Set(ai.asked), host).toEqual(new Set([driver]));
@@ -210,7 +212,7 @@ describe("the opponent's helpers the table runs itself", () => {
         // The next turn, after an interruption, runs on another chat, which starts from ponder {}.
         await until(() => turnsOf(ai, "ponder")[1]?.ends.includes("done") === true);
         const next = turnsOf(ai, "ponder")[1]!;
-        expect(next.sent).toEqual(["Ponder."]);
+        expect(next.sent.map(firstLine)).toEqual(["Ponder."]);
         expect(next.calls[0]).toBe("ponder");
         await until(() => next.closed && waitingAhead(ai, "ponder") !== undefined);
         expect(waitingAhead(ai, "ponder")!.sent).toEqual([]);
@@ -914,6 +916,12 @@ async function playing(
     await posted(driven.table.url, "/api/new", { ai_colour: white === undefined ? "black" : "white", level });
     await until(() => driven.ai.chats[0]!.sent.length === 2 && driven.ai.chats[0]!.idle());
     return driven;
+}
+
+/** The first line of a message: a helper's turn, without the position that may follow it. */
+function firstLine(message: string): string
+{
+    return message.split("\n")[0]!;
 }
 
 /** A helper that thinks on one reply, then is done. */

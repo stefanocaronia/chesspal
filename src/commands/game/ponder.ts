@@ -4,7 +4,7 @@ import { type CurrentGame, currentPlan, endOf, keepThought, loadGame, notePonder
 import { isCodex, ponderAgents, ponderHosts } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { boardView, colourName, compactView, type GameSummary, positionLines, say as sayWords, summaryOf } from "../answers/index.ts";
-import { defineCommand, sentence } from "../registry/index.ts";
+import { type Context, defineCommand, sentence } from "../registry/index.ts";
 import { levelText } from "./levels.ts";
 
 /**
@@ -28,6 +28,8 @@ interface Start
     mood?: string;
     comment?: string;
     talk: string[];
+    /** At the table, one reply at a time: the player may move at any moment, and only the answers kept reach the AI's move. */
+    oneByOne?: true;
 }
 
 /**
@@ -70,7 +72,7 @@ export const ponder = defineCommand({
             }
 
             notePondering(folder, thoughtKey(current), true, context.now());
-            return { start: startOf(current) };
+            return { start: startOf(current, context.helpers !== undefined) };
         }
 
         if ((say !== undefined || done) && (reply !== undefined || move !== undefined || why !== undefined || (say !== undefined && done))) {
@@ -212,7 +214,24 @@ async function waitForMove(folder: string, context: { now: () => Date; pause?: (
     return waited === "waiting" ? { waiting: position } : { stop: waited };
 }
 
-function startOf(current: CurrentGame): Start
+/**
+ * What ponder {} gives, for the message of a turn the table gives the one that thinks, so that it starts with no call: its sign on, as ponder {} puts it;
+ * none when there is nothing to think on.
+ */
+export function ponderStart(context: Context): string | undefined
+{
+    const folder = gameFolder(context.home());
+    const current = toPonder(folder, context.now(), undefined);
+
+    if (current === undefined) {
+        return undefined;
+    }
+
+    notePondering(folder, thoughtKey(current), true, context.now());
+    return startLines(startOf(current, true)).join("\n");
+}
+
+function startOf(current: CurrentGame, oneByOne: boolean): Start
 {
     const { game, ai, talk } = current;
     const level = levelOf(game.record);
@@ -233,10 +252,11 @@ function startOf(current: CurrentGame): Start
         ...(mood === "neutral" ? {} : { mood }),
         ...(comment === undefined ? {} : { comment }),
         talk: said,
+        ...(oneByOne ? { oneByOne } : {}),
     };
 }
 
-function startLines({ position, line, plan, mood, comment, talk }: Start): string[]
+function startLines({ position, line, plan, mood, comment, talk, oneByOne }: Start): string[]
 {
     return [
         line,
@@ -244,7 +264,10 @@ function startLines({ position, line, plan, mood, comment, talk }: Start): strin
         ...(mood === undefined ? [] : [`Your mood: ${mood}.`]),
         comment === undefined ? "You said nothing with your move." : `You said with your move: «${comment}»`,
         ...(talk.length === 0 ? [] : ["Last words on the board page:", ...talk]),
-        `For each reply you think likely, ponder {position: ${position}, reply} shows the position after it, then ponder {position: ${position}, reply, move, why} keeps `
-        + `your answer; ponder {position: ${position}, done: true} when you have no more.`,
+        oneByOne === true
+            ? `One reply at a time, the likeliest first: ponder {position: ${position}, reply} shows the position after it, then ponder {position: ${position}, reply, `
+                + `move, why} keeps your answer at once, before you look at the next; ponder {position: ${position}, done: true} when you have no more.`
+            : `For each reply you think likely, ponder {position: ${position}, reply} shows the position after it, then ponder {position: ${position}, reply, move, why} `
+                + `keeps your answer; ponder {position: ${position}, done: true} when you have no more.`,
     ];
 }

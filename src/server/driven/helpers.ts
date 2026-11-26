@@ -1,7 +1,7 @@
 // The opponent's helpers the table runs itself beside the chat it drives, while the switch is on, as the host's own agents would: the one that thinks on
 // the player's time and the coach with the helps on, each turn on a chat of its own that knows nothing of the turns before, with the next chat of the role
 // opened ahead and waiting; and the analyst of a game over, one chat for one review.
-import { type Context, endingToCoach, type HelperRole, namedGame, speechOf, type TableHelpers } from "../../commands/index.ts";
+import { type Context, endingToCoach, type HelperRole, namedGame, ponderStart, speechOf, type TableHelpers } from "../../commands/index.ts";
 import { isReviewed, levelOf } from "../../core/index.ts";
 import { type CurrentGame, endOf, forgetAnalyst, gameInAnalysis, loadGame, notePondering, ponderingUntil, thoughtKey } from "../../games/index.ts";
 import { onQuickModel } from "../../host-files/index.ts";
@@ -205,7 +205,9 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
 
         if (chat !== undefined) {
             shift.working = { chat, plies, answered: false };
-            chat.ask(promptOf(shift.role, chat.host));
+            // The one that thinks starts from the position in its turn's message, a request sooner than from ponder {}.
+            const start = shift.role === "ponder" ? ponderStart(context) : undefined;
+            chat.ask(start === undefined ? promptOf(shift.role, chat.host) : `${promptOf(shift.role, chat.host)}\n${start}`);
         }
     };
 

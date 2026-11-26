@@ -8,6 +8,6 @@ export { exportGame } from "./export.ts";
 export { look } from "./look.ts";
 export { ChatNotClear, newGame, pliesBeforeClearing, startNewGame } from "./new.ts";
 export { type MoveSentAlone, playerMove, playMoveSentAlone } from "./player-move.ts";
-export { ponder } from "./ponder.ts";
+export { ponder, ponderStart } from "./ponder.ts";
 export { position } from "./position.ts";
 export { type GameAtRing, gameAtRing, status } from "./status.ts";
