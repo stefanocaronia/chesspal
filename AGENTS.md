@@ -25,7 +25,7 @@ This file is about **developing** Chesspal. The instructions for **playing** are
 | `plugins/` | Chesspal's plugin for OpenCode, which `chesspal init` installs in a player's folder | yes | yes |
 | `data/` | Lichess's openings, which the build turns into an index by position | yes | built into `dist/` |
 | `scripts/` | the build's scripts | yes | no |
-| `docs/` | `structure.md`, what each folder and module holds, what it depends on and where new code goes, changed with every folder added, moved or removed; the README's screenshot | yes | no |
+| `docs/` | `structure.md`, what each folder and module holds, what it depends on and where new code goes, changed with every folder added, moved or removed; `hosts.md`, what the chat in the page has done with each real host; the README's screenshot | yes | no |
 | `test/` | tests, benches and demos | yes | no |
 | `tmp/` | scratch output | no | no |
 
