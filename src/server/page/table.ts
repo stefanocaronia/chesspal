@@ -10,6 +10,7 @@ import { gameFolder } from "../../profiles/index.ts";
 import { tellWatchers } from "./events.ts";
 import { bodyOf, isJson, jsonOf, type Refused, runRoute, sendJson } from "./http.ts";
 import type { Served } from "./page.ts";
+import type { ChatSeat } from "./seat.ts";
 import { giveOpening, releaseOpening } from "./windows.ts";
 
 /** A host the table offers a chat in: whether it is installed, the models and efforts the player may choose, and the command to open one by hand. */
@@ -37,6 +38,21 @@ export interface TableChats
     watch?(changed: () => void): void;
     /** Ollama on this computer, as last seen, asked again now and then: only where OpenCode is installed, which plays its models (D-117). */
     ollama?(): OllamaState | undefined;
+    /** Takes the page's seat for a chat the table drives in its own process: given once, as the page starts. */
+    seat?(seat: ChatSeat): void;
+    /** Stops the turn in course of the chat the table drives: whether one was in course. */
+    stop?(): boolean;
+    /** Why the last chat the table drove failed or ended by itself, numbered, until the next chat opens. */
+    failure?(): ChatFailure | undefined;
+    /** Closes the chats the table drives, as the table closes. */
+    close?(): Promise<void>;
+}
+
+/** Why a chat the table drove failed or ended by itself, in the host's words, and its number, larger for each, so that each page says it once. */
+export interface ChatFailure
+{
+    readonly why: string;
+    readonly number: number;
 }
 
 /** What the table tells of Ollama: whether it answers, and the context each model it has loaded runs with, by Ollama's name. */
@@ -85,6 +101,10 @@ export interface TableShown
     readonly refused?: WaitRefused;
     /** Ollama, which plays OpenCode's free models, where OpenCode is installed. */
     readonly ollama?: OllamaState;
+    /** The chat at the table is one the table drives, without a terminal, which the page can stop. */
+    readonly driven?: true;
+    /** Why the last chat the table drove failed or ended by itself. */
+    readonly failed?: ChatFailure;
 }
 
 /** A new game that waited for the chat and could not start: why, and its number, larger for each. */
@@ -103,6 +123,7 @@ export function tableShown(served: Served): { table?: TableShown; }
     const held = heldChat(served);
     const now = opening(served);
     const ollama = table.chats?.ollama?.();
+    const failed = table.chats?.failure?.();
     return {
         table: {
             chat: attached !== undefined,
@@ -114,6 +135,8 @@ export function tableShown(served: Served): { table?: TableShown; }
             ...(served.chatWait === undefined ? {} : { waiting: served.chatWait.for }),
             ...(served.waitRefused === undefined ? {} : { refused: served.waitRefused }),
             ...(ollama === undefined ? {} : { ollama }),
+            ...(attached?.local === undefined ? {} : { driven: true as const }),
+            ...(failed === undefined ? {} : { failed }),
         },
     };
 }
@@ -141,9 +164,11 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
         runRoute(response, () => endWaiting(request, response, served));
     } else if (path === "/api/table/update") {
         runRoute(response, () => updateChesspal(request, response, served));
+    } else if (path === "/api/table/stop") {
+        runRoute(response, () => stopChat(request, response, served));
     } else {
         sendJson(response, 404, {
-            error: `${path} is no route of the table's: it answers POST /api/table/open, /api/table/chat, /api/table/restart, /api/table/waiting, /api/table/update and /api/table/quit.`,
+            error: `${path} is no route of the table's: it answers POST /api/table/open, /api/table/chat, /api/table/restart, /api/table/waiting, /api/table/stop, /api/table/update and /api/table/quit.`,
         });
     }
 
@@ -328,6 +353,23 @@ async function endWaiting(request: IncomingMessage, response: ServerResponse, se
         const restarting = now && startWaited(served, wanted);
         tellWatchers(served.watchers);
         sendJson(response, 200, now ? { restarting } : { waiting: false });
+    }
+}
+
+/**
+ * Stops the turn in course of the chat the table drives, asked by the table's own page alone: the chat then waits for the bell, and the player's next act
+ * wakes it.
+ */
+async function stopChat(request: IncomingMessage, response: ServerResponse, served: Served): Promise<void>
+{
+    await bodyOf(request);
+
+    if (!fromTablePage(request, served)) {
+        sendJson(response, 403, { error: "Only the table's own page stops the chat." });
+    } else if (served.table?.chats?.stop?.() === true) {
+        sendJson(response, 200, { stopping: true });
+    } else {
+        sendJson(response, 409, { error: "No chat the table drives is at work: there is no answer to stop." });
     }
 }
 

@@ -18,6 +18,8 @@ export interface Place
     readonly role: ChatRole;
     /** The two variables of the chat's server configuration, which send its `chesspal mcp` to this place. */
     readonly environment: Readonly<Record<string, string>>;
+    /** The chat's own context, its state kept here: what it was given, the game and the position it saw. The table reads it, and marks what it showed. */
+    readonly context: Context;
     /**
      * Settled once the place is withdrawn, or the places closed, and its calls still running have answered or the places' `leaveWait` has passed. It
      * does not mean stopped: a command still running then goes on to its end, as a move written or a ponder that waits for the player.
@@ -128,7 +130,7 @@ export function tablePlaces(context: Context, options: PlacesOptions = {}): Tabl
                 }
             };
 
-            return { role, environment, left, withdraw: place.withdraw };
+            return { role, environment, context: place.context, left, withdraw: place.withdraw };
         },
         close: async () => {
             closing = true;

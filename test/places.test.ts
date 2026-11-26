@@ -50,7 +50,8 @@ function sleep(milliseconds: number): Promise<void>
 /** The places of a table on a data folder of its own. */
 function placesOf(context: Context = testContext(temporaryFolder()), options: PlacesOptions = {}): { places: TablePlaces; context: Context; }
 {
-    const places = tablePlaces(context, { socketFolder: temporaryFolder(), leaveWait: 500, ...options });
+    // The door's own folder in the system's temporary folder: on macOS, 49 bytes, a socket file's path is 49 + 16 + 21 = 86 of the 103 it may take.
+    const places = tablePlaces(context, { leaveWait: 500, ...options });
     opened.push(places);
     return { places, context };
 }
@@ -275,7 +276,10 @@ describe("the places of the chats the table opens", () => {
     });
 
     it("tries a door that could not open again at the next offer, and closes all the same", async () => {
-        const missing = join(temporaryFolder(), "missing");
+        // A short folder of its own: on macOS 49 + 10 + 2 + 16 + 21 = 98 bytes for the socket file's path, of the 103 it may take.
+        const own = mkdtempSync(join(tmpdir(), "cp-"));
+        folders.push(own);
+        const missing = join(own, "m");
         const places = tablePlaces(testContext(temporaryFolder()), { platform: "linux", socketFolder: missing });
         opened.push(places);
         const first = await places.offer("opponent", temporaryFolder()).then(() => "offered", (error: Error) => error.message);

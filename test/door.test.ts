@@ -18,7 +18,8 @@ afterEach(async () => {
 
 function socketFolder(): string
 {
-    const folder = mkdtempSync(join(tmpdir(), "chesspal-"));
+    // Short: on macOS a socket file's path is then 49 + 10 + 16 + 21 = 96 bytes, of the 103 it may take.
+    const folder = mkdtempSync(join(tmpdir(), "cp-"));
     folders.push(folder);
     return folder;
 }

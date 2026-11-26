@@ -103,7 +103,10 @@ export function startNewGame({ ai_colour: colour, from, clock, level: chosen, re
         refuseUnseenPosition(context, folder);
     }
 
-    if (chatToClear(context)) {
+    // A chat the table drives it starts again clean, once its turn ends, in place of asking for /clear.
+    const toClear = chatToClear(context);
+
+    if (toClear && context.startAgain === undefined) {
         throw new ChatNotClear();
     }
 
@@ -124,6 +127,10 @@ export function startNewGame({ ai_colour: colour, from, clock, level: chosen, re
 
     if (closed !== undefined) {
         pageGiven(context, current.started);
+    }
+
+    if (toClear) {
+        context.startAgain?.();
     }
 
     return {
@@ -158,7 +165,8 @@ function startedLines({ game, archived, past, player, speech, closedPage: closed
  */
 function askedOnPage(context: Context): Asked
 {
-    if (chatToClear(context)) {
+    // The page's new game starts again the chat the table drives.
+    if (context.startAgain === undefined && chatToClear(context)) {
         throw new ChatNotClear();
     }
 

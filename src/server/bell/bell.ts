@@ -18,12 +18,22 @@ export const bellLine = "The player acted on the board page: call status to see 
 const ringWithGame = "ring\n";
 
 /**
+ * Who waits at the doorbell: the hook of a chat over HTTP, or the table's own driven chat. It hears "ring", or "ring" and the game on the lines after it,
+ * or is let go without the bell.
+ */
+export interface BellListener
+{
+    hear(said: string): void;
+    dismissed(): void;
+}
+
+/**
  * The doorbell's end on the page's server: the hook of the chat that ended its turn waits here, one at a time, and hears "ring" when the player moves or
  * writes on the page. A ring no hook heard waits for the next one, while it is still news: the chat, awake, may have read it already.
  */
 export class Bell
 {
-    private listener: ServerResponse | undefined;
+    private listener: BellListener | undefined;
     private pending = false;
     // The chat is in a turn: the player's message started it, it called a tool, or a hook woke it, and its turn has not ended yet. A chat never started,
     // or just cleared, is not.
@@ -120,7 +130,7 @@ export class Bell
             return;
         }
 
-        this.listener.end("dismissed");
+        this.listener.dismissed();
         this.listener = undefined;
         this.busy = true;
         this.note("chatPrompted, the hook dismissed");
@@ -151,7 +161,7 @@ export class Bell
             return;
         }
 
-        this.listener.end(this.ringHeard());
+        this.listener.hear(this.ringHeard());
         this.listener = undefined;
         this.busy = true;
         this.woken = true;
@@ -166,6 +176,16 @@ export class Bell
     listen(request: IncomingMessage, response: ServerResponse, told = false, hook: HookSeen = {}): void
     {
         response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+        const gone = this.wait({ hear: (said) => response.end(said), dismissed: () => response.end("dismissed") }, told, hook);
+        request.on("close", gone);
+    }
+
+    /**
+     * A listener waits for the bell, as a hook does: it hears a ring it missed at once, or the next one. What it returns tells the bell the listener went
+     * without the bell; once it heard it, or was let go, it does nothing.
+     */
+    wait(listener: BellListener, told = false, hook: HookSeen = {}): () => void
+    {
         this.hooked = true;
         this.unheard = false;
         const missed = this.pending && !told;
@@ -173,22 +193,23 @@ export class Bell
         const who = hookNamed(hook);
 
         if (missed && this.news()) {
-            response.end(this.ringHeard());
+            listener.hear(this.ringHeard());
             this.busy = true;
             this.woken = true;
             this.note(`listen${who}, rung at once for a ring it missed`);
             this.changed();
-            return;
+            return () => undefined;
         }
 
         this.busy = false;
         this.woken = false;
-        this.listener?.end("dismissed");
-        this.listener = response;
+        this.listener?.dismissed();
+        this.listener = listener;
         this.note(`listen${who}${told ? ", told" : ""}`);
         this.changed();
-        request.on("close", () => {
-            if (this.listener === response) {
+
+        return () => {
+            if (this.listener === listener) {
                 // The hook went without the bell (the chat stopped, cleared or closed, or its host ended the hook): nobody hears the player until the chat calls
                 // a tool again, but the chat is out of its turn.
                 this.listener = undefined;
@@ -196,7 +217,7 @@ export class Bell
                 this.note(`hook gone without the bell${who}`);
                 this.tellIf(this.unheard);
             }
-        });
+        };
     }
 
     /** The chat left the table (D-104): its process ended, and nobody is in a turn or waits for the bell; a ring no hook heard is no longer news for anyone. */
@@ -207,7 +228,7 @@ export class Bell
         this.woken = false;
         this.unheard = false;
         this.pending = false;
-        this.listener?.end("dismissed");
+        this.listener?.dismissed();
         this.listener = undefined;
         this.note("chatLeft");
         this.changed();

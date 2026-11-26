@@ -67,6 +67,8 @@ export interface Context
     agentRun?: string;
     /** The chat makes this call of a tool it shares with an agent, as the host tells it: a caller that cannot be told is not the chat here (Federico). */
     chat?: true;
+    /** The table that drives this chat starts it again clean once its turn ends: a new game then asks the player for no /clear (D-57). */
+    startAgain?: () => void;
 }
 
 /** Who made a tool call: the model, else the host's name, never what the AI says of itself; the effort only when the host gives it. */

@@ -127,14 +127,22 @@ async function serveMcp(): Promise<void>
     process.stdout.write("", () => process.exit(piped));
 }
 
-/** The table, until it closes: `chesspal` alone starts it apart from the terminal. */
+/** The table, until it closes, and the chats it drives: `chesspal` alone starts it apart from the terminal. */
 async function serveTable(): Promise<void>
 {
-    const [{ npmUpdater, startTable, tableTimes, terminalChats }, { defaultContext }] = await Promise.all([import("../server/table/index.ts"), import("../commands/index.ts")]);
+    const [{ npmUpdater, startTable, tableTimes, terminalChats }, { drivenChats }, { defaultContext }] = await Promise.all([
+        import("../server/table/index.ts"),
+        import("../server/driven/index.ts"),
+        import("../commands/index.ts"),
+    ]);
 
     try {
         const context = defaultContext();
-        const table = await startTable(context, tableTimes, terminalChats(context), npmUpdater(context));
+        // The chat the table drives itself, over the terminal's: its places, with the MCP server, load at its first opening.
+        const chesspal = [process.execPath, ...process.execArgv, process.argv[1] ?? ""];
+        const places = async () => (await import("../server/places/index.ts")).tablePlaces(context);
+        const chats = drivenChats(context, { terminal: terminalChats(context, chesspal), places, chesspal });
+        const table = await startTable(context, tableTimes, chats, npmUpdater(context));
         console.log(table === undefined ? "Another Chesspal table, started at the same time, is open: this one closes." : `Chesspal's table: ${table.url}`);
         await table?.closed;
     } catch (error) {

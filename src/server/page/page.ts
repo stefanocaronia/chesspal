@@ -18,6 +18,7 @@ import { sendFile, sendHtml } from "./files.ts";
 import { answerGame, chatCalls, thinkingChanged } from "./game.ts";
 import { json, send } from "./http.ts";
 import { answerProfiles, readRatingsOf } from "./profiles.ts";
+import { chatSeat } from "./seat.ts";
 import { answerTable, type ChatWait, type Opening, startWhenAtRest, type TableChats, updateWhenAtRest, type WaitRefused } from "./table.ts";
 import { watchForUpdates } from "./update.ts";
 import { type TableWindows, windowConnected } from "./windows.ts";
@@ -120,6 +121,7 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
             const stopWatchingGame = watchGame(served);
             const stopAskingNpm = watchForUpdates(served);
             table?.chats?.watch?.(() => tellWatchers(watchers));
+            table?.chats?.seat?.(chatSeat(served, `http://127.0.0.1:${served.port}/`));
 
             // A chat's process ends without closing its page: the note goes with it.
             const forgetPort = (): void => {
@@ -193,6 +195,8 @@ export interface Served
     updating?: "installing" | "installed" | "restarting" | undefined;
     /** The windows the table opened: the newest stays, the others close (D-104). */
     windows?: TableWindows;
+    /** Tells the table's own chat that a browser opened the page. */
+    seatOpened?: () => void;
 }
 
 /**
@@ -275,6 +279,7 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
     } else if (path === "/api/events") {
         keepPosted(request, response, served.watchers);
         windowConnected(served, url);
+        served.seatOpened?.();
         // A page that opens reads the player's ratings again after a day (D-106).
         readRatingsOf(served);
     } else if (path === "/api/bell") {
@@ -309,6 +314,15 @@ function gameAtBell(served: Served): string | undefined
 
     try {
         const { text, position, stamp, given } = gameAtRing({ ...asTheChatSees(context, chat), given: new Set(chat.given) });
+        const local = served.attached?.local;
+
+        // The table's own chat is shown the game in its context, as its server would take the note before its next tool: no note on disk.
+        if (local !== undefined) {
+            given.forEach((key) => local.given.add(key));
+            chatHasRead(local, true);
+            return text;
+        }
+
         // On the table the chat attached to it may run in another folder: its hook and its server read the note there.
         const folder = served.attached?.chat.folder ?? served.folder;
         notePositionShown(folder, { page: served.port, ...position, ...(stamp === undefined ? {} : { stamp }), at: context.now().toISOString(), given });

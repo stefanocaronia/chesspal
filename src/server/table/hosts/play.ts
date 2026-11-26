@@ -9,7 +9,7 @@ import { tableFolder } from "../../../home/index.ts";
 import { activeProfile, gameFolder, languageIn, profileSettings } from "../../../profiles/index.ts";
 import { hostProgramPath, runsInShell } from "./find.ts";
 import { type HooksNews, setUpTable, takeHooksNews } from "./hooks.ts";
-import { choiceIn, hostArgs, type HostChoice, hostEnvironment, type HostName, isHostName, startMessage } from "./hosts.ts";
+import { choiceIn, hostArgs, type HostChoice, type HostChoices, hostEnvironment, type HostName, isHostName, startMessage } from "./hosts.ts";
 import { tableChoices } from "./models.ts";
 import { askedAgain, leaveSeat, refreshSeat, seatTimes, takeSeat } from "./seat.ts";
 import { cmdQuoted } from "./terminal.ts";
@@ -190,10 +190,8 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     // Codex's hooks written, by this play or by the table before it: the note is for Codex's chat, and waits for it.
     const news = host === "codex" ? takeHooksNews(folder) : undefined;
     const hooks = news === undefined ? {} : { hooks: news };
-    const choice = choiceIn(profileSettings(home, activeProfile(home).id), host, choices);
-    const games = gameFolder(home);
-    const analysis = analysisAsked(games);
-    const args = hostArgs(host, startMessage(languageIn(games, context.language), analysis), choice, folder, choices);
+    const { choice, message, analysis } = chatStart(context, host, choices);
+    const args = hostArgs(host, message, choice, folder, choices);
     // The seat this play holds, by which its chat's server tells the table it is the chat held, and not another opened in the same folder; spawn leaves out
     // a variable that is undefined.
     const childEnv = { ...env, ...Object.fromEntries(sessionMarks.map((name) => [name, undefined])), ...hostEnvironment(host, choice), CHESSPAL_SEAT: String(process.pid) };
@@ -204,6 +202,19 @@ export function hostLaunch(context: Context, host: HostName, env: NodeJS.Process
     }
 
     return { program: found, args, folder, env: childEnv, shell: runsInShell(found, context.platform), choice, analysis, ...hooks };
+}
+
+/**
+ * How a chat the table opens starts, for the profile in use: the model and effort the player chose on the page for the host, among its `choices`, the
+ * start message in the player's language, and whether it is for the game in analysis the page shows.
+ */
+export function chatStart(context: Context, host: HostName, choices: HostChoices = tableChoices(tableFolder(context.home()), host)): { choice: HostChoice; message: string; analysis: boolean; }
+{
+    const home = context.home();
+    const choice = choiceIn(profileSettings(home, activeProfile(home).id), host, choices);
+    const games = gameFolder(home);
+    const analysis = analysisAsked(games);
+    return { choice, message: startMessage(languageIn(games, context.language), analysis), analysis };
 }
 
 /** Whether the board page shows a game in analysis, none going on: the chat opened there is for that game, brought to review or to talk over, not for a new one. */

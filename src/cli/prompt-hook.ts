@@ -1,6 +1,6 @@
 // `chesspal prompt`, Claude Code's UserPromptSubmit hook (D-36): a prompt that is one move and nothing else, Chesspal plays as the player sends it and
 // tells the AI beside the prompt; any other goes to the AI as it is. Every prompt tells the chat's page the chat is at work. Only the move's shape is
-// checked before the commands load.
+// checked before the commands load, with the chess core alone.
 import type { Context } from "../commands/index.ts";
 
 /**
@@ -29,7 +29,7 @@ export async function promptAnswer(input: string, contextOf: (hook: HookInput) =
 {
     const hook = hookInput(input);
 
-    if (hook.prompt === undefined || !moveShape.test(hook.prompt) || hook.session === undefined) {
+    if (hook.prompt === undefined || hook.session === undefined || !(await import("../core/index.ts")).isMoveAlone(hook.prompt)) {
         return undefined;
     }
 
@@ -73,10 +73,6 @@ export interface HookInput
     session?: string;
     cwd?: string;
 }
-
-// One move and nothing else, as player_move takes it: SAN with K, Q, R, B and N, small or as figurines, or with the letters of other languages that name
-// one piece (Cf3, Tf1, Dd1, e8=D), or as squares, or castling; a check or mate sign.
-const moveShape = /^(?:[KQRBNkqrbnCSAFLTDt♔-♟]?[a-h]?[1-8]?[-x:×–—−]?[a-h][1-8](?:=?[QRBNqrbnCSAFLTD])?|[0Oo]-[0Oo](?:-[0Oo])?)[+#]?$/u;
 
 /**
  * Tells the chat's page that the prompt starts its turn: the doorbell lets the hook of the turn before go, and a new game asked on the page waits for

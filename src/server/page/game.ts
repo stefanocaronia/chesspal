@@ -15,6 +15,7 @@ import {
     newGame,
     offerDraw,
     playMove,
+    playMoveSentAlone,
     samePosition,
     say,
     type SeenPosition,
@@ -22,7 +23,7 @@ import {
     startNewGame,
     type VariationInput,
 } from "../../commands/index.ts";
-import { clockStarted, type GameRecord, isReviewed, writePgn } from "../../core/index.ts";
+import { clockStarted, type GameRecord, isMoveAlone, isReviewed, writePgn } from "../../core/index.ts";
 import {
     aiModelOf,
     archiveName,
@@ -199,6 +200,13 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
         return;
     }
 
+    // A move written alone, to the chat the table drives, the table plays as the prompt hook plays it in Claude Code's terminal.
+    if (shown === undefined && moveSentAlone(served, text)) {
+        served.bell.ring();
+        send(response, 200, json, JSON.stringify({ said: true, played: true }));
+        return;
+    }
+
     let current;
 
     try {
@@ -217,6 +225,28 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
     }
 
     send(response, 200, json, JSON.stringify({ said: true }));
+}
+
+/**
+ * Plays the player's words as their move when they are one move alone, written to the chat the table drives, in a game going on at the player's turn:
+ * whether it was played. A move refused stays words, which the AI reads, as in the prompt hook.
+ */
+function moveSentAlone(served: Served, text: string): boolean
+{
+    if (served.attached?.local === undefined || !isMoveAlone(text) || refusalOf(served) !== undefined) {
+        return false;
+    }
+
+    try {
+        playMoveSentAlone(text, { ...served.context, given: new Set() });
+        return true;
+    } catch (error) {
+        if (error instanceof Error && error.message.endsWith("Nothing changed.")) {
+            return false;
+        }
+
+        throw error;
+    }
 }
 
 /**
@@ -255,7 +285,8 @@ async function newGameFromPage(request: IncomingMessage, response: ServerRespons
             return;
         }
 
-        const sight = relaunching ? served.context : asTheChatSees(served.context, served.chat);
+        // The chat the table drives is never asked for /clear: the table starts it again (D-57).
+        const sight = relaunching || served.attached?.local !== undefined ? served.context : asTheChatSees(served.context, served.chat);
         chosen = input.data;
         rerunIfChanged(() => startNewGame(input.data, { ...sight, pageOpen: () => true }, "page"));
     } catch (error) {

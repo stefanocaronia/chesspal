@@ -356,6 +356,17 @@ export function foreignMovesIn(text: string): { written: string; san: string; }[
 }
 
 /**
+ * Whether a text is one move and nothing else, as a player writes it alone: SAN with K, Q, R, B and N, small or as figurines, or with the letters of other
+ * languages that name one piece (Cf3, Tf1, Dd1, e8=D), or as squares, or castling; a check or mate sign. Its shape alone: the move may be illegal.
+ */
+export function isMoveAlone(text: string): boolean
+{
+    return moveShape.test(text);
+}
+
+const moveShape = /^(?:[KQRBNkqrbnCSAFLTDt♔-♟]?[a-h]?[1-8]?[-x:×–—−]?[a-h][1-8](?:=?[QRBNqrbnCSAFLTD])?|[0Oo]-[0Oo](?:-[0Oo])?)[+#]?$/u;
+
+/**
  * A player's move written with a piece's letter of another language that names one piece only, in SAN's (D-113): Cf3 as Nf3, Tf1 as Rf1, e8=D as e8=Q;
  * a small t too, which is no file. Any other text as it is: B stays the bishop, K the king, R the rook, a small letter a file.
  */

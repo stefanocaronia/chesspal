@@ -26,6 +26,12 @@ const tableNotPlaces = {
     message: "The table never imports server/places, which imports server/mcp, which imports the table: take the places as a parameter.",
 };
 
+// Neither the table nor the MCP server imports the chats the table drives: the command line hands them over.
+const notDriven = {
+    regex: "^(?:\\.\\./)+driven/",
+    message: "The table and the MCP server never import server/driven, which imports them: the command line hands the chats it drives to the table.",
+};
+
 // The commands' folders by steps, from the bottom: each imports only the folders of a lower step, never one of its own step or above, nor commands/index.ts.
 const commandsSteps = [["registry"], ["answers"], ["setup", "profiles", "talk"], ["game", "analysis"]];
 const commandsOrder = commandsSteps.flatMap((step, index) =>
@@ -195,8 +201,15 @@ export default [
     {
         files: ["src/server/table/**/*.ts"],
         rules: {
-            "no-restricted-imports": ["error", { patterns: [tableNotPlaces, ...boundaries] }],
-            "no-restricted-syntax": ["error", ...lateBoundaries, ...late([tableNotPlaces])],
+            "no-restricted-imports": ["error", { patterns: [tableNotPlaces, notDriven, ...boundaries] }],
+            "no-restricted-syntax": ["error", ...lateBoundaries, ...late([tableNotPlaces, notDriven])],
+        },
+    },
+    {
+        files: ["src/server/mcp/**/*.ts"],
+        rules: {
+            "no-restricted-imports": ["error", { patterns: [notDriven, ...boundaries] }],
+            "no-restricted-syntax": ["error", ...lateBoundaries, ...late([notDriven])],
         },
     },
     // The door between the table and the chats it opens imports Node and the version alone: the process of a chat that only pipes its lines starts light.

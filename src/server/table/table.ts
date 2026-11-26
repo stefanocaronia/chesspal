@@ -73,6 +73,8 @@ export async function startTable(context: Context, times: TableTimes = tableTime
     const watch = closeWhenIdle(page, () => context.now().getTime() - lastUsed, used, times, quit);
     const closed = quitting.then(async () => {
         clearInterval(watch);
+        // The chats it drives close with it: no host's process is left behind.
+        await chats?.close?.();
         // Its ports free, the new table takes the first of them, where the pages open look for it.
         await page.close();
 

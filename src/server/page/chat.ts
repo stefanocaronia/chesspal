@@ -100,13 +100,17 @@ export const chatCopy = z.object({
 });
 export type ChatCopy = z.infer<typeof chatCopy>;
 
-/** The chat attached to the table: the token of its requests, what it said as it attached, and its last copy, with the words given as a set. */
+/**
+ * The chat attached to the table: the token of its requests, what it said as it attached, and its last copy, with the words given as a set; or, for a
+ * chat the table drives in its own process, its context, which the page reads as it is, and no copy.
+ */
 export interface Attached
 {
     readonly token: string;
     readonly chat: ChatAttach;
     copy: ChatCopy | undefined;
     given: ReadonlySet<string>;
+    readonly local?: Context;
 }
 
 /** The chat attached to the table as the page reads it; nobody's while none is: no words given, no game or position seen, no host. */
@@ -116,20 +120,27 @@ export function attachedSeen(attached: () => Attached | undefined): ChatSeen
     return {
         get given()
         {
-            return attached()?.given ?? none;
+            const chat = attached();
+            return chat?.local?.given ?? chat?.given ?? none;
         },
         get seen()
         {
-            return attached()?.copy?.seen;
+            const chat = attached();
+            return chat?.local === undefined ? chat?.copy?.seen : chat.local.seen;
         },
         get positionSeen()
         {
-            return attached()?.copy?.positionSeen;
+            const chat = attached();
+            return chat?.local === undefined ? chat?.copy?.positionSeen : chat.local.positionSeen;
         },
         get positionFirstSeen()
         {
-            return attached()?.copy?.positionFirstSeen;
+            const chat = attached();
+            return chat?.local === undefined ? chat?.copy?.positionFirstSeen : chat.local.positionFirstSeen;
         },
-        host: () => attached()?.copy?.host ?? attached()?.chat.host,
+        host: () => {
+            const chat = attached();
+            return (chat?.local === undefined ? chat?.copy?.host : chat.local.host?.()) ?? chat?.chat.host;
+        },
     };
 }

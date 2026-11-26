@@ -2,10 +2,11 @@
 // it saw, and asks for the New game window. One chat at a time, of this version alone; a page a chat serves itself has none of these routes.
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Context } from "../../commands/index.ts";
 import { forgetAnalyst, forgetTheAi, noteAiHost, noteAiModel } from "../../games/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
-import { type Attached, chatAttach, chatCopy } from "./chat.ts";
+import { type Attached, type ChatAttach, chatAttach, chatCopy } from "./chat.ts";
 import { askNewGame, tellWatchers } from "./events.ts";
 import { chatCalls } from "./game.ts";
 import { bytesOf, isJson, jsonOf, runRoute, sendJson } from "./http.ts";
@@ -62,21 +63,32 @@ function attach(body: Record<string, unknown>, response: ServerResponse, served:
         return;
     }
 
-    const attached: Attached = { token: randomUUID(), chat: parsed.data, copy: undefined, given: new Set() };
-    served.attached = attached;
-    served.chatOpened = undefined;
-    served.outdated = parsed.data.outdated;
+    const attached = seatChat(served, parsed.data);
     response.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
     response.write(`${JSON.stringify({ token: attached.token, open: served.watchers.size > 0 })}\n`);
-    response.on("close", () => {
-        if (served.attached === attached) {
-            served.attached = undefined;
-            served.outdated = false;
-            forgetChat(served);
-            served.bell.chatLeft();
-        }
-    });
+    response.on("close", () => chatLeft(served, attached));
     tellWatchers(served.watchers);
+}
+
+/** A chat takes the table, over HTTP or in the table's own process with its `local` context: what the table keeps of it. */
+export function seatChat(served: Served, chat: ChatAttach, local?: Context): Attached
+{
+    const attached: Attached = { token: randomUUID(), chat, copy: undefined, given: new Set(), ...(local === undefined ? {} : { local }) };
+    served.attached = attached;
+    served.chatOpened = undefined;
+    served.outdated = chat.outdated;
+    return attached;
+}
+
+/** The chat has left the table, if it is still the one at it: the table is nobody's, and nobody waits at the bell. */
+export function chatLeft(served: Served, attached: Attached): void
+{
+    if (served.attached === attached) {
+        served.attached = undefined;
+        served.outdated = false;
+        forgetChat(served);
+        served.bell.chatLeft();
+    }
 }
 
 /**
