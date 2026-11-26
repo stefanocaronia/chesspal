@@ -1,8 +1,7 @@
-// The models Codex offers on this computer: its app-server started, asked for its list of models after the protocol's first request, then stopped.
+// The models Codex offers on this computer: its app-server started, asked for its list of models after the protocol's first request, then let go.
 // No thread is opened, so no MCP server starts.
-import { type HostModel, isHostName, laterByTimer, type ModelsOptions } from "../chat.ts";
+import { type HostModel, hostModels, isHostName, type ModelsOptions } from "../chat.ts";
 import { isObject, notification, parsedLine, Requests } from "../lines.ts";
-import { type LineProcess, startLineProcess } from "../process.ts";
 import { modelArguments } from "./program.ts";
 import { initializeParams } from "./protocol.ts";
 
@@ -13,35 +12,14 @@ const mostModels = 40;
 const mostName = 100;
 const mostAbout = 300;
 
-/** The models Codex offers, the account's own default first; an empty list where it does not answer in time, fails or cannot start. */
+/**
+ * The models Codex offers, the account's own default first, its app-server then let go to end by itself; an empty list where it does not answer in time,
+ * fails or cannot start.
+ */
 export function codexModels(options: ModelsOptions): Promise<HostModel[]>
 {
-    const start = options.start ?? startLineProcess;
-    const later = options.later ?? laterByTimer;
-
-    return new Promise((done) => {
-        let host: LineProcess | undefined;
-        let finished = false;
-        const requests = new Requests((line) => host?.write(line));
-
-        const finish = (models: HostModel[]): void => {
-            if (!finished) {
-                finished = true;
-                cancel();
-                host?.stop();
-                done(models);
-            }
-        };
-
-        const cancel = later(answerWait, () => finish([]));
-
-        try {
-            host = start(options.program.command, [...options.program.args, ...modelArguments], { cwd: options.folder, env: options.environment, errors: () => undefined });
-        } catch {
-            finish([]);
-            return;
-        }
-
+    return hostModels(options, modelArguments, answerWait, (host, answer) => {
+        const requests = new Requests((line) => host.write(line));
         host.onLine((line) => {
             const message = parsedLine(line);
 
@@ -49,20 +27,20 @@ export function codexModels(options: ModelsOptions): Promise<HostModel[]>
                 requests.answer(message);
             }
         });
-        host.onEnd(() => finish([]));
         requests.ask("initialize", initializeParams(), (initialized) => {
             if (initialized.error !== undefined) {
-                finish([]);
+                answer([]);
                 return;
             }
 
-            host?.write(JSON.stringify(notification("initialized")));
-            requests.ask("model/list", {}, (listed) => finish(isObject(listed.result) ? modelsOf(listed.result.data) : []));
+            host.write(JSON.stringify(notification("initialized")));
+            requests.ask("model/list", {}, (listed) => answer(isObject(listed.result) ? modelsOf(listed.result.data) : []));
         });
+        return undefined;
     });
 }
 
-/** The models listed and not hidden, each once, the default first, none whose id the table could not take as a model's name. */
+/** The models listed and not hidden, each once, the default first and advised, none whose id the table could not take as a model's name. */
 function modelsOf(listed: unknown): HostModel[]
 {
     const entries = (Array.isArray(listed) ? listed : []).filter(isObject).filter((entry) => entry.hidden !== true);
@@ -79,7 +57,8 @@ function modelsOf(listed: unknown): HostModel[]
 
         const name = typeof entry.displayName === "string" && entry.displayName.trim() !== "" ? entry.displayName.trim().slice(0, mostName) : entry.id;
         const about = typeof entry.description === "string" && entry.description.trim() !== "" ? entry.description.trim().slice(0, mostAbout) : undefined;
-        models.push({ id: entry.id, name, ...(about === undefined ? {} : { about }), efforts: effortsOf(entry.supportedReasoningEfforts) });
+        const advised = entry.isDefault === true && !models.some((model) => model.advised === true) ? { advised: true as const } : {};
+        models.push({ id: entry.id, name, ...(about === undefined ? {} : { about }), efforts: effortsOf(entry.supportedReasoningEfforts), ...advised });
     }
 
     return models;

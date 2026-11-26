@@ -2,7 +2,10 @@
 import type { ToolKind } from "../chat.ts";
 import type { Message } from "../lines.ts";
 
-/** The host's built-in tools the table may give the AI, by kind; `--tools` lists those whose kind is allowed. */
+/**
+ * The host's built-in tools the table may give the AI, by kind; `--tools` lists those whose kind is allowed. WebFetch is the AI's own only in an
+ * older Claude Code: a newer one leaves it out and reads a page with a subagent.
+ */
 export const builtInTools: { name: string; kind: ToolKind; }[] = [
     { name: "Read", kind: "read" },
     { name: "Glob", kind: "read" },

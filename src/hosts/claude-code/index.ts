@@ -1,6 +1,7 @@
 // The chat in Claude Code: its program started with no terminal, spoken to by its stream-json protocol, one JSON object a line each way.
 import { join } from "node:path";
 import { type ChatOptions, type HostChat, type HostDriver, isHostName } from "../chat.ts";
+import { hosts } from "../names.ts";
 import { isFile } from "../program.ts";
 import { heldChat, startHost } from "../state.ts";
 import { givenArguments, serverOf } from "./given.ts";
@@ -8,7 +9,7 @@ import { claudeModels } from "./models.ts";
 import { agentArguments, claudeEnvironment, claudeProgram, settingArguments, streamArguments } from "./program.ts";
 import { builtInTools } from "./protocol.ts";
 import { readMessage } from "./read.ts";
-import { askModel, newTurn, type State, writeStop, writeWords } from "./state.ts";
+import { askModel, changeModel, newTurn, type State, writeStop, writeWords } from "./state.ts";
 
 /** Claude Code as the table drives it. */
 export const claudeCode: HostDriver = {
@@ -36,16 +37,17 @@ function openClaudeCode(options: ChatOptions): HostChat
 
     const server = serverOf(options);
     const state: State = {
-        ...startHost(options, programArguments(options)),
+        ...startHost(options, hosts.claudeCode.name, programArguments(options)),
         server,
-        ...(options.effort === undefined ? {} : { effort: options.effort }),
         requests: 0,
         model: { asked: options.model, request: "" },
+        ...(options.effort === undefined ? {} : { effort: options.effort }),
         protocol: {
             newTurn,
             words: (turn, text) => writeWords(state, turn, text),
             stop: () => writeStop(state),
             read: (message) => readMessage(state, message),
+            change: (model, effort) => changeModel(state, model, effort),
         },
     };
     return heldChat(state, () => askModel(state));

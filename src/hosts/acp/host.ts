@@ -5,6 +5,8 @@ import { isObject, type Message } from "../lines.ts";
 /** A host spoken to by the Agent Client Protocol, as its driver describes it. */
 export interface AcpHost
 {
+    /** The host's name, as the table's log says it. */
+    name: string;
     /** The program's arguments after its own, which make it speak the protocol on its input and output. */
     args: string[];
     /** A tool call's name for the table and its kind, from all the agent said of it and the chat's session: for a command of the chesspal server, the command's name alone. */
@@ -17,8 +19,14 @@ export interface AcpHost
     childOf?(update: Message): string | undefined;
     /** The subagent's session a call of kind agent started, as its end names it. */
     childStarted?(call: Message): string | undefined;
-    /** How the player signs the host in, for a chat it refuses as not signed in: "run … in a terminal, then try again". */
+    /** How the player signs the host in, for a chat it refuses as not signed in, never in a terminal: "sign in from … itself". */
     login: string;
+    /** For a host whose error for a player not signed in is not known yet: words of an error that say so, beside the protocol's own code. */
+    signInWords?: RegExp;
+    /** For a host that lists the models of many providers: a model's provider, and whether it is paid apart for each answer, by its id. */
+    modelMarks?(id: string): { group?: string; metered?: true; };
+    /** How early a model is kept, lowest first, before the list is cut: the first not paid apart is the one a chat proposes. All alike by default. */
+    modelRank?(id: string): number;
 }
 
 // The protocol's own kinds of tool calls, as the table's kinds: a search may be of files or of the web, and is held to the folder as a read. A thought may

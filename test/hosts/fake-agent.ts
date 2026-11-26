@@ -12,6 +12,8 @@ export interface FakeAgentOptions
     /** Methods the agent never answers, and those it answers with an error. */
     ignore?: string[];
     failing?: string[];
+    /** The values of a setting, a model or an effort, the agent answers with an error, and its words. */
+    refusing?: Record<string, string>;
 }
 
 // How many of the agent's lines it writes in a tick, so that the driver reads them as a stream.
@@ -35,6 +37,8 @@ export function fakeAgent(flow: FlowEntry[], options: FakeAgentOptions = {}): Fa
     let scheduled = false;
     // A model asked and not answered yet: the player's words must wait for its answer.
     let modelPending = false;
+    // The options the agent answered last, which it lists whole again with each setting, as OpenCode does.
+    let lastListed: Message[] | undefined;
     let lineListener: ((line: string) => void) | undefined;
     let endListener: ((reason: string) => void) | undefined;
 
@@ -104,10 +108,17 @@ export function fakeAgent(flow: FlowEntry[], options: FakeAgentOptions = {}): Fa
         const params = message.params as Message;
         const model = params.configId === "model" || message.method === "session/set_model";
         const value = String(params.value ?? params.modelId);
+
+        if (options.refusing?.[value] !== undefined) {
+            say({ jsonrpc: "2.0", id: message.id, error: { code: -32602, message: options.refusing[value] } });
+            return;
+        }
+
         const current = model ? options.models?.[value] ?? value : value;
         const recorded = recordedSettings.shift();
-        const listed = ((recorded?.result as Message | undefined)?.configOptions as Message[] | undefined) ?? [{ id: params.configId, category: model ? "model" : "thought_level", currentValue: value }];
+        const listed = ((recorded?.result as Message | undefined)?.configOptions as Message[] | undefined) ?? lastListed ?? [{ id: params.configId, category: model ? "model" : "thought_level", currentValue: value }];
         const configOptions = listed.map((option) => (option.id === params.configId ? { ...option, currentValue: current } : option));
+        lastListed = configOptions;
         modelPending ||= model;
         say({ jsonrpc: "2.0", id: message.id, result: message.method === "session/set_model" ? {} : { configOptions }, modelAnswer: model });
     };
@@ -195,6 +206,9 @@ export function fakeAgent(flow: FlowEntry[], options: FakeAgentOptions = {}): Fa
         onEnd: (listener) => {
             endListener = listener;
         },
+        closeInput: () => {
+            fake.inputClosed = true;
+        },
         stop: () => {
             fake.stops += 1;
             fake.stopped = true;
@@ -210,6 +224,7 @@ export function fakeAgent(flow: FlowEntry[], options: FakeAgentOptions = {}): Fa
         problems: [],
         stopped: false,
         stops: 0,
+        inputClosed: false,
         end: (reason) => {
             if (!fake.stopped) {
                 fake.stopped = true;

@@ -56,6 +56,30 @@ describe("a newer Chesspal on npm", () => {
         expect(startsAgain()).toBe(1);
     });
 
+    it("starts the new table only once the programs the old one started have ended", async () => {
+        let ended = (): void => undefined;
+        let waited = false;
+        const programsEnded = new Promise<void>((done) => (ended = done));
+        const { table, startsAgain } = await tableWith(true, "99.0.0", () => {
+            waited = true;
+            return programsEnded;
+        });
+        await shownWhen(table, (shown) => shown.update !== undefined);
+        let closed = false;
+        void table.closed.then(() => (closed = true));
+
+        expect(await update(table.url)).toEqual({ status: 200, body: { installed: true } });
+
+        for (let tried = 0; tried < 250 && !waited; tried++) {
+            await new Promise((done) => setTimeout(done, 20));
+        }
+
+        expect([waited, closed, startsAgain()]).toEqual([true, false, 0]);
+        ended();
+        await table.closed;
+        expect(startsAgain()).toBe(1);
+    });
+
     it("leaves the table as it is when npm did not install it, and the page gives the command to type", async () => {
         const { table, installs, startsAgain } = await tableWith(false);
         await shownWhen(table, (shown) => shown.update !== undefined);
@@ -165,7 +189,7 @@ async function pageWith(fetch: typeof globalThis.fetch): Promise<Page>
 }
 
 /** A table whose npm has `latest` and installs it or not, once asked: the versions it was asked to install, and how many tables started after it. */
-async function tableWith(installed: boolean | Promise<boolean>, latest = "99.0.0"): Promise<{ context: Context; table: Table; installs: string[]; startsAgain: () => number; }>
+async function tableWith(installed: boolean | Promise<boolean>, latest = "99.0.0", programsEnded?: () => Promise<unknown>): Promise<{ context: Context; table: Table; installs: string[]; startsAgain: () => number; }>
 {
     const installs: string[] = [];
     let starts = 0;
@@ -180,7 +204,7 @@ async function tableWith(installed: boolean | Promise<boolean>, latest = "99.0.0
     };
     return onFreePorts(async () => {
         const context = homeContext(npm({ version: latest }));
-        const table = await startTable(context, { idle: 60_000, every: 10 }, undefined, updater);
+        const table = await startTable(context, { idle: 60_000, every: 10 }, undefined, updater, programsEnded);
 
         if (table === undefined) {
             throw new Error("The table did not start: another one holds its ports.");

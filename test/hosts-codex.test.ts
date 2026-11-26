@@ -16,7 +16,7 @@ const folder = "/players/test";
 const model = "gpt-6-luna";
 const thread = "thr_1";
 // The kinds of tools the table allows.
-const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "agent", "image"];
+const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "fetch", "agent", "image"];
 // The flows of codex-cli 0.171.0 (24 Nov): a new chat of two turns that runs chesspal's commands without asking, as the folder's configuration lets them.
 // Codex asked no approval and took no thread up in those runs: the refused flow is the first turn with each command asking its approval as an MCP form of
 // the shape guessed, and the resumed one the same turn on thread/resume.
@@ -40,7 +40,7 @@ describe("the chat in Codex", () => {
             const host = fakeCodex([]);
             codex.open({ ...options(host), environment: { HOME: "/home/player" } });
             expect(host.started?.command).toBe("codex-program");
-            expect(host.started?.args).toEqual(["--first", "app-server", "-c", `projects.${folder}.trust_level="trusted"`, "-c", "check_for_update_on_startup=false"]);
+            expect(host.started?.args).toEqual(["--first", "app-server", "-c", `projects.${folder}.trust_level="trusted"`, "-c", "check_for_update_on_startup=false", "-c", "features.apps=false", "-c", "features.plugins=false"]);
             expect(host.started?.options.cwd).toBe(folder);
             expect(host.started?.options.env).toEqual({ HOME: "/home/player" });
         });
@@ -48,15 +48,55 @@ describe("the chat in Codex", () => {
         it("trusts a folder with a dot, which a key of -c cannot hold, in the value: a table of projects holding it alone, in TOML's quotes", () => {
             const host = fakeCodex([]);
             codex.open({ ...options(host), folder: 'C:\\Users\\mario.rossi\\"x"' });
-            expect(host.started?.args).toEqual(["--first", "app-server", "-c", 'projects={"C:\\\\Users\\\\mario.rossi\\\\\\"x\\""={trust_level="trusted"}}', "-c", "check_for_update_on_startup=false"]);
+            expect(host.started?.args).toEqual([
+                "--first",
+                "app-server",
+                "-c",
+                'projects={"C:\\\\Users\\\\mario.rossi\\\\\\"x\\""={trust_level="trusted"}}',
+                "-c",
+                "check_for_update_on_startup=false",
+                "-c",
+                "features.apps=false",
+                "-c",
+                "features.plugins=false",
+            ]);
         });
 
-        it("begins the protocol as the table, reads the account, then opens a thread with the model, the effort, its approvals, its sandbox and no web search", async () => {
+        it("begins the protocol as the table, reads its configuration and the account, then opens a thread with the model, the effort, its approvals, its sandbox and no web search", async () => {
             const { host, until } = play([...begin(), ...threadStart()], { effort: "low" });
-            await until(() => host.written.length >= 4);
-            expect(host.written.map((message) => message.method)).toEqual(["initialize", "initialized", "account/read", "thread/start"]);
+            await until(() => host.written.length >= 5);
+            expect(host.written.map((message) => message.method)).toEqual(["initialize", "initialized", "config/read", "account/read", "thread/start"]);
             expect(host.written[0]!.params).toMatchObject({ clientInfo: { name: "chesspal", title: "Chesspal" }, capabilities: { experimentalApi: true } });
-            expect(host.written[3]!.params).toEqual({ cwd: folder, model, approvalPolicy: "on-request", sandbox: "read-only", config: { model_reasoning_effort: "low", web_search: "disabled" } });
+            expect(host.written[2]!.params).toEqual({ cwd: folder });
+            expect(host.written[4]!.params).toEqual({ cwd: folder, model, approvalPolicy: "on-request", sandbox: "read-only", config: { model_reasoning_effort: "low", web_search: "disabled" } });
+        });
+
+        it("opens the thread with the player's own MCP servers turned off, chesspal alone left on", async () => {
+            const servers = { chesspal: { command: "chesspal" }, github: { command: "gh-mcp" }, "my.notes": { url: "http://localhost:9" } };
+            const { host, until } = play([...begin(), ...threadStart()], {}, { servers });
+            await until(() => host.written.some(isThreadRequest));
+            expect((host.written.find(isThreadRequest)?.params as Message).config).toEqual({ web_search: "disabled", mcp_servers: { github: { enabled: false }, "my.notes": { enabled: false } } });
+        });
+
+        it("opens the thread all the same where Codex fails to say its configuration, or keeps silent 5 seconds, turning off no server, and the table's log says so", async () => {
+            const logged: string[] = [];
+            const log = (line: string): number => logged.push(line);
+            const failed = play([...begin(), ...threadStart()], { log }, { failing: ["config/read"] });
+            await failed.until(() => failed.host.written.some(isThreadRequest));
+            expect((failed.host.written.find(isThreadRequest)?.params as Message).config).toEqual({ web_search: "disabled" });
+
+            const clock = manualClock();
+            const silent = play([...begin(), ...threadStart()], { later: clock.later, log }, { ignore: ["config/read"], servers: { github: {} } });
+            await silent.until(() => silent.host.written.some((message) => message.method === "config/read"));
+            clock.advance(4999);
+            expect(silent.host.written.map((message) => message.method)).toEqual(["initialize", "initialized", "config/read"]);
+            clock.advance(1);
+            await silent.until(() => silent.host.written.some(isThreadRequest));
+            expect((silent.host.written.find(isThreadRequest)?.params as Message).config).toEqual({ web_search: "disabled" });
+            expect(logged).toEqual([
+                "Codex did not say its configuration (config/read failed): the chat opens with the player's own MCP servers on.",
+                "Codex did not say its configuration within 5 seconds: the chat opens with the player's own MCP servers on.",
+            ]);
         });
     });
 
@@ -95,16 +135,20 @@ describe("the chat in Codex", () => {
                     await until(() => events.some((event) => event.type === "ended"));
                     expect(events).toEqual([{ type: "turnEnd", reason: "failed", why }, { type: "ended", why }]);
                     expect(host.written.some(isTurnStart)).toBe(false);
-                    expect(host.stopped).toBe(true);
+                    expect(host.inputClosed).toBe(true);
+                    expect(host.stopped).toBe(false);
                 }
             }
         });
 
-        it("ends the chat, saying how to mend it, when Codex is not signed in", async () => {
+        it("ends the chat with the sign-in's code, saying to sign in to Codex, when it is not signed in", async () => {
             const flow = begin({ account: null, requiresOpenaiAuth: true });
-            const { events, until } = play(flow);
+            const { chat, events, until } = play(flow);
+            chat.send("Hello");
             await until(() => events.some((event) => event.type === "ended"));
-            expect(events).toEqual([{ type: "ended", why: "Codex is not signed in: run codex login in a terminal, then try again" }]);
+            const why = "Codex is not signed in on this computer: sign in to Codex, then open the chat again";
+            expect(events).toEqual([{ type: "turnEnd", reason: "failed", why, code: "signin" }, { type: "ended", why, code: "signin" }]);
+            expect(why).not.toMatch(/terminal/);
         });
 
         it("ends the chat with Codex's words when it opens no thread", async () => {
@@ -123,6 +167,11 @@ describe("the chat in Codex", () => {
             clock.advance(1);
             const why = `the host was not ready to play with the model ${model} within 60 seconds`;
             expect(events).toEqual([{ type: "turnEnd", reason: "failed", why }, { type: "ended", why }]);
+            // Its input closed, it has ten seconds to end by itself before it is stopped.
+            expect(host.inputClosed).toBe(true);
+            clock.advance(9999);
+            expect(host.stopped).toBe(false);
+            clock.advance(1);
             expect(host.stopped).toBe(true);
         });
 
@@ -203,6 +252,20 @@ describe("the chat in Codex", () => {
             expect(turnEnds(events)).toEqual([
                 { type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: commandExecution read /etc/passwd, and the table lets the AI read only the chat's folder" },
             ]);
+        });
+
+        it("lets a page of the web opened by its search go on at the table, which gives fetching; never where fetching is not given", async () => {
+            const opened = async (allowed: ChatOptions["allowed"]): Promise<HostEvent[]> => {
+                const search = { type: "webSearch", id: "ws_1", query: "", action: { type: "openPage", url: "https://example.com" } };
+                const flow = [...begin(), ...threadStart(), ...turn("Hello", item("started", search), item("completed", search))];
+                const { chat, events, until } = play(flow, { allowed });
+                chat.send("Hello");
+                await until(() => turnEnds(events).length === 1);
+                return turnEnds(events);
+            };
+
+            expect(await opened(tableKinds)).toEqual([{ type: "turnEnd", reason: "done" }]);
+            expect(await opened(["chesspal", "read", "web"])).toEqual([{ type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use webSearch" }]);
         });
 
         it("reads a picture Codex painted as failed only where it says its failure, whatever its status says", async () => {
@@ -345,7 +408,8 @@ describe("the chat in Codex", () => {
         it("refuses writing and the network", async () => {
             expect(await answered(asking("item/fileChange/requestApproval", { itemId: "patch_1" }, { decision: "decline" }))).toEqual([{ type: "permission", name: "fileChange", kind: "write", allowed: false }]);
             const network = { itemId: "cmd_1", cwd: folder, reason: null, permissions: { network: { enabled: true }, fileSystem: null } };
-            expect(await answered(asking("item/permissions/requestApproval", network, { permissions: {}, scope: "turn" }))).toEqual([{ type: "permission", name: "permissions", kind: "fetch", allowed: false }]);
+            // The network for a command is a command's, refused even where the table lets the AI open a page.
+            expect(await answered(asking("item/permissions/requestApproval", network, { permissions: {}, scope: "turn" }), tableKinds)).toEqual([{ type: "permission", name: "permissions", kind: "shell", allowed: false }]);
         });
 
         it("grants more permissions only in the shapes it reads, and only what it read; any other shape is refused", async () => {
@@ -447,6 +511,19 @@ describe("the chat in Codex", () => {
             expect(events).toHaveLength(told);
             expect(host.stops).toBe(1);
         });
+
+        it("closed gently, as the table ends it, closes the program's input and stops it only ten seconds later, where it is still there", async () => {
+            const clock = manualClock();
+            const { chat, host, until } = play([...begin(), ...threadStart(), ...turn("Hello", delta("One"))], { later: clock.later });
+            chat.send("Hello");
+            await until((all) => all.some((event) => event.type === "text"));
+            chat.close(true);
+            expect(host.inputClosed).toBe(true);
+            clock.advance(9999);
+            expect(host.stops).toBe(0);
+            clock.advance(1);
+            expect(host.stops).toBe(1);
+        });
     });
 });
 
@@ -508,19 +585,29 @@ describe("Codex as the table drives it", () => {
             const models = await codex.models({ folder, program: { command: "codex-program", args: [] }, environment: { HOME: "/home/player" }, start: host.start });
             expect(host.started?.args).toEqual(["app-server", "-c", "check_for_update_on_startup=false"]);
             expect(models).toHaveLength(10);
-            expect(models[0]).toEqual({ id: "gpt-6.2-sol", name: "GPT-6.2-Sol", about: "Fast, go-to model for coding and everyday work.", efforts: ["low", "medium", "high", "xhigh", "max", "ultra"] });
+            expect(models[0]).toEqual({
+                id: "gpt-6.2-sol",
+                name: "GPT-6.2-Sol",
+                about: "Fast, go-to model for coding and everyday work.",
+                efforts: ["low", "medium", "high", "xhigh", "max", "ultra"],
+                advised: true,
+            });
+            expect(models.slice(1).some((one) => one.advised === true || one.metered === true || one.group !== undefined)).toBe(false);
             expect(models.find((one) => one.id === model)?.efforts).toEqual(["low", "medium", "high", "xhigh", "max"]);
             expect(host.written.map((message) => message.method)).toEqual(["initialize", "initialized", "model/list"]);
             expect(host.problems).toEqual([]);
-            expect(host.stopped).toBe(true);
+            expect(host.inputClosed).toBe(true);
+            expect(host.stopped).toBe(false);
         });
 
-        it("are none, the program stopped, where it does not answer within 10 seconds, or cannot start", async () => {
+        it("are none where it does not answer within 10 seconds, the program let go and stopped only ten seconds later, or cannot start", async () => {
             const clock = manualClock();
             const host = fakeCodex([], { ignore: ["initialize"] });
             const asking = codex.models({ folder, program: { command: "codex-program", args: [] }, environment: {}, start: host.start, later: clock.later });
             clock.advance(10_000);
             expect(await asking).toEqual([]);
+            expect(host.stopped).toBe(false);
+            clock.advance(10_000);
             expect(host.stopped).toBe(true);
             expect(await codex.models({ folder, program: { command: join(makeTempFolder(), "no-such-program"), args: [] }, environment: process.env })).toEqual([]);
         });

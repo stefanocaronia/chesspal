@@ -1,11 +1,18 @@
 // Getting the chat ready: the protocol begun, the account read, the thread opened or taken up with the model and effort, confirmed before the player's words.
 import { failureOf, isObject, type Message, notification, wordsOf } from "../lines.ts";
-import { chatReady, endTurn, refused, tell, write } from "../state.ts";
+import { chatReady, endTurn, modelChanged, refused, tell, write } from "../state.ts";
 import { initializeParams } from "./protocol.ts";
 import { sendInterrupt, type State, type Turn } from "./state.ts";
 
-// How long Codex may take to get ready: its program started, its account read, its thread opened.
+// How long Codex may take to get ready: its program started, its account read, its thread opened; and to say its configuration, which never holds the rest.
 const readyWait = 60_000;
+const configWait = 5000;
+// How long Codex may take to confirm another model asked in the open chat.
+const changeWait = 30_000;
+// The game's own MCP server, which the chat's folder's configuration starts.
+const chesspalServer = "chesspal";
+
+type Before = NonNullable<State["model"]["before"]>;
 
 /** Begins the protocol; the rest follows each answer. */
 export function begin(state: State): void
@@ -20,7 +27,45 @@ export function begin(state: State): void
         }
 
         write(state, notification("initialized"));
-        state.requests.ask("account/read", { refreshToken: false }, (account) => accountRead(state, account));
+        readConfig(state, () => state.requests.ask("account/read", { refreshToken: false }, (account) => accountRead(state, account)));
+    });
+}
+
+/**
+ * Asks Codex the configuration it reads in the chat's folder, for the names of the player's own MCP servers, then goes on: at once where it fails, and
+ * after a while where it does not answer, with none. Its names alone are taken: one Codex does not know would fail the thread.
+ */
+function readConfig(state: State, then: () => void): void
+{
+    let heard = false;
+
+    const next = (servers: unknown): void => {
+        if (heard) {
+            return;
+        }
+
+        heard = true;
+        cancel();
+        state.others = isObject(servers) ? Object.keys(servers).filter((name) => name !== chesspalServer) : [];
+        then();
+    };
+
+    const cancel = state.later(configWait, () => {
+        if (!heard) {
+            state.log(`Codex did not say its configuration within ${String(configWait / 1000)} seconds: the chat opens with the player's own MCP servers on.`);
+        }
+
+        next(undefined);
+    });
+    state.requests.ask("config/read", { cwd: state.folder }, (answer) => {
+        const why = failureOf(answer);
+
+        if (why !== undefined && !heard) {
+            state.log(`Codex did not say its configuration (${why}): the chat opens with the player's own MCP servers on.`);
+        }
+
+        const config = isObject(answer.result) && isObject(answer.result.config) ? answer.result.config : {};
+        next(config.mcp_servers);
     });
 }
 
@@ -62,13 +107,13 @@ export function turnCompleted(state: State, params: Message): void
     }
 }
 
-/** An account Codex needs and has not: it would ask for a sign-in in a terminal the table does not have. An answer that failed says nothing against it. */
+/** An account Codex needs and has not: the player signs in from the page. An answer that failed says nothing against it. */
 function accountRead(state: State, answer: Message): void
 {
     const read = isObject(answer.result) ? answer.result : {};
 
     if (failureOf(answer) === undefined && read.account === null && read.requiresOpenaiAuth === true) {
-        refused(state, "Codex is not signed in: run codex login in a terminal, then try again");
+        refused(state, "Codex is not signed in on this computer: sign in to Codex, then open the chat again", "signin");
         return;
     }
 
@@ -80,7 +125,9 @@ function openThread(state: State): void
 {
     const effort = state.model.effort;
     // The web is searched only where the table allows it; the sandbox lets Codex's commands write nothing, so that a write must ask.
-    const config = { ...(effort === undefined ? {} : { model_reasoning_effort: effort }), ...(state.allowed.includes("web") ? {} : { web_search: "disabled" }) };
+    // The player's own MCP servers are turned off for this thread (not yet tried on a thread taken up, nor on a subagent's).
+    const servers = state.others.length === 0 ? {} : { mcp_servers: Object.fromEntries(state.others.map((name) => [name, { enabled: false }])) };
+    const config = { ...(effort === undefined ? {} : { model_reasoning_effort: effort }), ...(state.allowed.includes("web") ? {} : { web_search: "disabled" }), ...servers };
     const options = { cwd: state.folder, model: state.model.asked, approvalPolicy: "on-request", sandbox: "read-only", config };
     const resumed = state.resumed;
 
@@ -110,6 +157,59 @@ function threadOpened(state: State, answer: Message): void
         state.model.confirmed = asked;
         chatReady(state);
     }
+}
+
+/**
+ * Another model asked in the open chat, and the effort where given: set on the thread now, the player's next words held until the thread's settings confirm
+ * them; an error, settings that name others, or none within the wait, and the chat goes on with those it ran before.
+ */
+export function changeModel(state: State, model: string, effort: string | undefined): void
+{
+    const { asked, effort: running, confirmed } = state.model;
+    const before = { asked, ...(running === undefined ? {} : { effort: running }), ...(confirmed === undefined ? {} : { confirmed }) };
+    state.ready = false;
+    state.model = { asked: model, ...(effort === undefined ? {} : { effort }), ...(confirmed === undefined ? {} : { confirmed }), before };
+    state.cancelReadyWait = state.later(changeWait, () => changeRefused(state, before, `the host did not confirm the model ${model} within ${String(changeWait / 1000)} seconds`));
+    state.requests.ask("thread/settings/update", { threadId: state.thread, model, ...(effort === undefined ? {} : { effort }) }, (answer) => {
+        const why = failureOf(answer);
+
+        if (why !== undefined) {
+            changeRefused(state, before, `the host did not take the model ${model}: ${why}`);
+        }
+    });
+}
+
+/** The thread's settings while a change waits: those asked confirm it, told at once; any others refuse it. */
+export function changeSettled(state: State, model: unknown, effort: unknown): void
+{
+    const { asked, effort: askedEffort, before } = state.model;
+
+    if (before === undefined) {
+        return;
+    }
+
+    if (model !== asked) {
+        changeRefused(state, before, `the host was asked for the model ${asked} and runs ${typeof model === "string" ? model : "another, unnamed"}`);
+    } else if (askedEffort !== undefined && effort !== askedEffort) {
+        changeRefused(state, before, `the host was asked for the effort ${askedEffort} and runs ${typeof effort === "string" ? effort : "another, unnamed"}`);
+    } else {
+        state.model = { asked, confirmed: asked, ...(askedEffort === undefined ? {} : { effort: askedEffort }) };
+        modelChanged(state, asked, undefined, asked);
+        chatReady(state);
+    }
+}
+
+/** Codex did not take the model or effort asked in the open chat: the chat goes on with those it ran before, its next turn's start naming them again. */
+function changeRefused(state: State, before: Before, why: string): void
+{
+    if (state.model.before !== before) {
+        return;
+    }
+
+    const asked = state.model.asked;
+    state.model = before;
+    tell(state, { type: "changeRefused", asked, model: before.asked, ...(before.effort === undefined ? {} : { effort: before.effort }), why });
+    chatReady(state);
 }
 
 /** Codex took the words, and names the turn; one that did not fails the turn, or ends it as interrupted where the table asked it to stop. */

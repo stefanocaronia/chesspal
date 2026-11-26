@@ -110,8 +110,9 @@ function commandTool(actions: unknown, cwd: unknown): CodexTool
 }
 
 /**
- * More permissions asked for a command: the network alone is fetching, writing is writing, reading alone is a read of the paths asked. Anything in a shape
- * the table does not know, or more than one of these, is of kind other; what is granted is only what was read.
+ * More permissions asked for a command: the network alone is a command's own, never a page the AI opens, so of the shell's kind; writing is writing,
+ * reading alone is a read of the paths asked. Anything in a shape the table does not know, or more than one of these, is of kind other; what is granted is
+ * only what was read.
  */
 function permissionsTool(permissions: unknown): CodexTool
 {
@@ -132,7 +133,7 @@ function permissionsTool(permissions: unknown): CodexTool
     }
 
     if (network.enabled === true) {
-        return { name: "permissions", kind: "fetch", paths: [], granted: { network: { enabled: true } } };
+        return { name: "permissions", kind: "shell", paths: [] };
     }
 
     if (write.length > 0) {

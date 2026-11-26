@@ -1,8 +1,7 @@
-// The models Claude Code offers on this computer: its program started with no tool and no MCP server, asked by the protocol's first request, then stopped.
+// The models Claude Code offers on this computer: its program started with no tool and no MCP server, asked by the protocol's first request, then let go.
 // Its answer holds the account too: nothing of it but the models is read.
-import { type HostModel, isHostName, laterByTimer, type ModelsOptions } from "../chat.ts";
+import { type HostModel, hostModels, isHostName, type ModelsOptions } from "../chat.ts";
 import { isObject } from "../lines.ts";
-import { type LineProcess, startLineProcess } from "../process.ts";
 import { settingArguments, streamArguments } from "./program.ts";
 import { controlRequest } from "./protocol.ts";
 
@@ -14,44 +13,24 @@ const mostModels = 40;
 const mostName = 100;
 const mostAbout = 300;
 
-/** The models Claude Code offers, as its first answer lists them; an empty list where it does not answer in time, fails or cannot start. */
+/**
+ * The models Claude Code offers, as its first answer lists them, its program then let go to end by itself; an empty list where it does not answer in time,
+ * fails or cannot start.
+ */
 export function claudeModels(options: ModelsOptions): Promise<HostModel[]>
 {
-    const start = options.start ?? startLineProcess;
-    const later = options.later ?? laterByTimer;
+    const args = [...streamArguments, ...settingArguments, "--disable-slash-commands", "--tools", ""];
 
-    return new Promise((done) => {
-        let host: LineProcess | undefined;
-        let finished = false;
-
-        const finish = (models: HostModel[]): void => {
-            if (!finished) {
-                finished = true;
-                cancel();
-                host?.stop();
-                done(models);
-            }
-        };
-
-        const cancel = later(answerWait, () => finish([]));
-
-        try {
-            const args = [...options.program.args, ...streamArguments, ...settingArguments, "--disable-slash-commands", "--tools", ""];
-            host = start(options.program.command, args, { cwd: options.folder, env: options.environment, errors: () => undefined });
-        } catch {
-            finish([]);
-            return;
-        }
-
+    return hostModels(options, args, answerWait, (host, answer) => {
         host.onLine((line) => {
-            const answer = answerOf(line);
+            const models = answerOf(line);
 
-            if (answer !== undefined) {
-                finish(answer);
+            if (models !== undefined) {
+                answer(models);
             }
         });
-        host.onEnd(() => finish([]));
         host.write(JSON.stringify(controlRequest(requestId, { subtype: "initialize" })));
+        return undefined;
     });
 }
 
@@ -74,12 +53,17 @@ function answerOf(line: string): HostModel[] | undefined
     return answer.subtype === "success" && isObject(answer.response) ? modelsOf(answer.response.models) : [];
 }
 
-/** The models listed, each once, but the account's own default, which the table never names, and any whose id the program could read as an option. */
+/**
+ * The models listed, each once, but the account's own default, which the table never names, and any whose id the program could read as an option; the
+ * first that is the model the default stands for is the one advised.
+ */
 function modelsOf(listed: unknown): HostModel[]
 {
     const models: HostModel[] = [];
+    const entries = Array.isArray(listed) ? listed : [];
+    const standsFor = entries.filter(isObject).find((entry) => entry.value === "default")?.resolvedModel;
 
-    for (const entry of Array.isArray(listed) ? listed : []) {
+    for (const entry of entries) {
         if (models.length >= mostModels) {
             break;
         }
@@ -90,7 +74,8 @@ function modelsOf(listed: unknown): HostModel[]
 
         const name = typeof entry.displayName === "string" && entry.displayName.trim() !== "" ? entry.displayName.trim().slice(0, mostName) : entry.value;
         const about = typeof entry.description === "string" && entry.description.trim() !== "" ? entry.description.trim().slice(0, mostAbout) : undefined;
-        models.push({ id: entry.value, name, ...(about === undefined ? {} : { about }), efforts: effortsOf(entry.supportedEffortLevels) });
+        const advised = typeof standsFor === "string" && entry.resolvedModel === standsFor && !models.some((model) => model.advised === true);
+        models.push({ id: entry.value, name, ...(about === undefined ? {} : { about }), efforts: effortsOf(entry.supportedEffortLevels), ...(advised ? { advised: true as const } : {}) });
     }
 
     return models;

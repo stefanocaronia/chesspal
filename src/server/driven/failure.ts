@@ -16,7 +16,7 @@ export function failureOf(why: string, number: number): ChatFailure
 /** The code of a host's words: the account's sign-in and limits first, as a program that ended may say why after its exit code. */
 export function failureCode(why: string): FailureCode
 {
-    if (/not logged in|please run \/login|invalid api key|oauth token (?:has )?expired|authentication_error/i.test(why)) {
+    if (/not logged in|not signed in|please run \/login|invalid api key|oauth token (?:has )?expired|authentication_error/i.test(why)) {
         return "not-signed-in";
     }
 

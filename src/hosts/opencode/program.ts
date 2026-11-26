@@ -19,10 +19,13 @@ export function openCodeProgram(environment: NodeJS.ProcessEnv, platform: string
     return found === undefined ? npmProgram(npmPackage, binName, environment, platform) : { command: found, args: [] };
 }
 
-/** The environment of OpenCode started by the table: the table's own, which is the player's, without what belongs to another chat or shell. */
+/**
+ * The environment of OpenCode started by the table: the table's own, which is the player's, without what belongs to another chat or shell, and without
+ * Claude Code's own instructions of the player's, which OpenCode would read where it has none of its own.
+ */
 export function openCodeEnvironment(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv
 {
-    return Object.fromEntries(Object.entries(environment).filter(([name]) => !dropped.test(name)));
+    return { ...Object.fromEntries(Object.entries(environment).filter(([name]) => !dropped.test(name))), OPENCODE_DISABLE_CLAUDE_CODE: "1" };
 }
 
 /** The environment of OpenCode in a folder: it takes the folder it works in from PWD, not from where its process starts. */

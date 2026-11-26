@@ -127,14 +127,36 @@ async function serveMcp(): Promise<void>
     process.stdout.write("", () => process.exit(piped));
 }
 
-/** The table, until it closes, and the chats it drives: `chesspal` alone starts it apart from the terminal. */
+/**
+ * The table, until it closes, and the chats it drives: `chesspal` alone starts it apart from the terminal. However it ends, idle, asked to quit, started
+ * again for an update, at a signal or an error nobody caught, it waits for the programs it started to end by themselves, `programsWait` at most, before
+ * its exit: on Windows the exit stops them at once, and a host stopped while it renews the player's sign-in signs them out.
+ */
 async function serveTable(): Promise<void>
 {
-    const [{ npmUpdater, startTable, tableTimes, terminalChats }, { drivenChats }, { defaultContext }] = await Promise.all([
+    const [{ npmUpdater, programsWait, startTable, tableTimes, terminalChats }, { drivenChats }, { defaultContext }, { childrenEnded, guardProcess }] = await Promise.all([
         import("../server/table/index.ts"),
         import("../server/driven/index.ts"),
         import("../commands/index.ts"),
+        import("../hosts/index.ts"),
     ]);
+    const log = (line: string): void =>
+        void process.stderr.write(`${line}
+`);
+    const programsEnded = (): Promise<boolean> => childrenEnded("the table", programsWait, log);
+    let close = (): void => undefined;
+    const exit = (code: number): void => void process.stdout.write("", () => process.exit(code));
+
+    // An error nobody caught closes the table as a quit does, and ends it with 1 once its programs ended.
+    const failed = (): void => {
+        process.exitCode = 1;
+        close();
+    };
+
+    const unguard = guardProcess("chesspal table", "the table", log, failed, exit, programsWait);
+    const stop = (): void => close();
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
 
     try {
         const context = defaultContext();
@@ -142,14 +164,25 @@ async function serveTable(): Promise<void>
         const chesspal = [process.execPath, ...process.execArgv, process.argv[1] ?? ""];
         const places = async () => (await import("../server/places/index.ts")).tablePlaces(context);
         const chats = drivenChats(context, { terminal: terminalChats(context, chesspal), places, chesspal });
-        const table = await startTable(context, tableTimes, chats, npmUpdater(context));
+        close = () => void chats.close?.();
+        const table = await startTable(context, tableTimes, chats, npmUpdater(context), programsEnded);
         console.log(table === undefined ? "Another Chesspal table, started at the same time, is open: this one closes." : `Chesspal's table: ${table.url}`);
+
+        if (table !== undefined) {
+            close = () => void table.close();
+        }
+
         await table?.closed;
     } catch (error) {
         console.error((error as Error).message);
         process.exitCode = 1;
+        close();
+        await programsEnded();
     }
 
-    // Closed, the table waits for no host's models still being read: `opencode models` takes seconds when it must start OpenCode's background service, less once it runs.
-    process.stdout.write("", () => process.exit());
+    process.off("SIGINT", stop);
+    process.off("SIGTERM", stop);
+    unguard();
+    // Closed, and its programs ended or waited for: the table waits for nothing else, as a list of models still being read.
+    exit(typeof process.exitCode === "number" ? process.exitCode : 0);
 }

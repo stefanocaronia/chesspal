@@ -27,6 +27,12 @@ export interface TableTimes
 /** Five minutes with no browser and no chat, looked at every fifteen seconds (D-104). */
 export const tableTimes: TableTimes = { idle: 5 * 60_000, every: 15_000 };
 
+/**
+ * How long `chesspal table`, once closed, waits for the programs it started to end by themselves before its exit stops them: on Windows at once, which can
+ * sign the player out of a host renewing its sign-in. A chat let go is stopped when its driver's grace of ten seconds is over; the rest is a margin.
+ */
+export const programsWait = 35_000;
+
 /** A table that answers on its ports: its address, port and version, and the folder of the chat attached to it, when one is. */
 export interface TableFound
 {
@@ -40,9 +46,16 @@ export interface TableFound
 /**
  * Starts the table on the context's data folder, its folder set up as init does, its page opening chats through `chats`: undefined when another table
  * started at the same time took a lower port, since a table's ports are its lock. It closes once no page has been open, no chat attached and no request
- * come, for `times.idle`; with `updater`, its page updates Chesspal, and a new table starts from it once this one has closed (D-108).
+ * come, for `times.idle`; with `updater`, its page updates Chesspal, and a new table starts from it once this one has closed (D-108). It has closed only
+ * once `programsEnded` settled, which `chesspal table` gives as the wait for the programs it started, the new table started after it.
  */
-export async function startTable(context: Context, times: TableTimes = tableTimes, chats?: TableChats, updater?: TableUpdater): Promise<Table | undefined>
+export async function startTable(
+    context: Context,
+    times: TableTimes = tableTimes,
+    chats?: TableChats,
+    updater?: TableUpdater,
+    programsEnded: () => Promise<unknown> = () => Promise.resolve(),
+): Promise<Table | undefined>
 {
     const folder = tableFolder(context.home());
     setUpTable(folder, context.platform, context.userHome?.());
@@ -73,10 +86,16 @@ export async function startTable(context: Context, times: TableTimes = tableTime
     const watch = closeWhenIdle(page, () => context.now().getTime() - lastUsed, used, times, quit);
     const closed = quitting.then(async () => {
         clearInterval(watch);
-        // The chats it drives close with it: no host's process is left behind.
-        await chats?.close?.();
-        // Its ports free, the new table takes the first of them, where the pages open look for it.
-        await page.close();
+
+        try {
+            // The chats it drives close with it, their programs let go to end by themselves.
+            await chats?.close?.();
+            // Its ports free, the new table takes the first of them, where the pages open look for it.
+            await page.close();
+        } finally {
+            // No program it started is still at work, or the wait is over: only then has it closed, and the new table starts.
+            await programsEnded().catch(() => undefined);
+        }
 
         if (startAgain) {
             updater?.startAgain();

@@ -62,14 +62,16 @@ describe("the models Claude Code offers", () => {
         });
         expect(fake.written).toEqual([ask]);
         expect(fake.problems).toEqual([]);
+        // The model the account's default stands for is the one advised.
         expect(read).toEqual([
-            { id: "opus", name: "Opus 5.5", about: "For complex work and everyday tasks", efforts },
+            { id: "opus", name: "Opus 5.5", about: "For complex work and everyday tasks", efforts, advised: true },
             { id: "claude-fable-5-2", name: "Fable 5.2", about: "For your toughest challenges", efforts },
             { id: "sonnet", name: "Sonnet 5.5", about: "Most efficient for simpler tasks", efforts },
             { id: "claude-haiku-4-5-20251001", name: "Haiku 4.5", about: "Fastest for quick answers", efforts: [] },
             { id: "odd", name: "odd", efforts: [] },
         ]);
-        expect(fake.stops).toBe(1);
+        expect(fake.inputClosed).toBe(true);
+        expect(fake.stops).toBe(0);
     });
 
     it("keep nothing of the account the answer holds", async () => {
@@ -87,7 +89,7 @@ describe("the models Claude Code offers", () => {
         expect((await asking(answered(many)).models).map((model) => model.id)).toEqual(many.slice(0, 40).map((model) => model.value));
     });
 
-    it("are none, the program stopped, where it does not answer within ten seconds", async () => {
+    it("are none where it does not answer within ten seconds, the program stopped only ten seconds later", async () => {
         const { fake, clock, models } = asking([{ dir: "in", msg: ask }]);
         let done = false;
         void models.then(() => (done = true));
@@ -97,22 +99,91 @@ describe("the models Claude Code offers", () => {
         expect(fake.stops).toBe(0);
         clock.advance(1);
         expect(await models).toEqual([]);
+        expect(fake.stops).toBe(0);
+        clock.advance(10_000);
         expect(fake.stops).toBe(1);
     });
 
-    it("are none, the program stopped, where its answer is an error, no JSON, or never comes as it ends", async () => {
+    it("are none, the program let go, where its answer is an error or no JSON; none, nothing stopped, where it ends without one", async () => {
         const failed = asking([{ dir: "in", msg: ask }, { dir: "out", msg: { type: "control_response", response: { subtype: "error", request_id: "chesspal-models", error: "no" } } }]);
         expect(await failed.models).toEqual([]);
-        expect(failed.fake.stops).toBe(1);
+        expect(failed.fake.inputClosed).toBe(true);
+        expect(failed.fake.stops).toBe(0);
 
         const garbled = asking([{ dir: "in", msg: ask }, { dir: "out", msg: {}, raw: "Not logged in" }]);
         expect(await garbled.models).toEqual([]);
-        expect(garbled.fake.stops).toBe(1);
+        expect(garbled.fake.inputClosed).toBe(true);
 
         const ended = asking([{ dir: "in", msg: ask }]);
         ended.fake.end("exit code 1");
         expect(await ended.models).toEqual([]);
-        expect(ended.fake.stops).toBe(1);
+        expect(ended.fake.stops).toBe(0);
+    });
+
+    it("let the program end by itself once it answered: its input closed, the list given at once, stopped only ten seconds later if it is still there", async () => {
+        const logged: string[] = [];
+
+        const ends = (): { fake: ReturnType<typeof fakeHost>; clock: ReturnType<typeof manualClock>; models: Promise<HostModel[]>; } => {
+            const fake = fakeHost(answered(listed));
+            const clock = manualClock();
+            const models = claudeModels({ folder: "/players/test", program: { command: "claude-program", args: [] }, environment: {}, start: fake.start, later: clock.later, log: (line) => logged.push(line) });
+            return { fake, clock, models };
+        };
+
+        // It ends by itself within the grace: never stopped.
+        const leaving = ends();
+        expect(await leaving.models).toHaveLength(5);
+        expect(leaving.fake.inputClosed).toBe(true);
+        leaving.clock.advance(3000);
+        leaving.fake.end("exit code 0");
+        leaving.clock.advance(20_000);
+        expect(leaving.fake.stops).toBe(0);
+        expect(logged).toEqual(["started for its models.", "ended by itself once asked its models."]);
+
+        // Still there after the grace: stopped then, not before.
+        logged.length = 0;
+        const staying = ends();
+        expect(await staying.models).toHaveLength(5);
+        staying.clock.advance(9999);
+        expect(staying.fake.stops).toBe(0);
+        staying.clock.advance(1);
+        expect(staying.fake.stops).toBe(1);
+        expect(logged).toEqual(["started for its models.", "was stopped 10 s after it gave its models."]);
+    });
+
+    it("let go a program that did not answer in time too, never stopped at once, and say in the log, without what it printed, how each one went", async () => {
+        const logged: string[] = [];
+        const fake = fakeHost([{ dir: "in", msg: ask }]);
+        const clock = manualClock();
+        const models = claudeModels({ folder: "/players/test", program: { command: "claude-program", args: [] }, environment: {}, start: fake.start, later: clock.later, log: (line) => logged.push(line) });
+        clock.advance(10_000);
+        expect(await models).toEqual([]);
+        expect(fake.inputClosed).toBe(true);
+        expect(fake.stops).toBe(0);
+        clock.advance(9_999);
+        expect(fake.stops).toBe(0);
+        clock.advance(1);
+        expect(fake.stops).toBe(1);
+        clock.advance(60_000);
+        expect(fake.stops).toBe(1);
+
+        const ended = fakeHost([{ dir: "in", msg: ask }]);
+        const lost = claudeModels({ folder: "/players/test", program: { command: "claude-program", args: [] }, environment: {}, start: ended.start, later: clock.later, log: (line) => logged.push(line) });
+        ended.end("exit code 1");
+        await lost;
+
+        const start = (): never => {
+            throw new Error("spawn ENOENT");
+        };
+
+        await claudeModels({ folder: "/players/test", program: { command: "nowhere", args: [] }, environment: {}, start, later: clock.later, log: (line) => logged.push(line) });
+        expect(logged).toEqual([
+            "started for its models.",
+            "was stopped: it did not give its models within 10 s, nor ended in 10 s more.",
+            "started for its models.",
+            "ended before it gave its models (exit code 1).",
+            "could not start for its models: spawn ENOENT.",
+        ]);
     });
 
     it("are none, with no wait left, where the program cannot start", async () => {
@@ -195,7 +266,7 @@ describe("the keeper of the models", () => {
         expect(keeper.known("claudeCode")).toEqual(sonnet);
     });
 
-    it("keeps the last list known when an ask fails or lists nothing, and asks again only ten minutes later", async () => {
+    it("keeps the last list known when an ask fails or lists nothing, and asks again a minute later, never ten", async () => {
         const { keeper, asks, changes, move } = keeping();
         keeper.models("claudeCode");
         await asks[0]!.answer(opus);
@@ -204,11 +275,39 @@ describe("the keeper of the models", () => {
         await asks[1]!.answer(new Error("the host failed"));
         expect(keeper.models("claudeCode")).toEqual(opus);
         expect(asks).toHaveLength(2);
-        move(10 * 60_000);
+        move(60_000 - 1);
+        keeper.models("claudeCode");
+        expect(asks).toHaveLength(2);
+        move(1);
         keeper.models("claudeCode");
         await asks[2]!.answer([]);
         expect(keeper.known("claudeCode")).toEqual(opus);
         expect(changes()).toBe(1);
+        move(60_000);
+        keeper.models("claudeCode");
+        expect(asks).toHaveLength(4);
+    });
+
+    it("asks a host again at once once its account changed, as after the player signed in; an answer from before the change does not stand", async () => {
+        const { keeper, asks, move } = keeping();
+        keeper.models("claudeCode");
+        await asks[0]!.answer([]);
+        keeper.forget("claudeCode");
+        expect(keeper.models("claudeCode")).toEqual([]);
+        expect(asks).toHaveLength(2);
+        await asks[1]!.answer(opus);
+        expect(keeper.models("claudeCode")).toEqual(opus);
+        expect(asks).toHaveLength(2);
+
+        // Forgotten while asked: the answer is kept, and the next look asks again.
+        move(10 * 60_000);
+        keeper.models("claudeCode");
+        keeper.forget("claudeCode");
+        keeper.models("claudeCode");
+        expect(asks).toHaveLength(3);
+        await asks[2]!.answer(opus);
+        keeper.models("claudeCode");
+        expect(asks).toHaveLength(4);
     });
 
     it("takes an ask that throws at once for one that failed", async () => {

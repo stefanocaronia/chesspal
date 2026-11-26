@@ -81,6 +81,7 @@ describe("what a chat the table drives failed of", () => {
         expect(failureCode("Not logged in · Please run /login")).toBe("not-signed-in");
         expect(failureCode("the host's program ended (exit code 1): Not logged in | Please run /login")).toBe("not-signed-in");
         expect(failureCode("Invalid API key · Please run /login")).toBe("not-signed-in");
+        expect(failureCode("Claude Code is not signed in on this computer: sign in to Claude Code, then open the chat again")).toBe("not-signed-in");
         expect(failureCode("Claude AI usage limit reached|1764000000")).toBe("usage-limit");
         expect(failureCode("5-hour limit reached ∙ resets 3pm")).toBe("usage-limit");
         expect(failureCode("You've hit your usage limit.")).toBe("usage-limit");
@@ -267,6 +268,8 @@ describe("the chat the table drives", () => {
         expect(keptChat(join(home, "chats"))?.session).toBe(ai.chats[1]!.session);
         expect(chats.relaunch(tableFolder(home), undefined, true)).toBe(true);
         expect(ai.chats[1]!.closed).toBe(true);
+        // Started again clean, and closed for the update: each time its program was let go to end by itself, never stopped at once.
+        expect([...chat.closes, ...ai.chats[1]!.closes]).toEqual([true, true]);
         expect(withdrawn).toEqual(["opponent", "opponent"]);
         expect(ai.chats).toHaveLength(2);
         expect(keptChat(join(home, "chats"))).toMatchObject({ closed: false, session: undefined });
@@ -331,6 +334,38 @@ describe("the chat the table drives", () => {
         await until(() => closed, 5_000);
         expect(ai.chats[0]!.closed).toBe(true);
         expect(keptChat(join(home, "chats"))).toMatchObject({ session: ai.chats[0]!.session, closed: false });
+    }, 30_000);
+
+    it("lets the chat's program end by itself as the table closes, and has closed only once it ended", async () => {
+        let ended = (): void => undefined;
+        let waited = false;
+        const programEnded = new Promise<void>((done) => (ended = done));
+        const { table, ai } = await drivenTable(undefined, undefined, undefined, true, undefined, () => {
+            waited = true;
+            return programEnded;
+        });
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        let closed = false;
+        const closing = table.close().then(() => (closed = true));
+        await until(() => ai.chats[0]!.closed);
+        expect(ai.chats[0]!.closes).toEqual([true]);
+
+        // Its page has gone, and the table waits for the program it started.
+        await until(() => waited);
+        expect(closed).toBe(false);
+        ended();
+        await closing;
+        expect(closed).toBe(true);
+    }, 30_000);
+
+    it("lets go the program of a chat that failed, as the program of any chat it closes", async () => {
+        const { table, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        ai.chats[0]!.emit({ type: "ended", why: "the host's program ended (exit code 1)" });
+        await until(() => ai.chats[0]!.closed);
+        expect(ai.chats[0]!.closes).toEqual([true]);
     }, 30_000);
 });
 
@@ -1243,6 +1278,8 @@ interface FakeChat
     /** What the AI does at its next turns woken by the bell, in order; none does nothing. One that gives "failed" fails as the host's API would. */
     readonly turns: ((client: Client) => Promise<void | "failed">)[];
     closed: boolean;
+    /** How each close asked its program to end: let go to end by itself (true), or stopped at once. */
+    readonly closes: boolean[];
     idle(): boolean;
     emit(event: HostEvent): void;
     /** A turn the host begins by itself, with no words of the table's, which ends once `play` has. */
@@ -1316,7 +1353,7 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver): { c
         emit({ type: "turnEnd", reason: "done" });
     };
 
-    const chat: FakeChat = { options, session, sent: [], calls: [], answers: [], ends: [], turns: [], closed: false, idle: () => !busy, emit, ownTurn };
+    const chat: FakeChat = { options, session, sent: [], calls: [], answers: [], ends: [], turns: [], closed: false, closes: [], idle: () => !busy, emit, ownTurn };
 
     const turn = async (text: string): Promise<void> => {
         // A host that cannot sign in fails its first turn before it says which chat it is.
@@ -1364,8 +1401,9 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver): { c
             waiting.splice(0).forEach(heard);
         },
         interrupt: () => stopTurn?.(),
-        close: () => {
+        close: (gently) => {
             chat.closed = true;
+            chat.closes.push(gently === true);
             void client?.then((sitting) => sitting.close()).catch(() => undefined);
         },
     };
@@ -1444,6 +1482,7 @@ async function drivenTable(
     given?: Context,
     switched = true,
     times: TableTimes = { idle: 60_000, every: 10 },
+    programsEnded?: () => Promise<unknown>,
 ): Promise<{ table: Table; home: string; ai: FakeDriver; terminal: ReturnType<typeof terminalChats>; context: Context; chats: TableChats; withdrawn: string[]; }>
 {
     const start = async (folder: string) => {
@@ -1458,7 +1497,7 @@ async function drivenTable(
         };
 
         const chats = drivenChats(context, { terminal: terminal.chats, places: () => watchedPlaces(context, withdrawn), driver, chesspal: ["node", "cli.js"], environment: {} });
-        const table = await startTable(context, times, chats);
+        const table = await startTable(context, times, chats, undefined, programsEnded);
 
         if (table === undefined) {
             throw new Error("The table did not start: another one holds its ports.");

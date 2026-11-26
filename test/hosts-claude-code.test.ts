@@ -121,7 +121,9 @@ describe("the chat in Claude Code", () => {
             await until((all) => all.some((event) => event.type === "ended"));
             const why = "the host did not take the model haiku: no such model";
             expect(events).toEqual([{ type: "turnEnd", reason: "failed", why }, { type: "ended", why }]);
-            expect(host.stops).toBe(1);
+            // Let go to end by itself: its input closed, never stopped at once.
+            expect(host.inputClosed).toBe(true);
+            expect(host.stops).toBe(0);
             expect(chat.send("Again")).toBe(false);
             expect(host.written.filter(isPlayerWords)).toEqual([]);
             expect(host.problems).toEqual([]);
@@ -145,6 +147,9 @@ describe("the chat in Claude Code", () => {
             clock.advance(1);
             const why = "the host did not confirm the model haiku within 30 seconds";
             expect(events).toEqual([{ type: "turnEnd", reason: "failed", why }, { type: "ended", why }]);
+            expect(host.inputClosed).toBe(true);
+            expect(host.stopped).toBe(false);
+            clock.advance(10_000);
             expect(host.stopped).toBe(true);
             expect(chat.send("Again")).toBe(false);
             expect(host.written.filter(isPlayerWords)).toEqual([]);
@@ -154,6 +159,8 @@ describe("the chat in Claude Code", () => {
             const { chat, host, clock, events } = play([], {}, { ignore: ["set_model"] });
             clock.advance(30_000);
             expect(events).toEqual([{ type: "ended", why: "the host did not confirm the model haiku within 30 seconds" }]);
+            expect(host.inputClosed).toBe(true);
+            clock.advance(10_000);
             expect(host.stopped).toBe(true);
             expect(chat.send("Hello")).toBe(false);
         });
@@ -342,12 +349,14 @@ describe("the chat in Claude Code", () => {
             expect(((host.written.at(-1)?.response as Message).response as Message).behavior).toBe("allow");
         });
 
-        it("never lets the AI fetch from the web: a fetch is not a search", async () => {
-            const { chat, host, events, until } = play(turn("Look", asks("p1", "WebFetch", { url: "https://example.com/?q=secret" }), answered("p1")), { allowed: ["chesspal", "read", "web", "agent"] });
-            chat.send("Look");
-            await until((all) => turnEnds(all).length === 1);
-            expect(events).toContainEqual({ type: "permission", name: "WebFetch", kind: "fetch", allowed: false });
-            expect(((host.written.at(-1)?.response as Message).response as Message).behavior).toBe("deny");
+        it("lets the AI fetch a page of the web only where fetching is given: a fetch is not a search", async () => {
+            for (const [allowed, behavior] of [[["chesspal", "read", "web", "agent"], "deny"], [["chesspal", "read", "web", "fetch", "agent"], "allow"]] as const) {
+                const { chat, host, events, until } = play(turn("Look", asks("p1", "WebFetch", { url: "https://example.com/?q=secret" }), answered("p1")), { allowed: [...allowed] });
+                chat.send("Look");
+                await until((all) => turnEnds(all).length === 1);
+                expect(events).toContainEqual({ type: "permission", name: "WebFetch", kind: "fetch", allowed: behavior === "allow" });
+                expect(((host.written.at(-1)?.response as Message).response as Message).behavior).toBe(behavior);
+            }
         });
 
         it("refuses with an error any other request of the host, between turns too", async () => {

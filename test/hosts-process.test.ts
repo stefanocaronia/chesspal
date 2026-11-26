@@ -1,7 +1,9 @@
 import { spawn, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type LineProcess, startLineProcess, stopTree, whenEnded } from "../src/hosts/process.ts";
+import { childrenEnded, guardProcess, type LineProcess, startLineProcess, stopTree, whenEnded } from "../src/hosts/process.ts";
 
 // spawnSync watched, as taskkill runs through it on Windows; everything else as it is.
 vi.mock("node:child_process", async (original) => {
@@ -42,6 +44,74 @@ describe("process", () => {
         child.write("two");
         await until(() => lines.length === 2);
         expect(lines).toEqual(["heard one", "heard two"]);
+    }, 15_000);
+
+    it("closes its input, which a program reading it to the end takes for the end of its work, and writes nothing after", async () => {
+        const child = node("process.stdin.on('data', () => undefined); process.stdin.on('end', () => { console.log('input closed'); process.exit(4); });");
+        const lines: string[] = [];
+        const ends: string[] = [];
+        child.onLine((line) => lines.push(line));
+        child.onEnd((reason) => ends.push(reason));
+        child.closeInput();
+        child.write("too late");
+        child.closeInput();
+        await until(() => ends.length > 0);
+        expect(lines).toEqual(["input closed"]);
+        expect(ends).toEqual(["exit code 4"]);
+    }, 15_000);
+
+    it("waits until the processes it started ended, at most as long as asked, says whether none runs, and logs how, with the time and those still at work", async () => {
+        // What the tests before left ends first.
+        await childrenEnded("the test", 10_000, () => undefined, { every: 10 });
+        const script = join(mkdtempSync(join(tmpdir(), "chesspal-process-")), "program.cjs");
+        writeFileSync(script, "setTimeout(() => process.exit(0), 500);");
+        const child = startLineProcess(process.execPath, [script], { cwd: tmpdir(), env: process.env });
+        started.push(child.pid);
+        const ends: string[] = [];
+        const lines: string[] = [];
+        child.onEnd((reason) => ends.push(reason));
+        expect(await childrenEnded("the table", 100, (line) => lines.push(line), { every: 10 })).toBe(false);
+        expect(lines).toEqual([`${lines[0]?.slice(0, 24)} The exit of the table stops 1 program it started, still at work after 100 ms: ${basename(process.execPath)} ${script} (process ${child.pid}).`]);
+        expect(lines[0]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z /);
+
+        expect(await childrenEnded("the table", 10_000, (line) => lines.push(line), { every: 10 })).toBe(true);
+        expect(lines[1]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z The programs the table started ended by themselves in \d+ ms\.$/);
+        expect(ends).toEqual(["exit code 0"]);
+    }, 15_000);
+
+    it("on an exception nobody caught cleans up, lets a program it started end by itself, as one saving once its input closed, then exits with 1", async () => {
+        await childrenEnded("the test", 10_000, () => undefined, { every: 10 });
+        const saved = join(mkdtempSync(join(tmpdir(), "chesspal-process-")), "saved.txt");
+        const child = node(`process.stdin.on('data', () => undefined); process.stdin.on('end', () => setTimeout(() => { require('node:fs').writeFileSync(${JSON.stringify(saved)}, 'saved'); process.exit(0); }, 500)); console.log('ready');`);
+        const lines: string[] = [];
+        child.onLine((line) => lines.push(line));
+        await until(() => lines.length > 0);
+        const logged: string[] = [];
+        const exits: number[] = [];
+        const before = process.listeners("uncaughtException");
+
+        // A cleanup that fails after closing the program's input: logged, and the wait and the exit still come.
+        const cleanup = (): void => {
+            child.closeInput();
+            throw new Error("cleanup broken");
+        };
+
+        const unguard = guardProcess("chesspal table", "the table", (line) => logged.push(line), cleanup, (code) => exits.push(code), 10_000);
+
+        try {
+            const thrown = process.listeners("uncaughtException").find((one) => !before.includes(one));
+            thrown?.(new Error("broken"), "uncaughtException");
+            expect(exits).toEqual([]);
+            await until(() => exits.length > 0);
+            expect(exits).toEqual([1]);
+            expect(readFileSync(saved, "utf8")).toBe("saved");
+            expect(logged[0]).toContain("chesspal table: an error nobody caught; the table ends. Error: broken");
+            expect(logged[1]).toContain("chesspal table: the table could not clean up after the error. Error: cleanup broken");
+            expect(logged[2]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z The programs the table started ended by themselves in \d+ ms\.$/);
+            expect(Number(/in (\d+) ms/.exec(logged[2] ?? "")?.[1])).toBeGreaterThanOrEqual(400);
+        } finally {
+            unguard();
+        }
     }, 15_000);
 
     it("tells its end once, with the exit code", async () => {

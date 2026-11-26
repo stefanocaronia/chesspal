@@ -1,10 +1,14 @@
 // Reading Claude Code's lines: one function per type of message; a line not understood changes nothing.
 import type { ToolKind, TurnUsage } from "../chat.ts";
 import { isObject, type Message } from "../lines.ts";
-import { askToStop, endTurn, nextBlock, playing, tell, write } from "../state.ts";
+import { askToStop, endTurn, nextBlock, playing, refused, tell, write } from "../state.ts";
 import { pathOutside } from "./paths.ts";
 import { controlAnswer, controlError, toolLoaders, toolOf } from "./protocol.ts";
-import { modelConfirmed, modelRefused, type State, type Turn } from "./state.ts";
+import { changeRefused, effortRefused, modelConfirmed, modelReady, modelRefused, type State, type Turn } from "./state.ts";
+
+// What the table says where Claude Code is not signed in, as it answers a turn with a message of its own instead of the model's.
+const notSignedIn = "Claude Code is not signed in on this computer: sign in to Claude Code, then open the chat again";
+const authenticationFailed = "authentication_failed";
 
 /** One line of the host, an object: one function per type of message. */
 export function readMessage(state: State, message: Message): void
@@ -57,10 +61,20 @@ function readControlRequest(state: State, message: Message): void
     tell(state, { type: "permission", name: tool.name, kind: tool.kind, allowed });
 }
 
-/** The host answers the table: only the model's answer matters; the interrupt's is told by the turn's result. */
+/** The host answers the table: only the model's and the effort's answers matter; the interrupt's is told by the turn's result. */
 function readControlResponse(state: State, message: Message): void
 {
     const response = isObject(message.response) ? message.response : {};
+
+    if (state.model.effortRequest !== undefined && response.request_id === state.model.effortRequest) {
+        if (response.subtype === "success") {
+            modelReady(state);
+        } else {
+            effortRefused(state, `the host did not take the effort ${String(state.model.effort)}: ${typeof response.error === "string" ? response.error : "it gave no reason"}`);
+        }
+
+        return;
+    }
 
     if (response.request_id !== state.model.request || state.model.confirmed !== undefined) {
         return;
@@ -68,11 +82,15 @@ function readControlResponse(state: State, message: Message): void
 
     const asked = state.model.asked;
     const answered = isObject(response.response) ? response.response.model : undefined;
+    const before = state.model.before?.confirmed;
 
     if (response.subtype !== "success") {
-        modelRefused(state, `the host did not take the model ${asked}: ${typeof response.error === "string" ? response.error : "it gave no reason"}`);
+        changeRefused(state, `the host did not take the model ${asked}: ${typeof response.error === "string" ? response.error : "it gave no reason"}`);
     } else if (typeof answered === "string" && (answered === asked || answered.includes(asked))) {
         modelConfirmed(state, answered);
+    } else if (typeof answered === "string" && answered === before) {
+        // The host stayed on the model it ran: the change was not taken, and the chat goes on with it.
+        changeRefused(state, `the host was asked for the model ${asked} and stayed on ${answered}`);
     } else {
         modelRefused(state, `the host was asked for the model ${asked} and runs ${typeof answered === "string" ? answered : "another, unnamed"}`);
     }
@@ -137,13 +155,28 @@ function readStreamEvent(state: State, message: Message): void
     }
 }
 
-/** A whole message of the AI: its tools start; its text is told only when none of it came in pieces. */
+/**
+ * A whole message of the AI: its tools start; its text is told only when none of it came in pieces. A message the host writes itself as the player is
+ * not signed in is never the AI's words: the chat ends, saying so.
+ */
 function readAssistant(state: State, message: Message): void
 {
     const turn = aiTurn(state, message);
     const body = isObject(message.message) ? message.message : undefined;
 
+    if (turn !== undefined && message.error === authenticationFailed) {
+        refused(state, notSignedIn, "signin");
+        return;
+    }
+
     if (turn === undefined || body === undefined || !Array.isArray(body.content)) {
+        return;
+    }
+
+    // An error of the API the host words itself, as a limit of use reached: the turn fails with its words, once, and they are never the AI's.
+    if (message.is_api_error_message === true) {
+        const said = body.content.filter(isObject).flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : [])).join(" ").trim();
+        turn.failure ??= said === "" ? `the host's model failed: ${String(message.error)}` : said;
         return;
     }
 

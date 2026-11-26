@@ -1,7 +1,8 @@
 // The state every driver's chat shares and what changes it: the turn and its end, the chat's end, the waits; and the chat the table holds, made from it.
-import { type ChatOptions, EventQueue, type HostChat, type HostEvent, keepError, laterByTimer, type ToolKind, type TurnUsage, warnFailed } from "./chat.ts";
+import { type ChatOptions, type EndCode, EventQueue, graceWait, type HostChat, type HostEvent, isHostName, keepError, laterByTimer, letGo, type ToolKind, type TurnUsage, warnFailed, withoutTrace } from "./chat.ts";
 import { type Message, parsedLine } from "./lines.ts";
 import { type LineProcess, startLineProcess } from "./process.ts";
+import { tracedProcess, traceTo } from "./trace.ts";
 
 // How long the host may take to stop a turn once asked.
 const interruptWait = 10_000;
@@ -21,13 +22,17 @@ export interface Turn
     byHost?: true;
 }
 
-/** What a driver does in its host's protocol: a new turn, the player's words written, the host asked to stop a turn, a line of the host read. */
+/**
+ * What a driver does in its host's protocol: a new turn, the player's words written, the host asked to stop a turn, a line of the host read, another model
+ * asked between turns, whose confirmation makes the chat ready again.
+ */
 export interface Protocol<T extends Turn>
 {
     newTurn(): T;
     words(turn: T, text: string): void;
     stop(turn: T): void;
     read(message: Message): void;
+    change(model: string, effort: string | undefined): void;
 }
 
 /** A chat's state, as every driver keeps it; a driver's own adds what its protocol needs. */
@@ -36,6 +41,9 @@ export interface ChatState<T extends Turn = Turn>
     process: LineProcess;
     events: EventQueue;
     later: (ms: number, run: () => void) => () => void;
+    /** What the chat tells the table's log, and the host's name it says. */
+    log: (line: string) => void;
+    name: string;
     /** The chat's folder: where the host runs, and the one its tools of kind read may read. */
     folder: string;
     allowed: ToolKind[];
@@ -54,14 +62,24 @@ export interface ChatState<T extends Turn = Turn>
     protocol: Protocol<T>;
 }
 
-/** Starts the host's program in the chat's folder, `args` after its own, and the state a chat begins with, but its protocol and turn. */
-export function startHost(options: ChatOptions, args: string[]): Omit<ChatState, "protocol" | "turn">
+/** Starts the host's program, `name`, in the chat's folder, `args` after its own, and the state a chat begins with, but its protocol and turn. */
+export function startHost(options: ChatOptions, name: string, args: string[]): Omit<ChatState, "protocol" | "turn">
 {
     const start = options.start ?? startLineProcess;
     const errors: string[] = [];
-    const host = start(options.program.command, [...options.program.args, ...args], { cwd: options.folder, env: options.environment, errors: (line) => keepError(errors, line) });
+    const traced = traceTo(options.trace);
+
+    const errorLine = (line: string): void => {
+        traced("err", line);
+        keepError(errors, line);
+    };
+
+    const started = start(options.program.command, [...options.program.args, ...args], { cwd: options.folder, env: withoutTrace(options.environment), errors: errorLine });
+    const host = options.trace === undefined ? started : tracedProcess(started, traced);
     return {
         process: host,
+        log: options.log ?? (() => undefined),
+        name,
         events: new EventQueue(options.failed ?? warnFailed),
         later: options.later ?? laterByTimer,
         folder: options.folder,
@@ -83,7 +101,8 @@ export function heldChat<T extends Turn>(state: ChatState<T>, begin: () => void)
         send: (text) => send(state, text),
         onEvent: (listener) => state.events.listen(listener),
         interrupt: () => interrupt(state),
-        close: () => close(state),
+        setModel: (model, effort) => setModel(state, model, effort),
+        close: (gently) => close(state, gently === true),
     };
 }
 
@@ -123,24 +142,43 @@ export function askToStop<T extends Turn>(state: ChatState<T>, turn: T): void
             return;
         }
 
-        endChat(state, "the host did not stop its turn and was closed", turn.failure === undefined ? "interrupted" : "failed", turn.failure);
+        endChat(state, "the host did not stop its turn and was closed", turn.failure === undefined ? "interrupted" : "failed", turn.failure, "now");
     });
 }
 
-/** Ends the turn in course, the chat free for the next words, then tells it, with its tokens where the host reported them. */
-export function endTurn(state: ChatState, reason: "done" | "interrupted" | "failed", why?: string, usage?: TurnUsage): void
+/** Ends the turn in course, the chat free for the next words, then tells it, with its tokens where the host reported them and its code where it has one. */
+export function endTurn(state: ChatState, reason: "done" | "interrupted" | "failed", why?: string, usage?: TurnUsage, code?: EndCode): void
 {
     state.turn = undefined;
     state.cancelInterruptWait?.();
     state.cancelInterruptWait = undefined;
-    tell(state, { type: "turnEnd", reason, ...(why === undefined ? {} : { why }), ...(usage === undefined ? {} : { usage }) });
+    tell(state, { type: "turnEnd", reason, ...(why === undefined ? {} : { why }), ...(code === undefined ? {} : { code }), ...(usage === undefined ? {} : { usage }) });
 }
 
-/** The chat cannot play: the turn held ends failed, and the chat ends with its process. */
-export function refused(state: ChatState, why: string): void
+/**
+ * The chat cannot play: the turn held ends failed, and the chat ends, its process let go to end by itself, which still answers; `code` says why beside the
+ * words, as a player not signed in.
+ */
+export function refused(state: ChatState, why: string, code?: EndCode): void
 {
     if (!state.closed && !state.ended) {
-        endChat(state, why, "failed", why);
+        endChat(state, why, "failed", why, "gently", code);
+    }
+}
+
+/**
+ * The host confirmed the model: another after a turn was played is told now, as a turn's start would tell it, with its efforts where the driver knows them
+ * now; and a change setModel asked, by the model it `asked`, is told as taken.
+ */
+export function modelChanged(state: ChatState, model: string, efforts?: string[], asked?: string): void
+{
+    if (state.told !== undefined && state.told.model !== model) {
+        state.told = { session: state.told.session, model };
+        tell(state, { type: "session", session: state.told.session, model, ...(efforts === undefined ? {} : { efforts }) });
+    }
+
+    if (asked !== undefined) {
+        tell(state, { type: "changeTaken", model: asked });
     }
 }
 
@@ -153,7 +191,7 @@ export function processEnded(state: ChatState, reason: string): void
 
     const said = state.errors.length === 0 ? "" : `: ${state.errors.join(" | ")}`;
     const why = `the host's program ended (${reason})${said}`;
-    endChat(state, why, "failed", why, false);
+    endChat(state, why, "failed", why, "gone");
 }
 
 export function tell(state: ChatState, event: HostEvent): void
@@ -218,6 +256,17 @@ function send<T extends Turn>(state: ChatState<T>, text: string): boolean
     return true;
 }
 
+/** Another model between turns, once the chat is ready: the player's next words wait until the host confirms it. */
+function setModel<T extends Turn>(state: ChatState<T>, model: string, effort: string | undefined): boolean
+{
+    if (state.closed || state.ended || !state.ready || state.turn !== undefined || !isHostName(model) || (effort !== undefined && !isHostName(effort))) {
+        return false;
+    }
+
+    state.protocol.change(model, effort);
+    return true;
+}
+
 function interrupt<T extends Turn>(state: ChatState<T>): void
 {
     const turn = state.turn;
@@ -235,8 +284,8 @@ function interrupt<T extends Turn>(state: ChatState<T>): void
     askToStop(state, turn);
 }
 
-/** Closes the chat; its process, stopped unless it ended. */
-function close(state: ChatState): void
+/** Closes the chat; its process, unless it ended, stopped at once, or `gently` let go to end by itself. */
+function close(state: ChatState, gently: boolean): void
 {
     if (state.closed) {
         return;
@@ -246,26 +295,43 @@ function close(state: ChatState): void
     cancelWaits(state);
     state.events.close();
 
-    if (!state.ended) {
+    if (state.ended) {
+        return;
+    }
+
+    if (gently) {
+        letGoClosed(state);
+    } else {
         state.process.stop();
     }
 }
 
-/** The chat ends: its turn in course ends as given, its process is stopped unless it is gone already, and `ended` says why. */
-function endChat(state: ChatState, why: string, reason: "interrupted" | "failed", turnWhy: string | undefined, stop = true): void
+/** Lets the host's program end by itself once its chat is over, the log saying how it went. */
+function letGoClosed(state: ChatState): void
+{
+    letGo(state.process, state.later, (how) => state.log(how === "by itself" ? `${state.name} ended by itself once its chat was closed.` : `${state.name} was stopped ${String(graceWait / 1000)} s after its chat was closed.`));
+}
+
+/**
+ * The chat ends: its turn in course ends as given, its process is stopped at once, let go to end by itself (`gently`), or left as it is gone already; and
+ * `ended` says why, with its code where it has one.
+ */
+function endChat(state: ChatState, why: string, reason: "interrupted" | "failed", turnWhy: string | undefined, stop: "now" | "gently" | "gone", code?: EndCode): void
 {
     state.ended = true;
     cancelWaits(state);
 
     if (state.turn !== undefined) {
-        endTurn(state, reason, turnWhy);
+        endTurn(state, reason, turnWhy, undefined, code);
     }
 
-    if (stop) {
+    if (stop === "now") {
         state.process.stop();
+    } else if (stop === "gently") {
+        letGoClosed(state);
     }
 
-    tell(state, { type: "ended", why });
+    tell(state, { type: "ended", why, ...(code === undefined ? {} : { code }) });
 }
 
 function cancelWaits(state: ChatState): void

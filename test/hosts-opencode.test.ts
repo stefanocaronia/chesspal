@@ -65,7 +65,7 @@ describe("the chat in OpenCode", () => {
             ]);
             expect(host.written[3]!.params).toEqual({ sessionId: "ses_1", configId: "effort", value: "high" });
             expect(events).toEqual([
-                { type: "session", session: "ses_1", model },
+                { type: "session", session: "ses_1", model, efforts: ["low", "high"] },
                 { type: "text", block: 0, text: "Fine" },
                 { type: "turnEnd", reason: "done" },
             ]);
@@ -80,6 +80,70 @@ describe("the chat in OpenCode", () => {
             expect(host.problems).toEqual([]);
         });
 
+        it("sets an effort the chosen model takes, known only once it is set, and tells the table that model's efforts with the session", async () => {
+            const flow = [...begin(), ...newSession([modelOption()]), ...setting("model", model, [modelOption(model), effortOption()]), ...turn("Hello", text("Fine"))];
+            const { chat, host, events, until } = play(flow, { effort: "high" });
+            chat.send("Hello");
+            await until(() => turnEnds(events).length === 1);
+            expect(host.written.filter((message) => message.method === "session/set_config_option").map((message) => (message.params as Message).configId)).toEqual(["model", "effort"]);
+            expect(events[0]).toEqual({ type: "session", session: "ses_1", model, efforts: ["low", "high"] });
+            expect(host.problems).toEqual([]);
+        });
+
+        it("leaves out an effort the chosen model does not take, its own default kept, and plays", async () => {
+            const flow = [...begin(), ...newSession([modelOption()]), ...setting("model", model, [modelOption(model), effortOption()]), ...turn("Hello", text("Fine"))];
+            const { chat, host, events, until } = play(flow, { effort: "max" });
+            chat.send("Hello");
+            await until(() => turnEnds(events).length === 1);
+            expect(host.written.filter((message) => message.method === "session/set_config_option")).toHaveLength(1);
+            expect(events).toEqual([{ type: "session", session: "ses_1", model, efforts: ["low", "high"] }, { type: "text", block: 0, text: "Fine" }, { type: "turnEnd", reason: "done" }]);
+            expect(host.problems).toEqual([]);
+        });
+
+        it("in an open chat, sets the new model and then the effort it takes, and tells its efforts", async () => {
+            const flow = [
+                ...begin(),
+                ...newSession([modelOption()]),
+                ...setting("model", model, [modelOption(model)]),
+                ...turn("Hello", text("Fine")),
+                ...setting("model", "opencode/free", [modelOption("opencode/free"), effortOption()]),
+                ...turn("Again", text("Sure", "m2")),
+            ];
+            const { chat, host, events, until } = play(flow);
+            chat.send("Hello");
+            await until(() => turnEnds(events).length === 1);
+            expect(chat.setModel?.("opencode/free", "low")).toBe(true);
+            await until(() => events.filter((event) => event.type === "session").length === 2);
+            chat.send("Again");
+            await until(() => turnEnds(events).length === 2);
+            expect(host.written.filter((message) => message.method === "session/set_config_option").map((message) => (message.params as Message).value)).toEqual([model, "opencode/free", "low"]);
+            expect(events.filter((event) => event.type === "session")).toEqual([
+                { type: "session", session: "ses_1", model, efforts: [] },
+                { type: "session", session: "ses_1", model: "opencode/free", efforts: ["low", "high"] },
+            ]);
+            expect(host.problems).toEqual([]);
+        });
+
+        it("in an open chat, sets another effort of the same model, telling no new session", async () => {
+            const flow = [
+                ...begin(),
+                ...newSession([modelOption(), effortOption()]),
+                ...setting("model", model, [modelOption(model), effortOption()]),
+                ...turn("Hello", text("Fine")),
+                ...turn("Again", text("Sure", "m2")),
+            ];
+            const { chat, host, events, until } = play(flow);
+            chat.send("Hello");
+            await until(() => turnEnds(events).length === 1);
+            expect(chat.setModel?.(model, "low")).toBe(true);
+            await ticksUntil(() => chat.send("Again"));
+            await until(() => turnEnds(events).length === 2);
+            expect(host.written.filter((message) => message.method === "session/set_config_option").map((message) => (message.params as Message).value)).toEqual([model, model, "low"]);
+            expect(events.filter((event) => event.type === "session")).toEqual([{ type: "session", session: "ses_1", model, efforts: ["low", "high"] }]);
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done" }, { type: "turnEnd", reason: "done" }]);
+            expect(host.problems).toEqual([]);
+        });
+
         it("ends the chat, writing none of the player's words, when the agent runs another model than the one asked", async () => {
             const { chat, host, events, until } = play([...begin(), ...newSession(), ...turn("Hello", text("leaked"))], {}, { models: { [model]: "opencode/free" } });
             chat.send("Hello");
@@ -87,7 +151,8 @@ describe("the chat in OpenCode", () => {
             const why = `the host was asked for the model ${model} and runs opencode/free`;
             expect(events).toEqual([{ type: "turnEnd", reason: "failed", why }, { type: "ended", why }]);
             expect(host.written.some(isPrompt)).toBe(false);
-            expect(host.stopped).toBe(true);
+            expect(host.inputClosed).toBe(true);
+            expect(host.stopped).toBe(false);
         });
 
         it("ends the chat with the agent's words when it refuses the model", async () => {
@@ -109,7 +174,7 @@ describe("the chat in OpenCode", () => {
                 msg: { jsonrpc: "2.0", id: 2, error: { code: -32000, message: "Authentication required" } },
             }]);
             await until(() => events.some((event) => event.type === "ended"));
-            expect(events).toEqual([{ type: "ended", why: "the host did not open the chat: Authentication required: run opencode auth login in a terminal, then try again" }]);
+            expect(events).toEqual([{ type: "ended", why: "the host did not open the chat: Authentication required: sign in from OpenCode itself, then try again", code: "signin" }]);
         });
 
         it("ends the chat when the agent is not ready within 60 seconds", async () => {
@@ -122,6 +187,8 @@ describe("the chat in OpenCode", () => {
             clock.advance(1);
             const why = `the host was not ready to play with the model ${model} within 60 seconds`;
             expect(events).toEqual([{ type: "turnEnd", reason: "failed", why }, { type: "ended", why }]);
+            expect(host.inputClosed).toBe(true);
+            clock.advance(10_000);
             expect(host.stopped).toBe(true);
         });
 
@@ -264,7 +331,7 @@ describe("the chat in OpenCode", () => {
 
     describe("a subagent's session", () => {
         // The table's own kinds: any subagent is allowed.
-        const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "agent", "image"];
+        const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "fetch", "agent", "image"];
 
         /** The AI's own words of a recorded flow, all its turns joined: never those of a subagent's session. */
         function chatWords(flow: FlowEntry[]): string
@@ -368,7 +435,7 @@ describe("the chat in OpenCode", () => {
     });
 
     describe("a turn the host begins by itself", () => {
-        const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "agent", "image"];
+        const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "fetch", "agent", "image"];
         const child = { "opencode/child-session": { id: "ses_child", parentID: "ses_1", depth: 1, title: "Bertoldo" } };
         const hostTurn = { type: "turnStart", by: "host" };
         const silence = 20_000;
@@ -600,6 +667,7 @@ describe("the chat in OpenCode", () => {
                 write: (line) => written.push(JSON.parse(line) as Message),
                 onLine: (listener) => (say = (line) => listener(JSON.stringify(line))),
                 onEnd: () => undefined,
+                closeInput: () => undefined,
                 stop: () => undefined,
             });
             const chat = openHostChat("openCode", { ...options(fakeAgent([])), allowed: ["chesspal"], start })!;
@@ -613,10 +681,11 @@ describe("the chat in OpenCode", () => {
             chat.close();
         });
 
-        it("refuses the shell, writing and fetching, and reads any subagent as of kind agent, which starts only where that kind is allowed", async () => {
+        it("refuses the shell, writing, and fetching where it is not given, and reads any subagent as of kind agent, which starts only where that kind is allowed", async () => {
             expect(await answered({ name: "bash", rawInput: { command: "echo hi" } }, "no", ["chesspal", "read", "web", "agent"])).toEqual([{ type: "permission", name: "bash", kind: "shell", allowed: false }]);
             expect(await answered({ name: "edit", rawInput: {} }, "no", ["chesspal", "read", "web", "agent"])).toEqual([{ type: "permission", name: "edit", kind: "write", allowed: false }]);
             expect(await answered({ name: "webfetch", rawInput: {} }, "no", ["chesspal", "read", "web", "agent"])).toEqual([{ type: "permission", name: "webfetch", kind: "fetch", allowed: false }]);
+            expect(await answered({ name: "webfetch", rawInput: {} }, "once", ["chesspal", "read", "web", "fetch", "agent"])).toEqual([{ type: "permission", name: "webfetch", kind: "fetch", allowed: true }]);
             expect(await answered({ name: "task", rawInput: { subagent_type: "rpg-character" } }, "once", ["agent"])).toEqual([{ type: "permission", name: "task", kind: "agent", allowed: true }]);
             expect(await answered({ name: "task", rawInput: { subagent_type: "general" } }, "once", ["agent"])).toEqual([{ type: "permission", name: "task", kind: "agent", allowed: true }]);
             expect(await answered({ name: "task", rawInput: { subagent_type: "general" } }, "no", ["chesspal"])).toEqual([{ type: "permission", name: "task", kind: "agent", allowed: false }]);
@@ -736,10 +805,10 @@ describe("OpenCode as the table drives it", () => {
         expect(driver.missing(makeTempFolder())).toContain("no opencode.json");
     });
 
-    it("gives OpenCode the table's environment without what belongs to another OpenCode chat or to a shell, in a copy", () => {
+    it("gives OpenCode the table's environment without what belongs to another OpenCode chat or to a shell, nor the player's Claude Code instructions, in a copy", () => {
         const given = { PATH: "/bin", OPENCODE_CONFIG: "/mine.json", OPENCODE_DISABLE_PROJECT_CONFIG: "1", opencode_session_id: "s", OPENCODE_CONFIG_CONTENT: "{}", PWD: "/x", OLDPWD: "/y" };
         const environment = driver.environment(given);
-        expect(environment).toEqual({ PATH: "/bin", OPENCODE_CONFIG: "/mine.json" });
+        expect(environment).toEqual({ PATH: "/bin", OPENCODE_CONFIG: "/mine.json", OPENCODE_DISABLE_CLAUDE_CODE: "1" });
         expect(environment).not.toBe(given);
     });
 
@@ -757,20 +826,36 @@ describe("OpenCode as the table drives it", () => {
             const models = await driver.models({ folder, program: { command: "opencode-program", args: [] }, environment: { HOME: "/home/player" }, start: host.start });
             expect(host.started?.args).toEqual(["acp"]);
             expect(host.started?.options.env).toEqual({ HOME: "/home/player", PWD: folder });
-            expect(models[0]).toEqual({ id: "opencode/tidepool-alpha-free", name: "opencode/Tidepool Alpha Free", efforts: ["minimal", "low", "medium", "high", "xhigh", "max"] });
-            expect(models.slice(1).map((one) => one.id)).toEqual(["cloudflare-ai-gateway/reflection-ai/beam-1.0-501b-a23b", "cloudflare-ai-gateway/anthropic/claude-fable-5", "cloudflare-ai-gateway/anthropic/claude-fable-5.1", model]);
+            expect(models[0]).toEqual({
+                id: "opencode/tidepool-alpha-free",
+                name: "opencode/Tidepool Alpha Free",
+                efforts: ["minimal", "low", "medium", "high", "xhigh", "max"],
+                group: "opencode",
+                advised: true,
+            });
+            // The providers' models are paid apart for each answer, on the player's key, but for one run on this computer, kept before them; none is advised.
+            expect(models.slice(1).map((one) => [one.group, one.metered, one.advised])).toEqual([
+                ["ollama", undefined, undefined],
+                ["cloudflare-ai-gateway", true, undefined],
+                ["cloudflare-ai-gateway", true, undefined],
+                ["cloudflare-ai-gateway", true, undefined],
+            ]);
+            expect(models.slice(1).map((one) => one.id)).toEqual([model, "cloudflare-ai-gateway/reflection-ai/beam-1.0-501b-a23b", "cloudflare-ai-gateway/anthropic/claude-fable-5", "cloudflare-ai-gateway/anthropic/claude-fable-5.1"]);
             expect(models.slice(1).every((one) => one.efforts.length === 0)).toBe(true);
             expect(host.written.map((message) => message.method)).toEqual(["initialize", "session/new", "session/delete"]);
             expect(host.problems).toEqual([]);
-            expect(host.stopped).toBe(true);
+            expect(host.inputClosed).toBe(true);
+            expect(host.stopped).toBe(false);
         });
 
-        it("are none, the program stopped, where it does not answer within 20 seconds, or cannot start", async () => {
+        it("are none where it does not answer within 20 seconds, the program let go and stopped only ten seconds later, or cannot start", async () => {
             const clock = manualClock();
             const host = fakeAgent([], { ignore: ["initialize"] });
             const asking = driver.models({ folder, program: { command: "opencode-program", args: [] }, environment: {}, start: host.start, later: clock.later });
             clock.advance(20_000);
             expect(await asking).toEqual([]);
+            expect(host.stopped).toBe(false);
+            clock.advance(10_000);
             expect(host.stopped).toBe(true);
             expect(await driver.models({ folder, program: { command: join(makeTempFolder(), "no-such-program"), args: [] }, environment: process.env })).toEqual([]);
         });

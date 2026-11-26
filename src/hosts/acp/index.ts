@@ -5,7 +5,7 @@ import { notification, Requests } from "../lines.ts";
 import { heldChat, startHost, write } from "../state.ts";
 import type { AcpHost } from "./host.ts";
 import { readMessage } from "./read.ts";
-import { begin, writePrompt } from "./setup.ts";
+import { begin, changeModel, writePrompt } from "./setup.ts";
 import { newTurn, type State } from "./state.ts";
 
 export { type AcpHost, kindOfCall, pathsOfCall, patternOutside } from "./host.ts";
@@ -14,7 +14,7 @@ export { acpModels } from "./models.ts";
 /** Opens a chat with the AI in the host, or takes one up again by its session; the player's words wait until the model is confirmed. */
 export function openAcp(options: ChatOptions, host: AcpHost): HostChat
 {
-    const shared = startHost(options, host.args);
+    const shared = startHost(options, host.name, host.args);
     const state: State = {
         ...shared,
         host,
@@ -29,6 +29,7 @@ export function openAcp(options: ChatOptions, host: AcpHost): HostChat
             words: (turn, text) => writePrompt(state, turn, text),
             stop: () => write(state, notification("session/cancel", { sessionId: state.session })),
             read: (message) => readMessage(state, message),
+            change: (model, effort) => changeModel(state, model, effort),
         },
     };
     return heldChat(state, () => begin(state));

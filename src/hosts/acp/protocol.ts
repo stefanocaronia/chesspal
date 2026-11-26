@@ -1,5 +1,6 @@
 // The Agent Client Protocol as the table speaks it: JSON-RPC 2.0, one JSON object a line each way; the session's options of configuration.
 import { version } from "../../version.ts";
+import { isHostName } from "../chat.ts";
 import { isObject, type Message } from "../lines.ts";
 
 /** The version of the protocol the table speaks. */
@@ -36,4 +37,14 @@ export function optionValues(option: Message | undefined): { value: string; name
 
         return [{ value, ...(typeof entry.name === "string" ? { name: entry.name } : {}), ...(typeof entry.description === "string" ? { about: entry.description } : {}) }];
     });
+}
+
+// The effort that leaves it to the model, which the table never names.
+const defaultEffort = "default";
+
+/** The efforts the model in play takes, as the session's options say them now: none where it has no option of effort. */
+export function effortsOf(options: unknown): string[]
+{
+    const option = configOption(options, "thought_level", "effort");
+    return optionValues(option).map((one) => one.value).filter((one) => one !== defaultEffort && isHostName(one));
 }

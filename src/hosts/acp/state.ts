@@ -16,8 +16,8 @@ export interface State extends ChatState<Turn>
     capabilities: Message;
     /** The options of the session's configuration as the agent last told them. */
     config: unknown;
-    /** The model and effort asked, and the model the agent confirmed. */
-    model: { asked: string; effort?: string; confirmed?: string; };
+    /** The model and effort asked, and the model the agent confirmed; for another asked in the open chat, those it ran before, until it confirms it. */
+    model: { asked: string; effort?: string; confirmed?: string; before?: { asked: string; effort?: string; confirmed?: string; }; };
     /** The subagents' sessions started by a call the table allows: their updates are never the AI's. */
     children: Set<string>;
     /** Cancels the wait for the silence that ends the host's own turn. */

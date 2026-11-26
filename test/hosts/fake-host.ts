@@ -25,6 +25,8 @@ export interface FakeHost
     stopped: boolean;
     /** How many times the driver stopped the process. */
     stops: number;
+    /** Whether the driver closed the process's input. */
+    inputClosed: boolean;
     /** Ends the process, as its exit would. */
     end(reason: string): void;
     /** A line on the process's stderr, for a driver that reads them. */
@@ -38,7 +40,12 @@ export interface FakeOptions
     /** The model the host names for each asked; by default haiku's. */
     models?: Record<string, string>;
     /** Requests the host never answers. */
-    ignore?: ("set_model" | "interrupt")[];
+    ignore?: ("set_model" | "interrupt" | "apply_flag_settings")[];
+    /** The error the host answers an effort set with, where it refuses it. */
+    effortError?: string;
+    /** The error the host answers a model with, by the model asked, where it refuses it; or the model it says it runs instead. */
+    modelErrors?: Record<string, string>;
+    modelRuns?: Record<string, string>;
 }
 
 // How many of the host's lines it writes in a tick, so that the driver reads them as a stream.
@@ -111,10 +118,18 @@ export function fakeHost(flow: FlowEntry[], options: FakeOptions = {}): FakeHost
             return;
         }
 
-        if (message.type === "control_request" && request?.subtype === "set_model") {
+        if (message.type === "control_request" && request?.subtype === "set_model" && options.modelErrors?.[String(request.model)] !== undefined) {
+            answerModel({ type: "control_response", response: { subtype: "error", request_id: message.request_id, error: options.modelErrors[String(request.model)] } });
+        } else if (message.type === "control_request" && request?.subtype === "set_model" && options.modelRuns?.[String(request.model)] !== undefined) {
+            answerModel({ type: "control_response", response: { subtype: "success", request_id: message.request_id, response: { model: options.modelRuns[String(request.model)] } } });
+        } else if (message.type === "control_request" && request?.subtype === "set_model") {
             const model = String(request.model);
             const recorded = modelAnswers.shift() ?? { type: "control_response", response: { subtype: "success", request_id: "", response: { model: models[model] ?? model } } };
             answerModel(withRequest(recorded, message.request_id));
+        } else if (message.type === "control_request" && request?.subtype === "apply_flag_settings") {
+            // As Claude Code 2.1.332 answers it (2026-11-25/43, cc2).
+            const answer = options.effortError === undefined ? { subtype: "success", request_id: message.request_id } : { subtype: "error", request_id: message.request_id, error: options.effortError };
+            answerModel({ type: "control_response", response: answer });
         } else if (message.type === "control_request" && request?.subtype === "interrupt") {
             interrupted(message.request_id);
         } else {
@@ -185,6 +200,9 @@ export function fakeHost(flow: FlowEntry[], options: FakeOptions = {}): FakeHost
         onEnd: (listener) => {
             endListener = listener;
         },
+        closeInput: () => {
+            fake.inputClosed = true;
+        },
         stop: () => {
             fake.stops += 1;
             fake.stopped = true;
@@ -199,6 +217,7 @@ export function fakeHost(flow: FlowEntry[], options: FakeOptions = {}): FakeHost
         problems: [],
         stopped: false,
         stops: 0,
+        inputClosed: false,
         end: (reason) => {
             if (!fake.stopped) {
                 fake.stopped = true;

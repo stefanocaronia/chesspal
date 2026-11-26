@@ -68,11 +68,12 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         keepChat(chats, { host, session: state?.session, game: state?.game, closed });
     };
 
-    // The chat leaves the table and its place, and its process ends with all it started.
+    // The chat leaves the table and its place. Its program ends by itself, its input closed, as one renewing the player's sign-in must: stopped, with all
+    // it started, only where it is still there after the driver's grace.
     const close = (state: Driven): void => {
         state.closing = true;
         state.gone?.();
-        state.chat?.close();
+        state.chat?.close(true);
 
         if (state.attached) {
             seat?.leave();
