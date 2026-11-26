@@ -85,10 +85,14 @@ type Played = MovePlayed & { agents?: string[]; board?: true; };
 
 /**
  * The agents to start after the move, in Claude Code or Codex, in a folder init set up with them: the one that thinks for the AI while the game goes on (D-72), then
- * the coach with the helps on, which judges the player's move even when the AI's ends the game (D-88).
+ * the coach with the helps on, which judges the player's move even when the AI's ends the game (D-88). None at the table's place: the table starts its own.
  */
 function agentsAfter(context: Context, folder: string, played: MovePlayed): string[]
 {
+    if (context.helpers !== undefined) {
+        return [];
+    }
+
     const ponder = ponderAgentFor(played.game.level);
     const thinks = played.game.end === undefined && agentRuns(context, ponder);
     const coaches = helpsIn(folder) && coachRuns(context);

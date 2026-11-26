@@ -543,7 +543,8 @@ async function studyFromPage(request: IncomingMessage, response: ServerResponse,
         return;
     }
 
-    if (brought && !hold) {
+    // The table's analyst goes over it where the table runs one; else the chat is rung for it.
+    if (brought && !hold && served.table?.chats?.analyse?.(name) !== true) {
         served.bell.ring();
     }
 
@@ -564,6 +565,7 @@ async function stopAnalysisFromPage(request: IncomingMessage, response: ServerRe
     }
 
     const stopped = stopAnalysis(gameFolder(served.context.home()), game);
+    served.table?.chats?.stopAnalysis?.();
 
     // The chat the table drives stops its turn too, which may be that analysis.
     if (served.attached?.local !== undefined) {
@@ -708,9 +710,8 @@ function analysisShown(served: Served): { name: string; pgn: string; book: numbe
         const { name, record } = namedGame(served.context, analysis.game);
         // Without a review, an AI is at it only while the chat is in a turn, or hears the player while its analyst holds the game (D-89): one the chat has
         // started again since is gone (Priya).
-        const { bell } = served;
         const reviewed = isReviewed(record);
-        const reviewing = !reviewed && (served.attached?.local === undefined ? bell.inTurn || (bell.listening && analystAtWork(served, analysis.game)) : drivenReviews(served, analysis));
+        const reviewing = !reviewed && reviewedNow(served, analysis);
         // Without a review and with nobody at it, the analysis is incomplete: the page offers to bring it back to the AI (D-109).
         const state = reviewed ? {} : reviewing ? { reviewing: true as const } : { incomplete: true as const };
         // How far the book goes, which the page cannot tell without the book's moves: its card names the opening on those moves.
@@ -719,6 +720,18 @@ function analysisShown(served: Served): { name: string; pgn: string; book: numbe
         // A game gone from the archive is no longer shown.
         return undefined;
     }
+}
+
+/** Whether an AI goes over the game in analysis now: the table's analyst where the table runs one, else the chat at the table. */
+function reviewedNow(served: Served, analysis: Analysis): boolean
+{
+    const { bell } = served;
+
+    if (served.table?.chats?.helpers?.() !== undefined) {
+        return analystAtWork(served, analysis.game);
+    }
+
+    return served.attached?.local === undefined ? bell.inTurn || (bell.listening && analystAtWork(served, analysis.game)) : drivenReviews(served, analysis);
 }
 
 /**

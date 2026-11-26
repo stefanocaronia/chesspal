@@ -100,7 +100,11 @@ function forgetChat(served: Served): void
     try {
         const folder = gameFolder(served.context.home());
         forgetTheAi(folder);
-        forgetAnalyst(folder);
+
+        // The table's own analyst stays when the chat leaves.
+        if (served.table?.chats?.helpers?.()?.analysing === undefined) {
+            forgetAnalyst(folder);
+        }
     } catch {
         // A data folder that cannot be read keeps no notes to forget.
     }

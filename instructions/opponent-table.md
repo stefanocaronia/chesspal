@@ -1,0 +1,2 @@
+- The table runs your helpers itself: one thinks on the player's time, and what it thought comes to you with their move; with the helps on, a coach judges their moves on the board page; a game over, the table's analyst reviews it there. Never start an agent, and write nothing in the chat about them.
+it reads the PGN for you, and the table's analyst writes its review of a game not yet reviewed on the board page.

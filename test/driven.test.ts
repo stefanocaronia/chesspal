@@ -1,6 +1,5 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { newGame, startNewGame } from "../src/commands/game/new.ts";
@@ -9,30 +8,37 @@ import { aiSay } from "../src/commands/talk/index.ts";
 import { endOf, loadGame, positionShownNote } from "../src/games/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { analystAgent } from "../src/host-files/index.ts";
-import type { ChatOptions, HostChat, HostDriver, HostEvent } from "../src/hosts/index.ts";
 import { activeProfile, gameFolder, saveProfileSettings } from "../src/profiles/index.ts";
 import { Bell, type BellListener } from "../src/server/bell/index.ts";
 import { doorVariable, keyVariable } from "../src/server/door/index.ts";
-import { chatInPage, drivenChats, failureCode, failureOf, keepChat, keptChat } from "../src/server/driven/index.ts";
-import type { TableChats } from "../src/server/page/index.ts";
-import { type TablePlaces, tablePlaces } from "../src/server/places/index.ts";
-import { startTable, type Table, type TableTimes } from "../src/server/table/index.ts";
-import { version } from "../src/version.ts";
-import { playedHere, testContext } from "./commands.ts";
-import { removeFolder } from "./folders.ts";
-import { sent } from "./http.ts";
-import { sitAt } from "./place-client.ts";
-import { onFreePorts } from "./ports.ts";
+import { chatInPage, failureCode, failureOf, keepChat, keptChat } from "../src/server/driven/index.ts";
+import type { Table } from "../src/server/table/index.ts";
+import { playedHere } from "./commands.ts";
+import {
+    call,
+    cleanUp,
+    drivenTable,
+    eventsOf,
+    type FakeChat,
+    type FakeDriver,
+    fakeDriver,
+    gate,
+    homeContext,
+    hookWaiting,
+    movingContext,
+    opened,
+    pause,
+    posted,
+    raw,
+    sans,
+    shown,
+    startTurn,
+    temporary,
+    terminalAttached,
+    until,
+} from "./driven-fakes.ts";
 
-const folders: string[] = [];
-const tables: Table[] = [];
-const clients: Client[] = [];
-
-afterEach(async () => {
-    await Promise.all(clients.splice(0).map((client) => client.close().catch(() => undefined)));
-    await Promise.all(tables.splice(0).map((table) => table.close()));
-    await Promise.all(folders.splice(0).map(removeFolder));
-});
+afterEach(cleanUp);
 
 const longGame = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7";
 
@@ -916,7 +922,7 @@ describe("the opening of a chat the table drives", () => {
         }
     }, 30_000);
 
-    it("shows the game in analysis reviewed only while the chat goes over it, never while it only answers the player about it", async () => {
+    it("shows the game in analysis reviewed only while the table's analyst goes over it, never while the chat only answers the player about it", async () => {
         const { table, ai } = await drivenTable();
         const looked = await posted(table.url, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *', look: true });
         const kept = (JSON.parse(looked.text) as { game: string; }).game;
@@ -935,17 +941,15 @@ describe("the opening of a chat the table drives", () => {
         await until(() => chat.idle());
 
         const reviewing = gate();
-        chat.turns.push(async (client) => {
-            chat.answers.push(await call(client, "analyse_game", { game: kept }));
-            await reviewing.passed;
-        });
+        ai.helpers.analyst = async () => await reviewing.passed;
+        chat.turns.push(async (client) => void chat.answers.push(await call(client, "analyse_game", { game: kept })));
         await posted(table.url, "/api/message", { text: "Go over it, please.", game: kept, at: 3 });
-        await until(() => chat.answers.length === 1);
-        expect(chat.answers[0]!.isError).toBe(false);
+        await until(() => chat.answers.length === 1 && chat.idle());
+        expect(chat.answers[0]!.text).toContain("The table's analyst is writing its review of this game on the board page");
         expect(await analysisNow()).toMatchObject({ reviewing: true });
         reviewing.open();
-        await until(() => chat.idle());
-        expect(await analysisNow()).not.toHaveProperty("reviewing");
+        await until(() => ai.helperChats[0]!.closed);
+        expect(await analysisNow()).toMatchObject({ incomplete: true });
     }, 30_000);
 });
 
@@ -1264,375 +1268,4 @@ async function watchedEvents(url: string): Promise<{ count(): number; destroy():
             done({ count: () => events, destroy: () => asked.destroy() });
         });
     });
-}
-
-/** A chat of the fake driver: what it was opened with, the words it was sent and the tools its AI called, how its turns ended; it plays through its place. */
-interface FakeChat
-{
-    readonly options: ChatOptions;
-    readonly session: string;
-    readonly sent: string[];
-    readonly calls: string[];
-    readonly answers: { text: string; isError: boolean; }[];
-    readonly ends: string[];
-    /** What the AI does at its next turns woken by the bell, in order; none does nothing. One that gives "failed" fails as the host's API would. */
-    readonly turns: ((client: Client) => Promise<void | "failed">)[];
-    closed: boolean;
-    /** How each close asked its program to end: let go to end by itself (true), or stopped at once. */
-    readonly closes: boolean[];
-    idle(): boolean;
-    emit(event: HostEvent): void;
-    /** A turn the host begins by itself, with no words of the table's, which ends once `play` has. */
-    ownTurn(play: () => Promise<void>): Promise<void>;
-}
-
-/**
- * A driver of Claude Code whose chat plays the AI for real: on each turn, a client of the MCP SDK at its place, through the door. Its program `missing`,
- * the driver `loading` until a promise settles, the first turns it plays, and the turns the next chat it opens plays.
- */
-interface FakeDriver
-{
-    driver: HostDriver;
-    chats: FakeChat[];
-    failFirst: boolean;
-    missing: boolean;
-    loading?: Promise<void>;
-    first?: (client: Client) => Promise<void>;
-    queued: ((client: Client) => Promise<void>)[];
-}
-
-function fakeDriver(): FakeDriver
-{
-    const chats: FakeChat[] = [];
-    const driver: HostDriver = {
-        open: (options) => {
-            const fake = fakeChat(options, `session-${chats.length + 1}`, made);
-            fake.chat.turns.push(...made.queued.splice(0));
-            chats.push(fake.chat);
-            return fake.host;
-        },
-        missing: () => undefined,
-        program: () => (made.missing ? undefined : { command: "claude", args: [] }),
-        environment: (environment) => ({ ...environment }),
-        models: () => Promise.resolve([]),
-        model: "opus",
-        efforts: ["low", "medium", "high"],
-    };
-    const made: FakeDriver = { driver, chats, failFirst: false, missing: false, queued: [] };
-    return made;
-}
-
-function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver): { chat: FakeChat; host: HostChat; }
-{
-    let listener: ((event: HostEvent) => void) | undefined;
-    const waiting: HostEvent[] = [];
-    const failFirst = ai.failFirst;
-    let busy = false;
-    let told = false;
-    let client: Promise<Client> | undefined;
-    let stopTurn: (() => void) | undefined;
-    const session = options.session ?? ownSession;
-
-    const emit = (event: HostEvent): void => {
-        if (chat.closed) {
-            return;
-        }
-
-        if (listener === undefined) {
-            waiting.push(event);
-        } else {
-            listener(event);
-        }
-    };
-
-    const ownTurn = async (play: () => Promise<void>): Promise<void> => {
-        busy = true;
-        emit({ type: "turnStart", by: "host" });
-        await play();
-        busy = false;
-        emit({ type: "turnEnd", reason: "done" });
-    };
-
-    const chat: FakeChat = { options, session, sent: [], calls: [], answers: [], ends: [], turns: [], closed: false, closes: [], idle: () => !busy, emit, ownTurn };
-
-    const turn = async (text: string): Promise<void> => {
-        // A host that cannot sign in fails its first turn before it says which chat it is.
-        if (failFirst) {
-            busy = false;
-            emit({ type: "turnEnd", reason: "failed", why: "Not logged in · Please run /login" });
-            return;
-        }
-
-        // As a host's process does, it says which chat it is a moment after it was sent its first words.
-        await new Promise((done) => setImmediate(done));
-
-        if (!told) {
-            told = true;
-            emit({ type: "session", session, model: `claude-${options.model}`, ...(options.effort === undefined ? {} : { effort: options.effort }) });
-        }
-
-        client ??= sitAt(options.server!.environment, (made) => void clients.push(made));
-        const sitting = await client;
-        const traced = tracing(sitting, chat);
-        const stopped = new Promise<"interrupted">((done) => (stopTurn = () => done("interrupted")));
-        // A clean chat's first words are the table's start message.
-        const starting = options.session === undefined && chat.sent.length === 1 && text === chat.sent[0];
-        const play = starting ? (ai.first ?? startTurn)(traced) : (chat.turns.shift() ?? (() => Promise.resolve()))(traced);
-        const reason = await Promise.race([play.then((ended) => ended ?? "done"), stopped]);
-        stopTurn = undefined;
-        chat.ends.push(reason);
-        busy = false;
-        emit(reason === "failed" ? { type: "turnEnd", reason, why: "API Error: 500 Internal server error" } : { type: "turnEnd", reason });
-    };
-
-    const host: HostChat = {
-        send: (text) => {
-            if (busy || chat.closed) {
-                return false;
-            }
-
-            busy = true;
-            chat.sent.push(text);
-            void turn(text);
-            return true;
-        },
-        onEvent: (heard) => {
-            listener = heard;
-            waiting.splice(0).forEach(heard);
-        },
-        interrupt: () => stopTurn?.(),
-        close: (gently) => {
-            chat.closed = true;
-            chat.closes.push(gently === true);
-            void client?.then((sitting) => sitting.close()).catch(() => undefined);
-        },
-    };
-    return { chat, host };
-}
-
-/** What a chat's AI does at its first turn: the instructions, then status. */
-async function startTurn(client: Client): Promise<void>
-{
-    await call(client, "instructions");
-    await call(client, "status");
-}
-
-/** The client, its tools' names noted in the chat as they are called, and told to the table as Claude Code tells them, once their answer is in. */
-function tracing(client: Client, chat: FakeChat): Client
-{
-    return new Proxy(client, {
-        get: (target, name) => {
-            if (name === "callTool") {
-                return async (asked: { name: string; }) => {
-                    const id = `tool-${chat.calls.length}`;
-                    chat.calls.push(asked.name);
-                    chat.emit({ type: "tool", id, name: asked.name, kind: "chesspal", state: "started" });
-                    const result = await target.callTool(asked as never);
-                    chat.emit({ type: "tool", id, name: asked.name, kind: "chesspal", state: result.isError === true ? "failed" : "done" });
-                    return result;
-                };
-            }
-
-            return Reflect.get(target, name) as unknown;
-        },
-    });
-}
-
-async function call(client: Client, name: string, args: Record<string, unknown> = {}): Promise<{ text: string; isError: boolean; }>
-{
-    const result = await client.callTool({ name, arguments: args });
-    return { text: (result.content as { text: string; }[])[0]?.text ?? "", isError: result.isError === true };
-}
-
-/** The terminal's chats, which open nothing: the hosts it was asked to open. */
-function terminalChats(): { chats: TableChats; opened: string[]; }
-{
-    const opened: string[] = [];
-    const hosts = ["claude", "codex"].map((name) => ({ name, installed: true, models: [], efforts: [], command: `chesspal play ${name}` }));
-    const chats: TableChats = { hosts: () => hosts, open: (host) => Promise.resolve(opened.push(host) < 0), held: () => undefined, relaunch: () => false };
-    return { chats, opened };
-}
-
-/** The table's places, the roles of those withdrawn noted in `withdrawn`. */
-function watchedPlaces(context: Context, withdrawn: string[]): TablePlaces
-{
-    const places = tablePlaces(context, { leaveWait: 500 });
-    return {
-        offer: async (role, folder, chat) => {
-            const place = await places.offer(role, folder, chat);
-            return {
-                ...place,
-                withdraw: () => {
-                    withdrawn.push(place.role);
-                    place.withdraw();
-                },
-            };
-        },
-        close: () => places.close(),
-    };
-}
-
-/**
- * A table on a data folder, a new one unless given, whose chats are driven over a terminal's that opens nothing, with the switch on unless `switched` is
- * false: its fake driver's chats, given to share them with a table started again.
- */
-async function drivenTable(
-    home?: string,
-    ai = fakeDriver(),
-    given?: Context,
-    switched = true,
-    times: TableTimes = { idle: 60_000, every: 10 },
-    programsEnded?: () => Promise<unknown>,
-): Promise<{ table: Table; home: string; ai: FakeDriver; terminal: ReturnType<typeof terminalChats>; context: Context; chats: TableChats; withdrawn: string[]; }>
-{
-    const start = async (folder: string) => {
-        const context = given ?? homeContext(folder);
-        saveProfileSettings(folder, activeProfile(context.home()).id, { [chatInPage]: switched });
-        const terminal = terminalChats();
-        const withdrawn: string[] = [];
-
-        const driver = async (): Promise<HostDriver> => {
-            await ai.loading;
-            return ai.driver;
-        };
-
-        const chats = drivenChats(context, { terminal: terminal.chats, places: () => watchedPlaces(context, withdrawn), driver, chesspal: ["node", "cli.js"], environment: {} });
-        const table = await startTable(context, times, chats, undefined, programsEnded);
-
-        if (table === undefined) {
-            throw new Error("The table did not start: another one holds its ports.");
-        }
-
-        tables.push(table);
-        return { table, home: folder, ai, terminal, context, chats, withdrawn };
-    };
-
-    return home === undefined ? onFreePorts(() => start(temporary())) : start(home);
-}
-
-/** The moves of the game going on, in SAN. */
-function sans(home: string): string[]
-{
-    return loadGame(gameFolder(home))!.game.record.moves.map((move) => move.san);
-}
-
-function homeContext(home: string): Context
-{
-    return { ...testContext(home), now: () => new Date() };
-}
-
-/** A context whose clock the test moves forward. */
-function movingContext(home: string): { context: Context; ahead: { ms: number; }; }
-{
-    const ahead = { ms: 0 };
-    return { context: { ...testContext(home), now: () => new Date(Date.now() + ahead.ms) }, ahead };
-}
-
-function temporary(): string
-{
-    const folder = mkdtempSync(join(tmpdir(), "chesspal-driven-"));
-    folders.push(folder);
-    return folder;
-}
-
-const pause = (ms: number): Promise<void> => new Promise((done) => setTimeout(done, ms));
-
-/** A gate a fake turn waits at. */
-function gate(): { open: () => void; passed: Promise<void>; }
-{
-    let open = (): void => undefined;
-    const passed = new Promise<void>((done) => (open = done));
-    return { open, passed };
-}
-
-/** A request of the table's own page, with its origin: the answer's status and text. */
-function posted(url: string, path: string, body: object): Promise<{ status: number; text: string; }>
-{
-    return sent(new URL(path, url), { method: "POST", headers: { "Content-Type": "application/json", Origin: new URL(url).origin }, body: JSON.stringify(body) });
-}
-
-function opened(url: string, host = "claude"): Promise<{ status: number; text: string; }>
-{
-    return posted(url, "/api/table/chat", { host });
-}
-
-interface Shown
-{
-    game?: { talk?: { text: string; heard?: unknown; }[]; };
-    thinking?: string;
-    aiModel?: { model: string; effort?: string; };
-    table?: { chat: boolean; started?: { model?: string; }; failed?: unknown; opening?: string; atWork?: true; stopped?: true; noMove?: true; };
-}
-
-async function shown(url: string): Promise<Shown>
-{
-    return JSON.parse((await sent(new URL("/api/game", url))).text) as Shown;
-}
-
-async function raw(url: string): Promise<Record<string, unknown>>
-{
-    return JSON.parse((await sent(new URL("/api/game", url))).text) as Record<string, unknown>;
-}
-
-/** A browser that has the page open, listening to its events. */
-async function eventsOf(url: string): Promise<{ destroy(): void; }>
-{
-    const { get } = await import("node:http");
-    return new Promise((done) => {
-        const events = get(new URL("/api/events", url), { agent: false }, () => done(events));
-    });
-}
-
-/** A chat of a terminal attached to the table over HTTP, which stays while its request does. */
-async function terminalAttached(url: string, folder: string): Promise<{ token: string; leave(): void; }>
-{
-    const { request } = await import("node:http");
-    return new Promise((done, failed) => {
-        const asked = request(new URL("/api/chat", url), { method: "POST", headers: { "Content-Type": "application/json" }, agent: false }, (response) => {
-            response.setEncoding("utf8");
-            response.once("data", (line: string) => {
-                const said = JSON.parse(line.split("\n")[0]!) as { token?: string; error?: string; };
-
-                if (said.token === undefined) {
-                    failed(new Error(said.error));
-                } else {
-                    done({ token: said.token, leave: () => asked.destroy() });
-                }
-            });
-        });
-        asked.on("error", () => undefined);
-        asked.end(JSON.stringify({ version, session: "terminal-session", folder, host: "claude-code", outdated: false }));
-    });
-}
-
-/** A hook that waits at the bell over HTTP: what it hears. */
-async function hookWaiting(url: string): Promise<{ heard: Promise<string>; }>
-{
-    const { get } = await import("node:http");
-    let said = (text: string): void => void text;
-    const heard = new Promise<string>((done) => (said = done));
-    await new Promise<void>((started) => {
-        const asked = get(new URL("/api/bell?session=terminal-session", url), { agent: false }, (response) => {
-            let text = "";
-            response.setEncoding("utf8");
-            response.on("data", (chunk: string) => (text += chunk));
-            response.on("end", () => said(text));
-        });
-        asked.on("error", () => said("error"));
-        setTimeout(started, 150);
-    });
-    return { heard };
-}
-
-async function until(condition: () => boolean | Promise<boolean>, wait = 10_000): Promise<void>
-{
-    const end = Date.now() + wait;
-
-    while (!(await condition())) {
-        if (Date.now() > end) {
-            throw new Error("What the test waited for did not come.");
-        }
-
-        await new Promise((done) => setTimeout(done, 20));
-    }
 }

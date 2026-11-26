@@ -14,6 +14,7 @@ export {
     analystQuietAt,
     bookOpening,
     bookPlies,
+    endingToCoach,
     gameAt,
     gameToStudy,
     type MovePlayed,
@@ -39,12 +40,14 @@ export {
     commandLineFieldProblem,
     type Context,
     defaultContext,
+    type HelperRole,
     homeForOneCall,
     inputProblems,
     isBoolean,
     isList,
     type SeenPosition,
     speaksItalian,
+    type TableHelpers,
     takesNumbers,
 } from "./registry/index.ts";
 

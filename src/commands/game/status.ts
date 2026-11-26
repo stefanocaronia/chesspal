@@ -1,12 +1,14 @@
 import { z } from "zod";
 import { Game, gameReviewOf, leadOf, reviewOf } from "../../core/index.ts";
 import { archivedName, type ChatStart, cleanSince, endOf, gameInAnalysis, gameStamp, lastChatStart } from "../../games/index.ts";
-import { isCodex, outdatedHostFiles } from "../../host-files/index.ts";
+import { outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
 import {
     analystLine,
     analystRuns,
+    analystStartIn,
+    analystStartOf,
     closingLines,
     coachOnEnd,
     coachOnEndLine,
@@ -57,7 +59,7 @@ interface Status
     /** What the player wrote on the board page that the AI has not answered yet, all of it. */
     words?: Written[];
     /** The game in analysis on the board page once none goes on (D-69), which the player may have brought there, for a new review too. */
-    analysis?: { game: string; brought?: true; redo?: true; analyst?: "done" | "offer"; codex?: true; review?: string; };
+    analysis?: { game: string; brought?: true; redo?: true; analyst?: "done" | "offer"; codex?: true; table?: true; review?: string; };
     /** A game going on from before this chat, told once a chat: the player says whether to go on with it. */
     fromBefore?: true;
     /** The coach to start, once a move ended the game, for the player's last move (D-88). */
@@ -192,12 +194,13 @@ function readGame(status: Status, context: Context, folder: string, first: boole
         if (analysis !== undefined) {
             // The analyst agent goes over a game the player brought, or whose review was deleted, where it runs, and the chat over what it reviewed (D-89).
             const review = analysis.brought === true ? undefined : reviewProgress(context, analysis.game);
+            const start = analystRuns(context) ? analystStartOf(context) : undefined;
             status.analysis = {
                 game: analysis.game,
                 ...(analysis.brought === true ? { brought: true } : {}),
                 ...(analysis.redo === true ? { redo: true } : {}),
                 ...(analystRuns(context) ? { analyst: goneOver(context, analysis.game) ? "done" as const : "offer" as const } : {}),
-                ...(analystRuns(context) && isCodex(context.host?.()) ? { codex: true as const } : {}),
+                ...(start === undefined ? {} : { [start]: true as const }),
                 ...(review === undefined ? {} : { review }),
             };
         }
@@ -239,27 +242,30 @@ function firstInChat(context: Context, chatStart: string | undefined): boolean
  * The game in analysis, with how far its review has got; the next step when the player has just brought it on the board page, unless an analyst is at it
  * already, at once when they asked for a new review (Priya); the analyst agent for a game whose review was deleted, where it runs (Stefano).
  */
-function analysisLine({ game, brought, redo, analyst, codex, review }: NonNullable<Status["analysis"]>): string
+function analysisLine(analysis: NonNullable<Status["analysis"]>): string
 {
+    const { game, brought, redo, analyst, review } = analysis;
+    const start = analystStartIn(analysis);
+
     // A chat that remembered the old review put its notes back with annotate_game, and its corrections stand over every review after (Priya).
     if (redo === true && analyst === "offer") {
-        return `The player asked on the board page for a new review of ${game}. Next, at once, even if an analyst was stopped before: ${analystLine(game, codex === true)} `
+        return `The player asked on the board page for a new review of ${game}. Next, at once, even if an analyst was stopped before: ${analystLine(game, start)} `
             + "The new review replaces the old one: correct a note with annotate_game only when the player shows it wrong.";
     }
 
     if (brought === true && analyst !== "done") {
         return analyst === "offer"
-            ? `The player brought ${game} on the board page to analyse it. Next: ${analystLine(game, codex === true)}`
+            ? `The player brought ${game} on the board page to analyse it. Next: ${analystLine(game, start)}`
             : `The player brought ${game} on the board page to analyse it. Next: call analyse_game {"game": "${game}"}, then keep your review on that page with annotate_game, and go over it with them.`;
     }
 
     const shown = `In analysis on the board page: ${game}${review === undefined ? "" : ` (${review})`}`;
 
     if (analyst === "done") {
-        return `${shown}. ${reviewedLine(game)}`;
+        return `${shown}. ${reviewedLine(game, start)}`;
     }
 
-    return analyst === "offer" ? `${shown}. When the player wants it gone over, ${analystLine(game, codex === true)}` : `${shown}; analyse_game {"game": "${game}"} goes over it with the player.`;
+    return analyst === "offer" ? `${shown}. When the player wants it gone over, ${analystLine(game, start)}` : `${shown}; analyse_game {"game": "${game}"} goes over it with the player.`;
 }
 
 /**

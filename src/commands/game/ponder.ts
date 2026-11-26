@@ -7,9 +7,12 @@ import { boardView, colourName, compactView, type GameSummary, positionLines, sa
 import { defineCommand, sentence } from "../registry/index.ts";
 import { levelText } from "./levels.ts";
 
-/** What ponder answers: stop, the position to think on, the position after a reply, the thoughts kept, its words said, or still the player's move. */
+/**
+ * What ponder answers: stop, the position to think on, the position after a reply, the thoughts kept, its words said, or still the player's move; at the
+ * table's place, stop once its work is kept: the table ends its turn at the player's move.
+ */
 type Pondered =
-    | { stop: "moved" | "waited"; }
+    | { stop: "moved" | "waited" | "kept"; }
     | { start: Start; }
     | { after: GameSummary; position: number; reply: string; }
     | { kept: readonly Thought[]; position: number; }
@@ -81,7 +84,7 @@ export const ponder = defineCommand({
 
         if (done) {
             notePondering(folder, thoughtKey(current), false, context.now());
-            return await waitForMove(folder, context, current);
+            return context.helpers === undefined ? await waitForMove(folder, context, current) : { stop: "kept" };
         }
 
         if (reply === undefined) {
@@ -119,6 +122,8 @@ export const ponder = defineCommand({
         if ("stop" in pondered) {
             return pondered.stop === "moved"
                 ? "Stop now: the player has moved, or the game is over. End with one word."
+                : pondered.stop === "kept"
+                ? "Stop now: your answers are kept. End with one word."
                 : "Stop now: you have waited long enough, and your answers are kept. End with one word.";
         }
 

@@ -44,9 +44,9 @@ export interface GameSummary
     mood?: MoodNow;
     /**
      * When the game is over: how it ended, its name in the archive once it is there, and, where an analyst agent runs (D-89), whether the chat offers it or
-     * goes over the review it did, and whether the host is Codex, which starts it with spawn_agent.
+     * goes over the review it did, and whether the host is Codex, which starts it with spawn_agent, or the chat sits at the table, which starts its own.
      */
-    end?: { result: string; termination?: string; archive?: string; analyst?: "offer" | "done"; codex?: true; };
+    end?: { result: string; termination?: string; archive?: string; analyst?: "offer" | "done"; codex?: true; table?: true; };
 }
 
 /** A move numbered as in the game (4.Ng5, 4...d5), with the squares it went from and to. */

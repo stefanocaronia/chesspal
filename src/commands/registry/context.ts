@@ -75,6 +75,22 @@ export interface Context
     readonly givenSinceWords?: Set<string>;
     /** Told with a tool's result, before its answer goes to the chat: a table that drives the chat ends its turn when the result asks nothing more. */
     answered?: (tool: string, result: unknown) => void;
+    /** The helpers the table runs itself beside a chat at its place, and its helpers' own chats, in place of a host's agents: none for every other chat. */
+    helpers?: TableHelpers;
+}
+
+/** A helper the table runs itself: the one that thinks on the player's time, the coach with the helps on, the analyst of a game over. */
+export type HelperRole = "ponder" | "coach" | "analyst";
+
+/** What a chat at the table's place knows of the helpers the table runs, which no host's files tell. */
+export interface TableHelpers
+{
+    /** Whether the table runs the helper of `role` now. */
+    runs(role: HelperRole): boolean;
+    /** The game the table's analyst goes over now: none while none is at work. */
+    analysing(): string | undefined;
+    /** Asks the table's analyst to go over `game`, as the player wants: whether one goes over it now. */
+    analyse(game: string): boolean;
 }
 
 /** Who made a tool call: the model, else the host's name, never what the AI says of itself; the effort only when the host gives it. */

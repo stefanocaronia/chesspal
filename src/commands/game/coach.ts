@@ -30,9 +30,12 @@ import { type Context, defineCommand } from "../registry/index.ts";
 import { waitForPlayer, wordsOf } from "./ponder.ts";
 import { profileLines } from "./position.ts";
 
-/** What coach answers: stop, the moves to work on, the words kept and what comes next, or still the player's move; with the game's key and the position. */
+/**
+ * What coach answers: stop, the moves to work on, the words kept and what comes next, or still the player's move; with the game's key and the position. At
+ * the table's place, stop once its words are kept: the table sends it the next move.
+ */
 type Coached =
-    | { stop: "moved" | "waited" | "helps" | "started"; }
+    | { stop: "moved" | "waited" | "helps" | "started" | "kept"; }
     | { start: string[]; }
     | { kept: Place; then: "lead" | "wait" | "moved" | "over"; saved: string[]; hintLeft: boolean; }
     | { waiting: Place; };
@@ -124,6 +127,10 @@ export const coach = defineCommand({
             throw new Error(`Who is ahead is still missing here: first ${aheadCall(place)}, then ${call(place, "done: true")}. Nothing changed.`);
         }
 
+        if (context.helpers !== undefined) {
+            return { stop: "kept" };
+        }
+
         const since = coachWaitingSince(folder, current, position, context.now());
         const waited = await waitForPlayer(context, since, () => !theirTurn(loadGame(folder), place));
         return waited === "waiting" ? { waiting: place } : { stop: waited };
@@ -136,6 +143,8 @@ export const coach = defineCommand({
                 ? "Stop now: another coach works on this position. End with one word."
                 : coached.stop === "moved"
                 ? "Stop now: the player has moved, or the game is over. End with one word."
+                : coached.stop === "kept"
+                ? "Stop now: your words are kept. End with one word."
                 : "Stop now: you have waited long enough. End with one word.";
         }
 

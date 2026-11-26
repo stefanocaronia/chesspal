@@ -3,7 +3,7 @@ import { type Facts, figurinesOf, materialOf, sees, type Side } from "../../core
 import { talkLimits } from "../../games/index.ts";
 import { hasDoorbell } from "../../host-files/index.ts";
 import type { Context } from "../registry/index.ts";
-import { analystLine, reviewedLine } from "./agents.ts";
+import { analystLine, analystStartIn, reviewedLine } from "./agents.ts";
 import { clockLine } from "./clock.ts";
 import type { Written } from "./say.ts";
 import { endText, type GameSummary, type LastMove, type MovePlayed, unplayed } from "./summary.ts";
@@ -147,9 +147,9 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
 
     if (game.end !== undefined) {
         const analysis = game.end.analyst === "offer"
-            ? ` To go over it, on their yes, ${analystLine(game.end.archive, game.end.codex === true)}`
+            ? ` To go over it, on their yes, ${analystLine(game.end.archive, analystStartIn(game.end))}`
             : game.end.analyst === "done"
-            ? ` ${reviewedLine(game.end.archive)}`
+            ? ` ${reviewedLine(game.end.archive, analystStartIn(game.end))}`
             : "";
         return words.length === 0
             ? `Next: tell the player how the game ended, ${ending}; then offer them, in words, another game or `

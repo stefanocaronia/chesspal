@@ -1,13 +1,20 @@
-// The agents that work beside the chat in Claude Code and Codex (D-98): the analyst that goes over a game over (D-89) and the coach that judges the player's moves (D-88).
+// The agents that work beside the chat in Claude Code and Codex (D-98): the analyst that goes over a game over (D-89) and the coach that judges the player's moves (D-88);
+// for a chat at the table's place, the helpers the table runs itself in their place.
 import { isReviewed } from "../../core/index.ts";
 import { archivedName, coachStarted, type CurrentGame, gameInAnalysis, lastChatStart } from "../../games/index.ts";
 import { agentHosts, analystAgent, coachAgent, hasAgent, isCodex } from "../../host-files/index.ts";
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
-import type { Context } from "../registry/index.ts";
+import type { Context, HelperRole } from "../registry/index.ts";
 import { namedGame } from "./study.ts";
 import { type GameSummary, unplayed } from "./summary.ts";
 
-/** Whether an analyst agent goes over a game over when the player wants: in Claude Code or Codex, with its agent in the player's folder (D-89, D-98). */
+/** How the chat has its analyst started: in Codex with spawn_agent, at the table with analyse_game; none in Claude Code, which starts it in the background. */
+export type AnalystStart = "codex" | "table";
+
+/**
+ * Whether an analyst agent goes over a game over when the player wants: in Claude Code or Codex, with its agent in the player's folder (D-89, D-98); for a
+ * chat at the table's place, the table's own.
+ */
 export function analystRuns(context: Context): boolean
 {
     return agentRuns(context, analystAgent);
@@ -28,20 +35,38 @@ export function withAnalyst(summary: GameSummary, context: Context, over?: Curre
 
     const archived = over === undefined ? undefined : archivedName(gameFolder(context.home()), over);
     const analyst = archived !== undefined && goneOver(context, archived) ? "done" : "offer";
-    return { ...summary, end: { ...end, analyst, ...(isCodex(context.host?.()) ? { codex: true } : {}) } };
+    const start = analystStartOf(context);
+    return { ...summary, end: { ...end, analyst, ...(start === undefined ? {} : { [start]: true as const }) } };
+}
+
+/** How the chat of `context` has its analyst started. */
+export function analystStartOf(context: Context): AnalystStart | undefined
+{
+    return context.helpers !== undefined ? "table" : isCodex(context.host?.()) ? "codex" : undefined;
+}
+
+/** How a game over, or a game in analysis, says the chat has its analyst started. */
+export function analystStartIn(said: { codex?: true; table?: true; }): AnalystStart | undefined
+{
+    return said.table === true ? "table" : said.codex === true ? "codex" : undefined;
 }
 
 /**
  * How the chat has a game over gone over by the analyst agent, on the player's yes or for the game they brought (D-89); in Codex with spawn_agent by name,
- * since a chat there called analyse_game itself instead (Priya).
+ * since a chat there called analyse_game itself instead (Priya); at the table with analyse_game, which has the table start its analyst.
  */
-export function analystLine(game?: string, codex = false): string
+export function analystLine(game?: string, start?: AnalystStart): string
 {
+    if (start === "table") {
+        return `call analyse_game ${game === undefined ? "{}" : `{"game": "${game}"}`}: the table's analyst then writes its review on the board page, which shows it at `
+            + "work, while you talk the game over with the player whenever they ask; when it ends, the table tells you, and you go over it with them.";
+    }
+
     const prompt = `Analyse${game === undefined ? "" : ` ${game}`}. The player speaks <their language>.`;
-    const start = codex
+    const started = start === "codex"
         ? `start the ${analystAgent} agent with spawn_agent {"agent_type": "${analystAgent}", "message": "${prompt}", "fork_turns": "none"}`
         : `start the ${analystAgent} agent in the background with the prompt "${prompt}"`;
-    return `${start}: it writes its review on the board page, which shows it at work; tell the player in a word, talk the game over with them meanwhile whenever `
+    return `${started}: it writes its review on the board page, which shows it at work; tell the player in a word, talk the game over with them meanwhile whenever `
         + "they ask, and when it ends go over it with them from what it tells you.";
 }
 
@@ -63,36 +88,58 @@ export function analystOnView(context: Context, game: string | undefined): strin
     }
 
     context.told?.add(key);
-    return `${game} has no review. When the player wants it gone over, ${analystLine(game, isCodex(context.host?.()))}`;
+    return `${game} has no review. When the player wants it gone over, ${analystLine(game, analystStartOf(context))}`;
 }
 
-/** How the chat goes over a game the analyst agent has reviewed, or is reviewing: from that review, never with another agent (Stefano). */
-export function reviewedLine(game?: string): string
+/**
+ * How the chat goes over a game the analyst agent has reviewed, or is reviewing: from that review, never with another agent (Stefano); at the table, the
+ * table's analyst.
+ */
+export function reviewedLine(game?: string, start?: AnalystStart): string
 {
+    const given = `analyse_game ${game === undefined ? "" : `{"game": "${game}"} `}gives`;
+
+    if (start === "table") {
+        return `The table's analyst has gone over this game, or is at it. When the player wants it gone over, go over it with them from its review on the board page, which ${given}.`;
+    }
+
     return "The analyst agent has gone over this game, or is at it: don't start it for this review. When the player wants it gone over, go over it with them from what "
-        + `it told you, or, in a chat without it, from its review on the board page, which analyse_game ${game === undefined ? "" : `{"game": "${game}"} `}gives.`;
+        + `it told you, or, in a chat without it, from its review on the board page, which ${given}.`;
 }
 
-/** Whether a coach judges the player's moves when the helps are on: in Claude Code or Codex, with its agent in the player's folder (D-80, D-88, D-98). */
+/**
+ * Whether a coach judges the player's moves when the helps are on: in Claude Code or Codex, with its agent in the player's folder (D-80, D-88, D-98); for a
+ * chat at the table's place, the table's own.
+ */
 export function coachRuns(context: Context): boolean
 {
     return agentRuns(context, coachAgent);
 }
 
-/** Whether one of Chesspal's agents runs beside this chat: in a host that starts agents, with its file in the player's folder. */
+/** Whether one of Chesspal's agents runs beside this chat: in a host that starts agents, with its file in the player's folder; at the table's place, the table's. */
 export function agentRuns(context: Context, agent: string): boolean
 {
+    if (context.helpers !== undefined) {
+        return context.helpers.runs(roleOf(agent));
+    }
+
     const host = context.host?.();
     return host !== undefined && agentHosts.includes(host) && hasAgent(context.folder, agent, host);
 }
 
 /**
  * Whether to start the coach once a move has ended the game on the board, with the helps on: it judges the player's last move, their own that ended it too
- * (D-88). Told again until it starts, since a chat busy telling the end may lose the line on its way to its words (Priya).
+ * (D-88). Told again until it starts, since a chat busy telling the end may lose the line on its way to its words (Priya). The table starts its own.
  */
 export function coachOnEnd(context: Context, folder: string, current: CurrentGame): boolean
 {
-    return current.game.outcome.over && helpsIn(folder) && coachRuns(context) && !coachStarted(folder, current);
+    return context.helpers === undefined && endingToCoach(folder, current) && coachRuns(context);
+}
+
+/** Whether a move has ended the game on the board, with the helps on, and no coach has started on it yet. */
+export function endingToCoach(folder: string, current: CurrentGame): boolean
+{
+    return current.game.outcome.over && helpsIn(folder) && !coachStarted(folder, current);
 }
 
 /**
@@ -128,11 +175,11 @@ export function agentsLine(agents: readonly string[]): string
 
 /**
  * Whether a game is gone over already: reviewed, or taken by an analyst at work on it, whatever the page opened since (Federico); not once its review is
- * deleted, for the analyst to write it again (Stefano).
+ * deleted, for the analyst to write it again (Stefano). At the table, one the table's analyst goes over.
  */
 export function goneOver(context: Context, game: string): boolean
 {
-    if (analystOf(context, game) !== undefined) {
+    if (context.helpers?.analysing() === game || analystOf(context, game) !== undefined) {
         return true;
     }
 
@@ -146,12 +193,18 @@ export function goneOver(context: Context, game: string): boolean
 
 /**
  * The run of the analyst agent at work on a game: the one that took it last, unless its chat has started again since, not only summarized, and took the
- * agent with it, or it has written nothing for half an hour, as one long dead (D-109): a quiet minute proves nothing, since an analyst may think long.
+ * agent with it, or it has written nothing for half an hour, as one long dead (D-109): a quiet minute proves nothing, since an analyst may think long. At
+ * the table, the one that took it while the table's analyst goes over it: the table knows.
  */
 export function analystOf(context: Context, game: string): string | undefined
 {
     const analysis = gameInAnalysis(gameFolder(context.home()));
     const taken = analysis?.analyst;
+
+    if (context.helpers !== undefined) {
+        return taken?.game === game && context.helpers.analysing() === game ? taken.run : undefined;
+    }
+
     const start = lastChatStart(context.folder);
     const restarted = taken !== undefined && start !== undefined && start.source !== "compact" && Date.parse(start.at) > Date.parse(taken.since);
     const quiet = analysis !== undefined && context.now().getTime() - Date.parse(analysis.at) > analystQuiet;
@@ -178,4 +231,10 @@ export function analysisStopped(game: string): string
 {
     return `Stop now: the player stopped the analysis of ${game} on the board page; what was written of its review stays. Nothing changed. An analyst agent ends `
         + "with one line for the AI that started it: the player stopped the analysis. Go over the game again only when the player asks, with analyse_game first.";
+}
+
+/** The helper of one of Chesspal's agents, by its name. */
+function roleOf(agent: string): HelperRole
+{
+    return agent === analystAgent ? "analyst" : agent === coachAgent ? "coach" : "ponder";
 }

@@ -5,7 +5,7 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { mkdirSync } from "node:fs";
 import { createServer } from "node:http";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { newProfile } from "../../src/commands/profiles/profiles.ts";
@@ -120,7 +120,7 @@ function terminalChats(): TableChats
 function fakeDriver(): HostDriver
 {
     return {
-        open: (options) => fakeChat(options, `demo-${chats.length + 1}`),
+        open: (options) => (basename(options.folder) === "opponent" ? fakeChat(options, `demo-${chats.length + 1}`) : helperChat()),
         missing: () => undefined,
         program: () => (script.opening === "missing" ? undefined : { command: "claude", args: [] }),
         environment: (environment) => ({ ...environment }),
@@ -215,6 +215,23 @@ function fakeChat(options: ChatOptions, ownSession: string): HostChat
             closed = true;
             void client?.then((sitting) => sitting.close()).catch(() => undefined);
         },
+    };
+}
+
+/** A helper's chat, which the table opens beside the opponent's: it ends each turn at once, with nothing done. */
+function helperChat(): HostChat
+{
+    let listener: ((event: HostEvent) => void) | undefined;
+    let closed = false;
+    const tell = (event: HostEvent): void => void (closed ? undefined : listener?.(event));
+    return {
+        send: () => {
+            setImmediate(() => tell({ type: "turnEnd", reason: "done" }));
+            return !closed;
+        },
+        onEvent: (heard) => void (listener = heard),
+        interrupt: () => undefined,
+        close: () => void (closed = true),
     };
 }
 

@@ -4,6 +4,7 @@ import { AiToMove, archivedName, type Talk, talkLimits } from "../../games/index
 import { gameFolder } from "../../profiles/index.ts";
 import {
     analystLine,
+    analystStartIn,
     coachOnEnd,
     coachOnEndLine,
     type Doorbell,
@@ -80,11 +81,11 @@ function afterWords(game: GameSummary | undefined, words: readonly Written[], do
     if (words.length === 0 && game?.end !== undefined) {
         // The offer to go over the game, made in the AI's words, waits for the player's yes (D-89).
         if (game.end.analyst === "done") {
-            return `Next: ${reviewedLine(game.end.archive)} When they want another game, ${newGameStep}`;
+            return `Next: ${reviewedLine(game.end.archive, analystStartIn(game.end))} When they want another game, ${newGameStep}`;
         }
 
         return game.end.analyst === "offer"
-            ? `Next: when the player wants this game gone over, ${analystLine(game.end.archive, game.end.codex === true)} When they want another game, ${newGameStep}`
+            ? `Next: when the player wants this game gone over, ${analystLine(game.end.archive, analystStartIn(game.end))} When they want another game, ${newGameStep}`
             : `Next: when the player wants another game, ${newGameStep}`;
     }
 

@@ -15,7 +15,7 @@ export const instructions = defineCommand({
     alwaysLoad: true,
     run: (input, context): string => {
         context.told?.add(readKey(lastChatStart(context.folder)?.at));
-        return opponentInstructions();
+        return opponentInstructions(context.helpers !== undefined);
     },
     format: (text) => text,
 });

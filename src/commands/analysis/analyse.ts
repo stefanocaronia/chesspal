@@ -93,6 +93,8 @@ interface Analysis
 {
     /** How to analyse, the first time in a chat (D-68). */
     instructions?: string;
+    /** For the chat at the table's place, that the table's analyst writes the review of this game. */
+    byTable?: string;
     /** The player's language, for the analyst's agent, which talks with no one (D-89). */
     speech?: string;
     /** Who the player is, how they play and their rating, for the analyst's agent, which never reads status (D-66). */
@@ -182,6 +184,8 @@ export const analyseGame = defineCommand({
             startAnalysis(gameFolder(context.home()), studied.name, context.now());
         }
 
+        const byTable = tableAnalyst(context, studied);
+
         // The analyst's agent has its instructions in its own file, and the player's language in its prompt or, when Chesspal knows it, here (D-89);
         // who the player is, which the chat reads in status, here too, so that it writes for their level.
         if (context.agent === analystAgent) {
@@ -191,11 +195,12 @@ export const analyseGame = defineCommand({
         }
 
         const told = analystInstructions(context);
-        return told === undefined ? analysis : { instructions: told, ...analysis };
+        return { ...(told === undefined ? {} : { instructions: told }), ...(byTable ? { byTable: byTableLine } : {}), ...analysis };
     },
     format: (analysis) =>
         [
             ...(analysis.instructions === undefined ? [] : [analysis.instructions, ""]),
+            ...(analysis.byTable === undefined ? [] : [analysis.byTable]),
             ...(analysis.speech === undefined ? [] : [analysis.speech]),
             ...(analysis.profile === undefined ? [] : [analysis.profile]),
             ...analysisHead(analysis),
@@ -240,6 +245,21 @@ function oneAnalyst(context: Context, studied: Studied): void
         }
     }
 }
+
+/** Whether the table's analyst takes the game the chat at the table's place asked for: a game of the archive with no review yet. */
+function tableAnalyst(context: Context, studied: Studied): boolean
+{
+    const { helpers } = context;
+
+    if (helpers === undefined || context.agent !== undefined || studied.name === undefined || isReviewed(studied.record)) {
+        return false;
+    }
+
+    return helpers.analyse(studied.name);
+}
+
+const byTableLine = "The table's analyst is writing its review of this game on the board page: don't write one yourself; talk the game over with the player "
+    + "meanwhile, and correct a note with annotate_game only when they show it wrong.";
 
 /** A game the player brings as a PGN, checked move by move and kept to study with its clock and Chesspal's own review: no other comment, no engine's evaluation (D-6). */
 function importedGame(context: Context, pgn: string): Studied

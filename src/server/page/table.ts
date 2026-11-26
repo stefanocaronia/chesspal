@@ -48,6 +48,12 @@ export interface TableChats
     turnSince?(): Date | undefined;
     /** Why the last chat the table drove failed or ended by itself, numbered, until the next chat opens. */
     failure?(): ChatFailure | undefined;
+    /** Has the table's analyst go over a game brought to analyse: whether it does; false where the table runs no analyst. */
+    analyse?(game: string): boolean;
+    /** Stops the table's analyst, as the player stops the analysis on the page. */
+    stopAnalysis?(): void;
+    /** The helpers the table runs itself, with the game its analyst goes over: none where it runs none, and the chat at the table has its own. */
+    helpers?(): { readonly analysing?: string; } | undefined;
     /** Closes the chats the table drives, as the table closes. */
     close?(): Promise<void>;
 }
@@ -244,7 +250,7 @@ export function relaunchChat(served: Served, how: "again" | "restart" = "again",
  */
 export function chatToWaitFor(served: Served): boolean
 {
-    return heldChat(served) !== undefined && !chatAtRest(served) && !analystAtWork(served);
+    return heldChat(served) !== undefined && !chatAtRest(served) && !chatsAnalystAtWork(served);
 }
 
 /**
@@ -530,7 +536,7 @@ function heldChat(served: Served): HeldChat | undefined
 function chatAtRest(served: Served): boolean
 {
     const { bell } = served;
-    return (bell.listening || bell.deaf) && !bell.inTurn && !analystAtWork(served);
+    return (bell.listening || bell.deaf) && !bell.inTurn && !chatsAnalystAtWork(served);
 }
 
 /**
@@ -538,10 +544,25 @@ function chatAtRest(served: Served): boolean
  * hour, is gone (D-109), and one that has written the game's review has done, though a host that lists no agents keeps it holding the game. The chat's
  * starts are in its own folder: on the table, the attached chat's.
  */
-export function analystAtWork(served: Served, game = gameInAnalysis(gameFolder(served.context.home()))?.analyst?.game): boolean
+export function analystAtWork(served: Served, game?: string): boolean
 {
+    const helpers = served.table?.chats?.helpers?.();
+
+    // The table's own analyst, where it runs one: at work on the game it goes over, until that game has its review.
+    if (helpers !== undefined) {
+        const at = helpers.analysing;
+        return at !== undefined && (game === undefined || game === at) && !reviewedGame(served, at);
+    }
+
+    const held = game ?? gameInAnalysis(gameFolder(served.context.home()))?.analyst?.game;
     const chat = { ...served.context, folder: served.attached?.chat.folder ?? served.folder };
-    return game !== undefined && analystOf(chat, game) !== undefined && !reviewedGame(served, game);
+    return held !== undefined && analystOf(chat, held) !== undefined && !reviewedGame(served, held);
+}
+
+/** Whether the chat at the table has its own analyst at work, which keeps it busy: the table's own never does. */
+function chatsAnalystAtWork(served: Served): boolean
+{
+    return served.table?.chats?.helpers?.() === undefined && analystAtWork(served);
 }
 
 // Whether the game has the analyst's review; one gone from the games has none.

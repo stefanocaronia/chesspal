@@ -87,6 +87,18 @@ export function instructionsFile(name: string): string
 
 const instructionTexts = new Map<string, string>();
 
+/**
+ * A helper's instructions for the chat the table opens for it: its agent's, with the table's own lines (`<role>-table.md`) in place of those that speak of
+ * the AI that started it: the last line, and the first too when the table's has two.
+ */
+export function tableHelperInstructions(role: "ponder" | "coach" | "analyst"): string
+{
+    const agent = instructionsFile(role === "analyst" ? "analyst-agent" : role).split("\n");
+    const own = instructionsFile(`${role}-table`).split("\n");
+    const text = [own.length > 1 ? own[0]! : agent[0]!, ...agent.slice(1, -1), own.at(-1)!].join("\n");
+    return role === "analyst" ? `${text}\n${instructionsFile("analysis")}` : text;
+}
+
 /** An agent as init writes it, with its model in each host: the AI's own unless one is given. */
 interface AgentSpec
 {

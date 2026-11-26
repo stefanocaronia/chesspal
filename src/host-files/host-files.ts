@@ -55,11 +55,25 @@ export function hasDoorbell(host: string | undefined): boolean
 /** The hosts that run the hooks init writes, by the names they give the server: Antigravity's too (D-115), and OpenCode's, through its plugin (D-117). */
 export const hookedHosts: readonly string[] = [...agentHosts, "antigravity-client", "opencode"];
 
-/** The instructions of the AI opponent, read from the package wherever it is installed: the MCP server's `instructions` tool gives them (D-102). */
-export function opponentInstructions(): string
+/**
+ * The instructions of the AI opponent, read from the package wherever it is installed: the MCP server's `instructions` tool gives them (D-102). `atTable`,
+ * for a chat at the table's place, whose helpers the table runs: its own lines in place of those that start the agents.
+ */
+export function opponentInstructions(atTable = false): string
 {
-    return instructionsFile("opponent");
+    const text = instructionsFile("opponent");
+
+    if (!atTable) {
+        return text;
+    }
+
+    const [helpers = "", analysis = ""] = instructionsFile("opponent-table").split("\n");
+    return text.split("\n").map((line) => (line.startsWith(agentsBullet) ? helpers : line.replace(analystClause, analysis))).join("\n");
 }
+
+// What the opponent's instructions say of the agents it starts, which the table's own lines replace.
+const agentsBullet = "- When `ai_move` tells you to start an agent";
+const analystClause = /it reads the PGN for you;.*?not even when the player asks for the analysis again\./;
 
 /** The lines that start a chat, in the MCP server's instructions and in AGENTS.md: call `instructions`, then `status` (D-102). */
 export function startInstructions(): string
