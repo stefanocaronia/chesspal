@@ -7,7 +7,7 @@ const none: DrivenTable = { chat: false };
 const driven: DrivenTable = { chat: true, driven: true };
 const atWork: DrivenTable = { ...driven, atWork: true };
 const inTerminal: DrivenTable = { chat: true };
-const failed = { why: "The chat's program stopped by itself: open the chat again from the board page. (exit code 1)", code: "program-ended", number: 2 };
+const failed = { why: "exit code 1", code: "program-ended", number: 2 };
 const on = settingsFrom({ chatInPage: true, chatHost: "claude" });
 const off = settingsFrom({ chatHost: "claude" });
 const languages = [textFor(["it"]), textFor(["en"])];
@@ -90,8 +90,6 @@ describe("the page with a chat the table drives", () => {
 
     it("offers to start the chat again when it does not listen, in place of sending the player to a window it does not have", () => {
         expect(drivenAsleep(driven, false)).toBe(true);
-        // In its first turn, before any tool, the doorbell does not know it yet: it is at work, and hears the player at the turn's end.
-        expect(drivenAsleep(atWork, false)).toBe(false);
         expect(drivenAsleep(driven, true)).toBe(false);
         expect(drivenAsleep(driven, undefined)).toBe(false);
         expect(drivenAsleep(inTerminal, false)).toBe(false);

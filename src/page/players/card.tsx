@@ -2,10 +2,10 @@
 // clock.
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { type Clock, type PieceLetter, type Side, timeLeft } from "../../core/index.ts";
+import type { PieceLetter, Side } from "../../core/index.ts";
 import { Piece } from "../pieces/pieces.tsx";
 import type { Text } from "../text.ts";
-import { lowTime, timeShown } from "./clock-time.ts";
+import { clockLeft, lowTime, type ShownClock, timeShown } from "./clock-time.ts";
 
 /** The card of one player: the AI's above its words, with its level; the player's below theirs, saying when it is their move. */
 export function PlayerCard({ place, picture, name, signed, side, level, taken, ahead, turn = false, clock, badges, text }: {
@@ -76,13 +76,13 @@ export function PlayerCard({ place, picture, name, signed, side, level, taken, a
 }
 
 /**
- * A side's time on the game's clock, as the server keeps it: it runs while the side is to move and the game goes on, unless `held` (a move on its way);
- * at nothing it calls `onFlag` once, for the server to say how the game ended.
+ * A side's time on the game's clock, as the server keeps it: it runs while the side is to move and the game goes on, unless `held` (a move on its way), or
+ * the server holds it, at the instant it says; at nothing it calls `onFlag` once, for the server to say how the game ended.
  */
-export function ClockFace({ clock, side, toMove, held, onFlag, text }: { clock: Clock; side: Side; toMove: boolean; held: boolean; onFlag: () => void; text: Text; })
+export function ClockFace({ clock, side, toMove, held, onFlag, text }: { clock: ShownClock; side: Side; toMove: boolean; held: boolean; onFlag: () => void; text: Text; })
 {
     const [now, setNow] = useState(() => Date.now());
-    const running = toMove && !held && clock.waiting !== true;
+    const running = toMove && !held && clock.held === undefined && clock.waiting !== true;
 
     useEffect(() => {
         if (!running) {
@@ -94,7 +94,7 @@ export function ClockFace({ clock, side, toMove, held, onFlag, text }: { clock: 
         return () => clearInterval(ticks);
     }, [running, clock]);
 
-    const left = toMove ? timeLeft(clock, side, new Date(now))[side] : clock.left[side];
+    const left = clockLeft(clock, side, toMove, new Date(now));
     const fallen = running && left === 0;
 
     useEffect(() => {

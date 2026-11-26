@@ -28,8 +28,11 @@ interface Script
     /** How long the host takes to say which chat it is, while the page shows the chat opening; and then to call its first tool, in milliseconds. */
     hold: number;
     mute: number;
-    /** A turn the bell wakes: the AI moves or answers, thinks without end, answers without ever moving, or fails once, in the host's words `why`. */
-    turn: "play" | "think" | "quiet" | "fail";
+    /**
+     * A turn the bell wakes: the AI moves or answers, thinks without end, answers without ever moving, reviews the game in analysis, or fails once, in the
+     * host's words `why`.
+     */
+    turn: "play" | "think" | "quiet" | "review" | "fail";
     why: string;
 }
 
@@ -50,6 +53,7 @@ const scenes: Readonly<Record<string, { label: string; set: () => void; }>> = {
     play: { label: "The AI answers each turn", set: () => void (script.turn = "play") },
     think: { label: "The AI thinks without end (stop it from the page)", set: () => void (script.turn = "think") },
     quiet: { label: "The AI answers, and never moves", set: () => void (script.turn = "quiet") },
+    review: { label: "The AI reviews the game in analysis", set: () => void (script.turn = "review") },
     "turn-fails": { label: "The next turn fails: the host is overloaded", set: fails(hostWords.overloaded) },
     "turn-limit": { label: "The next turn fails: the account's limit", set: fails(hostWords.limit) },
     "turn-login": { label: "The next turn fails: not signed in any more", set: fails(hostWords.login) },
@@ -182,7 +186,7 @@ function fakeChat(options: ChatOptions, ownSession: string): HostChat
 
         client ??= sitAt(options.server!.environment);
         const sitting = await client;
-        const work = first ? startTurn(sitting) : script.turn === "think" ? new Promise<void>(() => undefined) : answerTurn(sitting, script.turn === "quiet");
+        const work = first ? startTurn(sitting) : script.turn === "think" ? new Promise<void>(() => undefined) : script.turn === "review" ? reviewTurn(sitting) : answerTurn(sitting, script.turn === "quiet");
         const done = work.then(() => "done" as const, (error: unknown) => {
             console.log(`The fake AI's turn failed: ${String(error)}`);
             return "done" as const;
@@ -234,6 +238,14 @@ async function answerTurn(client: Client, quiet: boolean): Promise<void>
     } else {
         await call(client, "ai_say", { text: "Ti ascolto." });
     }
+}
+
+/** A turn that reviews the game in analysis, in a few words, as an analyst's last call does. */
+async function reviewTurn(client: Client): Promise<void>
+{
+    await call(client, "analyse_game");
+    await delay(1200);
+    await call(client, "annotate_game", { summary: "Una partita breve: l'apertura è andata bene, poi ti sei arreso presto.", closing: "Finita per abbandono." });
 }
 
 async function call(client: Client, name: string, args: Record<string, unknown> = {}): Promise<void>

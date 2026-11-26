@@ -567,9 +567,8 @@ export function App({ start }: { start: Settings; })
         : undefined;
     // The clocks only in a game going on: between games the player's card holds the next one in their place (D-77).
     const clock = going ? game?.clock : undefined;
-    // No chat hears the player: the page says where to wake it, and the AI's clock waits, as the server holds it. A chat the table drives hears them at
-    // the end of the turn it is in, its first too, before any tool of it has told the doorbell.
-    const asleep = served.listening === false && !offline && served.table?.atWork !== true;
+    // No chat hears the player: the page says where to wake it, and the AI's clock waits, as the server holds it.
+    const asleep = served.listening === false && !offline;
     // On the table, what its chat is doing stands on the page (D-107), and a chat the table drives is stopped from it (D-125).
     const table = offline ? undefined : served.table;
     // What the AI thinks on, a cloud at the Torretta's corner (Zoe): only in a game going on, and never while no chat hears the player, which the note says.
@@ -591,7 +590,7 @@ export function App({ start }: { start: Settings; })
                 clock={clock}
                 side={side}
                 toMove={!ended && live.position.turn === side}
-                held={pending !== undefined || ((asleep || stalled !== undefined) && side === ai)}
+                held={pending !== undefined || (asleep && side === ai)}
                 onFlag={reload}
                 text={text}
             />
@@ -599,7 +598,7 @@ export function App({ start }: { start: Settings; })
     // Where to wake the chat, under the AI's card (over the board when the talk is folded); the button that starts the clocks, under the player's (Zoe).
     // On the table, what its chat is doing stands there, and in a game with no chat at it a line that opens the chat's window (D-107).
     // With a chat the table drives (D-125), the mark that stops the AI while a turn of it runs: beside its clock, over the box in analysis, and under the
-    // tab of the talk folded away. In analysis no Torretta thinks: the cloud of its answer stands by the mark.
+    // tab of the talk folded away. In analysis no Torretta thinks: the cloud of its answer stands by the mark, but in a review, which its own card tells.
     const stop = canStop(table) ? <StopButton name={name} text={text} /> : null;
     // In analysis the chat that answers stands over the box: its name opens its window, as on the AI's card in a game.
     const chatButton = table === undefined ? undefined : <AiNameButton name={name} table={table} onOpen={askChat} text={text} />;
@@ -607,7 +606,7 @@ export function App({ start }: { start: Settings; })
         ? (
             <div class="chat-who">
                 {chatButton}
-                {stop === null ? null : <Thought thinking="answer" words={text.thinking} />}
+                {stop === null || reviewing ? null : <Thought thinking="answer" words={text.thinking} />}
                 {stop}
             </div>
         )

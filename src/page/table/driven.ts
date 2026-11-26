@@ -74,13 +74,10 @@ export function stalledOnMove(table: DrivenTable | undefined, aiToMove: boolean)
     return table.stopped === true ? "stopped" : table.noMove === true ? "noMove" : undefined;
 }
 
-/**
- * Whether the chat the table drives does not hear the player, out of any turn: it has no window to write in, so the page offers to start it again. One at
- * work hears them at its turn's end.
- */
+/** Whether the chat the table drives does not hear the player: it has no window to write in, so the page offers to start it again. */
 export function drivenAsleep(table: DrivenTable, listening: boolean | undefined): boolean
 {
-    return table.driven === true && listening === false && table.atWork !== true;
+    return table.driven === true && listening === false;
 }
 
 /**

@@ -1,10 +1,11 @@
 // What the page asks the server (D-47): the game of the player's folder, read again each time it changes, and the player's moves, words and choices sent
 // there, refused in the player's language.
 import { useEffect, useRef, useState } from "preact/hooks";
-import type { AiModel, Clock, Side } from "../../core/index.ts";
+import type { AiModel, Side } from "../../core/index.ts";
 import type { Thinking } from "../avatars/thought.tsx";
 import type { CoachShown, TalkLine } from "../game/plies.ts";
 import { closesForNewer, eventsAddress } from "../layout/window.ts";
+import type { ShownClock } from "../players/clock-time.ts";
 import type { ProfileShown } from "../profile/profile.ts";
 import type { OllamaShown } from "../table/action.ts";
 import type { ChatFailure } from "../table/driven.ts";
@@ -77,7 +78,7 @@ export interface PageData
         /** Its name in the archive, games/2026-11-02-153012.pgn. */
         readonly name: string;
         readonly talk: readonly TalkLine[];
-        readonly clock?: Clock;
+        readonly clock?: ShownClock;
         readonly drawOffer?: "player" | "ai";
         /** How many of its first moves are the book's. */
         readonly book?: number;
