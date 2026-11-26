@@ -23,9 +23,10 @@ import {
     startNewGame,
     type VariationInput,
 } from "../../commands/index.ts";
-import { clockStarted, type GameRecord, isMoveAlone, isReviewed, writePgn } from "../../core/index.ts";
+import { type Clock, clockStarted, type GameRecord, isMoveAlone, isReviewed, writePgn } from "../../core/index.ts";
 import {
     aiModelOf,
+    type Analysis,
     archiveName,
     coachShown,
     type CoachWords,
@@ -105,10 +106,12 @@ export function stallEnds(served: Served): void
     const folder = gameFolder(served.context.home());
     const current = loadGame(folder);
     const held = current !== undefined && aiHeld(served, current);
+    const since = served.stalledAt;
     served.stalled = undefined;
+    served.stalledAt = undefined;
 
     if (held) {
-        rerunIfChanged(() => giveHeldTime(served, folder));
+        rerunIfChanged(() => giveHeldTime(served, folder, since));
     }
 
     tellWatchers(served.watchers);
@@ -127,13 +130,19 @@ export function thinkingChanged(served: Served): boolean
     }
 }
 
-/** The AI's clock, held while nobody heard the player, starts now: the time it was held is not the AI's. */
-function giveHeldTime(served: Served, folder: string): void
+/**
+ * The AI's clock, held while nobody heard the player, starts now: the time it was held is not the AI's. Held `since` an instant, as when the chat stalled,
+ * it runs on from where it stood then.
+ */
+function giveHeldTime(served: Served, folder: string, since?: string): void
 {
     const current = loadGame(folder);
 
     if (current?.clock !== undefined && endOf(current.game) === undefined) {
-        saveGame(folder, { ...current, clock: { ...current.clock, since: served.context.now().toISOString() } });
+        const now = served.context.now().getTime();
+        const started = Date.parse(current.clock.since);
+        const runs = since === undefined ? now : started + now - Math.max(started, Date.parse(since));
+        saveGame(folder, { ...current, clock: { ...current.clock, since: new Date(runs).toISOString() } });
     }
 }
 
@@ -578,7 +587,7 @@ function sendGame(response: ServerResponse, served: Served): void
         talk,
         // How many of its first moves are the book's: the page marks them while the game goes on, as the AI's review does after.
         book: bookPlies(current.game),
-        ...(current.clock === undefined ? {} : { clock: current.clock }),
+        ...(current.clock === undefined ? {} : { clock: heldClock(served, current, current.clock) }),
         ...(offer === undefined ? {} : { drawOffer: offer }),
         ...(coach === undefined ? {} : { coach }),
     };
@@ -684,7 +693,7 @@ function analysisShown(served: Served): { name: string; pgn: string; book: numbe
         // started again since is gone (Priya).
         const { bell } = served;
         const reviewed = isReviewed(record);
-        const reviewing = !reviewed && (bell.inTurn || (bell.listening && analystAtWork(served, analysis.game)));
+        const reviewing = !reviewed && (served.attached?.local === undefined ? bell.inTurn || (bell.listening && analystAtWork(served, analysis.game)) : drivenReviews(served, analysis));
         // Without a review and with nobody at it, the analysis is incomplete: the page offers to bring it back to the AI (D-109).
         const state = reviewed ? {} : reviewing ? { reviewing: true as const } : { incomplete: true as const };
         // How far the book goes, which the page cannot tell without the book's moves: its card names the opening on those moves.
@@ -693,6 +702,16 @@ function analysisShown(served: Served): { name: string; pgn: string; book: numbe
         // A game gone from the archive is no longer shown.
         return undefined;
     }
+}
+
+/**
+ * Whether the chat the table drives goes over the game in analysis: in a turn, with the review asked and not begun, or begun in this turn; a turn that only
+ * answers the player about the game they look at is no review (D-109).
+ */
+function drivenReviews(served: Served, analysis: Analysis): boolean
+{
+    const since = served.table?.chats?.turnSince?.();
+    return since !== undefined && (analysis.brought === true || analysis.redo === true || Date.parse(analysis.at) >= since.getTime());
 }
 
 /** The game just over, or else the last one played, as analyse_game takes it without a name: always one of the archive. */
@@ -790,6 +809,16 @@ function gameNow(served: Served): CurrentGame | undefined
     }
 
     return current;
+}
+
+/**
+ * The clock as the pages show it: while the AI's is held, the instant it stands at, the same on every page, loaded before or after. Held while nobody
+ * heard the player, it stands where it started, since that time is given back; held as the chat stalled, where it stood then.
+ */
+function heldClock(served: Served, current: CurrentGame, clock: Clock): Clock & { held?: string; }
+{
+    const stalled = served.stalledAt === undefined || Date.parse(served.stalledAt) < Date.parse(clock.since) ? clock.since : served.stalledAt;
+    return aiHeld(served, current) ? { ...clock, held: stalled } : clock;
 }
 
 /** Whether the AI's clock is held: a game with a clock, going on, the AI to move, and nobody hearing the player, or the chat the table drives stalled. */

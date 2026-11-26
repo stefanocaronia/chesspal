@@ -33,6 +33,8 @@ export interface ChatSeat
     ring(): void;
     /** A turn of the chat's starts with words the bell did not send: the listener, if one waits, is let go. */
     prompted(): void;
+    /** The chat is in a turn the table sent it: it hears the player, as after a tool it calls, and the AI's clock held while nobody did runs again. */
+    atWork(): void;
     /** The chat is at rest without having moved: stopped by the player, or with no move after two turns. The AI's clock is held until it is woken. */
     stall(why: "stopped" | "noMove"): void;
     /** What the pages show of the chat may have changed: a turn started or ended. */
@@ -76,6 +78,7 @@ export function chatSeat(served: Served, page: string): ChatSeat
         leave: () => {
             if (seated !== undefined) {
                 served.stalled = undefined;
+                served.stalledAt = undefined;
                 chatLeft(served, seated);
                 seated = undefined;
             }
@@ -104,7 +107,9 @@ export function chatSeat(served: Served, page: string): ChatSeat
             stallEnds(served);
             served.bell.chatPrompted();
         },
+        atWork: () => chatCalls(served),
         stall: (why) => {
+            served.stalledAt ??= served.context.now().toISOString();
             served.stalled = why;
             tellWatchers(served.watchers);
         },

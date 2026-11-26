@@ -319,6 +319,11 @@ async function runTool(
         const who = agent !== undefined ? { agent, ...(run === undefined ? {} : { agentRun: run }) } : calling !== undefined ? { chat: true as const } : {};
         // A game another process changed under the call is read again, and the call made once more.
         const result: unknown = await rerunIfChanged(() => command.run(checkedInput(command, input), { ...context, home, caller, ...who }));
+
+        if (chat) {
+            context.answered?.(command.name, result);
+        }
+
         return { content: [{ type: "text", text: command.format(result, context) }] };
     } catch (error) {
         // A chat refused for a position it had not seen gets the game as it is now with the refusal, and has seen it: no status call between.

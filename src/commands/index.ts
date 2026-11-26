@@ -16,6 +16,7 @@ export {
     bookPlies,
     gameAt,
     gameToStudy,
+    type MovePlayed,
     namedGame,
     playMove,
     PositionChanged,

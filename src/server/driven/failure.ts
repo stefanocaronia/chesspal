@@ -1,14 +1,15 @@
 // What the table tells apart of why a chat it drives failed, read in one place from the words its driver passes on from the host.
 import type { ChatFailure, FailureCode } from "../page/index.ts";
 
-/** The failure numbered `number`, coded from the host's words; the words a player reads when the host's program ended by itself, its code kept at the end. */
+/**
+ * The failure numbered `number`, coded from the host's words, which it keeps: of a program that ended by itself, its last words, else its exit code alone.
+ * The sentence for the player is the page's, by the code.
+ */
 export function failureOf(why: string, number: number): ChatFailure
 {
     const code = failureCode(why);
     const ended = /^the host's program ended \(([^)]*)\)(.*)$/s.exec(why);
-    const said = code === "program-ended" && ended !== null
-        ? `The chat's program stopped by itself: open the chat again from the board page.${ended[2]!.trim() === "" ? "" : ` It said: ${ended[2]!.replace(/^[:\s]+/, "")}`} (${ended[1]})`
-        : why;
+    const said = code === "program-ended" && ended !== null ? lastWords(ended[2]!) ?? ended[1]! : why;
     return { why: said, code, number };
 }
 
@@ -32,4 +33,11 @@ export function failureCode(why: string): FailureCode
     }
 
     return "other";
+}
+
+// What the host's program said as it ended, after its exit code: none when it said nothing.
+function lastWords(said: string): string | undefined
+{
+    const words = said.replace(/^[:\s]+/, "").trim();
+    return words === "" ? undefined : words;
 }

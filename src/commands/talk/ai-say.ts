@@ -50,7 +50,10 @@ export const aiSay = defineCommand({
         const folder = gameFolder(context.home());
         refuseOtherGame(context, folder);
         const waiting = waitingWords(context);
-        const current = say(folder, "ai", text, context.now(), mood, undefined, doorbellOf(context) === "table");
+        // A chat the table drives answers each line of the player's, those given to it since its last words too.
+        const owed = context.givenSinceWords;
+        const current = say(folder, "ai", text, context.now(), mood, undefined, doorbellOf(context) === "table" ? { owed: (owed?.size ?? 0) > 0 } : false);
+        owed?.clear();
         const words = give(context, waiting);
 
         if (!("game" in current)) {

@@ -15,6 +15,7 @@ import type { Place, TablePlaces } from "../places/index.ts";
 import { chatStart, hostEnvironment } from "../table/index.ts";
 import { failureOf } from "./failure.ts";
 import { keepChat, keptChat } from "./kept.ts";
+import { moveEndsTurn } from "./move-ends-turn.ts";
 
 /** What the chats the table drives run with besides the table's context; the tests inject them. */
 export interface DrivenOptions
@@ -96,11 +97,18 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         }
 
         state.attached = true;
+
+        // It attaches in its first turn, which the table sent and the bell never saw: a chat at work hears the player.
+        if (state.inTurn) {
+            seat?.atWork();
+        }
     };
 
     // A turn begins: the pages see the chat at work, and what it writes outside its tools is gathered from here.
     const begin = (state: Driven): void => {
         state.inTurn = true;
+        state.moved = false;
+        state.ending = false;
         state.prose = [];
         state.from = { at: context.now(), position: positionNow(context) };
         seat?.changed();
@@ -111,6 +119,10 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
 
         if (sent) {
             begin(state);
+
+            if (state.attached) {
+                seat?.atWork();
+            }
         }
 
         return sent;
@@ -146,7 +158,9 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         } else if (event.type === "turnStart") {
             begin(state);
             seat?.prompted();
-        } else if (event.type === "text") {
+        } else if (event.type === "tool") {
+            endAtMove(state, event);
+        } else if (event.type === "text" && !state.ending) {
             state.prose[event.block] = `${state.prose[event.block] ?? ""}${event.text}`;
         } else if (event.type === "turnEnd") {
             endTurn(state, event.reason, event.reason === "failed" ? event.why ?? "The chat's turn failed." : undefined);
@@ -162,6 +176,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         const stopped = state.stopping;
         state.inTurn = false;
         state.stopping = false;
+        state.moved = false;
+        state.ending = false;
 
         if (why !== undefined) {
             failed(why);
@@ -225,6 +241,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             closing: false,
             startAgain: false,
             stopping: false,
+            moved: false,
+            ending: false,
             nudging: false,
             nudged: false,
             prose: [],
@@ -250,7 +268,11 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 state.startAgain = true;
             };
 
-            const hooks = { ...seat.hooks, caller, startAgain, drivenByTable: true as const };
+            const answered = (tool: string, result: unknown): void => {
+                state.moved = state.inTurn && moveEndsTurn(tool, result);
+            };
+
+            const hooks = { ...seat.hooks, caller, startAgain, answered, drivenByTable: true as const, givenSinceWords: new Set<string>() };
             places ??= Promise.resolve(options.places());
             state.place = await (await places).offer("opponent", folder, hooks);
 
@@ -361,6 +383,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             return true;
         },
         atWork: () => driven?.attached === true && driven.inTurn,
+        turnSince: () => (driven?.attached === true && driven.inTurn ? driven.from?.at : undefined),
         failure: () => failure,
         close: async () => {
             if (driven !== undefined) {
@@ -398,12 +421,27 @@ interface Driven
     startAgain: boolean;
     /** The player stopped the turn in course. */
     stopping: boolean;
+    /** The AI's move in this turn asked nothing more of it; the table, which interrupts the turn once the chat has the move's answer, ends it. */
+    moved: boolean;
+    ending: boolean;
     /** The table rings the chat for the AI's move it did not make; it did once since the player last woke it. */
     nudging: boolean;
     nudged: boolean;
     /** What the chat wrote in its turn outside its tools, by block; when the turn began, and the game then. */
     prose: string[];
     from?: { readonly at: Date; readonly position: SeenPosition | undefined; };
+}
+
+/** Once the chat has the answer of a move that asked nothing more of it, the table ends its turn: not the player's Stop, and what it writes after is not shown. */
+function endAtMove(state: Driven, event: Extract<HostEvent, { type: "tool"; }>): void
+{
+    if (event.name !== "ai_move" || event.state !== "done" || !state.moved || state.stopping) {
+        return;
+    }
+
+    state.moved = false;
+    state.ending = true;
+    state.chat?.interrupt();
 }
 
 function heldOf(state: Driven): HeldChat

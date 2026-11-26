@@ -204,6 +204,8 @@ export interface Served
      * held until the chat is woken again.
      */
     stalled?: "stopped" | "noMove" | undefined;
+    /** When the chat the table drives stalled: the AI's clock is held since then, and runs on from there once the chat is woken. */
+    stalledAt?: string | undefined;
 }
 
 /**

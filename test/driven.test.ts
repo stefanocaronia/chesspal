@@ -1,11 +1,7 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { ReadBuffer, serializeMessage } from "@modelcontextprotocol/sdk/shared/stdio.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { newGame, startNewGame } from "../src/commands/game/new.ts";
 import type { Context } from "../src/commands/index.ts";
@@ -15,7 +11,7 @@ import { analystAgent } from "../src/host-files/index.ts";
 import type { ChatOptions, HostChat, HostDriver, HostEvent } from "../src/hosts/index.ts";
 import { activeProfile, gameFolder, saveProfileSettings } from "../src/profiles/index.ts";
 import { Bell, type BellListener } from "../src/server/bell/index.ts";
-import { doorVariable, keyVariable, pipeToTable } from "../src/server/door/index.ts";
+import { doorVariable, keyVariable } from "../src/server/door/index.ts";
 import { chatInPage, drivenChats, failureCode, failureOf, keepChat, keptChat } from "../src/server/driven/index.ts";
 import type { TableChats } from "../src/server/page/index.ts";
 import { type TablePlaces, tablePlaces } from "../src/server/places/index.ts";
@@ -24,6 +20,7 @@ import { version } from "../src/version.ts";
 import { playedHere, testContext } from "./commands.ts";
 import { removeFolder } from "./folders.ts";
 import { sent } from "./http.ts";
+import { sitAt } from "./place-client.ts";
 import { onFreePorts } from "./ports.ts";
 
 const folders: string[] = [];
@@ -79,7 +76,7 @@ describe("the doorbell with a listener of the table's own", () => {
 });
 
 describe("what a chat the table drives failed of", () => {
-    it("tells apart the host's words it knows, and says a program that ended by itself in a player's words, its code at the end", () => {
+    it("tells apart the host's words it knows, and keeps of a program that ended by itself its last words, else its exit code", () => {
         expect(failureCode("Not logged in · Please run /login")).toBe("not-signed-in");
         expect(failureCode("the host's program ended (exit code 1): Not logged in | Please run /login")).toBe("not-signed-in");
         expect(failureCode("Invalid API key · Please run /login")).toBe("not-signed-in");
@@ -91,10 +88,11 @@ describe("what a chat the table drives failed of", () => {
         expect(failureCode("the host runs the model claude-haiku instead of claude-opus")).toBe("other");
 
         expect(failureOf("the host's program ended (exit code 4294967295)", 3)).toEqual({
-            why: "The chat's program stopped by itself: open the chat again from the board page. (exit code 4294967295)",
+            why: "exit code 4294967295",
             code: "program-ended",
             number: 3,
         });
+        expect(failureOf("the host's program ended (exit code 1): Segmentation fault", 4)).toEqual({ why: "Segmentation fault", code: "program-ended", number: 4 });
         expect(failureOf("Not logged in · Please run /login", 1)).toEqual({ why: "Not logged in · Please run /login", code: "not-signed-in", number: 1 });
     });
 });
@@ -271,7 +269,7 @@ describe("the chat the table drives", () => {
         expect(keptChat(join(home, "chats"))).toMatchObject({ closed: false, session: undefined });
     }, 30_000);
 
-    it("leaves the table when its host ends, and the page says why once, in a player's words; the table closes the chat it drives as it closes", async () => {
+    it("leaves the table when its host ends, and the page hears what it said, or its exit code alone, with the code of why; the table closes the chat it drives as it closes", async () => {
         const { table, home, ai } = await drivenTable();
         await opened(table.url);
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
@@ -281,7 +279,7 @@ describe("the chat the table drives", () => {
         ai.chats[0]!.emit({ type: "ended", why: "the host's program ended (exit code 1)" });
         await until(async () => (await shown(table.url)).table?.chat === false);
         expect((await shown(table.url)).table?.failed).toEqual({
-            why: "The chat's program stopped by itself: open the chat again from the board page. (exit code 1)",
+            why: "exit code 1",
             code: "program-ended",
             number: 1,
         });
@@ -510,9 +508,23 @@ describe("the turns of the chat the table drives", () => {
         await until(async () => (await shown(table.url)).table?.stopped === true);
         await pause(200);
         expect(chat.sent).toHaveLength(6);
+        // Every page shows the clock where it stood as the chat stalled, however late it loads; it runs on from there once the chat is woken.
+        const clockNow = async () => ((await raw(table.url)).game as { clock: { since: string; held?: string; }; }).clock;
+        const held = (await clockNow()).held;
+        expect(held).toBeDefined();
+        expect(Date.parse(held!)).toBeGreaterThanOrEqual(Date.parse((await clockNow()).since));
         ahead.ms = 40 * 60_000;
-        await shown(table.url);
+        expect((await clockNow()).held).toBe(held);
         expect(endOf(loadGame(gameFolder(home))!.game)).toBeUndefined();
+        const before = loadGame(gameFolder(home))!.clock!;
+        chat.turns.push(async (client) => void chat.answers.push(await call(client, "ai_move", { move: "Nc6", plan: "Develop." })));
+        await posted(table.url, "/api/message", { text: "Go on." });
+        await until(() => chat.answers.length === 2 && chat.idle());
+        expect(chat.answers[1]!.isError).toBe(false);
+        // The AI used before the Stop the time between its clock's start and the stall, and no more.
+        const used = Date.parse(held!) - Date.parse(before.since);
+        expect(before.left.black - loadGame(gameFolder(home))!.clock!.left.black).toBeGreaterThanOrEqual(used - 5_000);
+        expect(before.left.black - loadGame(gameFolder(home))!.clock!.left.black).toBeLessThan(used + 60_000);
     }, 30_000);
 
     it("rings at every line the player writes to it, and lets the AI answer each", async () => {
@@ -548,6 +560,35 @@ describe("the turns of the chat the table drives", () => {
         expect(loadGame(gameFolder(home))!.talk.filter((line) => line.who === "ai").map((line) => line.text)).toEqual(["Hello!", "Yes, I am here.", "Both read."]);
     }, 30_000);
 
+    it("lets the AI answer a line given to it in a tool's answer, written before its words, and never speak twice with nothing new", async () => {
+        const { table, home, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+        await posted(table.url, "/api/new", { ai_colour: "black" });
+        await until(() => chat.sent.length === 2 && chat.idle());
+
+        // The second line comes while the AI thinks on the first: its first ai_say gives it, and its next answers it.
+        const busy = gate();
+        chat.turns.push(async (client) => {
+            await busy.passed;
+            chat.answers.push(await call(client, "ai_say", { text: "Hello!" }));
+            chat.answers.push(await call(client, "ai_say", { text: "Yes, the Sicilian." }));
+            chat.answers.push(await call(client, "ai_say", { text: "And more." }));
+        });
+        await posted(table.url, "/api/message", { text: "Hi." });
+        await until(() => chat.sent.length === 3 && !chat.idle());
+        await posted(table.url, "/api/message", { text: "Shall we play the Sicilian?" });
+        busy.open();
+        await until(() => chat.answers.length === 3 && chat.idle());
+
+        expect(chat.answers[0]!.text).toContain("Shall we play the Sicilian?");
+        expect(chat.answers.map((one) => one.isError)).toEqual([false, false, true]);
+        expect(chat.answers[2]!.text).toContain("You have spoken once for this move: say the rest in ai_move's comment. Nothing changed.");
+        expect(loadGame(gameFolder(home))!.talk.filter((line) => line.who === "ai").map((line) => line.text)).toEqual(["Hello!", "Yes, the Sicilian."]);
+        expect((await shown(table.url)).game?.talk?.map((line) => line.text)).toEqual(["Hi.", "Shall we play the Sicilian?", "Hello!", "Yes, the Sicilian."]);
+    }, 30_000);
+
     it("shows on the page what the AI wrote outside its tools when no tool of the turn spoke, once", async () => {
         const { table, home, ai } = await drivenTable();
         await opened(table.url);
@@ -576,6 +617,23 @@ describe("the turns of the chat the table drives", () => {
         await until(() => chat.sent.length === 5 && chat.idle());
         await pause(200);
         expect(aiLines()).toEqual(["There is a game going on. Shall we go on?", "Of course."]);
+    }, 30_000);
+
+    it("listens from its attach, in the first turn the table sent it, before it calls any tool", async () => {
+        const { table, ai } = await drivenTable();
+        const first = gate();
+
+        ai.first = async (client) => {
+            await first.passed;
+            await startTurn(client);
+        };
+
+        await opened(table.url);
+        await until(async () => (await shown(table.url)).table?.chat === true);
+        expect(ai.chats[0]!.calls).toEqual([]);
+        expect((await raw(table.url)).listening).toBe(true);
+        first.open();
+        await until(() => ai.chats[0]!.idle());
     }, 30_000);
 
     it("keeps a chat in its first turn listening, and one in a turn from passing for stopped by an old chat's notes in the table's folder", async () => {
@@ -631,6 +689,70 @@ describe("the turns of the chat the table drives", () => {
         await until(() => chat.sent.length === 3 && chat.idle());
         expect(chat.sent[2]).toMatch(/^The player acted on the board page\./);
         expect(sans(home)).toEqual(["e4", "e5"]);
+    }, 30_000);
+
+    it("never gives the chat the board page's address, which its player has open already", async () => {
+        const { table, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+
+        chat.turns.push(async (client) => void chat.answers.push(await call(client, "status")));
+        await posted(table.url, "/api/message", { text: "Hello." });
+        await until(() => chat.answers.length === 1 && chat.idle());
+        expect(chat.answers[0]!.isError).toBe(false);
+        expect(chat.answers[0]!.text).toContain("Chesspal ");
+        expect(chat.answers[0]!.text).not.toContain("Board page");
+        expect(chat.answers[0]!.text).not.toContain(new URL(table.url).host);
+    }, 30_000);
+
+    it("ends the turn itself once the AI's move asks nothing more of it, never as the player's Stop; not when the move gives words to answer or ends the game", async () => {
+        const { table, home, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+        await posted(table.url, "/api/new", { ai_colour: "black" });
+        await until(() => chat.sent.length === 2 && chat.idle());
+
+        // A plain move: the turn is interrupted once the chat has its answer, and what it writes after is not shown.
+        chat.turns.push(async (client) => {
+            chat.answers.push(await call(client, "ai_move", { move: "e5", plan: "Hold the centre." }));
+            chat.emit({ type: "text", block: 0, text: "I played e5: your move." });
+            await new Promise<void>(() => undefined);
+        });
+        await posted(table.url, "/api/move", { move: "f3" });
+        await until(() => chat.sent.length === 3 && chat.idle());
+        expect(chat.ends.at(-1)).toBe("interrupted");
+        expect(chat.answers.map((one) => one.isError)).toEqual([false]);
+        const after = await shown(table.url);
+        expect(after.table).not.toHaveProperty("stopped");
+        expect(after.table).not.toHaveProperty("noMove");
+        expect(after.game?.talk ?? []).toEqual([]);
+
+        // Words of the player's given with the move: the AI answers them in the same turn.
+        const busy = gate();
+        chat.turns.push(async (client) => {
+            await busy.passed;
+            chat.answers.push(await call(client, "ai_move", { move: "Nc6", plan: "Develop." }));
+            chat.answers.push(await call(client, "ai_say", { text: "Thanks, you too." }));
+        });
+        await posted(table.url, "/api/move", { move: "a3" });
+        await until(() => chat.sent.length === 4 && !chat.idle());
+        await posted(table.url, "/api/message", { text: "Good luck!" });
+        busy.open();
+        await until(() => chat.answers.length === 3 && chat.idle());
+        expect(chat.ends.at(-1)).toBe("done");
+        expect(chat.answers.map((one) => one.isError)).toEqual([false, false, false]);
+
+        // The next move of the player's wakes the chat; a move that ends the game leaves the AI its words on the end.
+        await pause(100);
+        const sent = chat.sent.length;
+        chat.turns.push(async (client) => void chat.answers.push(await call(client, "ai_move", { move: "Qh4#", plan: "Mate." })));
+        await posted(table.url, "/api/move", { move: "g4" });
+        await until(() => chat.sent.length === sent + 1 && chat.idle());
+        expect(chat.answers.at(-1)!.isError).toBe(false);
+        expect(chat.ends.at(-1)).toBe("done");
+        expect(sans(home)).toEqual(["f3", "e5", "a3", "Nc6", "g4", "Qh4#"]);
     }, 30_000);
 
     it("plays a move written alone in the message box for the chat the table drives only: a chat in a terminal reads it as words", async () => {
@@ -705,6 +827,38 @@ describe("the opening of a chat the table drives", () => {
         } finally {
             page.destroy();
         }
+    }, 30_000);
+
+    it("shows the game in analysis reviewed only while the chat goes over it, never while it only answers the player about it", async () => {
+        const { table, ai } = await drivenTable();
+        const looked = await posted(table.url, "/api/study", { pgn: '[White "Ann"]\n[Black "Bob"]\n\n1. e4 e5 2. Qh5 Nc6 *', look: true });
+        const kept = (JSON.parse(looked.text) as { game: string; }).game;
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+        const analysisNow = async () => (await raw(table.url)).analysis as { reviewing?: true; incomplete?: true; };
+
+        const answering = gate();
+        chat.turns.push(async () => await answering.passed);
+        await posted(table.url, "/api/message", { text: "Why Qh5?", game: kept, at: 3 });
+        await until(() => !chat.idle());
+        expect(await analysisNow()).toMatchObject({ incomplete: true });
+        expect(await analysisNow()).not.toHaveProperty("reviewing");
+        answering.open();
+        await until(() => chat.idle());
+
+        const reviewing = gate();
+        chat.turns.push(async (client) => {
+            chat.answers.push(await call(client, "analyse_game", { game: kept }));
+            await reviewing.passed;
+        });
+        await posted(table.url, "/api/message", { text: "Go over it, please.", game: kept, at: 3 });
+        await until(() => chat.answers.length === 1);
+        expect(chat.answers[0]!.isError).toBe(false);
+        expect(await analysisNow()).toMatchObject({ reviewing: true });
+        reviewing.open();
+        await until(() => chat.idle());
+        expect(await analysisNow()).not.toHaveProperty("reviewing");
     }, 30_000);
 });
 
@@ -803,12 +957,15 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver): { c
             return;
         }
 
+        // As a host's process does, it says which chat it is a moment after it was sent its first words.
+        await new Promise((done) => setImmediate(done));
+
         if (!told) {
             told = true;
             emit({ type: "session", session, model: `claude-${options.model}`, ...(options.effort === undefined ? {} : { effort: options.effort }) });
         }
 
-        client ??= sitAt(options.server!.environment);
+        client ??= sitAt(options.server!.environment, (made) => void clients.push(made));
         const sitting = await client;
         const traced = tracing(sitting, chat);
         const stopped = new Promise<"interrupted">((done) => (stopTurn = () => done("interrupted")));
@@ -853,57 +1010,25 @@ async function startTurn(client: Client): Promise<void>
     await call(client, "status");
 }
 
-/** The client, its tools' names noted in the chat as they are called. */
+/** The client, its tools' names noted in the chat as they are called, and told to the table as Claude Code tells them, once their answer is in. */
 function tracing(client: Client, chat: FakeChat): Client
 {
     return new Proxy(client, {
         get: (target, name) => {
             if (name === "callTool") {
-                return (asked: { name: string; }) => {
+                return async (asked: { name: string; }) => {
+                    const id = `tool-${chat.calls.length}`;
                     chat.calls.push(asked.name);
-                    return target.callTool(asked as never);
+                    chat.emit({ type: "tool", id, name: asked.name, kind: "chesspal", state: "started" });
+                    const result = await target.callTool(asked as never);
+                    chat.emit({ type: "tool", id, name: asked.name, kind: "chesspal", state: result.isError === true ? "failed" : "done" });
+                    return result;
                 };
             }
 
             return Reflect.get(target, name) as unknown;
         },
     });
-}
-
-/** A host's client at the place the environment names, through the door, as `chesspal mcp` pipes it. */
-async function sitAt(environment: Record<string, string>): Promise<Client>
-{
-    const input = new PassThrough();
-    const output = new PassThrough();
-    void pipeToTable(input, output, { door: environment[doorVariable]!, key: environment[keyVariable]!, version });
-    const client = new Client({ name: "claude-code", version: "1.0.0" });
-    clients.push(client);
-    await client.connect(linesTransport(input, output));
-    return client;
-}
-
-function linesTransport(input: PassThrough, output: PassThrough): Transport
-{
-    const buffer = new ReadBuffer();
-    const transport: Transport = {
-        start: async () => {
-            output.on("data", (chunk: Buffer) => {
-                buffer.append(chunk);
-
-                for (let message = buffer.readMessage(); message !== null; message = buffer.readMessage()) {
-                    transport.onmessage?.(message);
-                }
-            });
-            output.on("end", () => transport.onclose?.());
-        },
-        send: async (message: JSONRPCMessage) => {
-            input.write(serializeMessage(message));
-        },
-        close: async () => {
-            input.end();
-        },
-    };
-    return transport;
 }
 
 async function call(client: Client, name: string, args: Record<string, unknown> = {}): Promise<{ text: string; isError: boolean; }>

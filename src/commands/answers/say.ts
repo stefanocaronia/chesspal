@@ -10,9 +10,9 @@ import { openingTags } from "./opening-tags.ts";
 /**
  * Adds a line to the talk of the current game, going on or just over, and saves it; the AI's mood once the game is over, which the archive keeps too (D-70).
  * With no game the line goes in the talk before it (D-77). A line refused changes nothing: it throws, in words for whoever spoke. With `answersEachLine`,
- * for a chat the table drives, the AI may answer each line the player wrote after its last words.
+ * for a chat the table drives, the AI may answer each line of the player's it has not answered: written after its last words, or given to it since (`owed`).
  */
-export function say(folder: string, who: Sayer, text: string, at: Date, mood?: Mood, shown?: Shown, answersEachLine = false): Talk
+export function say(folder: string, who: Sayer, text: string, at: Date, mood?: Mood, shown?: Shown, answersEachLine: false | { owed: boolean; } = false): Talk
 {
     const current = gameAt(folder, at);
 
@@ -160,6 +160,7 @@ export function give(context: Context, words: readonly Words[]): Written[]
 
     for (const { key } of words) {
         context.given.add(key);
+        context.givenSinceWords?.add(key);
     }
 
     if (context.given.size > before) {

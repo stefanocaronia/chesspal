@@ -44,6 +44,8 @@ export interface TableChats
     stop?(): boolean;
     /** Whether a turn of the chat the table drives is running, whatever it is for. */
     atWork?(): boolean;
+    /** When the turn running of the chat the table drives began: none out of a turn. */
+    turnSince?(): Date | undefined;
     /** Why the last chat the table drove failed or ended by itself, numbered, until the next chat opens. */
     failure?(): ChatFailure | undefined;
     /** Closes the chats the table drives, as the table closes. */

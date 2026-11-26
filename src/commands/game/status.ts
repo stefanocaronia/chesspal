@@ -89,7 +89,8 @@ export const status = defineCommand({
         const outdated = context.told === undefined || first ? outdatedHostFiles(context.folder, context.platform) : [];
         const status: Status = { version, folder, ...(player === undefined ? {} : { player }), ...(speech === undefined ? {} : { speech }), ...(outdated.length === 0 ? {} : { outdated }) };
 
-        if (context.page !== undefined) {
+        // A chat the table drives sits on the page already: its address would only be repeated to the player.
+        if (context.page !== undefined && context.drivenByTable !== true) {
             status.page = context.page;
         }
 

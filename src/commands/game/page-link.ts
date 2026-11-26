@@ -1,10 +1,10 @@
 // The board page's address for the AI to give the player when no browser has the page open: the instructions alone do not get it said.
 import type { Context } from "../registry/index.ts";
 
-/** The board page's address when the chat serves it and no browser has it open; none on the command line, or with the page open. */
+/** The board page's address when the chat serves it and no browser has it open; none on the command line, with the page open, or for a chat the table drives. */
 export function closedPage(context: Context): string | undefined
 {
-    return context.page !== undefined && context.pageOpen?.() === false ? context.page : undefined;
+    return context.page !== undefined && context.pageOpen?.() === false && context.drivenByTable !== true ? context.page : undefined;
 }
 
 /** The board page's address once a game, for a move written in the chat while no browser has the page open: the game is played there (D-85). */

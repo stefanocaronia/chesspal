@@ -71,6 +71,10 @@ export interface Context
     startAgain?: () => void;
     /** The table drives this chat itself: it wakes it with the player's acts on the page, already played, and its turn ends there. */
     drivenByTable?: true;
+    /** The player's lines given to a chat the table drives in a tool's answer since its last words: still to answer, though written before them. */
+    readonly givenSinceWords?: Set<string>;
+    /** Told with a tool's result, before its answer goes to the chat: a table that drives the chat ends its turn when the result asks nothing more. */
+    answered?: (tool: string, result: unknown) => void;
 }
 
 /** Who made a tool call: the model, else the host's name, never what the AI says of itself; the effort only when the host gives it. */
