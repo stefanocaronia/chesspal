@@ -1,44 +1,48 @@
-// The chat the table drives, kept in the table's folder across its restarts: a table that starts again opens it again with its session.
+// The chat the table drives, kept in the data folder across the table's restarts: a table that starts again opens it again with its session, while its
+// game goes on.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { makeFolder, writeAtomically } from "../../games/index.ts";
 
-/** The chat the table drove last: its host, model and effort, its session to take up again, none for a clean one, and whether it was let go for good. */
+/**
+ * The chat the table drove last: its host, its session to take up again, none for a clean one, the start of the game it played last, and whether it was
+ * let go for good.
+ */
 export interface KeptChat
 {
     readonly host: string;
-    readonly model?: string | undefined;
-    readonly effort?: string | undefined;
     readonly session?: string | undefined;
+    /** When the game the chat played last started, as the game names it: it is taken up again only while that game goes on. */
+    readonly game?: string | undefined;
     /** Ended by itself, or put aside for a chat in a terminal: a table that starts again opens none. */
     readonly closed: boolean;
 }
 
-/** Writes the chat the table drives in the table's `folder`. */
-export function keepChat(folder: string, chat: KeptChat): void
+/** Writes the chat the table drives in `chats`, the folder of the chats the table drives. */
+export function keepChat(chats: string, chat: KeptChat): void
 {
-    makeFolder(join(folder, "chats"));
-    writeAtomically(keptPath(folder), `${JSON.stringify(chat, null, 2)}\n`);
+    makeFolder(chats);
+    writeAtomically(keptPath(chats), `${JSON.stringify(chat, null, 2)}\n`);
 }
 
-/** The chat the table drove last, in the table's `folder`; none when there is none, or it cannot be read. */
-export function keptChat(folder: string): KeptChat | undefined
+/** The chat the table drove last, in `chats`; none when there is none, or it cannot be read. */
+export function keptChat(chats: string): KeptChat | undefined
 {
     try {
-        const kept = JSON.parse(readFileSync(keptPath(folder), "utf8")) as Partial<Record<keyof KeptChat, unknown>>;
+        const kept = JSON.parse(readFileSync(keptPath(chats), "utf8")) as Partial<Record<keyof KeptChat, unknown>>;
         const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
         if (typeof kept.host !== "string" || typeof kept.closed !== "boolean") {
             return undefined;
         }
 
-        return { host: kept.host, model: text(kept.model), effort: text(kept.effort), session: text(kept.session), closed: kept.closed };
+        return { host: kept.host, session: text(kept.session), game: text(kept.game), closed: kept.closed };
     } catch {
         return undefined;
     }
 }
 
-function keptPath(folder: string): string
+function keptPath(chats: string): string
 {
-    return join(folder, "chats", "driven.json");
+    return join(chats, "driven.json");
 }

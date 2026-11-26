@@ -645,6 +645,19 @@ describe("the chat in Claude Code given its server and instructions", () => {
         expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done", usage: { input: 10_203, output: 80 } }]);
     });
 
+    it("tells beside a turn's tokens, summed over its requests, the context of its last request, the last of its iterations", async () => {
+        const iterations = [
+            { input_tokens: 6, cache_creation_input_tokens: 12_343, cache_read_input_tokens: 0, output_tokens: 200 },
+            { input_tokens: 4, cache_creation_input_tokens: 500, cache_read_input_tokens: 12_343, output_tokens: 326 },
+        ];
+        const usage = { input_tokens: 10, cache_creation_input_tokens: 12_843, cache_read_input_tokens: 12_343, output_tokens: 526, iterations: [iterations.at(-1)] };
+        const flow = loadFlow("claude-code/three-turns").map((entry) => (entry.dir === "out" && entry.msg.type === "result" ? { ...entry, msg: { ...entry.msg, usage } } : entry));
+        const { chat, events, until } = play(flow, { allowed: ["chesspal", "read", "shell"] });
+        chat.send(playerWords(flow)[0]!);
+        await until((all) => turnEnds(all).length === 1);
+        expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "done", usage: { input: 25_196, output: 526, context: 12_847 } }]);
+    });
+
     it("tells no effort and no tokens where it was started with none and the host reports none", async () => {
         const { chat, events, until } = play(turn("Hello", delta("Hi")));
         chat.send("Hello");

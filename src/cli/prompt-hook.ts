@@ -21,6 +21,9 @@ export async function answerPrompt(input: NodeJS.ReadableStream = process.stdin,
     }
 }
 
+/** The longest a move written alone may be: a piece, its file and rank, the capture, the square, a promotion and a check, as Nb1xd2=Q+ and some to spare. */
+const longestMove = 12;
+
 /**
  * What the hook writes, the JSON Claude Code reads, when the prompt is one move and Chesspal played it; undefined, with nothing changed, for any other
  * prompt or a move refused. `contextOf` gives what the move is played with, in the chat's folder; it then notes there the position shown to the chat.
@@ -29,7 +32,8 @@ export async function promptAnswer(input: string, contextOf: (hook: HookInput) =
 {
     const hook = hookInput(input);
 
-    if (hook.prompt === undefined || hook.session === undefined || !(await import("../core/index.ts")).isMoveAlone(hook.prompt)) {
+    // A prompt longer than any move is none: the core is not even loaded for it.
+    if (hook.prompt === undefined || hook.session === undefined || hook.prompt.length > longestMove || !(await import("../core/index.ts")).isMoveAlone(hook.prompt)) {
         return undefined;
     }
 

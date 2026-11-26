@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Game, gameReviewOf, leadOf, reviewOf } from "../../core/index.ts";
 import { archivedName, type ChatStart, cleanSince, endOf, gameInAnalysis, gameStamp, lastChatStart } from "../../games/index.ts";
-import { hasDoorbell, isCodex, outdatedHostFiles } from "../../host-files/index.ts";
+import { isCodex, outdatedHostFiles } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
 import {
@@ -11,6 +11,8 @@ import {
     coachOnEnd,
     coachOnEndLine,
     coachRuns,
+    type Doorbell,
+    doorbellOf,
     gameAt,
     type GameSummary,
     goneOver,
@@ -147,7 +149,7 @@ export function gameAtRing(context: Context): GameAtRing
 function shownGame({ game, problem, words = [], analysis, pageClosed, coach }: Pick<Status, "game" | "problem" | "words" | "analysis" | "pageClosed" | "coach">, context: Context | undefined): string[]
 {
     return [
-        ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true, pageClosed === true, coach === true, hasDoorbell(context?.host?.()))),
+        ...(problem !== undefined ? [problem] : gameLines(game, words, analysis?.brought === true, pageClosed === true, coach === true, doorbellOf(context))),
         ...(analysis === undefined ? [] : [analysisLine(analysis)]),
     ];
 }
@@ -294,7 +296,7 @@ function reviewProgress(context: Context, game: string): string | undefined
  * The game's lines; a game the player brought to analyse takes the place of the next step. The coach to start goes just before the next step, where
  * the AI acts on it (Priya).
  */
-function gameLines(game: GameSummary | undefined, words: readonly Written[], brought: boolean, pageClosed: boolean, coach: boolean, doorbell: boolean): string[]
+function gameLines(game: GameSummary | undefined, words: readonly Written[], brought: boolean, pageClosed: boolean, coach: boolean, doorbell: Doorbell): string[]
 {
     const closing = [...(coach && game !== undefined ? [coachOnEndLine(game)] : []), ...(brought ? wordLines(words) : closingLines(game, words, pageClosed, doorbell))];
 

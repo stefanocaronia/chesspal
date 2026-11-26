@@ -84,6 +84,36 @@ export function chatCalls(served: Served): void
     }
 }
 
+/** Whether the AI is to move now in a game going on, its clock running if it has one: the turn the chat is woken for wants its move. */
+export function aiToMove(served: Served): boolean
+{
+    try {
+        const current = loadGame(gameFolder(served.context.home()));
+        return current !== undefined && endOf(current.game) === undefined && current.game.position.turn === current.ai && current.clock?.waiting !== true;
+    } catch {
+        return false;
+    }
+}
+
+/** The chat the table drives is woken: a clock held while it stalled starts again, with the time it was held given back. */
+export function stallEnds(served: Served): void
+{
+    if (served.stalled === undefined) {
+        return;
+    }
+
+    const folder = gameFolder(served.context.home());
+    const current = loadGame(folder);
+    const held = current !== undefined && aiHeld(served, current);
+    served.stalled = undefined;
+
+    if (held) {
+        rerunIfChanged(() => giveHeldTime(served, folder));
+    }
+
+    tellWatchers(served.watchers);
+}
+
 /**
  * Whether the AI's sign on the page is not the one the pages were last given: the ponder agent's every thought rewrites thoughts.json, and only the sign
  * that comes or goes is news for them. True when the game cannot be read: they read it again.
@@ -207,6 +237,8 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
         return;
     }
 
+    // The words wake the chat the table drives: its clock, held while it stalled, runs again from now, before the words would find its flag fallen.
+    stallEnds(served);
     let current;
 
     try {
@@ -218,8 +250,9 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
     }
 
     // The first words of a move wake the chat, and between games the first since the AI spoke; the AI finds the rest at its next call (D-54, D-74). In
-    // analysis every line does: a chat that answered in its own window would not hear the next (Priya).
-    if (shown !== undefined || wakesTheChat(current)) {
+    // analysis every line does: a chat that answered in its own window would not hear the next (Priya); and every line to the chat the table drives,
+    // which the player has no window to write in.
+    if (shown !== undefined || wakesTheChat(current) || served.attached?.local !== undefined) {
         // Words may come while the chat thinks on the AI's move, which they do not end.
         served.bell.ring("game" in current && endOf(current.game) === undefined && current.game.position.turn === current.ai);
     }
@@ -504,7 +537,14 @@ async function stopAnalysisFromPage(request: IncomingMessage, response: ServerRe
         return;
     }
 
-    send(response, 200, json, JSON.stringify({ stopped: stopAnalysis(gameFolder(served.context.home()), game) }));
+    const stopped = stopAnalysis(gameFolder(served.context.home()), game);
+
+    // The chat the table drives stops its turn too, which may be that analysis.
+    if (served.attached?.local !== undefined) {
+        served.table?.chats?.stop?.();
+    }
+
+    send(response, 200, json, JSON.stringify({ stopped }));
 }
 
 /**
@@ -752,10 +792,10 @@ function gameNow(served: Served): CurrentGame | undefined
     return current;
 }
 
-/** Whether the AI's clock is held: a game with a clock, going on, the AI to move, and nobody hearing the player. */
+/** Whether the AI's clock is held: a game with a clock, going on, the AI to move, and nobody hearing the player, or the chat the table drives stalled. */
 function aiHeld(served: Served, current: CurrentGame): boolean
 {
-    return !served.bell.listening && current.clock !== undefined && endOf(current.game) === undefined && current.game.position.turn === current.ai;
+    return (!served.bell.listening || served.stalled !== undefined) && current.clock !== undefined && endOf(current.game) === undefined && current.game.position.turn === current.ai;
 }
 
 /** The variation sent with the player's words (D-116): none when there is none, null when it is not one. */

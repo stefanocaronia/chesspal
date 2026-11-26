@@ -40,7 +40,7 @@ export interface Page
     readonly findable: boolean;
     /** Whether a browser has the page open now: one listens to the game's changes. */
     open(): boolean;
-    /** Whether the page is in use: open in a browser, or, on the table, with a chat attached. */
+    /** Whether the page is in use: open in a browser, or, on the table, with a chat attached from its own process. */
     inUse(): boolean;
     /** Opens the New game window on every page open now, for the player to choose the game there: whether one was open. */
     askNewGame(): boolean;
@@ -97,7 +97,8 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
                 updateWhenAtRest(served);
                 tellWatchers(watchers);
             },
-            () => chatInterrupted(folder),
+            // A chat in the table's own process is never stopped unseen: the table sees each of its turns end.
+            () => served.attached?.local === undefined && chatInterrupted(folder),
             (line) => noteBell(folder, line),
             () => gameAtBell(served),
         ),
@@ -148,7 +149,8 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
                 chatCalls: () => chatCalls(served),
                 toolEnded: () => undefined,
                 open: () => watchers.size > 0,
-                inUse: () => watchers.size > 0 || served.attached !== undefined,
+                // A chat the table drives in its own process keeps it in use no more than its page does: it closes, and keeps the chat for its next start.
+                inUse: () => watchers.size > 0 || (served.attached !== undefined && served.attached.local === undefined),
                 askNewGame: () => askNewGame(watchers),
                 close: () => closed(server, stopWatching),
             };
@@ -197,6 +199,11 @@ export interface Served
     windows?: TableWindows;
     /** Tells the table's own chat that a browser opened the page. */
     seatOpened?: () => void;
+    /**
+     * The chat the table drives is at rest without having moved: the player stopped it, or its turns ended twice without the AI's move. The AI's clock is
+     * held until the chat is woken again.
+     */
+    stalled?: "stopped" | "noMove" | undefined;
 }
 
 /**
@@ -313,7 +320,9 @@ function gameAtBell(served: Served): string | undefined
     const { chat, context } = served;
 
     try {
-        const { text, position, stamp, given } = gameAtRing({ ...asTheChatSees(context, chat), given: new Set(chat.given) });
+        // The chat's own folder, where its agents are: the table's has those init wrote, which a chat the table drives has not.
+        const sees = { ...asTheChatSees(context, chat), folder: served.attached?.chat.folder ?? context.folder, given: new Set(chat.given) };
+        const { text, position, stamp, given } = gameAtRing(sees);
         const local = served.attached?.local;
 
         // The table's own chat is shown the game in its context, as its server would take the note before its next tool: no note on disk.

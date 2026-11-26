@@ -40,7 +40,8 @@ export function createMcpServer(
     seat?: TableSeat,
 ): McpServer
 {
-    const server = new McpServer({ name: "chesspal", version }, { instructions: serverInstructions });
+    // A chat the table opened has the lines that start it in its prompt already: the server does not give them twice.
+    const server = new McpServer({ name: "chesspal", version }, seat === undefined ? { instructions: serverInstructions } : {});
     // The server keeps what it told the chat, the instructions a tool gives once, and the position it showed: none yet (D-71).
     context.told ??= new Set();
     context.positionSeen ??= null;

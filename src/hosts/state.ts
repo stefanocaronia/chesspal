@@ -1,5 +1,5 @@
 // The state every driver's chat shares and what changes it: the turn and its end, the chat's end, the waits; and the chat the table holds, made from it.
-import { type ChatOptions, EventQueue, type HostChat, type HostEvent, keepError, laterByTimer, type ToolKind, warnFailed } from "./chat.ts";
+import { type ChatOptions, EventQueue, type HostChat, type HostEvent, keepError, laterByTimer, type ToolKind, type TurnUsage, warnFailed } from "./chat.ts";
 import { type Message, parsedLine } from "./lines.ts";
 import { type LineProcess, startLineProcess } from "./process.ts";
 
@@ -128,7 +128,7 @@ export function askToStop<T extends Turn>(state: ChatState<T>, turn: T): void
 }
 
 /** Ends the turn in course, the chat free for the next words, then tells it, with its tokens where the host reported them. */
-export function endTurn(state: ChatState, reason: "done" | "interrupted" | "failed", why?: string, usage?: { input: number; output: number; }): void
+export function endTurn(state: ChatState, reason: "done" | "interrupted" | "failed", why?: string, usage?: TurnUsage): void
 {
     state.turn = undefined;
     state.cancelInterruptWait?.();

@@ -2,7 +2,7 @@
 import { clockAfterMove, clockTag } from "../../core/index.ts";
 import { archiveEnded, type CurrentGame, endOf, loadGame, saveGame, talkLine } from "../../games/index.ts";
 import type { Context, SeenPosition } from "../registry/index.ts";
-import { toldMove } from "./lines.ts";
+import { type Doorbell, toldMove } from "./lines.ts";
 import { openingTags } from "./opening-tags.ts";
 import { gameGoingOn, type MovePlayed, summaryOf, withThought } from "./summary.ts";
 import { colourName } from "./view.ts";
@@ -23,7 +23,7 @@ export interface WithMove
     /** The chat's host, which says on which model the AI thought on the player's time. */
     host?: string;
     /** The chat's host runs the doorbell: the AI refused a move hears the page will wake it, else that the player tells it. */
-    doorbell?: boolean;
+    doorbell?: Doorbell;
 }
 
 /**
@@ -144,7 +144,7 @@ export function samePosition(one: SeenPosition, other: SeenPosition): boolean
     return one.started === other.started && one.plies === other.plies;
 }
 
-function gameToMove(folder: string, mover: Mover, now: Date, doorbell: boolean): CurrentGame
+function gameToMove(folder: string, mover: Mover, now: Date, doorbell: Doorbell): CurrentGame
 {
     const current = gameGoingOn(folder, now);
     const { turn } = current.game.position;
@@ -155,7 +155,8 @@ function gameToMove(folder: string, mover: Mover, now: Date, doorbell: boolean):
     }
 
     if (mover === "ai" && !aiToMove) {
-        throw new Error(`It is the player's move (${colourName(turn)}): ${doorbell ? "wait for it, then call player_move." : toldMove} Nothing changed.`);
+        const wait = doorbell === "table" ? "end your turn: the table wakes you with it." : doorbell ? "wait for it, then call player_move." : toldMove;
+        throw new Error(`It is the player's move (${colourName(turn)}): ${wait} Nothing changed.`);
     }
 
     return current;

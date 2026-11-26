@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { type Move, withSanPieces } from "../../core/index.ts";
 import { endOf, gameStamp, loadGame, rerunIfChanged } from "../../games/index.ts";
-import { hasDoorbell } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { closingLines, coachOnEnd, coachOnEndLine, coachRuns, lastMoveText, moveLines, type MovePlayed, newWords, playMove, positionIn, refuseUnseenPosition, shownMove, withAnalyst } from "../answers/index.ts";
+import { closingLines, coachOnEnd, coachOnEndLine, coachRuns, doorbellOf, lastMoveText, moveLines, type MovePlayed, newWords, playMove, positionIn, refuseUnseenPosition, shownMove, withAnalyst } from "../answers/index.ts";
 import { type Context, defineCommand, type SeenPosition } from "../registry/index.ts";
 import { inviteLine, pageInvite } from "./page-link.ts";
 
@@ -27,7 +26,7 @@ export const playerMove = defineCommand({
             ...moveLines(result),
             ...(result.invite === undefined ? [] : [inviteLine(result.invite)]),
             ...(result.coach === true ? [coachOnEndLine(result.game)] : []),
-            ...closingLines(result.game, result.words, false, hasDoorbell(context?.host?.())),
+            ...closingLines(result.game, result.words, false, doorbellOf(context)),
         ].join("\n"),
 });
 

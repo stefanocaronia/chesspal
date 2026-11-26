@@ -19,9 +19,20 @@ export type HostEvent =
      * The turn ended: done, stopped by interrupt(), or failed, with why in words a player can read; and the turn's tokens where the host reports them, its
      * input counting those of its cache too.
      */
-    | { type: "turnEnd"; reason: "done" | "interrupted" | "failed"; why?: string; usage?: { input: number; output: number; }; }
+    | { type: "turnEnd"; reason: "done" | "interrupted" | "failed"; why?: string; usage?: TurnUsage; }
     /** The host's process is gone: nothing comes after. */
     | { type: "ended"; why: string; };
+
+/**
+ * A turn's tokens: its input, the cache's included, and its output, summed over every request of the turn; and, where the host tells it, `context`, the input
+ * of the turn's last request, which is how full the chat's context is.
+ */
+export interface TurnUsage
+{
+    input: number;
+    output: number;
+    context?: number;
+}
 
 export interface HostChat
 {

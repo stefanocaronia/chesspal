@@ -2,16 +2,17 @@
 import { endWithMood, type Mood } from "../../core/index.ts";
 import { archiveMood, endOf, gameInAnalysis, loadGame, loadTableTalk, saveGame, saveTableTalk, type Sayer, type Shown, type TableTalk, type Talk, talkLimits, talkLine, unheardWords, type Words } from "../../games/index.ts";
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
-import type { Context } from "../registry/index.ts";
+import type { Context, SeenPosition } from "../registry/index.ts";
 import { gameAt } from "./clock.ts";
 import { shownMove, shownMoves } from "./lines.ts";
 import { openingTags } from "./opening-tags.ts";
 
 /**
  * Adds a line to the talk of the current game, going on or just over, and saves it; the AI's mood once the game is over, which the archive keeps too (D-70).
- * With no game the line goes in the talk before it (D-77). A line refused changes nothing: it throws, in words for whoever spoke.
+ * With no game the line goes in the talk before it (D-77). A line refused changes nothing: it throws, in words for whoever spoke. With `answersEachLine`,
+ * for a chat the table drives, the AI may answer each line the player wrote after its last words.
  */
-export function say(folder: string, who: Sayer, text: string, at: Date, mood?: Mood, shown?: Shown): Talk
+export function say(folder: string, who: Sayer, text: string, at: Date, mood?: Mood, shown?: Shown, answersEachLine = false): Talk
 {
     const current = gameAt(folder, at);
 
@@ -26,7 +27,7 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
     }
 
     // With the helps on the AI writes as long as the analyst (D-78), and once the game is over as long, to talk it over (D-101).
-    current.talk.push(talkLine(current, who, text, at, undefined, aiMost(folder, who, text, going), shown));
+    current.talk.push(talkLine(current, who, text, at, undefined, aiMost(folder, who, text, going), shown, answersEachLine));
 
     if (mood !== undefined) {
         endWithMood(current.game, mood);
@@ -39,6 +40,80 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
     }
 
     return current;
+}
+
+/**
+ * The AI's words written in its chat outside any tool, which the player of a chat the table drives sees nowhere else: said on the board page as the AI's
+ * line, with none of ai_say's limits on when it speaks, cut at the end of a sentence within the longest line the talk takes. What it said, none when empty.
+ */
+export function sayProse(folder: string, text: string, at: Date): string | undefined
+{
+    const words = proseLine(text);
+
+    if (words === "") {
+        return undefined;
+    }
+
+    const current = loadGame(folder);
+    const line = { who: "ai" as const, text: words, at: at.toISOString() };
+
+    if (current === undefined) {
+        const before = loadTableTalk(folder);
+        saveTableTalk(folder, { started: before.started === "" ? at.toISOString() : before.started, talk: [...before.talk, { ...line, ply: 0 }] });
+    } else {
+        saveGame(folder, { ...current, talk: [...current.talk, { ...line, ply: current.game.record.moves.length }] });
+    }
+
+    return words;
+}
+
+/**
+ * Whether the AI spoke to the player through its tools since `since`, `from` being the game as it was then: a line of its own on the board page, or a
+ * comment on a move it played after `from`.
+ */
+export function aiSpokeSince(folder: string, since: Date, from: SeenPosition | undefined): boolean
+{
+    const current = loadGame(folder);
+    const talk = current?.talk ?? loadTableTalk(folder).talk;
+
+    if (talk.some((line) => line.who === "ai" && Date.parse(line.at) >= since.getTime())) {
+        return true;
+    }
+
+    if (current === undefined) {
+        return false;
+    }
+
+    const first = from?.started === current.started ? from.plies : 0;
+    // The AI's moves are those that leave the player to move: the last when it is the player's turn, and every other one before it.
+    const aiParity = (current.game.record.moves.length - (current.game.position.turn === current.ai ? 0 : 1)) % 2;
+    return current.game.record.moves.some((move, index) => index >= first && index % 2 === aiParity && spokenIn(move.comment));
+}
+
+/** The words of a move's comment, without the draw's mark and the clock's tags. */
+function spokenIn(comment: string | undefined): boolean
+{
+    return (comment ?? "").replace(/\[%[^\]]*\]/g, "").replace(/\(=\)/g, "").trim() !== "";
+}
+
+/** Prose made one line of the talk: its blank lines and spaces as one, cut at the last end of a sentence within the longest line, or at a word's end. */
+function proseLine(text: string): string
+{
+    const words = text.replace(/\s+/g, " ").trim();
+    const most = talkLimits.aiHelps;
+
+    if (words.length <= most) {
+        return words;
+    }
+
+    const kept = words.slice(0, most);
+    const sentence = Math.max(...[". ", "! ", "? ", "… "].map((end) => kept.lastIndexOf(end)));
+
+    if (sentence > 0) {
+        return kept.slice(0, sentence + 1);
+    }
+
+    return `${kept.slice(0, Math.max(kept.lastIndexOf(" "), most - 1))}…`;
 }
 
 /**

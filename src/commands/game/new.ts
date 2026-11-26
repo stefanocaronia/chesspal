@@ -3,9 +3,9 @@ import { join } from "node:path";
 import { z } from "zod";
 import { type AiLevel, aiLevels, carriedPlies, carriedTag, Game, type GameRecord, levelTag, pgnDate, readPgn, type Side, startClock, type TimeControl, timeControlOf, timeControlTag, withoutMoods } from "../../core/index.ts";
 import { archivedName, archiveGame, archiveName, type CurrentGame, endAnalysis, endOf, endTableTalk, lastChatStart, loadGame, pliesSinceClean, saveGame, startOfNewGame, withoutPlans } from "../../games/index.ts";
-import { hasDoorbell, hookedHosts } from "../../host-files/index.ts";
+import { hookedHosts } from "../../host-files/index.ts";
 import { gameFolder, gameFolders } from "../../profiles/index.ts";
-import { coachRuns, gameAt, type GameSummary, nextStep, openingTags, positionLines, refuseUnseenPosition, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "../answers/index.ts";
+import { coachRuns, type Doorbell, doorbellOf, gameAt, type GameSummary, nextStep, openingTags, positionLines, refuseUnseenPosition, sidesLine, type Speech, speechLine, speechOf, summaryOf, withThought } from "../answers/index.ts";
 import { pastGameLines, playerLine } from "../profiles/index.ts";
 import { type Context, defineCommand } from "../registry/index.ts";
 import { levelText, levelToPlay } from "./levels.ts";
@@ -71,7 +71,7 @@ export const newGame = defineCommand({
 
         return startNewGame(input, context, "chat");
     },
-    format: (result, context) => "window" in result ? askedLine(result, hasDoorbell(context?.host?.())) : startedLines(result, hasDoorbell(context?.host?.())),
+    format: (result, context) => "window" in result ? askedLine(result, doorbellOf(context)) : startedLines(result, doorbellOf(context)),
 });
 
 /**
@@ -144,7 +144,7 @@ export function startNewGame({ ai_colour: colour, from, clock, level: chosen, re
 }
 
 /** The new game's lines for the AI. */
-function startedLines({ game, archived, past, player, speech, closedPage: closed }: NewGame, doorbell: boolean): string
+function startedLines({ game, archived, past, player, speech, closedPage: closed }: NewGame, doorbell: Doorbell): string
 {
     return [
         `New game: ${sidesLine(game.ai)}, ${levelText(game.level)}.`,
@@ -198,8 +198,14 @@ function justBegun(context: Context): boolean
     return current !== undefined && endOf(current.game) === undefined && current.game.record.moves.length === carriedPlies(current.game.record);
 }
 
-function askedLine({ window, page }: Asked, doorbell: boolean): string
+function askedLine({ window, page }: Asked, doorbell: Doorbell): string
 {
+    if (doorbell === "table") {
+        return window === "opened"
+            ? "The New game window is open on the board page: the player chooses the game there. Don't ask; end your turn, the table wakes you when the game starts."
+            : "Nobody has the board page open: tell the player to open it and start the game there with its New game button. End your turn.";
+    }
+
     // A host with no doorbell hears of the game from the player, in its window.
     const told = "End your turn, and call status when they tell you the game started.";
 

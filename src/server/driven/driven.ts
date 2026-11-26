@@ -1,11 +1,11 @@
-// The chat the table drives itself, without a terminal: Claude Code started by its driver in a folder of the table's, its commands run at its place, in
-// the table's process, and its turns given by the doorbell. To the page it is a chat at the table as any other, which the table plays the hooks of.
+// The chat the table drives itself, without a terminal: Claude Code started by its driver in a folder of the data folder's, its commands run at its place,
+// in the table's process, and its turns given by the doorbell. To the page it is a chat at the table as any other, which the table plays the hooks of.
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { type Caller, type Context, speechOf } from "../../commands/index.ts";
-import { loadGame, makeFolder, saveChatStart } from "../../games/index.ts";
+import { aiSpokeSince, type Caller, type Context, positionIn, sayProse, type SeenPosition, speechOf } from "../../commands/index.ts";
+import { endOf, loadGame, makeFolder, saveChatStart } from "../../games/index.ts";
 import { samePath, tableFolder } from "../../home/index.ts";
-import { startInstructions } from "../../host-files/index.ts";
+import { drivenStartInstructions } from "../../host-files/index.ts";
 import type { HostChat, HostDriver, HostEvent } from "../../hosts/index.ts";
 import { activeProfile, gameFolder, profileSettings } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
@@ -13,6 +13,7 @@ import { bellLineIn, type BellListener, gameBellLine } from "../bell/index.ts";
 import type { ChatFailure, ChatSeat, HeldChat, TableChats } from "../page/index.ts";
 import type { Place, TablePlaces } from "../places/index.ts";
 import { chatStart, hostEnvironment } from "../table/index.ts";
+import { failureOf } from "./failure.ts";
 import { keepChat, keptChat } from "./kept.ts";
 
 /** What the chats the table drives run with besides the table's context; the tests inject them. */
@@ -33,16 +34,20 @@ export interface DrivenOptions
 /** The setting of the profile that has the table drive Claude Code's chat itself, without a terminal; off unless the player turns it on. */
 export const chatInPage = "chatInPage";
 
+/** The host the table drives, as the table and the page name it. */
+const host = "claude";
+
 /**
- * The chats of a table that drives Claude Code's chat itself when the profile in use says so (`chatInPage`), the terminal's for every other: the chat's
- * folder is `chats/opponent` in the table's, its place the opponent's. The chat it drove is kept across the table's restarts, and opened again with its
- * session once a page is open.
+ * The chats of a table that drives Claude Code's chat itself when the profile in use says so (`chatInPage`), the terminal's for every other. The chat's
+ * folder is `chats/opponent` in the data folder, outside the table's, whose files init wrote for a chat in a terminal; its place is the opponent's. The
+ * chat it drove is kept across the table's restarts, and taken up again with its session while the game it played goes on.
  */
 export function drivenChats(context: Context, options: DrivenOptions): TableChats
 {
     const { terminal } = options;
     const table = tableFolder(context.home());
-    const folder = join(table, "chats", "opponent");
+    const chats = join(context.home(), "chats");
+    const folder = join(chats, "opponent");
     let seat: ChatSeat | undefined;
     let driven: Driven | undefined;
     let places: Promise<TablePlaces> | undefined;
@@ -52,14 +57,14 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
 
     const failed = (why: string): void => {
         failures += 1;
-        failure = { why, number: failures };
+        failure = failureOf(why, failures);
     };
 
     // The chat the table drives answers for its folder; while it has not attached yet, for the table's too, where the page looks for a chat opening.
     const answersFor = (asked: string): boolean => driven !== undefined && (samePath(asked, folder) || (!driven.attached && samePath(asked, table)));
 
     const keep = (state: Driven | undefined, closed: boolean): void => {
-        keepChat(table, { host: "claude", model: state?.choice.model, effort: state?.choice.effort, session: state?.session, closed });
+        keepChat(chats, { host, session: state?.session, game: state?.game, closed });
     };
 
     // The chat leaves the table and its place, and its process ends with all it started.
@@ -82,7 +87,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
     };
 
     const attach = (state: Driven): void => {
-        const chat = { version, session: state.session ?? null, folder, host: "claude-code", outdated: false, seat: state.seat };
+        const chat = { version, session: state.session ?? null, folder, host, outdated: false, seat: state.seat };
 
         if (seat?.attach(chat, state.place!.context) !== true) {
             failed("Another chat is at the table: the one the table drives closed.");
@@ -93,18 +98,36 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         state.attached = true;
     };
 
-    // The chat's turn has ended: it waits at the doorbell, which sends it the game as its next turn when the player acts on the page.
-    const waitAtBell = (state: Driven): void => {
-        const listener: BellListener = {
-            hear: (said) => {
-                const game = said.startsWith("ring\n") ? said.slice("ring\n".length) : undefined;
-                const language = playerLanguage(context);
-                state.inTurn = state.chat?.send(game === undefined ? bellLineIn(language) : gameBellLine(language, game)) === true;
-            },
-            dismissed: () => undefined,
-        };
-        state.gone = seat?.wait(listener);
+    // A turn begins: the pages see the chat at work, and what it writes outside its tools is gathered from here.
+    const begin = (state: Driven): void => {
+        state.inTurn = true;
+        state.prose = [];
+        state.from = { at: context.now(), position: positionNow(context) };
+        seat?.changed();
     };
+
+    const send = (state: Driven, text: string): boolean => {
+        const sent = state.chat?.send(text) === true;
+
+        if (sent) {
+            begin(state);
+        }
+
+        return sent;
+    };
+
+    // The chat's turn has ended: it waits at the doorbell, which sends it the game as its next turn when the player acts on the page, or the table when
+    // the AI has not moved.
+    const listener = (state: Driven): BellListener => ({
+        rung: (game) => {
+            const language = playerLanguage(context);
+            const nudge = state.nudging;
+            state.nudging = false;
+            state.nudged = nudge;
+            send(state, game === undefined ? bellLineIn(language) : nudge ? yourMoveLine(language, game) : gameBellLine(language, game));
+        },
+        dismissed: () => undefined,
+    });
 
     const heard = (state: Driven, event: HostEvent): void => {
         if (state.closing) {
@@ -121,45 +144,91 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 attach(state);
             }
         } else if (event.type === "turnStart") {
-            state.inTurn = true;
+            begin(state);
             seat?.prompted();
+        } else if (event.type === "text") {
+            state.prose[event.block] = `${state.prose[event.block] ?? ""}${event.text}`;
         } else if (event.type === "turnEnd") {
-            endTurn(state, event.reason === "failed" ? event.why ?? "The chat's turn failed." : undefined);
+            endTurn(state, event.reason, event.reason === "failed" ? event.why ?? "The chat's turn failed." : undefined);
         } else if (event.type === "ended") {
             failed(event.why);
+            state.game = gameStarted(context);
             keep(state, true);
             close(state);
         }
     };
 
-    const endTurn = (state: Driven, why: string | undefined): void => {
+    const endTurn = (state: Driven, reason: "done" | "interrupted" | "failed", why: string | undefined): void => {
+        const stopped = state.stopping;
         state.inTurn = false;
+        state.stopping = false;
 
         if (why !== undefined) {
             failed(why);
         }
 
+        showProse(context, state);
+        state.game = gameStarted(context);
+        seat?.changed();
+
         // A new game in the chat after a long one: the table starts it again clean, in place of the player's /clear (D-57).
         if (state.startAgain) {
             close(state);
             void open(undefined);
-        } else if (state.attached) {
-            waitAtBell(state);
-        } else {
+            return;
+        }
+
+        if (!state.attached) {
             // Its first turn ended before the host said which chat it is, as when it cannot sign in: it would hold the table opening for nobody.
             keep(state, true);
             close(state);
+            return;
+        }
+
+        keep(state, false);
+        state.gone = seat?.wait(listener(state));
+
+        // A ring the chat missed in its turn woke it again already.
+        if (state.inTurn || seat === undefined) {
+            return;
+        }
+
+        if (stopped) {
+            seat.stall("stopped");
+        } else if (!seat.aiToMove()) {
+            state.nudged = false;
+        } else if (reason === "done" && !state.nudged) {
+            // The AI's turn ended without its move: the table asks it once more, with the game.
+            state.nudging = true;
+            seat.ring();
+        } else {
+            seat.stall("noMove");
         }
     };
 
-    // Opens the chat, clean or taking up `session`: whether it started.
-    const open = async (session: string | undefined): Promise<boolean> => {
-        if (seat === undefined || driven !== undefined) {
+    // Opens the chat, clean or taking up `session`: whether it started; "missing" when Claude Code's program is not where the driver looks.
+    const open = async (session: string | undefined): Promise<boolean | "missing"> => {
+        if (seat === undefined || driven !== undefined || !seat.free()) {
             return false;
         }
 
-        const start = chatStart(context, "claude");
-        const state: Driven = { seat: ++seats, choice: start.choice, model: start.choice.model ?? "", effort: start.choice.effort, analysis: start.analysis, attached: false, inTurn: false, closing: false, startAgain: false };
+        const start = chatStart(context, host);
+        const state: Driven = {
+            seat: ++seats,
+            choice: start.choice,
+            model: start.choice.model ?? "",
+            effort: start.choice.effort,
+            analysis: start.analysis,
+            resumed: session !== undefined,
+            attached: false,
+            inTurn: false,
+            closing: false,
+            startAgain: false,
+            stopping: false,
+            nudging: false,
+            nudged: false,
+            prose: [],
+        };
         driven = state;
         failure = undefined;
 
@@ -169,7 +238,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             const program = driver.program(environment, context.platform, context.userHome?.() ?? homedir());
 
             if (program === undefined) {
-                throw new Error("Claude Code's own program is not on this computer, where the table looks for it: install it from https://claude.com/claude-code, then try again.");
+                driven = undefined;
+                return "missing";
             }
 
             makeFolder(folder);
@@ -180,7 +250,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 state.startAgain = true;
             };
 
-            const hooks = { ...seat.hooks, caller, startAgain };
+            const hooks = { ...seat.hooks, caller, startAgain, drivenByTable: true as const };
             places ??= Promise.resolve(options.places());
             state.place = await (await places).offer("opponent", folder, hooks);
 
@@ -197,9 +267,9 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 ...(state.effort === undefined ? {} : { effort: state.effort }),
                 ...(session === undefined ? {} : { session }),
                 allowed: ["chesspal"],
-                environment: defined({ ...driver.environment(environment), ...hostEnvironment("claude", start.choice) }),
+                environment: defined({ ...driver.environment(environment), ...hostEnvironment(host, start.choice) }),
                 server: { name: "chesspal", command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...state.place.environment } },
-                instructions: startInstructions(),
+                instructions: drivenStartInstructions(),
             });
         } catch (error) {
             failed((error as Error).message);
@@ -208,34 +278,43 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         }
 
         state.session = session;
+        state.game = gameStarted(context);
         keep(state, false);
         state.chat.onEvent((event) => heard(state, event));
 
-        // A chat taken up again waits at rest for the player's first act; a new one starts with the start message, as a terminal's.
+        // A chat taken up again waits at the bell, rung at once when the AI is to move; a new one starts with the start message, as a terminal's.
         if (session !== undefined) {
             attach(state);
 
             if (state.attached) {
-                waitAtBell(state);
+                state.gone = seat.resume(listener(state));
             }
         } else {
-            state.inTurn = state.chat.send(start.message);
+            send(state, start.message);
             seat.prompted();
         }
 
         return true;
     };
 
+    // The chat the page asks for: the one kept, taken up again while its game goes on, else a clean one; the terminal's where Claude Code's program is not
+    // where the driver looks for it, as one installed by npm alone.
+    const asked = async (): Promise<boolean> => {
+        const kept = keptChat(chats);
+        const opened = await open(kept !== undefined && !kept.closed && kept.host === host && keptGameGoesOn(context, kept.game) ? kept.session : undefined);
+        return opened === "missing" ? terminal.open(host) : opened;
+    };
+
     return {
         hosts: () => terminal.hosts(),
         ...(terminal.watch === undefined ? {} : { watch: (changed: () => void) => terminal.watch!(changed) }),
         ...(terminal.ollama === undefined ? {} : { ollama: () => terminal.ollama!() }),
-        open: (host) => (host === "claude" && switchedOn(context) ? open(undefined) : terminal.open(host)),
-        held: (asked) => (answersFor(asked) ? heldOf(driven!) : terminal.held(asked)),
-        relaunch: (asked, host, updated) => {
+        open: (name) => (name === host && switchedOn(context) ? asked() : terminal.open(name)),
+        held: (folderAsked) => (answersFor(folderAsked) ? heldOf(driven!) : terminal.held(folderAsked)),
+        relaunch: (folderAsked, name, updated) => {
             // After an update the page asks for the chat of the table's folder, whichever is at the table (D-108).
-            if (!answersFor(asked) && !(updated === true && driven !== undefined)) {
-                return terminal.relaunch(asked, host, updated);
+            if (!answersFor(folderAsked) && !(updated === true && driven !== undefined)) {
+                return terminal.relaunch(folderAsked, name, updated);
             }
 
             const state = driven!;
@@ -244,30 +323,31 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             // The table starts again from the Chesspal just installed, and opens a clean chat then (D-108).
             if (updated === true) {
                 keep({ ...state, session: undefined }, false);
-            } else if (host !== undefined && host !== "claude") {
+            } else if (name !== undefined && name !== host) {
                 keep(state, true);
-                void terminal.open(host);
+                void terminal.open(name);
             } else if (switchedOn(context)) {
                 void open(undefined);
             } else {
                 keep(state, true);
-                void terminal.open("claude");
+                void terminal.open(host);
             }
 
             return true;
         },
         seat: (given) => {
             seat = given;
-            const kept = keptChat(table);
+            const kept = keptChat(chats);
 
-            // The chat of the table before, opened again with its session once a page is open: a table that starts by itself plays for nobody.
-            if (kept !== undefined && !kept.closed && kept.host === "claude") {
+            // The chat of the table before, taken up again once a page is open, and only while the game it played goes on: else at the player's next request.
+            if (kept !== undefined && !kept.closed && kept.host === host && kept.session !== undefined) {
                 let waiting = true;
                 given.pageOpened(() => {
-                    if (waiting && switchedOn(context)) {
-                        waiting = false;
+                    if (waiting && switchedOn(context) && keptGameGoesOn(context, kept.game)) {
                         void open(kept.session);
                     }
+
+                    waiting = false;
                 });
             }
         },
@@ -276,9 +356,11 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
                 return false;
             }
 
+            driven.stopping = true;
             driven.chat.interrupt();
             return true;
         },
+        atWork: () => driven?.attached === true && driven.inTurn,
         failure: () => failure,
         close: async () => {
             if (driven !== undefined) {
@@ -300,7 +382,11 @@ interface Driven
     model: string;
     effort: string | undefined;
     readonly analysis: boolean;
+    /** Taken up again with its session: it holds a game played before. */
+    readonly resumed: boolean;
     session?: string | undefined;
+    /** When the game it played last started. */
+    game?: string | undefined;
     place?: Place;
     chat?: HostChat;
     attached: boolean;
@@ -310,11 +396,88 @@ interface Driven
     closing: boolean;
     /** Started again clean once its turn ends (D-57). */
     startAgain: boolean;
+    /** The player stopped the turn in course. */
+    stopping: boolean;
+    /** The table rings the chat for the AI's move it did not make; it did once since the player last woke it. */
+    nudging: boolean;
+    nudged: boolean;
+    /** What the chat wrote in its turn outside its tools, by block; when the turn began, and the game then. */
+    prose: string[];
+    from?: { readonly at: Date; readonly position: SeenPosition | undefined; };
 }
 
 function heldOf(state: Driven): HeldChat
 {
-    return { model: state.choice.model, effort: state.choice.effort, seat: state.seat, ...(state.analysis ? { analysis: true as const } : {}) };
+    return {
+        model: state.choice.model,
+        effort: state.choice.effort,
+        seat: state.seat,
+        driven: true,
+        ...(state.analysis ? { analysis: true as const } : {}),
+        ...(state.resumed ? { played: true as const } : {}),
+    };
+}
+
+/**
+ * What the chat wrote in its turn outside its tools, shown on the board page as the AI's words when no tool of the turn carried any: the player of a chat
+ * the table drives has no other window to read it in.
+ */
+function showProse(context: Context, state: Driven): void
+{
+    const text = state.prose.filter((block) => block.trim() !== "").join("\n\n");
+    const from = state.from;
+    state.prose = [];
+
+    if (text === "" || from === undefined) {
+        return;
+    }
+
+    try {
+        const games = gameFolder(context.home());
+
+        if (!aiSpokeSince(games, from.at, from.position) && sayProse(games, text, context.now()) !== undefined) {
+            state.place?.context.heard?.();
+        }
+    } catch {
+        // A game that cannot be written keeps the words in the chat alone.
+    }
+}
+
+/** The line that asks the chat once more for the AI's move it did not make, with the game as status shows it. */
+function yourMoveLine(language: string | undefined, game: string): string
+{
+    const line = "It is your move, and the player waits for it: here is the game now, as status shows it. Don't call status for it: decide, then call ai_move.";
+    return `${line}${language === undefined ? "" : ` Write to the player in ${language}.`}\n${game}`;
+}
+
+/** Whether the game the kept chat played, by its start, is the one going on now. */
+function keptGameGoesOn(context: Context, started: string | undefined): boolean
+{
+    try {
+        const current = loadGame(gameFolder(context.home()));
+        return started !== undefined && current !== undefined && current.started === started && endOf(current.game) === undefined;
+    } catch {
+        return false;
+    }
+}
+
+/** When the game in the data folder started; none with no game, or when it cannot be read. */
+function gameStarted(context: Context): string | undefined
+{
+    try {
+        return loadGame(gameFolder(context.home()))?.started;
+    } catch {
+        return undefined;
+    }
+}
+
+function positionNow(context: Context): SeenPosition | undefined
+{
+    try {
+        return positionIn(gameFolder(context.home()));
+    } catch {
+        return undefined;
+    }
 }
 
 /** Whether the profile in use has the table drive Claude Code's chat itself: read at each opening, off when it cannot be read. */

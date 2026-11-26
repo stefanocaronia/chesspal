@@ -67,6 +67,12 @@ export function startInstructions(): string
     return instructionsFile("start");
 }
 
+/** The lines that start a chat the table drives itself, with no terminal and no folder of the player's: the board page is where it is opened again. */
+export function drivenStartInstructions(): string
+{
+    return instructionsFile("driven-start");
+}
+
 interface FileChange
 {
     path: string;

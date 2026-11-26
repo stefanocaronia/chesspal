@@ -8,7 +8,7 @@ import { type HostId, hostIds, hosts } from "./names.ts";
 import { openCode } from "./opencode/index.ts";
 
 export { isHostName } from "./chat.ts";
-export type { ChatOptions, ChatServer, HostChat, HostDriver, HostEvent, HostModel, ModelsOptions, ToolKind } from "./chat.ts";
+export type { ChatOptions, ChatServer, HostChat, HostDriver, HostEvent, HostModel, ModelsOptions, ToolKind, TurnUsage } from "./chat.ts";
 export { type ModelKeeper, modelKeeper } from "./keeper.ts";
 export { type Host, type HostId, hostIds, hostOfClient, hosts } from "./names.ts";
 export { guardProcess, isRunning, type LineProcess, startApart, startLineProcess, stopTree } from "./process.ts";

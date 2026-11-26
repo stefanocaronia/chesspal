@@ -4,4 +4,4 @@ export type { ChatAttach } from "./chat.ts";
 export { jsonOf } from "./http.ts";
 export { chatHasRead, type Page, startPage } from "./page.ts";
 export type { ChatSeat, SeatHooks } from "./seat.ts";
-export type { ChatFailure, ChatHost, HeldChat, OllamaState, TableChats } from "./table.ts";
+export type { ChatFailure, ChatHost, FailureCode, HeldChat, OllamaState, TableChats } from "./table.ts";

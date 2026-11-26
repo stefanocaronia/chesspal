@@ -23,6 +23,7 @@ export function talkLine(
     ply = isGame(current) ? current.game.record.moves.length : 0,
     aiMost: number = talkLimits.ai,
     shown?: Shown,
+    answersEachLine = false,
 ): TalkLine
 {
     const who = sayer === "agent" ? "ai" : sayer;
@@ -43,7 +44,7 @@ export function talkLine(
     }
 
     if (who === "ai" && isGame(current)) {
-        refuseAiWords(current, sayer === "agent");
+        refuseAiWords(current, sayer === "agent", answersEachLine);
     }
 
     return { who, text: words, ply, at: at.toISOString(), ...(sayer === "agent" ? { agent: true } : {}), ...(shown === undefined ? {} : { shown }) };
@@ -116,9 +117,10 @@ function wordsLeft(current: Talk): number
 /**
  * The AI speaks apart from its move once a move of the player's, on their time, with something to say or to answer (D-72), and never while its move waits:
  * it speaks in the move's comment then. Its agent speaks only first, when the player has written nothing to answer, and its word leaves the chat one answer
- * to what they write after. Between games it talks freely, about the game just over or to start another (D-74).
+ * to what they write after. A chat the table drives, woken at every line of the player's, answers each (`answersEachLine`). Between games it talks freely,
+ * about the game just over or to start another (D-74).
  */
-function refuseAiWords(current: CurrentGame, byAgent: boolean): void
+function refuseAiWords(current: CurrentGame, byAgent: boolean, answersEachLine: boolean): void
 {
     const { game, ai } = current;
     const since = sinceAiMoved(current);
@@ -135,6 +137,10 @@ function refuseAiWords(current: CurrentGame, byAgent: boolean): void
 
     if (byAgent) {
         refuseAgentWords(current, spoken);
+        return;
+    }
+
+    if (answersEachLine && unanswered(current).length > 0) {
         return;
     }
 

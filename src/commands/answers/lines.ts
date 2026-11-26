@@ -1,11 +1,22 @@
 // The lines an AI reads in a tool's answer about the current game: where it stands, the move just played, the player's words and what to do next.
 import { type Facts, figurinesOf, materialOf, sees, type Side } from "../../core/index.ts";
 import { talkLimits } from "../../games/index.ts";
+import { hasDoorbell } from "../../host-files/index.ts";
+import type { Context } from "../registry/index.ts";
 import { analystLine, reviewedLine } from "./agents.ts";
 import { clockLine } from "./clock.ts";
 import type { Written } from "./say.ts";
 import { endText, type GameSummary, type LastMove, type MovePlayed, unplayed } from "./summary.ts";
 import { boardView, colourName, compactView, materialText } from "./view.ts";
+
+/** How the chat hears the player's acts on the page: from its doorbell, from the table that drives it, or only from the player in its window (false). */
+export type Doorbell = boolean | "table";
+
+/** How the chat of `context` hears the player's acts on the page. */
+export function doorbellOf(context: Context | undefined): Doorbell
+{
+    return context?.drivenByTable === true ? "table" : hasDoorbell(context?.host?.());
+}
 
 /** Where the game stands: the AI's position to decide on, with its last move unless the lines before named it; the player's turn; or how it ended. */
 export function positionLines(game: GameSummary, withLastMove = true): string[]
@@ -92,7 +103,7 @@ export function moveLines({ note, game, warning }: MovePlayed): string[]
 }
 
 /** The last lines of a tool's answer: the player's words from the board page, then the next step, which stays the last line. */
-export function closingLines(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false, doorbell = true): string[]
+export function closingLines(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false, doorbell: Doorbell = true): string[]
 {
     return [...wordLines(words), nextStep(game, words, pageClosed, doorbell)];
 }
@@ -110,7 +121,7 @@ export function wordLines(words: readonly Written[]): string[]
  * What the AI does next: the one line every host reads, even where the server's instructions are not shown. Words of the player's ask for an answer. With the
  * board page open in no browser, a new game starts there, never in the chat. In a host with no `doorbell`, the player tells the chat what they did on the page.
  */
-export function nextStep(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false, doorbell = true): string
+export function nextStep(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false, doorbell: Doorbell = true): string
 {
     const step = pageClosed ? closedPageGameStep : newGameStep;
 
@@ -163,6 +174,10 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
 
     if (words.length > 0) {
         return "Next: answer the player with ai_say, then wait for their move.";
+    }
+
+    if (doorbell === "table") {
+        return "Next: end your turn: the table wakes you with the player's move, already played.";
     }
 
     return doorbell ? "Next: wait for the player's move, then call player_move with it." : `Next: wait for the player's move: ${toldMove}`;

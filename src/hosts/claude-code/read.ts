@@ -1,5 +1,5 @@
 // Reading Claude Code's lines: one function per type of message; a line not understood changes nothing.
-import type { ToolKind } from "../chat.ts";
+import type { ToolKind, TurnUsage } from "../chat.ts";
 import { isObject, type Message } from "../lines.ts";
 import { askToStop, endTurn, nextBlock, playing, tell, write } from "../state.ts";
 import { pathOutside } from "./paths.ts";
@@ -221,15 +221,26 @@ function readResult(state: State, message: Message): void
     }
 }
 
-/** The turn's tokens as its result reports them, the cache's written and read counted in the input; undefined where it reports none. */
-function usageOf(usage: unknown): { input: number; output: number; } | undefined
+/**
+ * The turn's tokens as its result reports them, summed over its requests, the cache's written and read counted in the input; and the input of its last
+ * request, the last of `iterations`, where it lists them. Undefined where it reports none.
+ */
+function usageOf(usage: unknown): TurnUsage | undefined
 {
     if (!isObject(usage) || typeof usage.input_tokens !== "number" || typeof usage.output_tokens !== "number") {
         return undefined;
     }
 
-    const cache = (field: unknown): number => (typeof field === "number" ? field : 0);
-    return { input: usage.input_tokens + cache(usage.cache_creation_input_tokens) + cache(usage.cache_read_input_tokens), output: usage.output_tokens };
+    const last = Array.isArray(usage.iterations) ? usage.iterations.at(-1) : undefined;
+    const context = isObject(last) && typeof last.input_tokens === "number" ? inputOf(last) : undefined;
+    return { input: inputOf(usage), output: usage.output_tokens, ...(context === undefined ? {} : { context }) };
+}
+
+/** A request's input tokens, the cache's written and read counted. */
+function inputOf(usage: Record<string, unknown>): number
+{
+    const count = (field: unknown): number => (typeof field === "number" ? field : 0);
+    return count(usage.input_tokens) + count(usage.cache_creation_input_tokens) + count(usage.cache_read_input_tokens);
 }
 
 function tellWholeText(state: State, turn: Turn, id: string | undefined, text: string): void

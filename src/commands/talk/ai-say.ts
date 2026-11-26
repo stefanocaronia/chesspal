@@ -1,9 +1,26 @@
 import { z } from "zod";
 import { moods } from "../../core/index.ts";
 import { archivedName, talkLimits } from "../../games/index.ts";
-import { hasDoorbell } from "../../host-files/index.ts";
 import { gameFolder } from "../../profiles/index.ts";
-import { analystLine, coachOnEnd, coachOnEndLine, type GameSummary, give, newGameStep, nextStep, refuseOtherGame, reviewedLine, say, summaryOf, waitingWords, withAnalyst, wordLines, type Written } from "../answers/index.ts";
+import {
+    analystLine,
+    coachOnEnd,
+    coachOnEndLine,
+    type Doorbell,
+    doorbellOf,
+    type GameSummary,
+    give,
+    newGameStep,
+    nextStep,
+    refuseOtherGame,
+    reviewedLine,
+    say,
+    summaryOf,
+    waitingWords,
+    withAnalyst,
+    wordLines,
+    type Written,
+} from "../answers/index.ts";
 import { defineCommand } from "../registry/index.ts";
 
 interface Said
@@ -33,7 +50,7 @@ export const aiSay = defineCommand({
         const folder = gameFolder(context.home());
         refuseOtherGame(context, folder);
         const waiting = waitingWords(context);
-        const current = say(folder, "ai", text, context.now(), mood);
+        const current = say(folder, "ai", text, context.now(), mood, undefined, doorbellOf(context) === "table");
         const words = give(context, waiting);
 
         if (!("game" in current)) {
@@ -48,12 +65,12 @@ export const aiSay = defineCommand({
             "Said on the board page, where the player reads it: don't write it again in the chat.",
             ...wordLines(words),
             ...(coach === true && game !== undefined ? [coachOnEndLine(game)] : []),
-            afterWords(game, words, hasDoorbell(context?.host?.())),
+            afterWords(game, words, doorbellOf(context)),
         ].join("\n"),
 });
 
 /** The next step once the AI has spoken: the end of a game over has been told already, and the player's draw offer answered in words. */
-function afterWords(game: GameSummary | undefined, words: readonly Written[], doorbell: boolean): string
+function afterWords(game: GameSummary | undefined, words: readonly Written[], doorbell: Doorbell): string
 {
     if (words.length === 0 && game?.end !== undefined) {
         // The offer to go over the game, made in the AI's words, waits for the player's yes (D-89).

@@ -4,11 +4,11 @@ export { agentRuns, agentsLine, analysisStopped, analystLine, analystOf, analyst
 export { clockLine, clockSummaryOf, gameAt } from "./clock.ts";
 export { arrowsInput, drawingsOf, noteInput, squaresInput } from "./drawings.ts";
 export { aheadWords, leadFrom, leadInput } from "./lead-input.ts";
-export { closingLines, headLines, lastMoveText, moveLines, newGameStep, nextStep, positionLines, shownMove, shownMoves, sidesLine, wordLines } from "./lines.ts";
+export { closingLines, type Doorbell, doorbellOf, headLines, lastMoveText, moveLines, newGameStep, nextStep, positionLines, shownMove, shownMoves, sidesLine, wordLines } from "./lines.ts";
 export { bookOpening, bookPlace, bookPlies, knownMoves, openingLine, openingName } from "./opening-book.ts";
 export { openingTags } from "./opening-tags.ts";
 export { playMove, PositionChanged, positionChangedShown, positionIn, refuseOtherGame, refuseUnseenPosition, samePosition } from "./play-move.ts";
-export { give, newWords, say, unansweredWords, waitingWords, type Written } from "./say.ts";
+export { aiSpokeSince, give, newWords, say, sayProse, unansweredWords, waitingWords, type Written } from "./say.ts";
 export { type Speech, speechLine, speechOf } from "./speech.ts";
 export { gameShown, gameToStudy, knownTag, moveIndex, moveNumbers, namedGame, noGameGoingOn, positionAfter, positionAfterLine, positionLine, shownPosition, type Studied, studyInput, type VariationInput } from "./study.ts";
 export { endText, gameGoingOn, type GameSummary, lastMoves, type MovePlayed, summaryOf, withThought } from "./summary.ts";

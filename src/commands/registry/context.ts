@@ -69,6 +69,8 @@ export interface Context
     chat?: true;
     /** The table that drives this chat starts it again clean once its turn ends: a new game then asks the player for no /clear (D-57). */
     startAgain?: () => void;
+    /** The table drives this chat itself: it wakes it with the player's acts on the page, already played, and its turn ends there. */
+    drivenByTable?: true;
 }
 
 /** Who made a tool call: the model, else the host's name, never what the AI says of itself; the effort only when the host gives it. */

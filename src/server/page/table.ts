@@ -42,18 +42,27 @@ export interface TableChats
     seat?(seat: ChatSeat): void;
     /** Stops the turn in course of the chat the table drives: whether one was in course. */
     stop?(): boolean;
+    /** Whether a turn of the chat the table drives is running, whatever it is for. */
+    atWork?(): boolean;
     /** Why the last chat the table drove failed or ended by itself, numbered, until the next chat opens. */
     failure?(): ChatFailure | undefined;
     /** Closes the chats the table drives, as the table closes. */
     close?(): Promise<void>;
 }
 
-/** Why a chat the table drove failed or ended by itself, in the host's words, and its number, larger for each, so that each page says it once. */
+/**
+ * Why a chat the table drove failed or ended by itself: in the host's words, and as a code the page says in the player's language; its number, larger for
+ * each, so that each page says it once.
+ */
 export interface ChatFailure
 {
     readonly why: string;
+    readonly code: FailureCode;
     readonly number: number;
 }
+
+/** What the table tells apart of a chat's failure: the host is not signed in, its program is missing, the account's limit is reached, it ended by itself, or else. */
+export type FailureCode = "not-signed-in" | "program-missing" | "usage-limit" | "program-ended" | "other";
 
 /** What the table tells of Ollama: whether it answers, and the context each model it has loaded runs with, by Ollama's name. */
 export interface OllamaState
@@ -72,6 +81,10 @@ export interface HeldChat
     readonly effort?: string | undefined;
     readonly seat?: number;
     readonly analysis?: true;
+    /** The chat is the table's own, which it drives with no terminal. */
+    readonly driven?: true;
+    /** The chat was taken up again with its session: it holds a game played before, which a new game wants it clean of (D-57). */
+    readonly played?: true;
 }
 
 /** A chat opening at the table: one the page asked for, the one started again for a new game, or with another model or host (D-107). */
@@ -105,6 +118,14 @@ export interface TableShown
     readonly driven?: true;
     /** Why the last chat the table drove failed or ended by itself. */
     readonly failed?: ChatFailure;
+    /** The chat opening is one the table drives, with no terminal. */
+    readonly openingDriven?: true;
+    /** A turn of the chat the table drives is running, for a move or anything else: the page can stop it. */
+    readonly atWork?: true;
+    /** The player stopped the chat the table drives, and nothing woke it since: the AI's clock is held. */
+    readonly stopped?: true;
+    /** The chat the table drives ended its turns twice without the AI's move: the AI's clock is held until the player wakes it. */
+    readonly noMove?: true;
 }
 
 /** A new game that waited for the chat and could not start: why, and its number, larger for each. */
@@ -124,19 +145,25 @@ export function tableShown(served: Served): { table?: TableShown; }
     const now = opening(served);
     const ollama = table.chats?.ollama?.();
     const failed = table.chats?.failure?.();
+    const driven = attached?.local !== undefined;
+    const openingDriven = now !== undefined && table.chats?.held(served.context.folder)?.driven === true;
     return {
         table: {
             chat: attached !== undefined,
             ...(host === undefined ? {} : { host }),
             held: held !== undefined,
-            ...(held === undefined ? {} : { started: held }),
+            ...(held === undefined ? {} : { started: { model: held.model, effort: held.effort } }),
             hosts: table.chats?.hosts() ?? [],
             ...(now === undefined ? {} : { opening: now }),
             ...(served.chatWait === undefined ? {} : { waiting: served.chatWait.for }),
             ...(served.waitRefused === undefined ? {} : { refused: served.waitRefused }),
             ...(ollama === undefined ? {} : { ollama }),
-            ...(attached?.local === undefined ? {} : { driven: true as const }),
+            ...(driven ? { driven: true as const } : {}),
             ...(failed === undefined ? {} : { failed }),
+            ...(openingDriven ? { openingDriven: true as const } : {}),
+            ...(driven && table.chats?.atWork?.() === true ? { atWork: true as const } : {}),
+            ...(driven && served.stalled === "stopped" ? { stopped: true as const } : {}),
+            ...(driven && served.stalled === "noMove" ? { noMove: true as const } : {}),
         },
     };
 }
@@ -183,8 +210,9 @@ export function answerTable(request: IncomingMessage, response: ServerResponse, 
 export function chatToRelaunch(served: Served): boolean
 {
     const { positionSeen, positionFirstSeen } = served.chat;
-    const played = positionSeen?.started !== undefined && (positionFirstSeen === undefined || !samePosition(positionSeen, positionFirstSeen));
-    return chatForAnalysis(served) ? served.attached === undefined || chatAtRest(served) : played && heldChat(served) !== undefined && chatAtRest(served);
+    const held = heldChat(served);
+    const played = held?.played === true || (positionSeen?.started !== undefined && (positionFirstSeen === undefined || !samePosition(positionSeen, positionFirstSeen)));
+    return chatForAnalysis(served) ? served.attached === undefined || chatAtRest(served) : played && held !== undefined && chatAtRest(served);
 }
 
 /**
@@ -235,6 +263,11 @@ export function chatForAnalysis(served: Served): boolean
 export function chatPlayedAtLength(served: Served, current: { readonly started: string; } | undefined): boolean
 {
     const { positionSeen: seen, positionFirstSeen: first } = served.chat;
+
+    // A chat taken up again holds the game it played before, at whatever length.
+    if (current !== undefined && heldChat(served)?.played === true) {
+        return true;
+    }
 
     if (current === undefined || seen?.started !== current.started) {
         return false;
@@ -488,7 +521,7 @@ function heldChat(served: Served): HeldChat | undefined
 {
     const { attached } = served;
     const held = attached === undefined ? undefined : served.table?.chats?.held(attached.chat.folder);
-    return held === undefined || held.seat !== attached?.chat.seat ? undefined : { model: held.model, effort: held.effort };
+    return held === undefined || held.seat !== attached?.chat.seat ? undefined : { model: held.model, effort: held.effort, ...(held.played === true ? { played: true as const } : {}) };
 }
 
 // The chat is out of a turn, waiting for the doorbell or deaf to it, and no analyst of it is at work: starting it again loses nothing.

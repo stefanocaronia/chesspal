@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { boardText, drawingsText, moods, moodTag } from "../../core/index.ts";
 import { commentWithPlan, talkLimits } from "../../games/index.ts";
-import { coachAgent, hasDoorbell, ponderAgentFor } from "../../host-files/index.ts";
+import { coachAgent, ponderAgentFor } from "../../host-files/index.ts";
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
-import { agentRuns, agentsLine, arrowsInput, closingLines, coachRuns, drawingsOf, give, moveLines, type MovePlayed, playMove, refuseUnseenPosition, shownMove, squaresInput, waitingWords, withAnalyst } from "../answers/index.ts";
+import { agentRuns, agentsLine, arrowsInput, closingLines, coachRuns, doorbellOf, drawingsOf, give, moveLines, type MovePlayed, playMove, refuseUnseenPosition, shownMove, squaresInput, waitingWords, withAnalyst } from "../answers/index.ts";
 import { type Context, defineCommand, sentence } from "../registry/index.ts";
 
 /** The AI's move, with its plan, kept hidden (D-29), and its comment for the player when it has something to say (D-12, D-54). */
@@ -43,7 +43,7 @@ export const aiMove = defineCommand({
         // The player's words are read before the move, which would count as the answer to them; a move refused leaves them for the next call.
         const waiting = waitingWords(context);
         const words = [commentWithPlan(comment, plan), drawingsText(drawings), mood === undefined ? "" : moodTag(mood)].filter((part) => part !== "").join(" ");
-        const played = playMove(folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: words, offerDraw, doorbell: hasDoorbell(context.host?.()) });
+        const played = playMove(folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: words, offerDraw, doorbell: doorbellOf(context) });
         const agents = agentsAfter(context, folder, played);
         const board = context.pageOpen?.() === true ? {} : { board: true as const };
         return { ...played, game: withAnalyst(played.game, context), words: give(context, waiting), ...(agents.length === 0 ? {} : { agents }), ...board };
@@ -58,7 +58,7 @@ export const aiMove = defineCommand({
             ...moveLines({ ...result, game }),
             ...(result.board === true ? ["No board page is open: copy this board into your message.", boardText(result.game.fen)] : []),
             ...(result.agents === undefined ? [] : [agentsLine(result.agents)]),
-            ...closingLines(result.game, result.words, false, hasDoorbell(context?.host?.())),
+            ...closingLines(result.game, result.words, false, doorbellOf(context)),
         ].join("\n");
     },
 });

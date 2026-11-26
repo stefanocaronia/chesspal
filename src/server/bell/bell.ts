@@ -17,13 +17,10 @@ export const bellLine = "The player acted on the board page: call status to see 
 // What the page answers a hook it rings for with the game: the game follows on the next lines.
 const ringWithGame = "ring\n";
 
-/**
- * Who waits at the doorbell: the hook of a chat over HTTP, or the table's own driven chat. It hears "ring", or "ring" and the game on the lines after it,
- * or is let go without the bell.
- */
+/** Who waits at the doorbell: the hook of a chat over HTTP, or the table's own driven chat. It is rung, with the game when the page gives it, or let go. */
 export interface BellListener
 {
-    hear(said: string): void;
+    rung(game?: string): void;
     dismissed(): void;
 }
 
@@ -161,7 +158,7 @@ export class Bell
             return;
         }
 
-        this.listener.hear(this.ringHeard());
+        this.listener.rung(this.rung());
         this.listener = undefined;
         this.busy = true;
         this.woken = true;
@@ -176,7 +173,8 @@ export class Bell
     listen(request: IncomingMessage, response: ServerResponse, told = false, hook: HookSeen = {}): void
     {
         response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
-        const gone = this.wait({ hear: (said) => response.end(said), dismissed: () => response.end("dismissed") }, told, hook);
+        const rung = (game?: string): void => void response.end(game === undefined ? "ring" : `${ringWithGame}${game}`);
+        const gone = this.wait({ rung, dismissed: () => response.end("dismissed") }, told, hook);
         request.on("close", gone);
     }
 
@@ -193,7 +191,7 @@ export class Bell
         const who = hookNamed(hook);
 
         if (missed && this.news()) {
-            listener.hear(this.ringHeard());
+            listener.rung(this.rung());
             this.busy = true;
             this.woken = true;
             this.note(`listen${who}, rung at once for a ring it missed`);
@@ -220,6 +218,13 @@ export class Bell
         };
     }
 
+    /** A chat whose turns the table itself sees end has come: it is hooked, as one whose hook waits, so a ring in its turn waits for that turn's end. */
+    chatHooked(): void
+    {
+        this.hooked = true;
+        this.note("chatHooked");
+    }
+
     /** The chat left the table (D-104): its process ended, and nobody is in a turn or waits for the bell; a ring no hook heard is no longer news for anyone. */
     chatLeft(): void
     {
@@ -238,13 +243,6 @@ export class Bell
     note(event: string): void
     {
         this.log(`bell ${event} -> ${this.state()}`);
-    }
-
-    /** What the hook hears: "ring", and on the lines after it the game, when the page gives it. */
-    private ringHeard(): string
-    {
-        const game = this.rung();
-        return game === undefined ? "ring" : `${ringWithGame}${game}`;
     }
 
     private tellIf(changed: boolean): void
