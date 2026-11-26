@@ -27,3 +27,5 @@ Known limits:
 - Models sometimes write an arrow in `ai_move` with a piece letter instead of a colour; the move is refused and asked again.
 - Antigravity starts every server of the player's global configuration in each chat; the table seats the player's own `chesspal`, which `chesspal init` writes there.
 - In Codex and OpenCode the helpers reach their first tool in 2–5 s, too late for a game at a few seconds a move.
+- OpenCode's own tools (shell, files, subagents, the web from its `execute`) are denied through `OPENCODE_CONFIG_CONTENT` and missing from its tools, through `opencode acp`, the table's way, and `opencode run --standalone`; `opencode run` without it talks to OpenCode's service in the background, which ignores that configuration and lets them all run. Its `skill` stays, with no shell to use.
+- Codex's model searches its tools with `ALL_TOOLS` before the first call, though the turn names it: at 1.6–2 s a request, the ponderer keeps its first thought at about 6 s at best, with its position given in its turn's message.
