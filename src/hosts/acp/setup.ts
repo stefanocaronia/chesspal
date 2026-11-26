@@ -115,6 +115,18 @@ function askModel(state: State): void
     const asked = state.model.asked;
     const option = configOption(state.config, "model", "model");
 
+    // No model asked: the agent's own, as it opened the session.
+    if (asked === "") {
+        const current = option?.currentValue;
+
+        if (typeof current === "string") {
+            state.model.confirmed = current;
+        }
+
+        askEffort(state);
+        return;
+    }
+
     if (option !== undefined && typeof option.id === "string") {
         setOption(state, option.id, asked, "model", (confirmed) => {
             state.model.confirmed = confirmed;

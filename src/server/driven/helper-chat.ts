@@ -9,7 +9,7 @@ import type { HostChat, HostDriver, HostEvent, HostId } from "../../hosts/index.
 import type { Place, TablePlaces } from "../places/index.ts";
 import { chatEnvironment, chatTrace } from "./environment.ts";
 import { failureCode } from "./failure.ts";
-import { chatModel, type DrivenHost } from "./hosts.ts";
+import type { DrivenHost } from "./hosts.ts";
 import type { Starts } from "./starts.ts";
 
 /** The host a helper's chat runs in, the model as the host names it, and its effort: the driver's own model where `model` is empty. */
@@ -183,7 +183,8 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
         chat = driver.open({
             folder,
             program,
-            ...chatModel(model.host, runs.model, model.effort),
+            model: runs.model,
+            ...(model.effort === undefined ? {} : { effort: model.effort }),
             allowed: [...model.host.allowed],
             environment: chatEnvironment(driver, options.environment, model.host.name, choice),
             server: { name: "chesspal", command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...place.environment } },

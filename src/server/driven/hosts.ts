@@ -7,7 +7,6 @@ import type { HostName } from "../table/index.ts";
  * A host the table drives: its name as the page says it, its driver, its name for the player, the kinds of tools its chats may use, the quick model the
  * ponderer thinks on at the lower levels, none where the ponderer thinks on the chat's model, and the name its MCP client gives itself, by which the
  * opponent's answers say which model thought. `endsTurnAtMove`: the table ends the opponent's turn itself once its move asks nothing more of it.
- * `effortInModel`: the host names a model's effort in its id, as `-high`, and takes no effort apart.
  */
 export interface DrivenHost
 {
@@ -18,7 +17,6 @@ export interface DrivenHost
     readonly quickModel?: string;
     readonly client: string;
     readonly endsTurnAtMove: boolean;
-    readonly effortInModel?: true;
 }
 
 /**
@@ -30,7 +28,7 @@ export interface DrivenHost
 const driven: readonly DrivenHost[] = [
     { name: "claude", driver: "claudeCode", title: hosts.claudeCode.name, allowed: ["chesspal"], quickModel: quickModels.claude, client: hosts.claudeCode.client, endsTurnAtMove: true },
     { name: "codex", driver: "codex", title: hosts.codex.name, allowed: ["chesspal", "read"], quickModel: quickModels.codex, client: hosts.codex.client, endsTurnAtMove: true },
-    { name: "antigravity", driver: "antigravity", title: hosts.antigravity.name, allowed: ["chesspal"], client: hosts.antigravity.client, endsTurnAtMove: false, effortInModel: true },
+    { name: "antigravity", driver: "antigravity", title: hosts.antigravity.name, allowed: ["chesspal"], client: hosts.antigravity.client, endsTurnAtMove: false },
     { name: "opencode", driver: "openCode", title: hosts.openCode.name, allowed: ["chesspal"], client: hosts.openCode.client, endsTurnAtMove: true },
 ];
 
@@ -38,14 +36,4 @@ const driven: readonly DrivenHost[] = [
 export function drivenHost(name: string | undefined): DrivenHost | undefined
 {
     return driven.find((host) => host.name === name);
-}
-
-/** The model and effort a chat of `host` opens with, as its driver takes them: for a host that names the effort in the model's id, in it. */
-export function chatModel(host: DrivenHost, model: string, effort: string | undefined): { model: string; effort?: string; }
-{
-    if (effort === undefined) {
-        return { model };
-    }
-
-    return host.effortInModel === true ? { model: `${model}-${effort}` } : { model, effort };
 }

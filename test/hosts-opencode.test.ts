@@ -33,9 +33,26 @@ checklist({
 // What the table's OpenCode may not do by itself where the table allows the web and agents: read files, run commands, edit, and reach any folder outside the chat's.
 // The kinds of tools the table allows.
 const tableKinds: ChatOptions["allowed"] = ["chesspal", "web", "fetch", "agent", "image"];
-const denied = { read: "deny", glob: "deny", grep: "deny", list: "deny", bash: "deny", edit: "deny", external_directory: "deny" };
+const denied = { read: "deny", glob: "deny", grep: "deny", list: "deny", bash: "deny", edit: "deny", lsp: "deny", skill: "deny", todowrite: "deny", todoread: "deny", question: "deny", external_directory: "deny" };
 // With Chesspal's commands alone: every tool of its own.
-const allDenied = { read: "deny", glob: "deny", grep: "deny", list: "deny", bash: "deny", edit: "deny", webfetch: "deny", websearch: "deny", codesearch: "deny", task: "deny", external_directory: "deny" };
+const allDenied = {
+    read: "deny",
+    glob: "deny",
+    grep: "deny",
+    list: "deny",
+    bash: "deny",
+    edit: "deny",
+    webfetch: "deny",
+    websearch: "deny",
+    codesearch: "deny",
+    task: "deny",
+    lsp: "deny",
+    skill: "deny",
+    todowrite: "deny",
+    todoread: "deny",
+    question: "deny",
+    external_directory: "deny",
+};
 
 describe("the chat in OpenCode", () => {
     describe("its program", () => {
@@ -56,7 +73,9 @@ describe("the chat in OpenCode", () => {
             };
 
             expect(given(tableKinds)).toEqual({ permission: denied });
-            expect(given(["chesspal", "read"])).toEqual({ permission: { bash: "deny", edit: "deny", webfetch: "deny", websearch: "deny", codesearch: "deny", task: "deny", external_directory: "deny" } });
+            expect(given(["chesspal", "read"])).toEqual({
+                permission: { bash: "deny", edit: "deny", webfetch: "deny", websearch: "deny", codesearch: "deny", task: "deny", skill: "deny", todowrite: "deny", todoread: "deny", question: "deny", external_directory: "deny" },
+            });
         });
 
         it("begins the protocol, then opens a new session in the chat's folder with no MCP server of the table's", async () => {

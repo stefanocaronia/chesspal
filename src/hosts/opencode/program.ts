@@ -63,6 +63,11 @@ const permissionKinds: Record<string, ToolKind> = {
     websearch: "web",
     codesearch: "web",
     task: "agent",
+    lsp: "read",
+    skill: "other",
+    todowrite: "other",
+    todoread: "other",
+    question: "other",
 };
 
 /** The environment of OpenCode in a folder: it takes the folder it works in from PWD, not from where its process starts. */

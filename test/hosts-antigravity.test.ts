@@ -341,6 +341,7 @@ describe("Antigravity with the server and the instructions of who opens the chat
             call("c3", { title: "mcp_t361_ponder", kind: "other" }),
             call("c4", { name: "call_mcp_tool", kind: "other", rawInput: { ServerName: "t361", ToolName: "coach" } }),
             call("c5", { name: "read_file", kind: "read", rawInput: { Path: "C:\\Users\\player\\.gemini\\antigravity-cli\\mcp\\t361\\advance.json" } }),
+            call("c5b", { name: "read_file", kind: "read", rawInput: { Path: "C:\\Users\\player\\.gemini\\antigravity-cli\\mcp\\t361_db2ed3c2\\advance.json" } }),
             call("c6", { name: "call_mcp_tool", kind: "other", rawInput: { ServerName: "chesspal", ToolName: "status" } }),
         ].flat();
         const { chat, events, until } = play([...handshake, ...newSession(), ...turn("Hello", ...tools)], { server: given });
@@ -351,6 +352,7 @@ describe("Antigravity with the server and the instructions of who opens the chat
             ["ai_move", "chesspal"],
             ["ponder", "chesspal"],
             ["coach", "chesspal"],
+            ["read_file", "chesspal"],
             ["read_file", "chesspal"],
             ["call_mcp_tool", "other"],
         ]);

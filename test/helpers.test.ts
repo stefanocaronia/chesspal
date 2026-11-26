@@ -149,9 +149,9 @@ describe("the opponent's helpers the table runs itself", () => {
     }, 30_000);
 
     it("runs the helpers of a chat in Antigravity or OpenCode on the chat's own model at every level, the coach too, as the opponent's next turn says", async () => {
-        const hosts = [{ host: "antigravity", driver: "antigravity", model: "gemini-3.8-flash-medium" }, { host: "opencode", driver: "openCode", model: "ollama/gpt-oss:20b" }];
+        const hosts = [{ host: "antigravity", driver: "antigravity", model: "gemini-3.8-flash", effort: "medium" }, { host: "opencode", driver: "openCode", model: "ollama/gpt-oss:20b" }];
 
-        for (const { host, driver, model } of hosts) {
+        for (const { host, driver, model, effort } of hosts) {
             const { table, ai } = await playing({ level: "club", helps: true, host }, (fake) => {
                 fake.helpers.coach = coaching;
             });
@@ -164,7 +164,7 @@ describe("the opponent's helpers the table runs itself", () => {
 
             for (const role of ["ponder", "coach"] as const) {
                 expect(helperOf(ai, role)!.options, `${host} ${role}`).toMatchObject({ model, allowed: ["chesspal"] });
-                expect(helperOf(ai, role)!.options.effort, `${host} ${role}`).toBeUndefined();
+                expect(helperOf(ai, role)!.options.effort, `${host} ${role}`).toBe(effort);
                 expect(helperOf(ai, role)!.options.server?.name, `${host} ${role}`).toBe("chesspal");
             }
 

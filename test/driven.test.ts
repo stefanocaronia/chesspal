@@ -511,13 +511,12 @@ describe("the chat the table drives in Antigravity and OpenCode", () => {
         return driven;
     }
 
-    it("opens Antigravity in the page with the switch on, by its driver, with Chesspal's commands alone, the effort chosen in the model's id", async () => {
+    it("opens Antigravity in the page with the switch on, by its driver, with Chesspal's commands alone, the effort apart from the model", async () => {
         const { table, home, ai, terminal } = await openedIn("antigravity");
         const chat = ai.chats[0]!;
         expect(ai.asked).toEqual(["antigravity"]);
         expect(terminal.opened).toEqual([]);
-        expect(chat.options).toMatchObject({ model: "gemini-3.8-flash-medium", allowed: ["chesspal"], folder: join(home, "chats", "opponent") });
-        expect(chat.options.effort).toBeUndefined();
+        expect(chat.options).toMatchObject({ model: "gemini-3.8-flash", effort: "medium", allowed: ["chesspal"], folder: join(home, "chats", "opponent") });
         expect(chat.options.server).toMatchObject({ name: "chesspal", command: "node", args: ["cli.js", "mcp"] });
         expect(chat.options.instructions).toContain("open the chat again from the board page");
         expect(chat.sent).toEqual(["Let's play!"]);
@@ -587,7 +586,7 @@ describe("the chat the table drives in Antigravity and OpenCode", () => {
         try {
             await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
             expect(new Set(ai.asked)).toEqual(new Set(["antigravity"]));
-            expect(ai.chats[1]!.options).toMatchObject({ session: ai.chats[0]!.session, model: "gemini-3.8-flash-medium", allowed: ["chesspal"] });
+            expect(ai.chats[1]!.options).toMatchObject({ session: ai.chats[0]!.session, model: "gemini-3.8-flash", effort: "medium", allowed: ["chesspal"] });
             expect((await shown(again.table.url)).table).toMatchObject({ chat: true, host: "antigravity", driven: true });
         } finally {
             page.destroy();

@@ -16,7 +16,7 @@ import { chatStart, noOpenCodeModel } from "../table/index.ts";
 import { chatEnvironment, chatTrace } from "./environment.ts";
 import { failureOf } from "./failure.ts";
 import { tableHelpers } from "./helpers.ts";
-import { chatModel, type DrivenHost, drivenHost } from "./hosts.ts";
+import { type DrivenHost, drivenHost } from "./hosts.ts";
 import { keepChat, keptChat } from "./kept.ts";
 import { moveEndsTurn } from "./move-ends-turn.ts";
 import { oneByOne, type ProgramStart } from "./starts.ts";
@@ -371,7 +371,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             state.chat = hostDriver.open({
                 folder,
                 program,
-                ...chatModel(host, state.model === "" ? hostDriver.model : state.model, state.effort),
+                model: state.model === "" ? hostDriver.model : state.model,
+                ...(state.effort === undefined ? {} : { effort: state.effort }),
                 ...(session === undefined ? {} : { session }),
                 allowed: [...host.allowed],
                 environment: chatEnvironment(hostDriver, environment, host.name, start.choice),

@@ -38,7 +38,7 @@ const taskActions = ["status"];
 // The description of a tool of the chesspal server, which Antigravity keeps in its own folder and reads before it calls one.
 function chesspalDescription(server: string): RegExp
 {
-    return new RegExp(`[\\\\/]antigravity-cli[\\\\/]mcp[\\\\/]${server}[\\\\/][\\w-]+\\.(?:json|md)$`, "i");
+    return new RegExp(`[\\\\/]antigravity-cli[\\\\/]mcp[\\\\/]${server}(?:_[0-9a-f]{8})?[\\\\/][\\w-]+\\.(?:json|md)$`, "i");
 }
 
 /** Antigravity as the protocol's client reads it: a tool by its own name where the table knows it, else by the protocol's kind; a command of chesspal by its name. */
