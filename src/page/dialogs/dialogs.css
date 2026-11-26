@@ -257,6 +257,15 @@ h3 + .switch {
     border-top: 0;
 }
 
+/* Under a switch's label, where it applies: a line in the soft ink */
+.switch small {
+    display: block;
+    margin-top: 3px;
+    color: var(--soft);
+    font-size: 12.5px;
+    line-height: 1.35;
+}
+
 .switch input {
     appearance: none;
     flex: none;

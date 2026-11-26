@@ -39,6 +39,7 @@ This file is about **developing** Chesspal. The instructions for **playing** are
 - `npm run smoke`: after the build, pack the package, install it in a temporary folder and run it as a player would (its version, `chesspal init`, its MCP server), as CI does.
 - `npm run page -- <folder>`: serve the board page of a player's folder, with the data of `CHESSPAL_HOME` or Documents, to look at it while it is built.
 - `npm run endings`: show the ends of a game on the board page.
+- `npm run driven`: serve the table's page with a chat the table drives, played by a fake host, to look at its states while it is built.
 - Releasing: a tag `v<version>` equal to `package.json`'s version publishes it to npm through GitHub Actions (`.github/workflows/publish.yml`), after lint, build, tests and the smoke; only on the maintainer's word. The repo is public, `project/` stays private.
 - Each release gets its notes on GitHub (`gh release create v<version> --verify-tag`), gathering every change since the previous tag, written for who plays, short and plain: what is new, what changed, what to do to update; never the list of commits, task or decision numbers.
 

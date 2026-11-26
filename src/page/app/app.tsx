@@ -65,10 +65,11 @@ import { keepSettings, type ProfileShown } from "../profile/profile.ts";
 import { languagesOf, saveSettings, type Settings, settingsFrom, showSettings } from "../profile/settings.ts";
 import { endSoundOf, playSound, soundOf, wakeSounds } from "../sounds/sounds.ts";
 import { holdsChoice, withStartedChoice } from "../table/action.ts";
+import { canStop, drivenAsleep, failuresSaid, failuresSaidAtLoad, failureToSay, opensDriven, stoppedOnMove } from "../table/driven.ts";
 import { UpdateDialog, UpdateNotice } from "../table/update.tsx";
-import { AiNameButton, ChatDialog, tableNote } from "../table/window.tsx";
+import { AiNameButton, ChatDialog, type DrivenNotes, StopButton, tableNote } from "../table/window.tsx";
 import { AiNote, Compose, PointSquare, TalkFaces, Thread } from "../talk/talk.tsx";
-import { textFor } from "../text.ts";
+import { textFor, withoutTerminal } from "../text.ts";
 import { anchorName, type LinkIgnored, useAnchor } from "./anchor.ts";
 import { useBrowseKeys, useEscapeKey, useFoldKeys, useHushKeys, useLegendKey, useMapKey, useWheelSteps } from "./keys.ts";
 import { helpsShown, phaseOf, verdictOf } from "./phase.ts";
@@ -83,11 +84,11 @@ export function App({ start }: { start: Settings; })
 {
     const [settings, setSettings] = useState(start);
     const [setting, setSetting] = useState(false);
-    const text = useMemo(() => textFor(languagesOf(settings)), [settings.language]);
+    const spoken = useMemo(() => textFor(languagesOf(settings)), [settings.language]);
     const sound = settings.sound;
     // The sounds off hush the voice too: it is one of them.
     const voiced = settings.voice && sound;
-    useEffect(() => void (document.documentElement.lang = text.language), [text]);
+    useEffect(() => void (document.documentElement.lang = spoken.language), [spoken]);
 
     const apply = (next: Settings): void => {
         setSettings(next);
@@ -106,6 +107,9 @@ export function App({ start }: { start: Settings; })
 
     const [dialog, setDialog] = useState<"profile" | "profiles" | "new-game" | "chat" | "study" | "guide" | "update" | undefined>(undefined);
     const { data: served, problem, offline, reload } = useServed(() => setDialog("new-game"));
+    // A chat the table drives has no window of its own: the page's words never send the player there (D-125).
+    const driven = served?.table?.driven === true;
+    const text = useMemo(() => driven ? withoutTerminal(spoken) : spoken, [spoken, driven]);
     // Nuova partita with no chat at the table asks for one first (D-107): the chat's window, then the new game's once a chat starts; closed without, neither.
     const [chatFirst, setChatFirst] = useState(false);
 
@@ -214,6 +218,22 @@ export function App({ start }: { start: Settings; })
 
         waitRefusedSeen.current = number;
     }, [served === undefined, waitRefused?.number]);
+
+    // The failure of a chat the table drove is said once (D-125): how many the page has said, or the player closed; none before the page has its data.
+    const [failuresTold, setFailuresTold] = useState<number | undefined>(undefined);
+    const failedNumber = served?.table?.failed?.number;
+    useEffect(() => {
+        if (served !== undefined) {
+            setFailuresTold((told) => told === undefined ? failuresSaidAtLoad(served.table) : failuresSaid(served.table, told));
+        }
+    }, [served === undefined, failedNumber]);
+    // The position the player stopped the AI at, on its move, with a chat the table drives: the page says so until the AI thinks again.
+    const [stoppedAt, setStoppedAt] = useState<string | undefined>(undefined);
+    useEffect(() => {
+        if (served?.thinking !== undefined) {
+            setStoppedAt(undefined);
+        }
+    }, [served?.thinking]);
 
     // The game is replayed from its PGN once for each one the server sends, not at every click. Once no game goes on, the game in analysis shows in its place
     // (D-69), with the AI's badges and notes: replayed again only when its review changed.
@@ -468,7 +488,7 @@ export function App({ start }: { start: Settings; })
         />
     );
 
-    const panel = <SettingsPanel open={setting} settings={settings} analysing={analysing} onChange={change} onClose={() => setSetting(false)} text={text} />;
+    const panel = <SettingsPanel open={setting} settings={settings} analysing={analysing} atTable={served?.table !== undefined} onChange={change} onClose={() => setSetting(false)} text={text} />;
     // The guide opens before the page has its data too.
     const guide = <GuideDialog open={dialog === "guide"} onClose={() => setDialog(undefined)} text={text} />;
 
@@ -581,7 +601,27 @@ export function App({ start }: { start: Settings; })
     const table = offline ? undefined : served.table;
     // In analysis the chat that answers stands over the box: its name opens its window, as on the AI's card in a game.
     const chatName = table === undefined ? undefined : <AiNameButton name={name} table={table} onOpen={askChat} text={text} />;
-    const atTable = table === undefined ? null : tableNote({ table, name, inGame: going, onOpen: askChat, text });
+    // With a chat the table drives (D-125): the mark that stops the AI while it thinks on its move, beside its clock; and in the note's place the chat that
+    // opens in the page, its failure still to say, the chat that does not listen, and the AI the player stopped on its move.
+    const position = `${game?.started ?? ""} ${total}`;
+    const stop = canStop(table, thinking) ? <StopButton name={name} onStopped={() => setStoppedAt(position)} text={text} /> : null;
+    const failure = table === undefined || failuresTold === undefined ? undefined : failureToSay(table, failuresTold);
+    const closeFailure = (): void => setFailuresTold(table?.failed?.number ?? 0);
+
+    // The player's next words or move wake the chat after a turn that failed: by then the failure is said.
+    const closeTurnFailure = (): void => {
+        if (failure?.kind === "turn") {
+            closeFailure();
+        }
+    };
+
+    const drivenNotes: DrivenNotes | undefined = table === undefined ? undefined : {
+        opening: opensDriven(table, settings),
+        asleep: drivenAsleep(table, served.listening),
+        stopped: table.driven === true && stoppedOnMove(stoppedAt, position, going && !playerToMove, thinking),
+        ...(failure === undefined ? {} : { failure, onClose: closeFailure }),
+    };
+    const atTable = table === undefined ? null : tableNote({ table, name, inGame: going, ...(drivenNotes === undefined ? {} : { driven: drivenNotes }), onOpen: askChat, text });
     const asleepNote = atTable !== null
         ? atTable
         : asleep && table?.chat !== false
@@ -641,7 +681,9 @@ export function App({ start }: { start: Settings; })
             setUnsent(refused?.words === true ? refused.text : command ? text.commandHere(name) : undefined);
             clearSent(refused?.text, words);
 
-            if (refused !== undefined) {
+            if (refused === undefined) {
+                closeTurnFailure();
+            } else {
                 setPending(undefined);
             }
         });
@@ -707,6 +749,10 @@ export function App({ start }: { start: Settings; })
         void sendMessage(words, text, name, position).then((refused) => {
             setUnsent(refused?.text);
             clearSent(refused?.text, words);
+
+            if (refused === undefined) {
+                closeTurnFailure();
+            }
         });
     };
 
@@ -982,7 +1028,7 @@ export function App({ start }: { start: Settings; })
                                             {...(idle ? {} : { level: text.start.levels[level] })}
                                             taken={material.taken[ai]}
                                             ahead={ahead(ai)}
-                                            clock={clockOf(ai)}
+                                            clock={going && table?.driven === true ? <span class="beside-clock">{stop}{clockOf(ai)}</span> : clockOf(ai)}
                                             text={text}
                                         />
                                         {asleepNote}

@@ -215,6 +215,31 @@ export interface Text
         readonly failed: string;
         readonly notRestarted: string;
         readonly typeIt: string;
+        /**
+         * A chat the table drives in the page, with no terminal (D-125): the switch in the settings; the window's notes on the host that plays in the
+         * page; the mark that stops the AI and what the page says once it is stopped; the host's failure, whose own words follow; and what stands in
+         * place of the words that send the player to the host's window.
+         */
+        readonly inPage: {
+            readonly experimental: string;
+            readonly switch: string;
+            readonly switchNote: string;
+            readonly choose: string;
+            readonly reviewChoose: string;
+            readonly restartHint: string;
+            readonly opening: string;
+            readonly notOpened: string;
+            readonly notRestarted: string;
+            stop(name: string): string;
+            stopped(name: string): string;
+            /** Lines that open the chat's window: the chat left the table; it does not listen. */
+            readonly closed: string;
+            asleep(name: string): string;
+            turnFailed(name: string): string;
+            clearChat(name: string): string;
+            commandHere(name: string): string;
+            offline(name: string): string;
+        };
     };
     /** The thought cloud on the Torretta, by what the AI thinks on: its move, or on the player's time (D-72). */
     thinking: { readonly move: string; readonly ponder: string; };
@@ -569,6 +594,16 @@ export function textFor(languages: readonly string[]): Text
     return known === "it" ? italian : english;
 }
 
+/**
+ * The words with a chat the table drives at it, which has no window of its own: where they send the player there, to clear the chat, to write a command
+ * or to bring a lost page back, they keep them on the page.
+ */
+export function withoutTerminal(text: Text): Text
+{
+    const words = text.table.inPage;
+    return { ...text, clearChat: words.clearChat, commandHere: words.commandHere, offline: words.offline, refused: { ...text.refused, "clear-chat": (most, name) => words.clearChat(name) } };
+}
+
 const englishNames: Readonly<Record<PieceLetter, string>> = { K: "king", Q: "queen", R: "rook", B: "bishop", N: "knight", P: "pawn" };
 const italianNames: Readonly<Record<PieceLetter, string>> = { K: "re", Q: "donna", R: "torre", B: "alfiere", N: "cavallo", P: "pedone" };
 
@@ -799,6 +834,25 @@ const english: Text = {
         failed: "The terminal did not open: type the command below in a terminal.",
         notRestarted: "The chat did not start again: close its window, then open another from here.",
         typeIt: "Or type in a terminal:",
+        inPage: {
+            experimental: "Experimental",
+            switch: "The chat with the AI in the page, without a terminal",
+            switchNote: "Only with Claude Code for now. It applies from the next chat.",
+            choose: "Choose the chat to play with: Claude Code plays here in the page, with no window of its own.",
+            reviewChoose: "Choose the chat that reviews the game: Claude Code works here in the page, with no window of its own.",
+            restartHint: "The chat starts again, clean, once it has ended its answer, with the chat, model and effort chosen here. The game stays as it is.",
+            opening: "Opening the chat…",
+            notOpened: "The chat did not open.",
+            notRestarted: "The chat did not start again: try once more.",
+            stop: (name) => `Stop ${name}`,
+            stopped: (name) => `You stopped ${name}, and it is still its move: write to it to have it go on.`,
+            closed: "The chat has closed: open it again",
+            asleep: (name) => `${name} is not listening yet: if it stays so, start it again`,
+            turnFailed: (name) => `${name} could not answer: write to it to have it try again.`,
+            clearChat: (name) => `Before a new game the chat with ${name} must start again clean: restart it from the chat's window, on ${name}'s name.`,
+            commandHere: (name) => `With the chat in the page, /clear and the other commands are not needed: for a clean chat or another model, restart it from ${name}'s name.`,
+            offline: (name) => `Chesspal has closed. Open it again: the page connects again by itself, and the chat with ${name} goes on.`,
+        },
     },
     commandHere: (name) => `/clear and the other commands go in the window where you opened ${name}, not here.`,
     link: {
@@ -1269,6 +1323,25 @@ const italian: Text = {
         failed: "Il terminale non si è aperto: scrivi il comando qui sotto in un terminale.",
         notRestarted: "La chat non è ripartita: chiudi la sua finestra, poi aprine un'altra da qui.",
         typeIt: "Oppure scrivi in un terminale:",
+        inPage: {
+            experimental: "Sperimentale",
+            switch: "La chat con l'AI nella pagina, senza terminale",
+            switchNote: "Per ora solo con Claude Code. Vale dalla prossima chat.",
+            choose: "Scegli la chat con cui giocare: Claude Code gioca qui nella pagina, senza una finestra a parte.",
+            reviewChoose: "Scegli la chat che analizza la partita: Claude Code lavora qui nella pagina, senza una finestra a parte.",
+            restartHint: "La chat riparte pulita, appena ha finito di rispondere, con la chat, il modello e il ragionamento scelti qui. La partita resta com'è.",
+            opening: "Apro la chat…",
+            notOpened: "La chat non si è aperta.",
+            notRestarted: "La chat non è ripartita: riprova.",
+            stop: (name) => `Ferma ${name}`,
+            stopped: (name) => `Hai fermato ${name}, e tocca ancora a lui: scrivigli per farlo riprendere.`,
+            closed: "La chat si è chiusa: riaprila",
+            asleep: (name) => `${name} non ti sta ancora ascoltando: se resta fermo, riavvialo`,
+            turnFailed: (name) => `${name} non è riuscito a rispondere: scrivigli per farlo riprovare.`,
+            clearChat: (name) => `Prima di una nuova partita la chat con ${name} deve ripartire pulita: riavviala dalla finestra della chat, sul nome di ${name}.`,
+            commandHere: (name) => `Con la chat nella pagina /clear e gli altri comandi non servono: per una chat pulita o un altro modello, riavviala dal nome di ${name}.`,
+            offline: (name) => `Chesspal si è chiuso. Riaprilo: la pagina si ricollega da sola e la chat con ${name} riprende.`,
+        },
     },
     commandHere: (name) => `/clear e gli altri comandi vanno scritti nella finestra dove hai aperto ${name}, non qui.`,
     link: {

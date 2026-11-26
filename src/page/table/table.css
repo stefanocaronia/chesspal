@@ -199,6 +199,49 @@
     cursor: pointer;
 }
 
+/* With a chat the table drives (D-125), the mark that stops the AI beside its clock, while it thinks: a full square, as on any player; the clock keeps
+   its place at the card's edge */
+.player-line > .beside-clock {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stop-ai {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    background: var(--card);
+    color: var(--ink);
+    animation: appear 150ms;
+}
+
+.stop-ai .icon rect {
+    fill: currentColor;
+    stroke: none;
+}
+
+.stop-ai:disabled {
+    opacity: 0.5;
+}
+
+/* A failure of the chat's host: its own words under the page's line, as it said them; the × that closes it at the top */
+.host-words {
+    display: block;
+    margin-top: 4px;
+    color: var(--soft);
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.chat-failed {
+    align-items: flex-start;
+}
+
 /* No chat at the table: a hollow ring before the AI's name, and before the line that says so */
 .no-chat {
     flex: none;

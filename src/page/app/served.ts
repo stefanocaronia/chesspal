@@ -7,6 +7,7 @@ import type { CoachShown, TalkLine } from "../game/plies.ts";
 import { closesForNewer, eventsAddress } from "../layout/window.ts";
 import type { ProfileShown } from "../profile/profile.ts";
 import type { OllamaShown } from "../table/action.ts";
+import type { ChatFailure } from "../table/driven.ts";
 import type { ServerRefusal, Text } from "../text.ts";
 import { watchServed } from "./watch.ts";
 
@@ -125,6 +126,10 @@ export interface TableShown
     readonly refused?: ServerRefused & { readonly number: number; };
     /** Ollama, which plays OpenCode's free models, where OpenCode is installed: whether it answers, and the context of each model it has loaded. */
     readonly ollama?: OllamaShown;
+    /** The chat at the table is one the table drives itself, without a terminal: the page can stop it, and never sends the player to its window. */
+    readonly driven?: true;
+    /** Why the last chat the table drove failed or ended by itself, in the host's words, numbered so that the page says it once. */
+    readonly failed?: ChatFailure;
 }
 
 /** A refusal as the server sends it: its words, and the code of one the page says in the player's language, with the characters left for words too long. */

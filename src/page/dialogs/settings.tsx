@@ -7,11 +7,15 @@ import { type Look, looks, pieceSets, type Settings } from "../profile/settings.
 import { hasVoice, onVoices } from "../talk/voice.ts";
 import type { Text } from "../text.ts";
 
-/** The panel of the settings, open while `open` is true: every change goes to `onChange` at once; `analysing` while a game is in analysis. */
-export function SettingsPanel({ open, settings, analysing, onChange, onClose, text }: {
+/**
+ * The panel of the settings, open while `open` is true: every change goes to `onChange` at once; `analysing` while a game is in analysis; `atTable` on the
+ * table's page, which alone opens the chats the experimental switch is about.
+ */
+export function SettingsPanel({ open, settings, analysing, atTable, onChange, onClose, text }: {
     open: boolean;
     settings: Settings;
     analysing: boolean;
+    atTable: boolean;
     onChange: (settings: Settings) => void;
     onClose: () => void;
     text: Text;
@@ -96,13 +100,20 @@ export function SettingsPanel({ open, settings, analysing, onChange, onClose, te
                             {(["auto", "it", "en"] as const).map((language) => <Choice key={language} on={settings.language === language} onPick={() => set("language", language)}>{text.languages[language]}</Choice>)}
                         </Segments>
                     </Section>
+                    {atTable
+                        ? (
+                            <Section title={text.table.inPage.experimental} icon={experimentIcon}>
+                                <Switch on={settings.chatInPage} onSwitch={(on) => set("chatInPage", on)} note={text.table.inPage.switchNote}>{text.table.inPage.switch}</Switch>
+                            </Section>
+                        )
+                        : null}
                 </div>
             </div>
         </dialog>
     );
 }
 
-// The sections' line icons: a palette, a pawn, a globe.
+// The sections' line icons: a palette, a pawn, a globe, a flask.
 const lookIcon = (
     <>
         <path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.8 1.8-1.7 0-1.2-1-1.6-1-2.6 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4C21 6.5 17 3 12 3Z" />
@@ -123,6 +134,13 @@ const languageIcon = (
     <>
         <circle cx="12" cy="12" r="9" />
         <path d="M3 12h18M12 3c2.5 2.5 3.6 5.5 3.6 9s-1.1 6.5-3.6 9c-2.5-2.5-3.6-5.5-3.6-9S9.5 5.5 12 3Z" />
+    </>
+);
+
+const experimentIcon = (
+    <>
+        <path d="M9.5 3.5h5M10.5 3.5v6L5.2 18.2A1.6 1.6 0 0 0 6.6 20.5h10.8a1.6 1.6 0 0 0 1.4-2.3L13.5 9.5v-6" />
+        <path d="M8 14.5h8" />
     </>
 );
 
@@ -177,12 +195,15 @@ function Choice({ on, onPick, children }: { on: boolean; onPick: () => void; chi
     );
 }
 
-/** A switch; one `locked` here holds its value, disabled, and its tooltip says why. */
-function Switch({ on, onSwitch, locked, children }: { on: boolean; onSwitch: (on: boolean) => void; locked?: { on: boolean; why: string; }; children: ComponentChildren; })
+/** A switch; one `locked` here holds its value, disabled, and its tooltip says why; a `note` under its label says where it applies. */
+function Switch({ on, onSwitch, locked, note, children }: { on: boolean; onSwitch: (on: boolean) => void; locked?: { on: boolean; why: string; }; note?: string; children: ComponentChildren; })
 {
     return (
         <label class="switch" title={locked?.why}>
-            <span>{children}</span>
+            <span>
+                {children}
+                {note === undefined ? null : <small>{note}</small>}
+            </span>
             <input type="checkbox" role="switch" checked={locked?.on ?? on} disabled={locked !== undefined} title={locked?.why} onChange={(event) => onSwitch(event.currentTarget.checked)} />
         </label>
     );
