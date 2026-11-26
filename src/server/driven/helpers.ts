@@ -20,6 +20,8 @@ export interface HelpersOptions extends Omit<HelperChatOptions, "context" | "hel
     readonly changed: () => void;
     /** Tells the opponent's chat what the analyst found. */
     readonly tell: (line: string) => void;
+    /** How long the coach's turn on a position gone by may work at least while its next turn waits, in ms: `staleTurn` unless given. */
+    readonly staleTurn?: number;
 }
 
 /** The table's helpers, as the chat it drives and the page call them. */
@@ -61,6 +63,9 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
     // The falls in a row of each role, and whether the host said the player is not signed in: either stills helpers until the opponent opens again.
     const falls = new Map<HelperRole, number>();
     let signedOut = false;
+    const staleAfter = options.staleTurn ?? staleTurn;
+    // How long the coach's last turns worked from the position they took: a slow model's turns are let work as long as they take.
+    const coachTimes: number[] = [];
 
     const runs = (role: HelperRole): boolean => options.switchedOn() && options.opponent() !== undefined && !signedOut && (falls.get(role) ?? 0) < 2;
 
@@ -94,6 +99,7 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
     };
 
     const closeShift = (shift: Shift): void => {
+        clearTimeout(shift.working?.stale);
         shift.working?.chat.close();
         shift.waiting?.close();
         shift.working = undefined;
@@ -190,6 +196,7 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
             }
 
             shift.asked = plies;
+            watchStale(shift);
             return;
         }
 
@@ -204,7 +211,15 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
 
     // The turn at work is over: its chat goes, and the role's next turn goes to a chat of its own, the one asked meanwhile, else one opened ahead.
     const finish = (shift: Shift): void => {
+        const took = shift.working?.took;
+        clearTimeout(shift.working?.stale);
         shift.working?.chat.close();
+
+        if (shift.role === "coach" && took !== undefined) {
+            coachTimes.push(context.now().getTime() - took.at.getTime());
+            coachTimes.splice(0, coachTimes.length - timesKept);
+        }
+
         shift.working = undefined;
         const asked = shift.asked;
         shift.asked = undefined;
@@ -244,6 +259,12 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
 
         turn.answered = true;
 
+        if (shift.role === "coach" && started(result)) {
+            const position = currentGame(context)?.game.record.moves.length;
+            turn.took = position === undefined ? undefined : { position, at: context.now() };
+            watchStale(shift);
+        }
+
         if (playerMoved(result)) {
             skipped[shift.role] += 1;
             const now = currentGame(context)?.game.record.moves.length;
@@ -252,13 +273,36 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
         }
     };
 
-    // The player moved while the turn thought on their time: what it thought is kept, and its chat ends with its turn, or at once before it was sent.
-    const stopThinking = (turn: Turn): void => {
+    // A turn stopped: what it kept stays, and its chat ends with its turn, or at once before it was sent; the turn asked meanwhile goes next.
+    const stopTurn = (shift: Shift, turn: Turn): void => {
         if (turn.chat.turnSince() === undefined) {
-            finish(shifts.ponder);
+            finish(shift);
         } else {
             turn.chat.interrupt();
         }
+    };
+
+    // The coach's turn at work on a position gone by while its next turn waits is stopped once it has worked twice as long as its turns take, `staleAfter`
+    // at least, from the position it took: a slow turn would leave the moves after it unjudged.
+    const watchStale = (shift: Shift): void => {
+        const turn = shift.working;
+        const took = turn?.took;
+
+        if (turn === undefined || took === undefined || turn.stale !== undefined || shift.asked === undefined || shift.asked === took.position) {
+            return;
+        }
+
+        const limit = Math.max(staleAfter, 2 * median(coachTimes));
+        const left = limit - (context.now().getTime() - took.at.getTime());
+
+        turn.stale = setTimeout(() => {
+            if (shift.working === turn && shift.asked !== undefined) {
+                const seconds = Math.round((context.now().getTime() - took.at.getTime()) / 1000);
+                options.log(`coach turn on ply ${took.position} stopped after ${seconds} s, past its ${Math.round(limit / 1000)} s: the turn for ply ${shift.asked} waits`);
+                stopTurn(shift, turn);
+            }
+        }, Math.max(0, left));
+        turn.stale.unref();
     };
 
     const think = (current: CurrentGame): void => {
@@ -350,7 +394,7 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
             if (over || (ponder.game !== undefined && ponder.game !== current.started)) {
                 closeShift(ponder);
             } else if (ponder.working !== undefined && ponder.working.plies !== current.game.record.moves.length) {
-                stopThinking(ponder.working);
+                stopTurn(ponder, ponder.working);
             }
 
             if (coach.game !== undefined && coach.game !== current?.started) {
@@ -409,13 +453,24 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
 /** The helpers that take turns, each on a chat of its own. */
 type TurnRole = "ponder" | "coach";
 
-/** A turn given to a chat: the plies of the game when it was asked, and whether the role's tool has answered in it yet. */
+/**
+ * A turn given to a chat: the plies of the game when it was asked, whether the role's tool has answered in it yet, the position the coach's took and when,
+ * and the timer that stops it once that position has gone by and another turn waits.
+ */
 interface Turn
 {
     readonly chat: HelperChat;
     readonly plies: number;
     answered: boolean;
+    took?: { readonly position: number; readonly at: Date; } | undefined;
+    stale?: ReturnType<typeof setTimeout> | undefined;
 }
+
+/** How long the coach's turn on a position gone by may work at least while its next turn waits: past its turns as the trials saw them (4–17 s), in ms. */
+const staleTurn = 30_000;
+
+/** How many of the coach's last turns its limit is drawn from. */
+const timesKept = 9;
 
 /** The chats of a role that takes turns: the game they serve, the turn at work, the chat waiting ahead, and the plies of a turn asked while one works. */
 interface Shift
@@ -434,6 +489,20 @@ const prompts: Readonly<Record<TurnRole, string>> = { ponder: "Ponder.", coach: 
 function promptOf(role: TurnRole, host: DrivenHost): string
 {
     return host.helperTool === undefined ? prompts[role] : `${prompts[role]} Your tool: ${host.helperTool(role)}.`;
+}
+
+/** Whether a tool's first result gave its turn a position to work on. */
+function started(result: unknown): boolean
+{
+    return typeof result === "object" && result !== null && "start" in result;
+}
+
+/** The median of some times, 0 with none. */
+function median(times: readonly number[]): number
+{
+    const sorted = [...times].sort((first, second) => first - second);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length === 0 ? 0 : sorted.length % 2 === 1 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
 }
 
 /** Whether a tool's result says the player had moved, or the game is over: its turn came too late. */

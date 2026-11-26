@@ -336,6 +336,69 @@ describe("the opponent's helpers the table runs itself", () => {
         expect(ai.helperChats.filter((chat) => role(chat) === "coach" && !chat.closed).length).toBeLessThanOrEqual(1);
     }, 30_000);
 
+    it("stops a coach's turn on the position it took once gone by, past its limit while the next waits, and gives the next on a chat of its own", async () => {
+        const [called, stuck] = [gate(), gate()];
+        const { table, ai } = await playing({ level: "strong", helps: true, white: "f3", staleTurn: 500 }, (driver) => {
+            driver.helpers.coach = async (client, _prompt, chat) => {
+                if (turnsOf(driver, "coach").indexOf(chat) === 0) {
+                    // It takes its position, then thinks on it for ever.
+                    await call(client, "coach");
+                    called.open();
+                    await stuck.passed;
+                    return;
+                }
+
+                await coaching(client);
+            };
+        });
+        const opponent = ai.chats[0]!;
+        await called.passed;
+        const first = helperOf(ai, "coach")!;
+
+        opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: "g4", plan: "Attack." })));
+        await posted(table.url, "/api/move", { move: "e5" });
+        await until(() => turnsOf(ai, "coach")[1]?.ends.includes("done") === true);
+        expect(first.ends).toEqual(["interrupted"]);
+        expect(first.closed).toBe(true);
+        expect(ai.logged.filter((line) => / stopped after /.test(line))).toEqual([
+            expect.stringMatching(/^coach turn on ply 1 stopped after \d+ s, past its 1 s: the turn for ply 3 waits$/),
+        ]);
+        const { coach } = (await raw(table.url)).game as { coach: { judgments: { ply: number; }[]; }; };
+        expect(coach.judgments.map((judged) => judged.ply)).toEqual([2]);
+        stuck.open();
+    }, 30_000);
+
+    it("lets a coach's turn asked on a position gone by, which took the newest with its first call, work past the limit and judge it", async () => {
+        const moved = gate();
+        const { table, ai } = await playing({ level: "strong", helps: true, white: "f3", staleTurn: 500 }, (driver) => {
+            driver.helpers.coach = async (client, _prompt, chat) => {
+                if (turnsOf(driver, "coach").indexOf(chat) === 0) {
+                    // A turn that starts late: it looks only once the player and the opponent have moved, and thinks past the limit.
+                    await moved.passed;
+                    const start = /^Game "(\w+)", position (\d+)/.exec((await call(client, "coach")).text)!;
+                    const at = { game: start[1], position: Number(start[2]) };
+                    await pause(1000);
+                    await call(client, "coach", { ...at, badge: "best", note: "Well played." });
+                    await call(client, "coach", { ...at, ahead: 0 });
+                    await call(client, "coach", { ...at, done: true });
+                }
+            };
+        });
+        const opponent = ai.chats[0]!;
+        await until(() => helperOf(ai, "coach")?.idle() === false);
+        const first = helperOf(ai, "coach")!;
+
+        opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: "g4", plan: "Attack." })));
+        await posted(table.url, "/api/move", { move: "e5" });
+        await until(() => opponent.sent.length === 3 && opponent.idle());
+        moved.open();
+        await until(() => first.ends.length === 1);
+        expect(first.ends).toEqual(["done"]);
+        expect(ai.logged.filter((line) => / stopped after /.test(line))).toEqual([]);
+        const { coach } = (await raw(table.url)).game as { coach: { judgments: { ply: number; }[]; }; };
+        expect(coach.judgments.map((judged) => judged.ply)).toEqual([2]);
+    }, 30_000);
+
     it("judges a move after two turns its tool answered too late, each on a fresh chat, and counts those it skipped from coach's answer", async () => {
         const late = [gate(), gate()];
         const { table, ai } = await playing({ level: "strong", helps: true, white: "e4" }, (driver) => {
@@ -822,11 +885,19 @@ describe("the opponent's helpers the table runs itself", () => {
  * when given: its first turns done, the helpers' fakes `set` before the game starts.
  */
 async function playing(
-    { level, helps = false, white, model, effort, host = "claude" }: { level: string; helps?: boolean; white?: string; model?: string; effort?: string; host?: string; },
+    { level, helps = false, white, model, effort, host = "claude", staleTurn }: {
+        level: string;
+        helps?: boolean;
+        white?: string;
+        model?: string;
+        effort?: string;
+        host?: string;
+        staleTurn?: number;
+    },
     set: (driver: FakeDriver) => void = () => undefined,
 ): Promise<Awaited<ReturnType<typeof drivenTable>>>
 {
-    const driven = await drivenTable();
+    const driven = await drivenTable(undefined, staleTurn === undefined ? undefined : Object.assign(fakeDriver(), { staleTurn }));
     // OpenCode's models as the table keeps them once read: OpenCode offers none before.
     writeFileSync(join(tableFolder(driven.home), "opencode-models.json"), `${JSON.stringify({ models: ["ollama/gpt-oss:20b"], model: "ollama/gpt-oss:20b" })}\n`);
     const chosen = { ...(model === undefined ? {} : { [`${host}Model`]: model }), ...(effort === undefined ? {} : { [`${host}Effort`]: effort }) };

@@ -84,6 +84,8 @@ export interface FakeDriver
     failFirst: boolean;
     missing: boolean;
     loading?: Promise<void>;
+    /** How long a helper's turn on a position gone by may work while the next waits, in ms: the table's own unless given. */
+    staleTurn?: number;
     first?: (client: Client) => Promise<void>;
     queued: ((client: Client) => Promise<void>)[];
 }
@@ -371,6 +373,7 @@ export async function drivenTable(
             environment: ai.environment,
             log: (line) => void ai.logged.push(line),
             start: ai.start,
+            ...(ai.staleTurn === undefined ? {} : { staleTurn: ai.staleTurn }),
         });
         const table = await startTable(context, times, chats, undefined, programsEnded);
 

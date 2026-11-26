@@ -38,6 +38,8 @@ export interface DrivenOptions
     readonly log?: (line: string) => void;
     /** How the programs of its chats start: as a line process unless given. */
     readonly start?: ProgramStart;
+    /** How long a helper's turn on a position gone by may work while the next waits, in ms: the helpers' own unless given. */
+    readonly staleTurn?: number;
 }
 
 /** The setting of the profile that has the table drive the chat itself, without a terminal, in a host it drives; off unless the player turns it on. */
@@ -79,6 +81,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         opponent: () => (driven !== undefined && !driven.closing ? { host: driven.host, model: driven.choice.model ?? "", effort: driven.choice.effort } : undefined),
         changed: () => seat?.changed(),
         tell: (line) => news(line),
+        ...(options.staleTurn === undefined ? {} : { staleTurn: options.staleTurn }),
     });
 
     const failed = (state: Driven, why: string): void => {
