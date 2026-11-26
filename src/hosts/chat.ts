@@ -249,6 +249,24 @@ export function isHostName(value: string): boolean
     return /^[A-Za-z0-9][\w.:/@[\]-]{0,199}$/.test(value);
 }
 
+/** The server's name when the chat is given none: the one the folder's files name. */
+export const folderServer = "chesspal";
+
+// A server's name as the hosts keep it whole in their tools' names: anything else they would change, and the table would not know its tools.
+const serverName = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** The name of the server whose tools are the table's commands: the one given, else the folder's; throws for a name a host would change. */
+export function serverNameOf(options: ChatOptions): string
+{
+    const name = options.server?.name ?? folderServer;
+
+    if (!serverName.test(name)) {
+        throw new Error(`${JSON.stringify(name.slice(0, 100))} is no name of an MCP server: letters, digits, _ and - only, up to 64.`);
+    }
+
+    return name;
+}
+
 /** Throws, before any process starts, where a driver that does not take them yet is given a server or instructions. */
 export function refuseGiven(options: ChatOptions, host: string): void
 {

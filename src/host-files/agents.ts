@@ -135,15 +135,18 @@ const toolsOf: Readonly<Record<string, readonly string[]>> = {
     [analystAgent]: ["analyse_game", "annotate_game", "look", "position"],
 };
 
-// Codex's quick model for the lower levels: written in its agent, since Codex ignores a model the chat names when it starts one that has it (Priya).
-const codexQuickModel = "gpt-6-luna";
+/**
+ * Each host's quick model for the lower levels, as the agent that thinks on it names it; Codex's written in its agent, since Codex ignores a model the
+ * chat names when it starts one that has it (Priya).
+ */
+export const quickModels = { claude: "haiku", codex: "gpt-6-luna" } as const;
 
 function agentSpecs(): AgentSpec[]
 {
     const ponder = instructionsFile("ponder");
     const thinking = "Chesspal's opponent thinking on the player's time. Started by the AI in the background after its move, as ai_move says.";
     return [
-        { agent: quickAgent, claudeModel: "haiku", codexModel: codexQuickModel, description: thinking, text: ponder },
+        { agent: quickAgent, claudeModel: quickModels.claude, codexModel: quickModels.codex, description: thinking, text: ponder },
         { agent: ownAgent, claudeModel: "inherit", description: thinking, text: ponder },
         // Its description tells the chat it starts the agent only as ai_move says, never to ask it about the game (Priya).
         {

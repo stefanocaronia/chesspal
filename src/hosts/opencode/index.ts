@@ -3,14 +3,14 @@ import { join } from "node:path";
 import { acpModels, openAcp } from "../acp/index.ts";
 import { type HostDriver, refuseGiven } from "../chat.ts";
 import { isFile } from "../program.ts";
-import { inFolder, openCodeEnvironment, openCodeProgram } from "./program.ts";
+import { allowedEnvironment, inFolder, openCodeEnvironment, openCodeProgram } from "./program.ts";
 import { openCodeAcp } from "./tools.ts";
 
 /** OpenCode as the table drives it: the model a new chat proposes is the first OpenCode lists, the one it would play itself. */
 export const openCode: HostDriver = {
     open: (options) => {
         refuseGiven(options, "OpenCode");
-        return openAcp({ ...options, environment: inFolder(options.environment, options.folder) }, openCodeAcp);
+        return openAcp({ ...options, environment: allowedEnvironment(inFolder(options.environment, options.folder), options.allowed) }, openCodeAcp);
     },
     missing: (folder) =>
         isFile(join(folder, "opencode.json"))

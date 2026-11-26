@@ -2,15 +2,15 @@
 import type { ChatFailure, FailureCode } from "../page/index.ts";
 
 /**
- * The failure numbered `number`, coded from the host's words, which it keeps: of a program that ended by itself, its last words, else its exit code alone.
- * The sentence for the player is the page's, by the code.
+ * The failure numbered `number` of a chat in `host`, coded from the host's words, which it keeps: of a program that ended by itself, its last words, else
+ * its exit code alone. The sentence for the player is the page's, by the code, naming the host.
  */
-export function failureOf(why: string, number: number): ChatFailure
+export function failureOf(why: string, number: number, host?: string): ChatFailure
 {
     const code = failureCode(why);
     const ended = /^the host's program ended \(([^)]*)\)(.*)$/s.exec(why);
     const said = code === "program-ended" && ended !== null ? lastWords(ended[2]!) ?? ended[1]! : why;
-    return { why: said, code, number };
+    return { why: said, code, number, ...(host === undefined ? {} : { host }) };
 }
 
 /** The code of a host's words: the account's sign-in and limits first, as a program that ended may say why after its exit code. */

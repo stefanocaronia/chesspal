@@ -22,7 +22,27 @@ export function traceTo(file: string | undefined): (way: "in" | "out" | "err", l
     };
 }
 
-/** The host's process, every line written to it ("in") and read from it ("out") added to the trace first. */
+/** The mark that stands in the trace for the value of a variable of an MCP server's environment. */
+export const hiddenValue = "<hidden>";
+
+/**
+ * A line written to the host as the trace keeps it: the value of every variable of an `env`, as a server given in a request carries its key, replaced by a
+ * mark, its name kept; a line that is no JSON, or holds no `env`, as it is.
+ */
+export function withoutSecrets(line: string): string
+{
+    if (!line.includes('"env"')) {
+        return line;
+    }
+
+    try {
+        return JSON.stringify(hidden(JSON.parse(line) as unknown));
+    } catch {
+        return line;
+    }
+}
+
+/** The host's process, every line written to it ("in"), its servers' secrets hidden, and read from it ("out") added to the trace first. */
 export function tracedProcess(host: LineProcess, traced: (way: "in" | "out", line: string) => void): LineProcess
 {
     return {
@@ -31,7 +51,7 @@ export function tracedProcess(host: LineProcess, traced: (way: "in" | "out", lin
             return host.pid;
         },
         write: (line) => {
-            traced("in", line);
+            traced("in", withoutSecrets(line));
             host.write(line);
         },
         onLine: (listener) =>
@@ -43,4 +63,26 @@ export function tracedProcess(host: LineProcess, traced: (way: "in" | "out", lin
         closeInput: () => host.closeInput(),
         stop: () => host.stop(),
     };
+}
+
+// A value with every `env` in it hidden: an object's values, or a list's entries of name and value, as ACP gives them.
+function hidden(value: unknown, key?: string): unknown
+{
+    if (key === "env" && Array.isArray(value)) {
+        return value.map((entry: unknown) => (typeof entry === "object" && entry !== null && "value" in entry ? { ...entry, value: hiddenValue } : entry));
+    }
+
+    if (key === "env" && typeof value === "object" && value !== null) {
+        return Object.fromEntries(Object.keys(value).map((name) => [name, hiddenValue]));
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((entry) => hidden(entry));
+    }
+
+    if (typeof value === "object" && value !== null) {
+        return Object.fromEntries(Object.entries(value).map(([name, field]) => [name, hidden(field, name)]));
+    }
+
+    return value;
 }

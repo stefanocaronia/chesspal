@@ -1,14 +1,14 @@
-// The environment a chat of Claude Code the table opens starts with: the driver's own, without what the model and effort chosen take away; and the file of
-// its trace, where the table's environment asks for one.
+// The environment a chat the table opens starts with: its driver's own, without what the model and effort chosen take away; and the file of its trace,
+// where the table's environment asks for one.
 import { join } from "node:path";
 import { makeFolder } from "../../games/index.ts";
 import { type HostDriver, traceVariable } from "../../hosts/index.ts";
-import { hostEnvironment } from "../table/index.ts";
+import { hostEnvironment, type HostName } from "../table/index.ts";
 
-/** The environment of Claude Code's program for a chat opened with `choice`, from the table's `environment`. */
-export function chatEnvironment(driver: HostDriver, environment: NodeJS.ProcessEnv, choice: Parameters<typeof hostEnvironment>[1]): NodeJS.ProcessEnv
+/** The environment of the program of `host` for a chat opened with `choice`, from the table's `environment`. */
+export function chatEnvironment(driver: HostDriver, environment: NodeJS.ProcessEnv, host: HostName, choice: Parameters<typeof hostEnvironment>[1]): NodeJS.ProcessEnv
 {
-    const given = { ...driver.environment(environment), ...hostEnvironment("claude", choice) };
+    const given = { ...driver.environment(environment), ...hostEnvironment(host, choice) };
     return Object.fromEntries(Object.entries(given).filter(([, value]) => value !== undefined));
 }
 

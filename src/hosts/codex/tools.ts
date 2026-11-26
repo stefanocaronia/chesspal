@@ -12,16 +12,18 @@ export interface CodexTool
     granted?: Message;
 }
 
-// The chesspal server, whose tools are Chesspal's commands; the actions Codex reads in a command that only read.
-const chesspalServer = "chesspal";
+// The actions Codex reads in a command that only read.
 const readingActions = ["read", "listFiles", "search"];
 
-/** The tool an item of the thread is; undefined for an item that is no tool, as the AI's prose, its reasoning or the player's words. */
-export function toolOfItem(item: Message): CodexTool | undefined
+/**
+ * The tool an item of the thread is, the tools of the server named `chesspal` being Chesspal's commands; undefined for an item that is no tool, as the AI's
+ * prose, its reasoning or the player's words.
+ */
+export function toolOfItem(item: Message, chesspal: string): CodexTool | undefined
 {
     switch (item.type) {
         case "mcpToolCall":
-            return mcpTool(item.server, item.tool);
+            return mcpTool(item.server, item.tool, chesspal);
         case "commandExecution":
             return commandTool(item.commandActions, item.cwd);
         case "fileChange":
@@ -47,7 +49,7 @@ export function toolOfItem(item: Message): CodexTool | undefined
 }
 
 /** The tool a request of the host asks to use; undefined for a request that asks no approval of a tool. */
-export function toolOfRequest(method: string, params: Message): CodexTool | undefined
+export function toolOfRequest(method: string, params: Message, chesspal: string): CodexTool | undefined
 {
     switch (method) {
         case "item/commandExecution/requestApproval":
@@ -60,7 +62,7 @@ export function toolOfRequest(method: string, params: Message): CodexTool | unde
         case "item/permissions/requestApproval":
             return permissionsTool(params.permissions);
         case "mcpServer/elicitation/request":
-            return isApproval(params) ? mcpTool(params.serverName, undefined) : undefined;
+            return isApproval(params) ? mcpTool(params.serverName, undefined, chesspal) : undefined;
         default:
             return undefined;
     }
@@ -82,13 +84,13 @@ export function approvalAnswer(method: string, tool: CodexTool, allowed: boolean
     }
 }
 
-/** A tool of an MCP server: a command of the chesspal server by its own name; any other server's by its name and the tool's. */
-export function mcpTool(server: unknown, tool: unknown): CodexTool
+/** A tool of an MCP server: a command of Chesspal's server, named `chesspal`, by its own name; any other server's by its name and the tool's. */
+function mcpTool(server: unknown, tool: unknown, chesspal: string): CodexTool
 {
     const named = typeof tool === "string" && tool !== "" ? tool : undefined;
 
-    if (server === chesspalServer) {
-        return { name: named ?? chesspalServer, kind: "chesspal", server: chesspalServer, paths: [] };
+    if (server === chesspal) {
+        return { name: named ?? chesspal, kind: "chesspal", server: chesspal, paths: [] };
     }
 
     return { name: `${String(server)}/${named ?? "?"}`, kind: "other", ...(typeof server === "string" ? { server } : {}), paths: [] };

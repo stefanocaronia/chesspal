@@ -78,6 +78,11 @@ describe("the chat in Claude Code", () => {
             expect(settings(["chesspal", "read", "shell"])).toEqual([]);
         });
 
+        it("gives a chat of the table's kinds no tool that reads, writes or runs on the computer: the web and the subagent alone, beside the chesspal server", () => {
+            const args = open([], { allowed: ["chesspal", "web", "fetch", "agent", "image"] }).host.started?.args ?? [];
+            expect(args[args.indexOf("--tools") + 1]).toBe("WebSearch,WebFetch,Task");
+        });
+
         it("lists only the kinds allowed: searching the web is not fetching from it", () => {
             const { host } = open([], { allowed: ["read", "web"] });
             expect(host.started?.args.at(-1)).toBe("Read,Glob,Grep,WebSearch");

@@ -136,7 +136,7 @@ describe("the chat in Antigravity", () => {
 
     describe("recorded turns (agy 1.5.17, gemini-3.8-flash)", () => {
         // The table's own kinds.
-        const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "fetch", "agent", "image"];
+        const tableKinds: ChatOptions["allowed"] = ["chesspal", "web", "fetch", "agent", "image"];
 
         function playRecorded(name: string): ReturnType<typeof play> & { flow: FlowEntry[]; }
         {

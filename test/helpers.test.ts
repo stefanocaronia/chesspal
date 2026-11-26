@@ -108,6 +108,45 @@ describe("the opponent's helpers the table runs itself", () => {
         expect(opponent.sent[3]).toContain("Thought on their time by a quicker model (legal, not checked): d5, The centre.");
     }, 30_000);
 
+    it("runs the helpers of a chat in Codex on Codex: the one that thinks on Codex's quick model at a low level, as the opponent's next turn says", async () => {
+        const { table, ai } = await playing({ level: "club", host: "codex" });
+        ai.helpers.ponder = pondering("d4", "d5");
+        const opponent = ai.chats[0]!;
+        opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Centre." })));
+        await posted(table.url, "/api/move", { move: "e4" });
+        await until(() => helperOf(ai, "ponder")?.ends.includes("done") === true);
+        const ponder = helperOf(ai, "ponder")!;
+        expect(ponder.options).toMatchObject({ model: "gpt-6-luna", allowed: ["chesspal", "read"] });
+        expect(ponder.options.effort).toBeUndefined();
+        expect(ponder.options.server?.name).toBe("chesspal");
+        expect(new Set(ai.asked)).toEqual(new Set(["codex"]));
+
+        await posted(table.url, "/api/move", { move: "d4" });
+        await until(() => opponent.sent.length >= 4);
+        expect(opponent.sent[3]).toContain("Thought on their time by a quicker model (legal, not checked): d5, The centre.");
+    }, 30_000);
+
+    it("runs the helpers of a chat in Codex on the opponent's model and effort above the low levels, the coach too, never with a subagent", async () => {
+        const { table, ai } = await playing({ level: "strong", helps: true, model: "gpt-6-astra", effort: "high", host: "codex" }, (driver) => {
+            driver.helpers.coach = coaching;
+        });
+        ai.helpers.ponder = pondering("d4", "d5");
+        const opponent = ai.chats[0]!;
+        opponent.turns.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Centre." })));
+        await posted(table.url, "/api/move", { move: "e4" });
+        await until(() => helperOf(ai, "ponder")?.ends.includes("done") === true && helperOf(ai, "coach")?.ends.includes("done") === true);
+
+        for (const role of ["ponder", "coach"] as const) {
+            expect(helperOf(ai, role)!.options).toMatchObject({ model: "gpt-6-astra", effort: "high", allowed: ["chesspal", "read"] });
+            expect(helperOf(ai, role)!.options.allowed).not.toContain("agent");
+        }
+
+        expect(new Set(ai.asked)).toEqual(new Set(["codex"]));
+        await posted(table.url, "/api/move", { move: "d4" });
+        await until(() => opponent.sent.length >= 4);
+        expect(opponent.sent[3]).toContain("Thought on their time by your model (legal, not checked): d5, The centre.");
+    }, 30_000);
+
     it("stops the thinking at the player's move, its thought kept and given, and starts the next turn from ponder {} on the chat waiting ahead", async () => {
         const { table, ai } = await playing({ level: "strong" });
         let kept = 0;
@@ -728,9 +767,9 @@ describe("the opponent's helpers the table runs itself", () => {
         left.ai.helpers.analyst = analysing(gate(), "");
         await study(left.table.url, { pgn: brought });
         await until(() => analysts(left.ai)[0]?.calls.length === 1);
-        await posted(left.table.url, "/api/table/restart", { host: "codex" });
+        await posted(left.table.url, "/api/table/restart", { host: "antigravity" });
         await until(() => analysts(left.ai)[0]!.closed && left.terminal.opened.length === 1);
-        expect(left.terminal.opened).toEqual(["codex"]);
+        expect(left.terminal.opened).toEqual(["antigravity"]);
         expect(gameInAnalysis(gameFolder(left.home))?.analyst).toBeUndefined();
 
         const gone = await playing({ level: "strong", helps: true });
@@ -739,7 +778,7 @@ describe("the opponent's helpers the table runs itself", () => {
         gone.ai.chats[0]!.turns.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Centre." })));
         await posted(gone.table.url, "/api/move", { move: "e4" });
         await until(() => working === 4);
-        await posted(gone.table.url, "/api/table/restart", { host: "codex" });
+        await posted(gone.table.url, "/api/table/restart", { host: "antigravity" });
         await until(() => gone.ai.helperChats.every((chat) => chat.closed));
     }, 30_000);
 });
@@ -749,15 +788,15 @@ describe("the opponent's helpers the table runs itself", () => {
  * when given: its first turns done, the helpers' fakes `set` before the game starts.
  */
 async function playing(
-    { level, helps = false, white, model, effort }: { level: string; helps?: boolean; white?: string; model?: string; effort?: string; },
+    { level, helps = false, white, model, effort, host = "claude" }: { level: string; helps?: boolean; white?: string; model?: string; effort?: string; host?: string; },
     set: (driver: FakeDriver) => void = () => undefined,
 ): Promise<Awaited<ReturnType<typeof drivenTable>>>
 {
     const driven = await drivenTable();
-    const chosen = { ...(model === undefined ? {} : { claudeModel: model }), ...(effort === undefined ? {} : { claudeEffort: effort }) };
+    const chosen = { ...(model === undefined ? {} : { [`${host}Model`]: model }), ...(effort === undefined ? {} : { [`${host}Effort`]: effort }) };
     saveProfileSettings(driven.home, activeProfile(driven.home).id, { [chatInPage]: true, ...(helps ? { helps: true } : {}), ...chosen });
     set(driven.ai);
-    await opened(driven.table.url);
+    await opened(driven.table.url, host);
     await until(() => driven.ai.chats.length === 1 && driven.ai.chats[0]!.idle());
     const opponent = driven.ai.chats[0]!;
 

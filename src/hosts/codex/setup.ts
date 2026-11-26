@@ -9,8 +9,6 @@ const readyWait = 60_000;
 const configWait = 5000;
 // How long Codex may take to confirm another model asked in the open chat.
 const changeWait = 30_000;
-// The game's own MCP server, which the chat's folder's configuration starts.
-const chesspalServer = "chesspal";
 
 type Before = NonNullable<State["model"]["before"]>;
 
@@ -46,7 +44,7 @@ function readConfig(state: State, then: () => void): void
 
         heard = true;
         cancel();
-        state.others = isObject(servers) ? Object.keys(servers).filter((name) => name !== chesspalServer) : [];
+        state.others = isObject(servers) ? Object.keys(servers).filter((name) => name !== state.server) : [];
         then();
     };
 
@@ -120,15 +118,18 @@ function accountRead(state: State, answer: Message): void
     openThread(state);
 }
 
-/** A new thread in the chat's folder, or the one taken up, with the model, the effort and the table's limits set on it. */
+/**
+ * A new thread in the chat's folder, or the one taken up, with the model, the effort and the table's limits set on it; and the server and the instructions
+ * given, set again on a thread taken up, whose server has a new key.
+ */
 function openThread(state: State): void
 {
     const effort = state.model.effort;
     // The web is searched only where the table allows it; the sandbox lets Codex's commands write nothing, so that a write must ask.
-    // The player's own MCP servers are turned off for this thread (not yet tried on a thread taken up, nor on a subagent's).
-    const servers = state.others.length === 0 ? {} : { mcp_servers: Object.fromEntries(state.others.map((name) => [name, { enabled: false }])) };
-    const config = { ...(effort === undefined ? {} : { model_reasoning_effort: effort }), ...(state.allowed.includes("web") ? {} : { web_search: "disabled" }), ...servers };
-    const options = { cwd: state.folder, model: state.model.asked, approvalPolicy: "on-request", sandbox: "read-only", config };
+    const config = { ...(effort === undefined ? {} : { model_reasoning_effort: effort }), ...(state.allowed.includes("web") ? {} : { web_search: "disabled" }), ...serversOf(state) };
+    // The instructions given come after Codex's own, which they do not replace.
+    const instructions = state.instructions === undefined ? {} : { developerInstructions: state.instructions };
+    const options = { cwd: state.folder, model: state.model.asked, approvalPolicy: "on-request", sandbox: "read-only", config, ...instructions };
     const resumed = state.resumed;
 
     if (resumed === undefined) {
@@ -136,6 +137,18 @@ function openThread(state: State): void
     } else {
         state.requests.ask("thread/resume", { threadId: resumed, ...options, excludeTurns: true }, (answer) => threadOpened(state, answer));
     }
+}
+
+/**
+ * The thread's MCP servers: the player's own turned off by name, as one Codex does not know would fail the thread; and the server given, with its
+ * environment, which holds its key, in its own configuration: Codex gives an MCP server none of its process's.
+ */
+function serversOf(state: State): { mcp_servers?: Record<string, unknown>; }
+{
+    const off = state.others.map((name) => [name, { enabled: false }]);
+    const given = state.given === undefined ? [] : [[state.given.name, { command: state.given.command, args: state.given.args, env: state.given.environment }]];
+    const servers = [...off, ...given];
+    return servers.length === 0 ? {} : { mcp_servers: Object.fromEntries(servers) as Record<string, unknown> };
 }
 
 /** The thread is open: its model, and its effort where one was asked, must be those asked, as Codex goes back to the account's own when it takes one up. */

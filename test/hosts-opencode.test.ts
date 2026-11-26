@@ -30,15 +30,31 @@ checklist({
     isPlayerWords: isPrompt,
 });
 
+// What the table's OpenCode may not do by itself: read files, and reach any folder outside the chat's.
+// The kinds of tools the table allows.
+const tableKinds: ChatOptions["allowed"] = ["chesspal", "web", "fetch", "agent", "image"];
+const denied = { read: "deny", glob: "deny", grep: "deny", list: "deny", external_directory: "deny" };
+
 describe("the chat in OpenCode", () => {
     describe("its program", () => {
-        it("starts as opencode acp after its own arguments, in the chat's folder, which PWD names too", () => {
+        it("starts as opencode acp after its own arguments, in the chat's folder, which PWD names too, its reading tools and any folder outside denied", () => {
             const host = fakeAgent([]);
             openHostChat("openCode", { ...options(host), environment: { HOME: "/home/player", pwd: "/elsewhere" } });
             expect(host.started?.command).toBe("opencode-program");
             expect(host.started?.args).toEqual(["--first", "acp"]);
             expect(host.started?.options.cwd).toBe(folder);
-            expect(host.started?.options.env).toEqual({ HOME: "/home/player", PWD: folder });
+            expect(host.started?.options.env).toEqual({ HOME: "/home/player", PWD: folder, OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: denied }) });
+        });
+
+        it("denies its reading tools only where the kinds allowed hold no read, and any folder outside the chat's always, in this process alone", () => {
+            const given = (allowed: ChatOptions["allowed"]): unknown => {
+                const host = fakeAgent([]);
+                openHostChat("openCode", { ...options(host), allowed });
+                return JSON.parse(String(host.started?.options.env?.OPENCODE_CONFIG_CONTENT));
+            };
+
+            expect(given(tableKinds)).toEqual({ permission: denied });
+            expect(given(["chesspal", "read"])).toEqual({ permission: { external_directory: "deny" } });
         });
 
         it("begins the protocol, then opens a new session in the chat's folder with no MCP server of the table's", async () => {
@@ -330,9 +346,6 @@ describe("the chat in OpenCode", () => {
     });
 
     describe("a subagent's session", () => {
-        // The table's own kinds: any subagent is allowed.
-        const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "fetch", "agent", "image"];
-
         /** The AI's own words of a recorded flow, all its turns joined: never those of a subagent's session. */
         function chatWords(flow: FlowEntry[]): string
         {
@@ -398,15 +411,14 @@ describe("the chat in OpenCode", () => {
             return turnEnds(events);
         }
 
-        it("holds a tool the subagent ran without asking to the AI's limits: a shell, or a read outside the chat's folder, fails the turn", async () => {
+        it("holds a tool the subagent ran without asking to the AI's limits: a shell, or any read of a file, fails the turn", async () => {
             const any = { agent: "general", prompt: "Bertoldo" };
             expect(await childRuns(any, { name: "execute", rawInput: { code: "return await tools.chesspal.view({ as: 'Bertoldo' });" } })).toEqual([{ type: "turnEnd", reason: "done" }]);
             expect(await childRuns(any, { name: "bash", rawInput: { command: "dir" } })).toEqual([{ type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use bash" }]);
-            expect(await childRuns(any, { name: "read", rawInput: { filePath: "/home/player/.ssh/id_rsa" } })).toEqual([{
-                type: "turnEnd",
-                reason: "failed",
-                why: "the host ran a tool without asking: read read /home/player/.ssh/id_rsa, and the table lets the AI read only the chat's folder",
-            }]);
+            const read = (path: string): Promise<HostEvent[]> => childRuns(any, { name: "read", rawInput: { filePath: path } });
+            const refused = [{ type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use read" }];
+            expect(await read("/home/player/.ssh/id_rsa")).toEqual(refused);
+            expect(await read(join(folder, "games", "a.json"))).toEqual(refused);
         });
 
         it("fails the turn for a subagent where the table does not allow one, and for a session no subagent the table allows started", async () => {
@@ -435,7 +447,6 @@ describe("the chat in OpenCode", () => {
     });
 
     describe("a turn the host begins by itself", () => {
-        const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "fetch", "agent", "image"];
         const child = { "opencode/child-session": { id: "ses_child", parentID: "ses_1", depth: 1, title: "Bertoldo" } };
         const hostTurn = { type: "turnStart", by: "host" };
         const silence = 20_000;

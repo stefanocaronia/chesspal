@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { settingsFrom } from "../src/page/profile/settings.ts";
-import { canStop, drivenAsleep, type DrivenTable, failureCodes, failuresSaid, failuresSaidAtLoad, failureToSay, opensInPage, stalledOnMove, workShown } from "../src/page/table/driven.ts";
+import { canStop, drivenAsleep, drivenHosts, type DrivenTable, drivenTitle, failureCodes, failuresSaid, failuresSaidAtLoad, failureToSay, opensInPage, stalledOnMove, workShown } from "../src/page/table/driven.ts";
 import { type Text, textFor, withoutTerminal } from "../src/page/text.ts";
+import { drivenHost } from "../src/server/driven/hosts.ts";
+import { hostNames } from "../src/server/table/hosts/hosts.ts";
 
 const none: DrivenTable = { chat: false };
 const driven: DrivenTable = { chat: true, driven: true };
@@ -15,16 +17,29 @@ const languages = [textFor(["it"]), textFor(["en"])];
 const terminal = /terminal|finestra dove|window where|\/clear, then|scrivi \/clear|chesspal play|trust|fid/i;
 
 describe("the page with a chat the table drives", () => {
+    it("knows as driven the hosts the server drives, each by the server's name for the player, and no other", () => {
+        const served = Object.fromEntries(hostNames.flatMap((name) => {
+            const host = drivenHost(name);
+            return host === undefined ? [] : [[name, host.title]];
+        }));
+        expect(drivenHosts).toEqual(served);
+    });
+
     it("keeps the switch off until the player turns it on", () => {
         expect(settingsFrom({}).chatInPage).toBe(false);
         expect(settingsFrom({ chatInPage: "yes" }).chatInPage).toBe(false);
         expect(on.chatInPage).toBe(true);
     });
 
-    it("opens the chat in the page for Claude Code alone, with the switch on, and never in place of a chat in a terminal", () => {
+    it("opens the chat in the page for Claude Code and Codex alone, with the switch on, and never in place of a chat in a terminal", () => {
         expect(opensInPage(none, on, "claude")).toBe(true);
         expect(opensInPage(driven, on, "claude")).toBe(true);
-        expect(opensInPage(none, on, "codex")).toBe(false);
+        expect(opensInPage(none, on, "codex")).toBe(true);
+        expect(opensInPage(driven, on, "codex")).toBe(true);
+        expect(opensInPage(none, off, "codex")).toBe(false);
+        expect(opensInPage(none, on, "antigravity")).toBe(false);
+        expect(opensInPage(none, on, "opencode")).toBe(false);
+        expect(opensInPage(none, on, "toString")).toBe(false);
         expect(opensInPage(none, off, "claude")).toBe(false);
         expect(opensInPage(inTerminal, on, "claude")).toBe(false);
         expect(opensInPage(none, on, undefined)).toBe(false);
@@ -58,11 +73,18 @@ describe("the page with a chat the table drives", () => {
     });
 
     it("says the failure of the chat that left the table, and of a turn of the chat still at it, never another chat's nor while one opens", () => {
-        expect(failureToSay({ ...none, failed }, 0)).toEqual({ kind: "closed", code: "program-ended", why: failed.why });
-        expect(failureToSay({ ...driven, failed }, 0)).toEqual({ kind: "turn", code: "program-ended", why: failed.why });
+        expect(failureToSay({ ...none, failed }, 0)).toEqual({ kind: "closed", code: "program-ended", why: failed.why, host: "Claude Code" });
+        expect(failureToSay({ ...driven, failed }, 0)).toEqual({ kind: "turn", code: "program-ended", why: failed.why, host: "Claude Code" });
         expect(failureToSay({ ...inTerminal, failed }, 0)).toBeUndefined();
         expect(failureToSay({ ...none, opening: "chat", failed }, 0)).toBeUndefined();
         expect(failureToSay(none, 0)).toBeUndefined();
+    });
+
+    it("names the host of the chat that failed, Claude Code where the table told none", () => {
+        expect(failureToSay({ ...none, failed: { ...failed, host: "codex" } }, 0)?.host).toBe("Codex");
+        expect(failureToSay({ ...driven, failed: { ...failed, host: "claude" } }, 0)?.host).toBe("Claude Code");
+        expect(drivenTitle(undefined)).toBe("Claude Code");
+        expect(drivenTitle("antigravity")).toBe("Claude Code");
     });
 
     it("says a failure whose code it does not know, or that has none, as any other", () => {
@@ -133,12 +155,19 @@ describe("the page with a chat the table drives", () => {
         }
     });
 
-    it("says on the switch that it is experimental, for Claude Code, and from the next chat, in both languages", () => {
+    it("says on the switch that it is experimental, for the hosts the table drives, and from the next chat, in both languages", () => {
         const [italian, english] = languages.map((text) => text.table.inPage);
         expect(italian!.experimental).toBe("Sperimentale");
         expect(italian!.switch).toBe("La chat con l'AI nella pagina, senza terminale");
-        expect(italian!.switchNote).toBe("Per ora solo con Claude Code. Vale dalla prossima chat.");
-        expect(english!.switchNote).toBe("Only with Claude Code for now. It applies from the next chat.");
+        expect(italian!.switchNote).toBe("Per ora solo con Claude Code e Codex. Vale dalla prossima chat.");
+        expect(english!.switchNote).toBe("Only with Claude Code and Codex for now. It applies from the next chat.");
+
+        for (const text of languages) {
+            expect(Object.values(drivenHosts).filter((host) => !text.table.inPage.switchNote.includes(host))).toEqual([]);
+            expect(text.table.inPage.choose("Codex")).toContain("Codex");
+            expect(text.table.inPage.reviewChoose("Codex")).toContain("Codex");
+        }
+
         expect(english!.stop("Claude")).toBe("Stop Claude");
         expect(languages[0]!.thinking.answer).toBe("Sta rispondendo");
     });

@@ -1,4 +1,4 @@
-// The opponent's helpers the table runs itself beside the chat it drives, while the switch is on, as Claude Code's own agents would: the one that thinks on
+// The opponent's helpers the table runs itself beside the chat it drives, while the switch is on, as the host's own agents would: the one that thinks on
 // the player's time and the coach with the helps on, each turn on a chat of its own that knows nothing of the turns before, with the next chat of the role
 // opened ahead and waiting; and the analyst of a game over, one chat for one review.
 import { type Context, endingToCoach, type HelperRole, namedGame, speechOf, type TableHelpers } from "../../commands/index.ts";
@@ -13,7 +13,7 @@ export interface HelpersOptions extends Omit<HelperChatOptions, "context" | "hel
 {
     /** Whether the profile in use has the switch on. */
     readonly switchedOn: () => boolean;
-    /** The opponent's chat the table drives, from its opening to its close, with the model and effort it was opened with; none otherwise. */
+    /** The opponent's chat the table drives, from its opening to its close, with the host, model and effort it was opened with; none otherwise. */
     readonly opponent: () => HelperModel | undefined;
     /** What the pages show may have changed: the analyst started or ended, the sign of the thinking went. */
     readonly changed: () => void;
@@ -138,7 +138,8 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
         }
     };
 
-    // A chat of the role for `current`, on the quick model for the one that thinks at the levels where the opponent's agent would be on it.
+    // A chat of the role for `current`, on its host's quick model for the one that thinks at the levels where the opponent's answers say a quicker model
+    // thought, as they ask by the name the host's MCP client gives itself.
     const chatOf = (shift: Shift, current: CurrentGame): HelperChat | undefined => {
         const opponent = options.opponent();
 
@@ -146,7 +147,8 @@ export function tableHelpers(context: Context, options: HelpersOptions): Helpers
             return undefined;
         }
 
-        const model = shift.role === "ponder" && onQuickModel(levelOf(current.game.record)) ? { model: quickModel } : opponent;
+        const quick = shift.role === "ponder" && onQuickModel(levelOf(current.game.record), opponent.host.client);
+        const model = quick ? { host: opponent.host, model: opponent.host.quickModel } : opponent;
         const chat: HelperChat = open(shift.role, model, {
             ended: () => shiftEnded(shift, chat),
             answered: (tool, result) => toolAnswered(shift, chat, tool, result),
@@ -424,9 +426,6 @@ interface Shift
 
 /** What each role is told at its turn: its tool gives it all the rest. */
 const prompts: Readonly<Record<TurnRole, string>> = { ponder: "Ponder.", coach: "Coach." };
-
-/** The quick model Claude Code's agent thinks on at the lower levels. */
-const quickModel = "haiku";
 
 /** Whether a tool's result says the player had moved, or the game is over: its turn came too late. */
 function playerMoved(result: unknown): boolean

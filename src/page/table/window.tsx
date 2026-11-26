@@ -10,7 +10,7 @@ import { checkIcon } from "../dialogs/profiles.tsx";
 import type { Settings } from "../profile/settings.ts";
 import type { Text } from "../text.ts";
 import { canAct, chatAction, choiceKeys, chosen, effortsOf, firstHost, offeredHosts, ollamaTroubleOf, startedWith } from "./action.ts";
-import { failureCodes, type FailureSaid, opensInPage, type Stalled } from "./driven.ts";
+import { drivenTitle, failureCodes, type FailureSaid, opensInPage, type Stalled } from "./driven.ts";
 
 /**
  * The chat's window: `onStarted` once a chat opens or starts again, the page then saying where it stands; `onClose` when the player closes it without;
@@ -128,11 +128,11 @@ export function tableNote({ table, name, inGame, driven, onOpen, text }: { table
     }
 
     if (driven?.failure !== undefined) {
-        const { kind, code, why } = driven.failure;
+        const { kind, code, why, host } = driven.failure;
         return (
             <p class="asleep table-note chat-failed" role="alert">
                 <span>
-                    {kind === "closed" ? words.inPage.closed[code](drivenHost) : words.inPage.turnFailed[code](name, drivenHost)}
+                    {kind === "closed" ? words.inPage.closed[code](host) : words.inPage.turnFailed[code](name, host)}
                     <code class="host-words" lang="en">{why}</code>
                     {kind === "closed"
                         ? (
@@ -203,9 +203,6 @@ export function chatState(table: TableShown, name: string, text: Text): string |
 
 const hostTitles: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity", opencode: "OpenCode" };
 
-/** The host of the chats the table drives, as the page names it in their failures: Claude Code alone for now. */
-const drivenHost = "Claude Code";
-
 /** The ↻ of a chat that starts again. */
 const restartIcon = (
     <svg class="icon in-use" viewBox="0 0 24 24" aria-hidden="true">
@@ -249,7 +246,7 @@ function ChatForm({ review, onKeep, table, settings, onChange, name, onStarted, 
     const busy = table.opening !== undefined || table.waiting !== undefined;
     // With the switch on, the host selected may play in the page, with no terminal (D-125): the notes say so, and no command to type is offered instead.
     const inPage = opensInPage(table, settings, host?.name);
-    const chooseNote = review ? (inPage ? words.inPage.reviewChoose : words.reviewChoose) : inPage ? words.inPage.choose : words.choose;
+    const chooseNote = review ? (inPage ? words.inPage.reviewChoose(drivenTitle(host?.name)) : words.reviewChoose) : inPage ? words.inPage.choose(drivenTitle(host?.name)) : words.choose;
     const chatNote = choosing ? words.reviewKeep(name) : table.driven === true ? words.inPage.restartHint : words.restartHint;
     const state = busy ? chatState(table, name, text) : undefined;
     const note = installed.length === 0 ? words.install(name) : busy ? state ?? chooseNote : byHand ? words.byHand(name) : table.chat ? chatNote : chooseNote;
@@ -257,7 +254,7 @@ function ChatForm({ review, onKeep, table, settings, onChange, name, onStarted, 
     // Why the chat in the page did not open: the page's line for the table's code, and the host's words under it.
     const notOpened = failed && inPage && !table.chat ? table.failed : undefined;
     const notOpenedCode = failureCodes.find((code) => code === notOpened?.code) ?? "other";
-    const unopened = notOpened === undefined || notOpenedCode === "other" ? words.inPage.notOpened : words.inPage.closed[notOpenedCode](drivenHost);
+    const unopened = notOpened === undefined || notOpenedCode === "other" ? words.inPage.notOpened : words.inPage.closed[notOpenedCode](drivenTitle(notOpened.host ?? host?.name));
     const problem = !failed ? null : restarted ? (inPage ? words.inPage.notRestarted : words.notRestarted) : inPage ? unopened : words.failed;
     const why = notOpened?.why;
     // What the chat held started with, marked among the choices of its host.

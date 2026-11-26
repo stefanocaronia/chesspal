@@ -27,7 +27,7 @@ export function readMessage(state: State, message: Message): void
 function readRequest(state: State, method: string, id: unknown, params: Message): void
 {
     const turn = playing(state);
-    const asked = toolOfRequest(method, params);
+    const asked = toolOfRequest(method, params, state.server);
 
     if (asked === undefined) {
         // A form of an MCP server the table cannot show, as a question to the player, is cancelled; any other request is not handled.
@@ -108,7 +108,7 @@ function readItem(state: State, item: unknown, completed: boolean, own = true): 
     }
 
     const id = item.id;
-    const tool = turn.tools.get(id) ?? toolOfItem(item);
+    const tool = turn.tools.get(id) ?? toolOfItem(item, state.server);
 
     if (tool === undefined || turn.ended.has(id)) {
         return;

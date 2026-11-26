@@ -1,10 +1,10 @@
 // The chat in Claude Code: its program started with no terminal, spoken to by its stream-json protocol, one JSON object a line each way.
 import { join } from "node:path";
-import { type ChatOptions, type HostChat, type HostDriver, isHostName } from "../chat.ts";
+import { type ChatOptions, type HostChat, type HostDriver, isHostName, serverNameOf } from "../chat.ts";
 import { hosts } from "../names.ts";
 import { isFile } from "../program.ts";
 import { heldChat, startHost } from "../state.ts";
-import { givenArguments, serverOf } from "./given.ts";
+import { givenArguments } from "./given.ts";
 import { claudeModels } from "./models.ts";
 import { agentArguments, claudeEnvironment, claudeProgram, settingArguments, streamArguments } from "./program.ts";
 import { builtInTools } from "./protocol.ts";
@@ -35,7 +35,7 @@ function openClaudeCode(options: ChatOptions): HostChat
         }
     }
 
-    const server = serverOf(options);
+    const server = serverNameOf(options);
     const state: State = {
         ...startHost(options, hosts.claudeCode.name, programArguments(options)),
         server,

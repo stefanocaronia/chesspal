@@ -1,5 +1,6 @@
 // OpenCode on this computer, as the table starts it: its own program, and the environment it runs in.
 import { join } from "node:path";
+import type { ToolKind } from "../chat.ts";
 import { fileOnPath, type FoundProgram, npmProgram } from "../program.ts";
 
 // The npm package of OpenCode's program, and the name its bin gives the program.
@@ -27,6 +28,19 @@ export function openCodeEnvironment(environment: NodeJS.ProcessEnv): NodeJS.Proc
 {
     return { ...Object.fromEntries(Object.entries(environment).filter(([name]) => !dropped.test(name))), OPENCODE_DISABLE_CLAUDE_CODE: "1" };
 }
+
+/**
+ * The environment of the chat's OpenCode at the table: its own tools that read files denied where the kinds allowed hold no read, and any folder outside
+ * the chat's always, given for this process alone beside the folder's opencode.json, so that a chat opened by hand keeps the player's.
+ */
+export function allowedEnvironment(environment: NodeJS.ProcessEnv, allowed: ToolKind[]): NodeJS.ProcessEnv
+{
+    const reading = allowed.includes("read") ? {} : Object.fromEntries(readingTools.map((tool) => [tool, "deny"]));
+    return { ...environment, OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: { ...reading, external_directory: "deny" } }) };
+}
+
+// OpenCode's tools that read files, by their permission's names.
+const readingTools = ["read", "glob", "grep", "list"];
 
 /** The environment of OpenCode in a folder: it takes the folder it works in from PWD, not from where its process starts. */
 export function inFolder(environment: NodeJS.ProcessEnv, folder: string): NodeJS.ProcessEnv

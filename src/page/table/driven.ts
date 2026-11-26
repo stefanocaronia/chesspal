@@ -6,12 +6,13 @@ import type { Settings } from "../profile/settings.ts";
 export const failureCodes = ["not-signed-in", "program-missing", "usage-limit", "program-ended", "other"] as const;
 export type FailureCode = typeof failureCodes[number];
 
-/** Why a chat the table drove failed or ended by itself: the host's words, the table's code for them, and its number, larger for each. */
+/** Why a chat the table drove failed or ended by itself: the host's words, the table's code for them, its number, larger for each, and its host. */
 export interface ChatFailure
 {
     readonly why: string;
     readonly code?: string;
     readonly number: number;
+    readonly host?: string;
 }
 
 /** What these read of the table (`TableShown` of the page), kept apart so that they are tested without the page around them. */
@@ -26,24 +27,34 @@ export interface DrivenTable
     readonly noMove?: true;
 }
 
-/** A failure the page says: the chat left the table, or a turn of the chat still at it failed; by its code, with the host's words. */
+/** A failure the page says: the chat left the table, or a turn of the chat still at it failed; by its code, with the host's words and its name. */
 export interface FailureSaid
 {
     readonly kind: "closed" | "turn";
     readonly code: FailureCode;
     readonly why: string;
+    readonly host: string;
 }
 
 /** The AI at rest on its move, which the page says with what the player can do: they stopped it, or it ended its turns without moving. */
 export type Stalled = "stopped" | "noMove";
 
+/** The hosts whose chat the table drives in the page, by the names the page gives them, each with its name for the player. */
+export const drivenHosts: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex" };
+
 /**
- * Whether the window's button opens the chat in the page, with no terminal: in Claude Code alone for now, with the switch on, and never in place of a chat
+ * Whether the window's button opens the chat in the page, with no terminal: in a host the table drives, with the switch on, and never in place of a chat
  * in a terminal, which starts again where it is.
  */
 export function opensInPage(table: DrivenTable, settings: Pick<Settings, "chatInPage">, host: string | undefined): boolean
 {
-    return settings.chatInPage && host === "claude" && (!table.chat || table.driven === true);
+    return settings.chatInPage && host !== undefined && Object.hasOwn(drivenHosts, host) && (!table.chat || table.driven === true);
+}
+
+/** The name for the player of a host the table drives: Claude Code's where the host is not one of them, as a failure told by an older table. */
+export function drivenTitle(host: string | undefined): string
+{
+    return host !== undefined && Object.hasOwn(drivenHosts, host) ? drivenHosts[host]! : drivenHosts.claude!;
 }
 
 /** Whether the page shows the mark that stops the AI: a turn of the chat the table drives is running, for a move, an answer or anything else. */
@@ -94,11 +105,13 @@ export function failureToSay(table: DrivenTable, said: number): FailureSaid | un
 
     const code = failureCodes.find((known) => known === failed.code) ?? "other";
 
+    const host = drivenTitle(failed.host);
+
     if (!table.chat) {
-        return { kind: "closed", code, why: failed.why };
+        return { kind: "closed", code, why: failed.why, host };
     }
 
-    return table.driven === true ? { kind: "turn", code, why: failed.why } : undefined;
+    return table.driven === true ? { kind: "turn", code, why: failed.why, host } : undefined;
 }
 
 /**

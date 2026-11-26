@@ -1,6 +1,7 @@
-// The chat in Codex: its program started with no terminal as `codex app-server`, spoken to by its own JSON-RPC protocol, in the chat's folder.
+// The chat in Codex: its program started with no terminal as `codex app-server`, spoken to by its own JSON-RPC protocol, in the chat's folder; the server
+// and the instructions given by who opens it travel in the thread's request alone.
 import { join } from "node:path";
-import { type ChatOptions, type HostChat, type HostDriver, refuseGiven } from "../chat.ts";
+import { type ChatOptions, type HostChat, type HostDriver, serverNameOf } from "../chat.ts";
 import { Requests } from "../lines.ts";
 import { hosts } from "../names.ts";
 import { isFile } from "../program.ts";
@@ -25,14 +26,20 @@ export const codex: HostDriver = {
     efforts: ["low", "medium", "high", "xhigh", "max", "ultra"],
 };
 
-/** Opens a chat with the AI in Codex, or takes one up again by its thread; the player's words wait until the model is confirmed. */
+/**
+ * Opens a chat with the AI in Codex, or takes one up again by its thread; the player's words wait until the model is confirmed. A server given, and the
+ * instructions, are set on the thread, never on the command line nor in the process's environment.
+ */
 function openCodex(options: ChatOptions): HostChat
 {
-    refuseGiven(options, hosts.codex.name);
-    const shared = startHost(options, hosts.codex.name, serverArguments(options.folder));
+    const server = serverNameOf(options);
+    const shared = startHost(options, hosts.codex.name, serverArguments(options.folder, options.allowed));
     const state: State = {
         ...shared,
         requests: new Requests((line) => shared.process.write(line)),
+        server,
+        ...(options.server === undefined ? {} : { given: options.server }),
+        ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
         ...(options.session === undefined ? {} : { resumed: options.session }),
         model: { asked: options.model, ...(options.effort === undefined ? {} : { effort: options.effort }) },
         others: [],

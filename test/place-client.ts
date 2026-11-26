@@ -11,12 +11,12 @@ import { version } from "../src/version.ts";
  * A client of the MCP SDK at the place the environment names, through the door, as `chesspal mcp` pipes it; `made` takes it before it connects, for who
  * closes it after.
  */
-export async function sitAt(environment: Record<string, string>, made: (client: Client) => void = () => undefined): Promise<Client>
+export async function sitAt(environment: Record<string, string>, made: (client: Client) => void = () => undefined, name = "claude-code"): Promise<Client>
 {
     const input = new PassThrough();
     const output = new PassThrough();
     void pipeToTable(input, output, { door: environment[doorVariable]!, key: environment[keyVariable]!, version });
-    const client = new Client({ name: "claude-code", version: "1.0.0" });
+    const client = new Client({ name, version: "1.0.0" });
     made(client);
     await client.connect(linesTransport(input, output));
     return client;

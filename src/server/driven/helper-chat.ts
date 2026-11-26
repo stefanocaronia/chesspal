@@ -1,30 +1,32 @@
-// A helper's chat the table opens beside the opponent's: Claude Code in a folder of its role's, at a place of that role. It may be opened ahead, its program
-// started and waiting with no word sent, so no request made; a prompt asked before its program has started is sent once it has.
+// A helper's chat the table opens beside the opponent's, in the opponent's host: in a folder of its role's, at a place of that role. It may be opened
+// ahead, its program started and waiting with no word sent, so no request made; a prompt asked before its program has started is sent once it has.
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Caller, Context, HelperRole, TableHelpers } from "../../commands/index.ts";
 import { makeFolder } from "../../games/index.ts";
 import { tableHelperInstructions } from "../../host-files/index.ts";
-import type { HostChat, HostDriver, HostEvent } from "../../hosts/index.ts";
+import type { HostChat, HostDriver, HostEvent, HostId } from "../../hosts/index.ts";
 import type { Place, TablePlaces } from "../places/index.ts";
 import { chatEnvironment, chatTrace } from "./environment.ts";
 import { failureCode } from "./failure.ts";
+import type { DrivenHost } from "./hosts.ts";
 import type { Starts } from "./starts.ts";
 
-/** The model a helper's chat runs, as the host names it, and its effort: the driver's own model where `model` is empty. */
+/** The host a helper's chat runs in, the model as the host names it, and its effort: the driver's own model where `model` is empty. */
 export interface HelperModel
 {
+    readonly host: DrivenHost;
     readonly model: string;
     readonly effort?: string | undefined;
 }
 
-/** What a helper's chat runs with: the table's context, the field its place answers from, and how the table starts Claude Code's chats. */
+/** What a helper's chat runs with: the table's context, the field its place answers from, and how the table starts its chats. */
 export interface HelperChatOptions
 {
     readonly context: Context;
     readonly helpers: TableHelpers;
     readonly places: () => Promise<TablePlaces>;
-    readonly driver: () => Promise<HostDriver>;
+    readonly driver: (host: HostId) => Promise<HostDriver>;
     readonly chesspal: readonly string[];
     readonly environment: NodeJS.ProcessEnv;
     readonly log: (line: string) => void;
@@ -126,7 +128,7 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
 
         if (event.type === "session") {
             started();
-            runs = { model: event.model, effort: event.effort ?? runs.effort };
+            runs = { host: runs.host, model: event.model, effort: event.effort ?? runs.effort };
         } else if (event.type === "text") {
             prose[event.block] = `${prose[event.block] ?? ""}${event.text}`;
         } else if (event.type === "turnEnd") {
@@ -146,11 +148,11 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
     };
 
     const open = async (): Promise<void> => {
-        const driver = await options.driver();
+        const driver = await options.driver(model.host.driver);
         const program = driver.program(options.environment, context.platform, context.userHome?.() ?? homedir());
 
         if (program === undefined) {
-            throw new Error("Claude Code's program was not found where the table looks for it.");
+            throw new Error(`${model.host.title}'s program was not found where the table looks for it.`);
         }
 
         makeFolder(folder);
@@ -177,14 +179,14 @@ export function openHelperChat(role: HelperRole, model: HelperModel, options: He
         const [command, ...args] = options.chesspal;
         const choice = { ...(model.model === "" ? {} : { model: model.model }), ...(model.effort === undefined ? {} : { effort: model.effort }) };
         const trace = chatTrace(options.environment, role, context.now());
-        runs = { model: model.model === "" ? driver.model : model.model, effort: model.effort };
+        runs = { host: model.host, model: model.model === "" ? driver.model : model.model, effort: model.effort };
         chat = driver.open({
             folder,
             program,
             model: runs.model,
             ...(model.effort === undefined ? {} : { effort: model.effort }),
-            allowed: ["chesspal"],
-            environment: chatEnvironment(driver, options.environment, choice),
+            allowed: [...model.host.allowed],
+            environment: chatEnvironment(driver, options.environment, model.host.name, choice),
             server: { name: "chesspal", command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...place.environment } },
             instructions: tableHelperInstructions(role),
             log: options.log,

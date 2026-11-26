@@ -88,6 +88,7 @@ describe("what a chat the table drives failed of", () => {
         expect(failureCode("the host's program ended (exit code 1): Not logged in | Please run /login")).toBe("not-signed-in");
         expect(failureCode("Invalid API key · Please run /login")).toBe("not-signed-in");
         expect(failureCode("Claude Code is not signed in on this computer: sign in to Claude Code, then open the chat again")).toBe("not-signed-in");
+        expect(failureCode("Codex is not signed in on this computer: sign in to Codex, then open the chat again")).toBe("not-signed-in");
         expect(failureCode("Claude AI usage limit reached|1764000000")).toBe("usage-limit");
         expect(failureCode("5-hour limit reached ∙ resets 3pm")).toBe("usage-limit");
         expect(failureCode("You've hit your usage limit.")).toBe("usage-limit");
@@ -102,6 +103,7 @@ describe("what a chat the table drives failed of", () => {
         });
         expect(failureOf("the host's program ended (exit code 1): Segmentation fault", 4)).toEqual({ why: "Segmentation fault", code: "program-ended", number: 4 });
         expect(failureOf("Not logged in · Please run /login", 1)).toEqual({ why: "Not logged in · Please run /login", code: "not-signed-in", number: 1 });
+        expect(failureOf("You've hit your usage limit.", 2, "codex")).toEqual({ why: "You've hit your usage limit.", code: "usage-limit", number: 2, host: "codex" });
     });
 });
 
@@ -112,6 +114,7 @@ describe("the chat the table drives", () => {
         await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
         const chat = ai.chats[0]!;
 
+        expect(ai.asked).toEqual(["claudeCode"]);
         expect(chat.options).toMatchObject({ model: "sonnet", effort: "medium", allowed: ["chesspal"], folder: join(home, "chats", "opponent") });
         expect(chat.options.server).toMatchObject({ name: "chesspal", command: "node", args: ["cli.js", "mcp"] });
         expect(chat.options.instructions).toContain("open the chat again from the board page");
@@ -295,6 +298,7 @@ describe("the chat the table drives", () => {
             why: "exit code 1",
             code: "program-ended",
             number: 1,
+            host: "claude",
         });
         expect(keptChat(join(home, "chats"))?.closed).toBe(true);
     }, 30_000);
@@ -316,10 +320,16 @@ describe("the chat the table drives", () => {
         expect(off.terminal.opened).toEqual(["claude"]);
         expect(off.ai.chats).toEqual([]);
 
+        await opened(off.table.url, "codex");
+        expect(off.terminal.opened).toEqual(["claude", "codex"]);
+        expect(off.ai.chats).toEqual([]);
+
         const on = await drivenTable();
-        await opened(on.table.url, "codex");
-        expect(on.terminal.opened).toEqual(["codex"]);
+        await opened(on.table.url, "antigravity");
+        await opened(on.table.url, "opencode");
+        expect(on.terminal.opened).toEqual(["antigravity", "opencode"]);
         expect(on.ai.chats).toEqual([]);
+        expect(on.ai.asked).toEqual([]);
     }, 30_000);
 
     it("opens Claude Code in a terminal where the driver does not find its program, as one npm installed", async () => {
@@ -386,7 +396,7 @@ describe("the chat the table drives", () => {
         await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
         expect(ai.timeline.filter((entry) => entry.endsWith(" opponent"))).toEqual(["start opponent", "sat opponent", "exit opponent", "start opponent", "sat opponent"]);
 
-        await posted(table.url, "/api/table/restart", { host: "codex" });
+        await posted(table.url, "/api/table/restart", { host: "antigravity" });
         expect(terminal.opened).toEqual([]);
         await until(() => terminal.opened.length === 1);
         expect(ai.timeline.at(-1)).toBe("exit opponent");
@@ -427,6 +437,67 @@ describe("the chat the table drives", () => {
         expect(basename(opponent)).toMatch(/^opponent-\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z\.jsonl$/);
         expect(dirname(ponder)).toBe(traces);
         expect(basename(ponder)).toMatch(/^ponder-.+\.jsonl$/);
+    }, 30_000);
+});
+
+describe("the chat the table drives in Codex", () => {
+    it("opens Codex in the page with the switch on, by Codex's driver, with Chesspal's commands and Codex's own reads alone, never a subagent", async () => {
+        const { table, home, ai, terminal } = await drivenTable();
+        expect(await opened(table.url, "codex")).toEqual({ status: 200, text: JSON.stringify({ opened: true }) });
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+
+        expect(ai.asked).toEqual(["codex"]);
+        expect(terminal.opened).toEqual([]);
+        expect(chat.options).toMatchObject({ model: "gpt-6.1-terra", effort: "medium", allowed: ["chesspal", "read"], folder: join(home, "chats", "opponent") });
+        expect(chat.options.allowed).not.toContain("agent");
+        expect(chat.options.server).toMatchObject({ name: "chesspal", command: "node", args: ["cli.js", "mcp"] });
+        expect(Object.keys(chat.options.server!.environment).sort()).toEqual([doorVariable, keyVariable].sort());
+        expect(chat.options.instructions).toContain("open the chat again from the board page");
+        expect(chat.sent).toEqual(["Let's play!"]);
+        expect((await shown(table.url)).table).toMatchObject({ chat: true, host: "codex", held: true, started: { model: "gpt-6.1-terra", effort: "medium" }, driven: true });
+        expect(keptChat(join(home, "chats"))).toMatchObject({ host: "codex", session: chat.session, closed: false });
+    }, 30_000);
+
+    it("starts again clean in Codex, from Claude Code or from Codex, and names Codex in its failure", async () => {
+        const { table, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+
+        await posted(table.url, "/api/table/restart", { host: "codex" });
+        await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
+        expect(ai.asked).toEqual(["claudeCode", "codex"]);
+        expect(ai.chats[1]!.options).toMatchObject({ model: "gpt-6.1-terra", allowed: ["chesspal", "read"] });
+        expect(ai.chats[1]!.options.session).toBeUndefined();
+
+        ai.chats[1]!.emit({ type: "ended", why: "Codex is not signed in on this computer: sign in to Codex, then open the chat again" });
+        await until(async () => (await shown(table.url)).table?.chat === false);
+        expect((await shown(table.url)).table?.failed).toMatchObject({ code: "not-signed-in", host: "codex" });
+    }, 30_000);
+
+    it("is taken up again in Codex, by Codex's driver, as the table starts again while its game goes on", async () => {
+        const home = temporary();
+        const ai = fakeDriver();
+        const context = homeContext(home);
+        const first = await drivenTable(home, ai, context);
+        await opened(first.table.url, "codex");
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        await posted(first.table.url, "/api/new", { ai_colour: "black" });
+        await until(() => ai.chats[0]!.sent.length === 2 && ai.chats[0]!.idle());
+        await first.table.close();
+        expect(keptChat(join(home, "chats"))).toMatchObject({ host: "codex", closed: false });
+
+        const again = await drivenTable(home, ai, context);
+        const page = await eventsOf(again.table.url);
+
+        try {
+            await until(() => ai.chats.length === 2 && ai.chats[1]!.idle());
+            expect(new Set(ai.asked)).toEqual(new Set(["codex"]));
+            expect(ai.chats[1]!.options).toMatchObject({ session: ai.chats[0]!.session, model: "gpt-6.1-terra", allowed: ["chesspal", "read"] });
+            expect((await shown(again.table.url)).table).toMatchObject({ chat: true, host: "codex", driven: true });
+        } finally {
+            page.destroy();
+        }
     }, 30_000);
 });
 
@@ -943,8 +1014,8 @@ describe("the opening of a chat the table drives", () => {
         await until(async () => (await shown(table.url)).table?.opening === "chat");
         expect((await shown(table.url)).table).toMatchObject({ opening: "chat", openingDriven: true });
 
-        // The player chooses Codex while Claude Code is still opening.
-        expect(chats.relaunch(tableFolder(home), "codex")).toBe(true);
+        // The player chooses Antigravity while Claude Code is still opening.
+        expect(chats.relaunch(tableFolder(home), "antigravity")).toBe(true);
         loaded.open();
         await asked;
         await pause(300);

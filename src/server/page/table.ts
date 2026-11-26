@@ -69,6 +69,8 @@ export interface ChatFailure
     readonly why: string;
     readonly code: FailureCode;
     readonly number: number;
+    /** The host of the chat that failed, as the page names it. */
+    readonly host?: string;
 }
 
 /** What the table tells apart of a chat's failure: the host is not signed in, its program is missing, the account's limit is reached, it ended by itself, or else. */

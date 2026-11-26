@@ -1,12 +1,12 @@
-// The chat the table drives itself, without a terminal: Claude Code started by its driver in a folder of the data folder's, its commands run at its place,
-// in the table's process, and its turns given by the doorbell. To the page it is a chat at the table as any other, which the table plays the hooks of.
+// The chat the table drives itself, without a terminal: Claude Code or Codex started by its driver in a folder of the data folder's, its commands run at its
+// place, in the table's process, and its turns given by the doorbell. To the page it is a chat at the table as any other, which the table plays the hooks of.
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { aiActedSince, type Caller, type Context, positionIn, sayProse, type SeenPosition, speechOf } from "../../commands/index.ts";
 import { endOf, loadGame, makeFolder, saveChatStart } from "../../games/index.ts";
 import { samePath, tableFolder } from "../../home/index.ts";
 import { drivenStartInstructions } from "../../host-files/index.ts";
-import { type HostChat, type HostDriver, type HostEvent, startLineProcess } from "../../hosts/index.ts";
+import { type HostChat, type HostDriver, type HostEvent, type HostId, startLineProcess } from "../../hosts/index.ts";
 import { activeProfile, gameFolder, profileSettings } from "../../profiles/index.ts";
 import { version } from "../../version.ts";
 import { bellLineIn, type BellListener, gameBellLine, noteBell } from "../bell/index.ts";
@@ -16,6 +16,7 @@ import { chatStart } from "../table/index.ts";
 import { chatEnvironment, chatTrace } from "./environment.ts";
 import { failureOf } from "./failure.ts";
 import { tableHelpers } from "./helpers.ts";
+import { type DrivenHost, drivenHost } from "./hosts.ts";
 import { keepChat, keptChat } from "./kept.ts";
 import { moveEndsTurn } from "./move-ends-turn.ts";
 import { oneByOne, type ProgramStart } from "./starts.ts";
@@ -23,15 +24,15 @@ import { oneByOne, type ProgramStart } from "./starts.ts";
 /** What the chats the table drives run with besides the table's context; the tests inject them. */
 export interface DrivenOptions
 {
-    /** The chats in a terminal: every host but Claude Code, and Claude Code too while the switch is off. */
+    /** The chats in a terminal: every host the table does not drive, and those it drives too while the switch is off. */
     readonly terminal: TableChats;
     /** The table's places, asked for at the first chat the table drives. */
     readonly places: () => TablePlaces | Promise<TablePlaces>;
-    /** Claude Code's driver, loaded at the first chat the table drives. */
-    readonly driver?: () => Promise<HostDriver>;
+    /** A host's driver, loaded at the first chat the table drives. */
+    readonly driver?: (host: HostId) => Promise<HostDriver>;
     /** The command line that runs Chesspal, as the table runs it: the chat's server is it with `mcp`. */
     readonly chesspal: readonly string[];
-    /** The environment Claude Code starts from: the table's own unless given. */
+    /** The environment the hosts start from: the table's own unless given. */
     readonly environment?: NodeJS.ProcessEnv;
     /** Where the helpers' failures are told: the table's bell log unless given. */
     readonly log?: (line: string) => void;
@@ -39,14 +40,12 @@ export interface DrivenOptions
     readonly start?: ProgramStart;
 }
 
-/** The setting of the profile that has the table drive Claude Code's chat itself, without a terminal; off unless the player turns it on. */
+/** The setting of the profile that has the table drive the chat itself, without a terminal, in a host it drives; off unless the player turns it on. */
 export const chatInPage = "chatInPage";
 
-/** The host the table drives, as the table and the page name it. */
-const host = "claude";
-
 /**
- * The chats of a table that drives Claude Code's chat itself when the profile in use says so (`chatInPage`), the terminal's for every other. The chat's
+ * The chats of a table that drives the chat itself in Claude Code or Codex when the profile in use says so (`chatInPage`), the terminal's for every other
+ * host. The chat's
  * folder is `chats/opponent` in the data folder, outside the table's, whose files init wrote for a chat in a terminal; its place is the opponent's. The
  * chat it drove is kept across the table's restarts, and taken up again with its session while the game it played goes on. Beside it the table runs the
  * opponent's helpers, a chat each, in `chats/<role>`.
@@ -64,7 +63,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
     let failures = 0;
     let seats = 0;
 
-    const driver = options.driver ?? claudeDriver;
+    const driver = options.driver ?? loadedDriver;
     const environment = options.environment ?? process.env;
     const placesOpen = (): Promise<TablePlaces> => (places ??= Promise.resolve(options.places()));
     const starts = oneByOne({ start: options.start ?? startLineProcess });
@@ -78,21 +77,21 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         switchedOn: () => switchedOn(context),
         starts,
         // The helpers open with what the opponent was opened with, not the name its host gives the model.
-        opponent: () => (driven !== undefined && !driven.closing ? { model: driven.choice.model ?? "", effort: driven.choice.effort } : undefined),
+        opponent: () => (driven !== undefined && !driven.closing ? { host: driven.host, model: driven.choice.model ?? "", effort: driven.choice.effort } : undefined),
         changed: () => seat?.changed(),
         tell: (line) => news(line),
     });
 
-    const failed = (why: string): void => {
+    const failed = (state: Driven, why: string): void => {
         failures += 1;
-        failure = failureOf(why, failures);
+        failure = failureOf(why, failures, state.host.name);
     };
 
     // The chat the table drives answers for its folder; while it has not attached yet, for the table's too, where the page looks for a chat opening.
     const answersFor = (asked: string): boolean => driven !== undefined && (samePath(asked, folder) || (!driven.attached && samePath(asked, table)));
 
-    const keep = (state: Driven | undefined, closed: boolean): void => {
-        keepChat(chats, { host, session: state?.session, game: state?.game, closed });
+    const keep = (state: Driven, closed: boolean): void => {
+        keepChat(chats, { host: state.host.name, session: state.session, game: state.game, closed });
     };
 
     // The chat leaves the table and its place. Its turn at work is stopped first, so that it asks the host nothing more; then its program ends by itself,
@@ -118,7 +117,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         }
     };
 
-    // A chat in a terminal, of another host or with the switch off, opens once the program of the chat the table drove has exited.
+    // A chat in a terminal, of a host the table does not drive or with the switch off, opens once the program of the chat the table drove has exited.
     const terminalOpen = (name: string): void => {
         void starts.next("opponent").then((turn) => {
             turn.opened();
@@ -127,10 +126,10 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
     };
 
     const attach = (state: Driven): void => {
-        const chat = { version, session: state.session ?? null, folder, host, outdated: false, seat: state.seat };
+        const chat = { version, session: state.session ?? null, folder, host: state.host.name, outdated: false, seat: state.seat };
 
         if (seat?.attach(chat, state.place!.context) !== true) {
-            failed("Another chat is at the table: the one the table drives closed.");
+            failed(state, "Another chat is at the table: the one the table drives closed.");
             close(state);
             return;
         }
@@ -212,7 +211,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         } else if (event.type === "turnEnd") {
             endTurn(state, event.reason, event.reason === "failed" ? event.why ?? "The chat's turn failed." : undefined);
         } else if (event.type === "ended") {
-            failed(event.why);
+            failed(state, event.why);
             state.game = gameStarted(context);
             keep(state, true);
             close(state);
@@ -243,7 +242,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         state.tools.clear();
 
         if (why !== undefined) {
-            failed(why);
+            failed(state, why);
         }
 
         showProse(context, state, reason === "done" && !stopped);
@@ -253,7 +252,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         // A new game in the chat after a long one: the table starts it again clean, in place of the player's /clear (D-57).
         if (state.startAgain) {
             close(state);
-            void open(undefined);
+            void open(state.host, undefined);
             return;
         }
 
@@ -291,14 +290,15 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         }
     };
 
-    // Opens the chat, clean or taking up `session`: whether it started; "missing" when Claude Code's program is not where the driver looks.
-    const open = async (session: string | undefined): Promise<boolean | "missing"> => {
+    // Opens the chat in `host`, clean or taking up `session`: whether it started; "missing" when the host's program is not where its driver looks.
+    const open = async (host: DrivenHost, session: string | undefined): Promise<boolean | "missing"> => {
         if (seat === undefined || driven !== undefined || !seat.free()) {
             return false;
         }
 
-        const start = chatStart(context, host);
+        const start = chatStart(context, host.name);
         const state: Driven = {
+            host,
             seat: ++seats,
             choice: start.choice,
             model: start.choice.model ?? "",
@@ -322,8 +322,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         helpers.opponentOpened();
 
         try {
-            const claude = await driver();
-            const program = claude.program(environment, context.platform, context.userHome?.() ?? homedir());
+            const hostDriver = await driver(host.driver);
+            const program = hostDriver.program(environment, context.platform, context.userHome?.() ?? homedir());
 
             if (program === undefined) {
                 driven = undefined;
@@ -364,21 +364,21 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
 
             const [command, ...args] = options.chesspal;
             const trace = chatTrace(environment, "opponent", context.now());
-            state.chat = claude.open({
+            state.chat = hostDriver.open({
                 folder,
                 program,
-                model: state.model === "" ? claude.model : state.model,
+                model: state.model === "" ? hostDriver.model : state.model,
                 ...(state.effort === undefined ? {} : { effort: state.effort }),
                 ...(session === undefined ? {} : { session }),
-                allowed: ["chesspal"],
-                environment: chatEnvironment(claude, environment, start.choice),
+                allowed: [...host.allowed],
+                environment: chatEnvironment(hostDriver, environment, host.name, start.choice),
                 server: { name: "chesspal", command: command ?? process.execPath, args: [...args, "mcp"], environment: { ...state.place.environment } },
                 instructions: drivenStartInstructions(),
                 start: starts.starter("opponent"),
                 ...(trace === undefined ? {} : { trace }),
             });
         } catch (error) {
-            failed((error as Error).message);
+            failed(state, (error as Error).message);
             close(state);
             return false;
         }
@@ -405,19 +405,25 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         return true;
     };
 
-    // The chat the page asks for: the one kept, taken up again while its game goes on, else a clean one; the terminal's where Claude Code's program is not
-    // where the driver looks for it, as one installed by npm alone.
-    const asked = async (): Promise<boolean> => {
+    // The chat the page asks for in `host`: the one kept, taken up again while its game goes on in that host, else a clean one; the terminal's where the
+    // host's program is not where its driver looks for it, as one installed by npm alone.
+    const asked = async (host: DrivenHost): Promise<boolean> => {
         const kept = keptChat(chats);
-        const opened = await open(kept !== undefined && !kept.closed && kept.host === host && keptGameGoesOn(context, kept.game) ? kept.session : undefined);
-        return opened === "missing" ? terminal.open(host) : opened;
+        const opened = await open(host, kept !== undefined && !kept.closed && kept.host === host.name && keptGameGoesOn(context, kept.game) ? kept.session : undefined);
+        return opened === "missing" ? terminal.open(host.name) : opened;
     };
+
+    // The host the table drives by that name, while the switch is on; none for a chat in a terminal.
+    const driving = (name: string | undefined): DrivenHost | undefined => (switchedOn(context) ? drivenHost(name) : undefined);
 
     return {
         hosts: () => terminal.hosts(),
         ...(terminal.watch === undefined ? {} : { watch: (changed: () => void) => terminal.watch!(changed) }),
         ...(terminal.ollama === undefined ? {} : { ollama: () => terminal.ollama!() }),
-        open: (name) => (name === host && switchedOn(context) ? asked() : terminal.open(name)),
+        open: (name) => {
+            const host = driving(name);
+            return host === undefined ? terminal.open(name) : asked(host);
+        },
         held: (folderAsked) => (answersFor(folderAsked) ? heldOf(driven!) : terminal.held(folderAsked)),
         relaunch: (folderAsked, name, updated) => {
             // After an update the page asks for the chat of the table's folder, whichever is at the table (D-108).
@@ -427,18 +433,17 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
 
             const state = driven!;
             close(state);
+            const next = name ?? state.host.name;
+            const host = driving(next);
 
             // The table starts again from the Chesspal just installed, and opens a clean chat then (D-108).
             if (updated === true) {
                 keep({ ...state, session: undefined }, false);
-            } else if (name !== undefined && name !== host) {
-                keep(state, true);
-                terminalOpen(name);
-            } else if (switchedOn(context)) {
-                void open(undefined);
+            } else if (host !== undefined) {
+                void open(host, undefined);
             } else {
                 keep(state, true);
-                terminalOpen(host);
+                terminalOpen(next);
             }
 
             return true;
@@ -447,12 +452,15 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             seat = given;
             const kept = keptChat(chats);
 
-            // The chat of the table before, taken up again once a page is open, and only while the game it played goes on: else at the player's next request.
-            if (kept !== undefined && !kept.closed && kept.host === host && kept.session !== undefined) {
+            // The chat of the table before, taken up again in its host once a page is open, and only while the game it played goes on: else at the player's
+            // next request.
+            const host = drivenHost(kept?.host);
+
+            if (kept !== undefined && host !== undefined && !kept.closed && kept.session !== undefined) {
                 let waiting = true;
                 given.pageOpened(() => {
                     if (waiting && switchedOn(context) && keptGameGoesOn(context, kept.game)) {
-                        void open(kept.session);
+                        void open(host, kept.session);
                     }
 
                     waiting = false;
@@ -494,6 +502,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
 /** A chat the table drives, as it keeps it. */
 interface Driven
 {
+    /** The host it runs in. */
+    readonly host: DrivenHost;
     readonly seat: number;
     /** Lets the next program start, once this one has opened or failed. */
     started?: () => void;
@@ -632,7 +642,7 @@ function positionNow(context: Context): SeenPosition | undefined
     }
 }
 
-/** Whether the profile in use has the table drive Claude Code's chat itself: read at each opening, off when it cannot be read. */
+/** Whether the profile in use has the table drive the chat itself: read at each opening, off when it cannot be read. */
 function switchedOn(context: Context): boolean
 {
     try {
@@ -671,9 +681,9 @@ function playerLanguage(context: Context): string | undefined
     }
 }
 
-/** Claude Code's driver, loaded with the hosts' module at the first chat the table drives. */
-async function claudeDriver(): Promise<HostDriver>
+/** A host's driver, loaded with the hosts' module at the first chat the table drives. */
+async function loadedDriver(host: HostId): Promise<HostDriver>
 {
     const { hostDriver } = await import("../../hosts/index.ts");
-    return hostDriver("claudeCode")!;
+    return hostDriver(host)!;
 }

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import type { Context, HelperRole } from "../src/commands/index.ts";
 import { loadGame } from "../src/games/index.ts";
-import type { ChatOptions, HostChat, HostDriver, HostEvent, LineProcess } from "../src/hosts/index.ts";
+import { type ChatOptions, type HostChat, type HostDriver, type HostEvent, type HostId, hosts, type LineProcess } from "../src/hosts/index.ts";
 import { activeProfile, gameFolder, saveProfileSettings } from "../src/profiles/index.ts";
 import { chatInPage, drivenChats } from "../src/server/driven/index.ts";
 import type { TableChats } from "../src/server/page/index.ts";
@@ -60,6 +60,8 @@ export interface FakeChat
 export interface FakeDriver
 {
     driver: HostDriver;
+    /** The hosts the table asked a driver for, in order: the same fake answers for each. */
+    asked: HostId[];
     /** The opponent's chats; the helpers' apart, each playing its turns as `helpers` says for its role, else doing nothing. */
     chats: FakeChat[];
     helperChats: FakeChat[];
@@ -115,7 +117,7 @@ export function fakeDriver(): FakeDriver
     };
     const timeline: string[] = [];
     const start = (_command: string, _args: string[], options: { cwd: string; }): LineProcess => fakeProgram(basename(options.cwd), made);
-    const made: FakeDriver = { driver, chats, helperChats, helpers: {}, logged: [], timeline, exitAfter: 0, sitAfter: 0, environment: {}, start, failFirst: false, missing: false, queued: [] };
+    const made: FakeDriver = { driver, asked: [], chats, helperChats, helpers: {}, logged: [], timeline, exitAfter: 0, sitAfter: 0, environment: {}, start, failFirst: false, missing: false, queued: [] };
     return made;
 }
 
@@ -179,8 +181,10 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver, prog
     };
 
     const chat: FakeChat = { options, session, sent: [], calls: [], answers: [], ends: [], turns: [], closed: false, closes: [], steps: [], idle: () => !busy, emit, ownTurn };
-    // A helper's program starts its server at once, as Claude Code does before its first words: the table hears it sit at its place.
-    const sit = (): Promise<Client> => (client ??= pause(role === undefined ? 0 : ai.sitAfter).then(() => sitAt(options.server!.environment, (made) => void clients.push(made))));
+    // A helper's program starts its server at once, as Claude Code does before its first words: the table hears it sit at its place, its MCP client named
+    // as the host's the table last asked a driver for.
+    const name = hosts[ai.asked.at(-1) ?? "claudeCode"].client;
+    const sit = (): Promise<Client> => (client ??= pause(role === undefined ? 0 : ai.sitAfter).then(() => sitAt(options.server!.environment, (made) => void clients.push(made), name)));
 
     if (role !== undefined) {
         void sit().catch(() => undefined);
@@ -309,8 +313,8 @@ export async function call(client: Client, name: string, args: Record<string, un
 function terminalChats(): { chats: TableChats; opened: string[]; }
 {
     const opened: string[] = [];
-    const hosts = ["claude", "codex"].map((name) => ({ name, installed: true, models: [], efforts: [], command: `chesspal play ${name}` }));
-    const chats: TableChats = { hosts: () => hosts, open: (host) => Promise.resolve(opened.push(host) < 0), held: () => undefined, relaunch: () => false };
+    const offered = ["claude", "codex", "antigravity", "opencode"].map((name) => ({ name, installed: true, models: [], efforts: [], command: `chesspal play ${name}` }));
+    const chats: TableChats = { hosts: () => offered, open: (host) => Promise.resolve(opened.push(host) < 0), held: () => undefined, relaunch: () => false };
     return { chats, opened };
 }
 
@@ -353,7 +357,8 @@ export async function drivenTable(
         const terminal = terminalChats();
         const withdrawn: string[] = [];
 
-        const driver = async (): Promise<HostDriver> => {
+        const driver = async (host: HostId): Promise<HostDriver> => {
+            ai.asked.push(host);
             await ai.loading;
             return ai.driver;
         };

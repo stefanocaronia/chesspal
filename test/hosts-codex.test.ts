@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { codex } from "../src/hosts/codex/index.ts";
@@ -16,7 +16,7 @@ const folder = "/players/test";
 const model = "gpt-6-luna";
 const thread = "thr_1";
 // The kinds of tools the table allows.
-const tableKinds: ChatOptions["allowed"] = ["chesspal", "read", "web", "fetch", "agent", "image"];
+const tableKinds: ChatOptions["allowed"] = ["chesspal", "web", "fetch", "agent", "image"];
 // The flows of codex-cli 0.171.0 (24 Nov): a new chat of two turns that runs chesspal's commands without asking, as the folder's configuration lets them.
 // Codex asked no approval and took no thread up in those runs: the refused flow is the first turn with each command asking its approval as an MCP form of
 // the shape guessed, and the resumed one the same turn on thread/resume.
@@ -40,7 +40,22 @@ describe("the chat in Codex", () => {
             const host = fakeCodex([]);
             codex.open({ ...options(host), environment: { HOME: "/home/player" } });
             expect(host.started?.command).toBe("codex-program");
-            expect(host.started?.args).toEqual(["--first", "app-server", "-c", `projects.${folder}.trust_level="trusted"`, "-c", "check_for_update_on_startup=false", "-c", "features.apps=false", "-c", "features.plugins=false"]);
+            expect(host.started?.args).toEqual([
+                "--first",
+                "app-server",
+                "-c",
+                `projects.${folder}.trust_level="trusted"`,
+                "-c",
+                "check_for_update_on_startup=false",
+                "-c",
+                "features.apps=false",
+                "-c",
+                "features.plugins=false",
+                "-c",
+                "features.shell_tool=false",
+                "-c",
+                "features.view_image=false",
+            ]);
             expect(host.started?.options.cwd).toBe(folder);
             expect(host.started?.options.env).toEqual({ HOME: "/home/player" });
         });
@@ -59,7 +74,23 @@ describe("the chat in Codex", () => {
                 "features.apps=false",
                 "-c",
                 "features.plugins=false",
+                "-c",
+                "features.shell_tool=false",
+                "-c",
+                "features.view_image=false",
             ]);
+        });
+
+        it("keeps its shell and its look at a picture only where the kinds allowed hold them", () => {
+            const started = (allowed: ChatOptions["allowed"]): string[] => {
+                const host = fakeCodex([]);
+                codex.open({ ...options(host), allowed });
+                return (host.started?.args ?? []).filter((arg) => arg.startsWith("features.shell_tool") || arg.startsWith("features.view_image"));
+            };
+
+            expect(started(tableKinds)).toEqual(["features.shell_tool=false", "features.view_image=false"]);
+            expect(started(["chesspal", "shell"])).toEqual(["features.view_image=false"]);
+            expect(started(["chesspal", "read"])).toEqual(["features.shell_tool=false"]);
         });
 
         it("begins the protocol as the table, reads its configuration and the account, then opens a thread with the model, the effort, its approvals, its sandbox and no web search", async () => {
@@ -97,6 +128,89 @@ describe("the chat in Codex", () => {
                 "Codex did not say its configuration (config/read failed): the chat opens with the player's own MCP servers on.",
                 "Codex did not say its configuration within 5 seconds: the chat opens with the player's own MCP servers on.",
             ]);
+        });
+    });
+
+    describe("a server and instructions given by who opens the chat", () => {
+        const key = "key-0123456789abcdef";
+        const server = { name: "table", command: "node", args: ["cli.js", "mcp"], environment: { CHESSPAL_DOOR: "door-1", CHESSPAL_KEY: key } };
+        const instructions = "You play chess at the table.";
+        const given = { server, instructions };
+        const own = { table: { command: "node", args: ["cli.js", "mcp"], env: { CHESSPAL_DOOR: "door-1", CHESSPAL_KEY: key } } };
+
+        it("sets the server, its key in its own environment, and the instructions after Codex's own, on the new thread", async () => {
+            const { host, until } = play([...begin(), ...threadStart()], given, { servers: {} });
+            await until(() => host.written.some(isThreadRequest));
+            const asked = host.written.find(isThreadRequest);
+            expect(asked?.method).toBe("thread/start");
+            expect(asked?.params).toEqual({ cwd: folder, model, approvalPolicy: "on-request", sandbox: "read-only", config: { web_search: "disabled", mcp_servers: own }, developerInstructions: instructions });
+        });
+
+        it("sets them again on the thread taken up, as its server's key is new", async () => {
+            const { host, until } = play([...begin(), ...threadStart()], { ...given, session: thread }, { servers: {} });
+            await until(() => host.written.some(isThreadRequest));
+            expect(host.written.find(isThreadRequest)).toMatchObject({
+                method: "thread/resume",
+                params: { threadId: thread, config: { web_search: "disabled", mcp_servers: own }, developerInstructions: instructions, excludeTurns: true },
+            });
+        });
+
+        it("turns off every other server of the player's, chesspal too, so that the chat has the one given alone", async () => {
+            const servers = { chesspal: { command: "chesspal" }, github: { command: "gh-mcp" }, table: { command: "old" } };
+            const { host, until } = play([...begin(), ...threadStart()], given, { servers });
+            await until(() => host.written.some(isThreadRequest));
+            expect((host.written.find(isThreadRequest)?.params as Message).config).toEqual({ web_search: "disabled", mcp_servers: { chesspal: { enabled: false }, github: { enabled: false }, ...own } });
+        });
+
+        it("never writes the key in the chat's trace, which keeps the names of the server's variables, on a new thread and on one taken up", async () => {
+            for (const session of [undefined, thread]) {
+                const trace = join(makeTempFolder(), "trace.jsonl");
+                const { host, until } = play([...begin(), ...threadStart()], { ...given, trace, ...(session === undefined ? {} : { session }) }, { servers: {} });
+                await until(() => host.written.some(isThreadRequest));
+                expect((host.written.find(isThreadRequest)?.params as Message).config).toMatchObject({ mcp_servers: own });
+                const traced = readFileSync(trace, "utf8");
+                expect(traced).toContain(session === undefined ? "thread/start" : "thread/resume");
+                expect(traced).not.toContain(key);
+                expect(traced).toContain("CHESSPAL_KEY");
+                expect(traced).toContain("<hidden>");
+            }
+        });
+
+        it("never puts the key on the command line nor in the process's environment", () => {
+            const host = fakeCodex([]);
+            codex.open({ ...options(host), ...given, environment: { HOME: "/home/player" } });
+            expect(host.started?.args.join(" ")).not.toContain(key);
+            expect(JSON.stringify(host.started?.options.env)).not.toContain(key);
+            expect(host.started?.options.env).toEqual({ HOME: "/home/player" });
+        });
+
+        it("tells the tools of the server given as Chesspal's commands, by its name, and the chesspal server's as any other", async () => {
+            const tool = (server: string, id: string): FlowEntry[] => [
+                item("started", { type: "mcpToolCall", id, server, tool: "status", status: "inProgress" }),
+                item("completed", { type: "mcpToolCall", id, server, tool: "status", status: "completed" }),
+            ];
+            const { chat, events, until } = play([...begin(), ...threadStart(), ...turn("Hello", ...tool("table", "call_1"), ...tool("chesspal", "call_2"))], { ...given, allowed: ["chesspal"] });
+            chat.send("Hello");
+            await until(() => turnEnds(events).length === 1);
+            expect(events.filter((event) => event.type === "tool" && event.state === "started")).toEqual([
+                { type: "tool", id: "call_1", name: "status", kind: "chesspal", state: "started" },
+                { type: "tool", id: "call_2", name: "chesspal/status", kind: "other", state: "started" },
+            ]);
+            expect(turnEnds(events)).toEqual([{ type: "turnEnd", reason: "failed", why: "the host ran a tool without asking: the table does not let the AI use chesspal/status" }]);
+        });
+
+        it("refuses a server's name Codex would not keep whole, before its program starts", () => {
+            const host = fakeCodex([]);
+            expect(() => codex.open({ ...options(host), server: { ...server, name: "chess pal" } })).toThrow(/no name of an MCP server/);
+            expect(host.started).toBeUndefined();
+        });
+
+        it("opens a chat given neither as before: the folder's chesspal server, no instructions", async () => {
+            const { host, until } = play([...begin(), ...threadStart()]);
+            await until(() => host.written.some(isThreadRequest));
+            const params = host.written.find(isThreadRequest)?.params as Message;
+            expect(params.config).toEqual({ web_search: "disabled" });
+            expect(params).not.toHaveProperty("developerInstructions");
         });
     });
 
@@ -528,14 +642,6 @@ describe("the chat in Codex", () => {
 });
 
 describe("Codex as the table drives it", () => {
-    it("refuses a server or instructions from the table, before starting any process", () => {
-        for (const given of [{ server: { name: "chesspal", command: "node", args: [], environment: { KEY: "secret" } } }, { instructions: "You play chess." }]) {
-            const host = fakeCodex([]);
-            expect(() => codex.open({ ...options(host), ...given })).toThrow("Codex's driver does not take its server or its instructions from the table yet.");
-            expect(host.started).toBeUndefined();
-        }
-    });
-
     const exe = process.platform === "win32" ? "codex.exe" : "codex";
     const separator = process.platform === "win32" ? ";" : ":";
 
