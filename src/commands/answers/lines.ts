@@ -123,7 +123,9 @@ export function wordLines(words: readonly Written[]): string[]
  */
 export function nextStep(game: GameSummary | undefined, words: readonly Written[] = [], pageClosed = false, doorbell: Doorbell = true): string
 {
-    const step = pageClosed ? closedPageGameStep : newGameStep;
+    // A chat the table drives sits at the page, which the player has in front of them: never sent to it.
+    const step = doorbell === "table" ? placeGameStep : pageClosed ? closedPageGameStep : newGameStep;
+    const ending = doorbell === "table" ? "with ai_say and how you feel as its mood" : "with ai_say and how you feel as its mood if they play on the board page";
 
     // Words written on a game in analysis: the chat answers them there, and corrects the review where they show it wrong (D-101).
     if (words.some((word) => word.place !== undefined) && (game === undefined || game.end !== undefined)) {
@@ -139,8 +141,7 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
 
     if (game.end !== undefined && unplayed(game)) {
         return words.length === 0
-            ? "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another "
-                + `game. For another, ${step}`
+            ? `Next: tell the player how the game ended, ${ending}; then offer them, in words, another game. For another, ${step}`
             : `Next: answer the player with ai_say. When they want another game, ${step}`;
     }
 
@@ -151,9 +152,13 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
             ? ` ${reviewedLine(game.end.archive)}`
             : "";
         return words.length === 0
-            ? "Next: tell the player how the game ended, with ai_say and how you feel as its mood if they play on the board page; then offer them, in words, another game or "
+            ? `Next: tell the player how the game ended, ${ending}; then offer them, in words, another game or `
                 + `to go over this one${analysis === "" ? " (analyse_game)." : `.${analysis}`} For another, ${step}`
             : `Next: answer the player with ai_say.${analysis} When they want another game, ${step}`;
+    }
+
+    if (game.turn === game.ai && game.clock?.waiting === true && doorbell === "table") {
+        return "Next: don't move yet: the player starts the game with Start, on the page in front of them, and the table wakes you then. End your turn.";
     }
 
     if (game.turn === game.ai && game.clock?.waiting === true) {
@@ -185,6 +190,10 @@ export function nextStep(game: GameSummary | undefined, words: readonly Written[
 
 /** What the AI does with the player's move in a host with no doorbell: one played on the board page they tell it of, one written in the chat it plays. */
 export const toldMove = "when they tell you they moved on the board page, call status; when they write it here, call player_move with it.";
+
+/** How a new game starts for a chat the table drives: in the window new_game opens on the page the player has in front of them. */
+const placeGameStep = "call new_game without choices: it opens the New game window on the page the player has in front of them, where they choose the colour, the clock and "
+    + "the level.";
 
 /** How a new game starts: the player chooses it in the board page's window, which new_game without choices opens (D-85). */
 export const newGameStep = "call new_game without choices: it opens the board page's New game window, where the player chooses the colour, the clock and the level.";

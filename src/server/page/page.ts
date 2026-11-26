@@ -149,8 +149,9 @@ export async function startPage(context: Context, options: PageOptions = {}): Pr
                 chatCalls: () => chatCalls(served),
                 toolEnded: () => undefined,
                 open: () => watchers.size > 0,
-                // A chat the table drives in its own process keeps it in use no more than its page does: it closes, and keeps the chat for its next start.
-                inUse: () => watchers.size > 0 || (served.attached !== undefined && served.attached.local === undefined),
+                // A chat the table drives in its own process keeps it in use only while a turn of its is at work, for `longestTurn` at most: else the table
+                // closes, and keeps the chat for its next start.
+                inUse: () => watchers.size > 0 || (served.attached !== undefined && served.attached.local === undefined) || drivenAtWork(served),
                 askNewGame: () => askNewGame(watchers),
                 close: () => closed(server, stopWatching),
             };
@@ -311,6 +312,16 @@ function answer(request: IncomingMessage, response: ServerResponse, served: Serv
     } else {
         sendFile(response, path);
     }
+}
+
+/** The longest turn of the chat the table drives that keeps the table in use with no browser: longer than the longest review of a game (D-109). */
+const longestTurn = 30 * 60_000;
+
+/** Whether a turn of the chat the table drives is at work, and began less than `longestTurn` ago: one that never ends keeps the table open no longer. */
+function drivenAtWork(served: Served): boolean
+{
+    const since = served.attached?.local === undefined ? undefined : served.table?.chats?.turnSince?.();
+    return since !== undefined && served.context.now().getTime() - since.getTime() < longestTurn;
 }
 
 /**

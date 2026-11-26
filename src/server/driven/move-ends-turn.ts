@@ -2,8 +2,8 @@
 import type { MovePlayed } from "../../commands/index.ts";
 
 /**
- * Whether a tool's result, as the chat gets it, asks nothing more of the AI in its turn: ai_move played, the game going on with the player to move, no
- * draw offer of theirs standing, no words of theirs to answer, no agent to start.
+ * Whether a tool's result, as the chat gets it, asks nothing more of the AI in its turn: ai_move played, the game going on, no words of the player's to
+ * answer. After the AI's move the player is to move and no draw offer of theirs stands, and a chat the table drives has no agents to start.
  */
 export function moveEndsTurn(tool: string, result: unknown): boolean
 {
@@ -11,6 +11,6 @@ export function moveEndsTurn(tool: string, result: unknown): boolean
         return false;
     }
 
-    const { game, words = [], agents = [] } = result as MovePlayed & { agents?: readonly string[]; };
-    return game.end === undefined && game.turn !== game.ai && game.drawOffer !== "player" && words.length === 0 && agents.length === 0;
+    const { game, words = [] } = result as MovePlayed;
+    return game.end === undefined && words.length === 0;
 }

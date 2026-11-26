@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { newGame, startNewGame } from "../src/commands/game/new.ts";
-import type { Context } from "../src/commands/index.ts";
+import { type Context, PositionChanged } from "../src/commands/index.ts";
+import { aiSay } from "../src/commands/talk/index.ts";
 import { endOf, loadGame, positionShownNote } from "../src/games/index.ts";
 import { tableFolder } from "../src/home/index.ts";
 import { analystAgent } from "../src/host-files/index.ts";
@@ -132,6 +133,8 @@ describe("the chat the table drives", () => {
         expect(chat.answers[0]!.isError).toBe(false);
         expect(chat.answers[0]!.text).toContain("Next: end your turn: the table wakes you with the player's move, already played.");
         expect(chat.answers[0]!.text).not.toContain("player_move");
+        // No browser has the page open here: still no board to copy, the player has the page in front of them.
+        expect(chat.answers[0]!.text).not.toContain("No board page is open");
         expect(serverInstructions).toEqual([undefined]);
         expect(sans(home)).toEqual(["e4", "e5"]);
         expect(existsSync(join(chat.options.folder, "position-shown.json"))).toBe(false);
@@ -368,8 +371,8 @@ describe("the chat the table drives, across the table's restarts", () => {
         await until(() => ai.chats[0]!.sent.length === 3);
         await first.table.close();
 
-        // Five minutes go by with no table.
-        ahead.ms = 5 * 60_000;
+        // Fifteen minutes go by with no table, more than the AI's ten.
+        ahead.ms = 15 * 60_000;
         ai.queued.push(async (client) => void (await call(client, "ai_move", { move: "e5", plan: "Hold the centre." })));
         const again = await drivenTable(home, ai, context);
         await pause(300);
@@ -383,6 +386,7 @@ describe("the chat the table drives, across the table's restarts", () => {
             expect(chat.sent[0]).toMatch(/^The player acted on the board page\. Here is the game now/);
             expect(sans(home)).toEqual(["e4", "e5"]);
             expect(endOf(loadGame(gameFolder(home))!.game)).toBeUndefined();
+            expect(loadGame(gameFolder(home))!.clock!.left.black).toBeGreaterThan(9 * 60_000);
             expect((await shown(again.table.url)).table).toMatchObject({ chat: true, driven: true });
         } finally {
             page.destroy();
@@ -631,6 +635,12 @@ describe("the turns of the chat the table drives", () => {
         expect(sans(home)).toEqual(["e4", "Nf6"]);
         expect(aiLines()).toEqual(["There is a game going on. Shall we go on?", "Of course."]);
         expect(JSON.stringify(await raw(table.url))).not.toContain("Ng5 ideas");
+
+        // A later turn on the player's move, after the AI moved and spoke in turns before it, shows its words.
+        chat.turns.push(async () => void chat.emit({ type: "text", block: 0, text: "Thank you." }));
+        await posted(table.url, "/api/message", { text: "Nice move?" });
+        await until(() => aiLines().length === 3);
+        expect(aiLines().at(-1)).toBe("Thank you.");
     }, 30_000);
 
     it("listens from its attach, in the first turn the table sent it, before it calls any tool", async () => {
@@ -904,6 +914,323 @@ describe("the opening of a chat the table drives", () => {
     }, 30_000);
 });
 
+describe("the stalls and the words of the chat the table drives", () => {
+    /** A table whose clock the test moves, a chat at it, and a game of 10+5 begun with the AI as Black, the player's e4 played and its turn hanging. */
+    async function stalledGame(): Promise<{ table: Table; home: string; ai: FakeDriver; chat: FakeChat; ahead: { ms: number; }; }>
+    {
+        const home = temporary();
+        const { context, ahead } = movingContext(home);
+        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 3_600_000, every: 10 });
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+        await posted(table.url, "/api/new", { ai_colour: "black", clock: "10+5" });
+        await until(() => chat.sent.length === 2 && chat.idle());
+        await posted(table.url, "/api/start", {});
+        chat.turns.push(() => new Promise<void>(() => undefined));
+        await posted(table.url, "/api/move", { move: "e4" });
+        await until(() => chat.sent.length === 3 && !chat.idle());
+        return { table, home, ai, chat, ahead };
+    }
+
+    it("after a Stop, wakes nobody for a line the turn missed, and keeps the AI's clock held through a line refused, a Resign and the minutes", async () => {
+        const { table, home, chat, ahead } = await stalledGame();
+        await posted(table.url, "/api/message", { text: "w".repeat(200) });
+        await posted(table.url, "/api/table/stop", {});
+        await until(async () => (await shown(table.url)).table?.stopped === true);
+        await pause(200);
+        expect(chat.sent).toHaveLength(3);
+
+        // A line refused, its move's characters spent, wakes nobody and leaves the stall on.
+        expect((await posted(table.url, "/api/message", { text: "Still there?" })).status).toBe(409);
+        ahead.ms = 20 * 60_000;
+        expect((await shown(table.url)).table).toMatchObject({ stopped: true });
+        expect(endOf(loadGame(gameFolder(home))!.game)).toBeUndefined();
+        expect(chat.sent).toHaveLength(3);
+
+        // Longer than the AI's whole time: the player who resigns loses by resigning, never wins on time.
+        ahead.ms = 40 * 60_000;
+        expect(await posted(table.url, "/api/resign", {})).toEqual({ status: 200, text: JSON.stringify({ resigned: true }) });
+        expect(endOf(loadGame(gameFolder(home))!.game)).toMatchObject({ result: "0-1" });
+        expect(JSON.stringify(endOf(loadGame(gameFolder(home))!.game))).not.toContain("time");
+    }, 30_000);
+
+    it("charges the AI none of the time of a turn the player stopped, and holds its clock from the player's move", async () => {
+        const { table, home, chat, ahead } = await stalledGame();
+        const before = loadGame(gameFolder(home))!.clock!;
+        ahead.ms = 3 * 60_000;
+        await posted(table.url, "/api/table/stop", {});
+        await until(async () => (await shown(table.url)).table?.stopped === true);
+        // Held from the turn's start, a moment after the player's move: the three minutes since are not the AI's.
+        const held = ((await raw(table.url)).game as { clock: { held?: string; }; }).clock.held;
+        expect(Date.parse(held!) - Date.parse(before.since)).toBeGreaterThanOrEqual(0);
+        expect(Date.parse(held!) - Date.parse(before.since)).toBeLessThan(10_000);
+
+        ahead.ms = 5 * 60_000;
+        chat.turns.push(async (client) => void chat.answers.push(await call(client, "ai_move", { move: "e5", plan: "Hold the centre." })));
+        await posted(table.url, "/api/message", { text: "Your move?" });
+        await until(() => chat.answers.length === 1 && chat.idle());
+        expect(chat.answers[0]!.isError).toBe(false);
+        // Its time and the increment: the three minutes before the Stop, and the two after, are not the AI's.
+        expect(loadGame(gameFolder(home))!.clock!.left.black).toBeGreaterThan(before.left.black + 4_000);
+    }, 30_000);
+
+    it("ends a stall when the host begins a turn by itself, and when the chat leaves, giving the AI's clock its time back", async () => {
+        const { table, home, chat, ahead } = await stalledGame();
+        await posted(table.url, "/api/table/stop", {});
+        await until(async () => (await shown(table.url)).table?.stopped === true);
+
+        // While the host's own turn runs, the chat is no longer stopped.
+        const own = gate();
+        const owned = chat.ownTurn(async () => await own.passed);
+        await until(async () => (await shown(table.url)).table?.stopped !== true);
+        own.open();
+        await owned;
+
+        // Stalled once more, and gone: the time it stood stalled is given back.
+        chat.turns.push(() => new Promise<void>(() => undefined));
+        await posted(table.url, "/api/message", { text: "Hello?" });
+        await until(() => !chat.idle());
+        await posted(table.url, "/api/table/stop", {});
+        await until(async () => (await shown(table.url)).table?.stopped === true);
+        const since = loadGame(gameFolder(home))!.clock!.since;
+        ahead.ms = 60_000;
+        chat.emit({ type: "ended", why: "the host's program ended (exit code 1)" });
+        await until(async () => (await shown(table.url)).table?.chat === false);
+        expect(Date.parse(loadGame(gameFolder(home))!.clock!.since)).toBeGreaterThan(Date.parse(since));
+    }, 30_000);
+
+    it("asks a failed turn for no move again, and shows none of what it wrote", async () => {
+        const { table, home, chat } = await stalledGame();
+        await posted(table.url, "/api/table/stop", {});
+        await until(async () => (await shown(table.url)).table?.stopped === true);
+
+        chat.turns.push(async () => {
+            chat.emit({ type: "text", block: 0, text: "I will answer e5, then bring the knight to f6." });
+            return "failed";
+        });
+        await posted(table.url, "/api/message", { text: "Your move?" });
+        await until(async () => (await shown(table.url)).table?.noMove === true);
+        await pause(200);
+        expect(chat.sent).toHaveLength(4);
+        expect(loadGame(gameFolder(home))!.talk.filter((line) => line.who === "ai")).toEqual([]);
+    }, 30_000);
+
+    it("never shows what the AI wrote while its move waits: a turn with no move, one stopped, a move refused", async () => {
+        const { table, home, chat } = await stalledGame();
+        const aiLines = (): unknown[] => loadGame(gameFolder(home))!.talk.filter((line) => line.who === "ai");
+
+        // Stopped: its plans stay its own.
+        chat.emit({ type: "text", block: 0, text: "I will answer e5, then bring the knight to f6." });
+        await posted(table.url, "/api/table/stop", {});
+        await until(async () => (await shown(table.url)).table?.stopped === true);
+        expect(aiLines()).toEqual([]);
+
+        // A move refused, then no move: neither turn's words are shown, and the table's second asking says why.
+        chat.turns.push(
+            async (client) => {
+                chat.emit({ type: "text", block: 0, text: "Kd7 keeps it all closed." });
+                chat.answers.push(await call(client, "ai_move", { move: "Kd7", plan: "Walk." }));
+            },
+            async () => void chat.emit({ type: "text", block: 0, text: "Then Nf6 and d5." }),
+        );
+        await posted(table.url, "/api/message", { text: "Your move?" });
+        await until(async () => (await shown(table.url)).table?.noMove === true);
+        expect(chat.answers[0]!.isError).toBe(true);
+        expect(chat.sent[4]).toContain("What you wrote outside your tools was not shown to the player: speak to them in ai_move's comment.");
+        expect(aiLines()).toEqual([]);
+    }, 30_000);
+
+    it("shows the words of a turn between games, written before a line of the player's it never received, which the next turn gives it", async () => {
+        const { table, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+
+        const thinking = gate();
+        chat.turns.push(async () => {
+            await thinking.passed;
+            chat.emit({ type: "text", block: 0, text: "Hello! Shall we play?" });
+        });
+        await posted(table.url, "/api/message", { text: "Hi." });
+        await until(() => chat.sent.length === 2 && !chat.idle());
+        await posted(table.url, "/api/message", { text: "Can you play the Sicilian?" });
+        thinking.open();
+        await until(() => chat.sent.length === 3 && chat.idle());
+        expect(chat.sent[2]).toContain("Can you play the Sicilian?");
+        const page = await raw(table.url) as { talk?: { text: string; heard?: string; }[]; };
+        expect(page.talk?.map((line) => line.text)).toEqual(["Hi.", "Hello! Shall we play?", "Can you play the Sicilian?"]);
+        expect(page.talk?.at(-1)?.heard).not.toBe("answered");
+
+        // A turn the player stopped shows nothing of what it wrote, whoever's move it is.
+        chat.turns.push(async () => {
+            chat.emit({ type: "text", block: 0, text: "Thinking aloud about openings." });
+            await new Promise<void>(() => undefined);
+        });
+        await posted(table.url, "/api/message", { text: "Well?" });
+        await until(() => chat.sent.length === 4 && !chat.idle());
+        await posted(table.url, "/api/table/stop", {});
+        await until(() => chat.idle());
+        await pause(100);
+        expect(((await raw(table.url)) as { talk?: { text: string; }[]; }).talk?.map((line) => line.text)).not.toContain("Thinking aloud about openings.");
+    }, 30_000);
+
+    it("keeps the AI's move made as the player stops the turn, and holds no clock for it: the player's next move wakes the chat", async () => {
+        const home = temporary();
+        const { context, ahead } = movingContext(home);
+        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 3_600_000, every: 10 });
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+        await posted(table.url, "/api/new", { ai_colour: "black", clock: "10+5" });
+        await until(() => chat.sent.length === 2 && chat.idle());
+        await posted(table.url, "/api/start", {});
+
+        chat.turns.push(async (client) => {
+            chat.emit({ type: "tool", id: "read", name: "Read", kind: "read", state: "started" });
+            chat.answers.push(await call(client, "ai_move", { move: "e5", plan: "Hold the centre." }));
+            await new Promise<void>(() => undefined);
+        });
+        await posted(table.url, "/api/move", { move: "e4" });
+        await until(() => chat.answers.length === 1);
+        await posted(table.url, "/api/table/stop", {});
+        await until(() => chat.idle());
+        expect(sans(home)).toEqual(["e4", "e5"]);
+        expect(((await raw(table.url)).game as { clock: { held?: string; }; }).clock).not.toHaveProperty("held");
+        ahead.ms = 60_000;
+        expect(endOf(loadGame(gameFolder(home))!.game)).toBeUndefined();
+
+        chat.turns.push(async (client) => void chat.answers.push(await call(client, "ai_move", { move: "Nc6", plan: "Develop." })));
+        await posted(table.url, "/api/move", { move: "Nf3" });
+        await until(() => chat.answers.length === 2 && chat.idle());
+        expect(chat.answers[1]!.isError).toBe(false);
+        expect(sans(home)).toEqual(["e4", "e5", "Nf3", "Nc6"]);
+        expect((await shown(table.url)).table).not.toHaveProperty("stopped");
+    }, 30_000);
+
+    it("ends the turn after the move only once every tool of the AI's has its answer", async () => {
+        const { table, home, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+        await posted(table.url, "/api/new", { ai_colour: "black" });
+        await until(() => chat.sent.length === 2 && chat.idle());
+
+        const other = gate();
+        chat.turns.push(async (client) => {
+            chat.emit({ type: "tool", id: "said", name: "ai_say", kind: "chesspal", state: "started" });
+            chat.answers.push(await call(client, "ai_move", { move: "e5", plan: "Hold the centre." }));
+            await other.passed;
+            chat.emit({ type: "tool", id: "said", name: "ai_say", kind: "chesspal", state: "done" });
+            await new Promise<void>(() => undefined);
+        });
+        await posted(table.url, "/api/move", { move: "e4" });
+        await until(() => chat.answers.length === 1);
+        await pause(200);
+        expect(chat.idle()).toBe(false);
+        other.open();
+        await until(() => chat.idle());
+        expect(chat.ends.at(-1)).toBe("interrupted");
+        expect(sans(home)).toEqual(["e4", "e5"]);
+        expect((await shown(table.url)).table).not.toHaveProperty("stopped");
+    }, 30_000);
+
+    it("tells the pages when a turn ends", async () => {
+        const { table, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+        const page = await watchedEvents(table.url);
+
+        try {
+            const thinking = gate();
+            chat.turns.push(async () => await thinking.passed);
+            await posted(table.url, "/api/message", { text: "Hi." });
+            await until(() => !chat.idle());
+            await until(() => page.count() > 0);
+            await pause(100);
+            const before = page.count();
+            thinking.open();
+            await until(() => chat.idle());
+            await until(() => page.count() > before);
+        } finally {
+            page.destroy();
+        }
+    }, 30_000);
+
+    it("keeps the table in use with no browser while a turn of its chat is at work, for thirty minutes at most", async () => {
+        const home = temporary();
+        const { context, ahead } = movingContext(home);
+        const { table, ai } = await drivenTable(home, fakeDriver(), context, true, { idle: 60_000, every: 10 });
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        let closed = false;
+        void table.closed.then(() => (closed = true));
+
+        ai.chats[0]!.turns.push(() => new Promise<void>(() => undefined));
+        await posted(table.url, "/api/message", { text: "A long review, please." });
+        await until(() => !ai.chats[0]!.idle());
+        ahead.ms = 20 * 60_000;
+        await pause(200);
+        expect(closed).toBe(false);
+        ahead.ms = 32 * 60_000;
+        await until(() => closed, 5_000);
+    }, 30_000);
+
+    it("speaks to the chat of the page in front of the player, and never sends it there", async () => {
+        const { table, ai } = await drivenTable();
+        await opened(table.url);
+        await until(() => ai.chats.length === 1 && ai.chats[0]!.idle());
+        const chat = ai.chats[0]!;
+
+        chat.turns.push(async (client) => {
+            chat.answers.push(await call(client, "status"));
+            chat.answers.push(await call(client, "new_game"));
+        });
+        await posted(table.url, "/api/message", { text: "A game?" });
+        await until(() => chat.answers.length === 2 && chat.idle());
+        expect(chat.answers[0]!.text).toContain("it opens the New game window on the page the player has in front of them");
+        expect(chat.answers[1]!.text).toContain("the New game button of the page in front of them");
+        // Where the player wrote stays said; where they go, never.
+        expect(chat.answers[1]!.text).not.toContain("board page");
+        expect(chat.answers[0]!.text.split("Next:")[1]).not.toContain("board page");
+    }, 30_000);
+
+    it("refuses the AI's words on its move with the game for the chat the table drives alone: another chat gets the one line", async () => {
+        const home = temporary();
+        const context = { ...homeContext(home), pageOpen: () => true };
+        startNewGame(newGame.input.parse({ ai_colour: "white", replace: true }), context, "page");
+
+        const refusal = async (asked: Context): Promise<unknown> => {
+            try {
+                await aiSay.run(aiSay.input.parse({ text: "Hello!" }), asked);
+                return undefined;
+            } catch (error) {
+                return error;
+            }
+        };
+
+        const other = await refusal(context);
+        expect(other).not.toBeInstanceOf(PositionChanged);
+        expect((other as Error).message).toBe("It is your move: speak in ai_move's comment. Nothing changed.");
+        expect(await refusal({ ...context, drivenByTable: true })).toBeInstanceOf(PositionChanged);
+    });
+});
+
+/** A browser that has the page open, counting the events the table sends it. */
+async function watchedEvents(url: string): Promise<{ count(): number; destroy(): void; }>
+{
+    const { get } = await import("node:http");
+    let events = 0;
+    return new Promise((done) => {
+        const asked = get(new URL("/api/events", url), { agent: false }, (response) => {
+            response.setEncoding("utf8");
+            response.on("data", (chunk: string) => (events += chunk.split("data:").length - 1));
+            done({ count: () => events, destroy: () => asked.destroy() });
+        });
+    });
+}
+
 /** A chat of the fake driver: what it was opened with, the words it was sent and the tools its AI called, how its turns ended; it plays through its place. */
 interface FakeChat
 {
@@ -913,8 +1240,8 @@ interface FakeChat
     readonly calls: string[];
     readonly answers: { text: string; isError: boolean; }[];
     readonly ends: string[];
-    /** What the AI does at its next turns woken by the bell, in order; none does nothing. */
-    readonly turns: ((client: Client) => Promise<void>)[];
+    /** What the AI does at its next turns woken by the bell, in order; none does nothing. One that gives "failed" fails as the host's API would. */
+    readonly turns: ((client: Client) => Promise<void | "failed">)[];
     closed: boolean;
     idle(): boolean;
     emit(event: HostEvent): void;
@@ -1014,11 +1341,11 @@ function fakeChat(options: ChatOptions, ownSession: string, ai: FakeDriver): { c
         // A clean chat's first words are the table's start message.
         const starting = options.session === undefined && chat.sent.length === 1 && text === chat.sent[0];
         const play = starting ? (ai.first ?? startTurn)(traced) : (chat.turns.shift() ?? (() => Promise.resolve()))(traced);
-        const reason = await Promise.race([play.then(() => "done" as const), stopped]);
+        const reason = await Promise.race([play.then((ended) => ended ?? "done"), stopped]);
         stopTurn = undefined;
         chat.ends.push(reason);
         busy = false;
-        emit({ type: "turnEnd", reason });
+        emit(reason === "failed" ? { type: "turnEnd", reason, why: "API Error: 500 Internal server error" } : { type: "turnEnd", reason });
     };
 
     const host: HostChat = {

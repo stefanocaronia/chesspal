@@ -20,8 +20,11 @@ export interface ChatSeat
     attach(chat: ChatAttach, context: Context): boolean;
     /** The chat attached through this seat leaves the table, as a chat's process that ends: nobody waits at the bell any more. */
     leave(): void;
-    /** The chat's turn has ended: it waits at the bell with `listener`. What it returns tells the bell the listener went without it. */
-    wait(listener: BellListener): () => void;
+    /**
+     * The chat's turn has ended: it waits at the bell with `listener`, rung at once for a ring it missed in its turn, unless `missedLetGo`, as after the
+     * player's Stop. What it returns tells the bell the listener went without it.
+     */
+    wait(listener: BellListener, missedLetGo?: boolean): () => void;
     /**
      * The chat taken up again waits at the bell with `listener`: rung at once when the AI is to move, its clock given back the time it was held while
      * nobody heard the player.
@@ -35,8 +38,11 @@ export interface ChatSeat
     prompted(): void;
     /** The chat is in a turn the table sent it: it hears the player, as after a tool it calls, and the AI's clock held while nobody did runs again. */
     atWork(): void;
-    /** The chat is at rest without having moved: stopped by the player, or with no move after two turns. The AI's clock is held until it is woken. */
-    stall(why: "stopped" | "noMove"): void;
+    /**
+     * The chat is at rest without having moved: stopped by the player, or with no move after two turns. The AI's clock is held until it is woken, from now,
+     * or from `since`, as the turn the player stopped costs the AI no time.
+     */
+    stall(why: "stopped" | "noMove", since?: Date): void;
     /** What the pages show of the chat may have changed: a turn started or ended. */
     changed(): void;
     /** The chat opening will not come, as one that failed before it attached: the pages stop showing it opening. */
@@ -61,7 +67,7 @@ export function chatSeat(served: Served, page: string): ChatSeat
         },
         dismissed: () => listener.dismissed(),
     });
-    const wait = (listener: BellListener): () => void => served.bell.wait(waking(listener), false, { session: seated?.chat.session ?? undefined });
+    const wait = (listener: BellListener, missedLetGo = false): () => void => served.bell.wait(waking(listener), missedLetGo, { session: seated?.chat.session ?? undefined });
 
     return {
         free: () => served.attached === undefined,
@@ -77,8 +83,8 @@ export function chatSeat(served: Served, page: string): ChatSeat
         },
         leave: () => {
             if (seated !== undefined) {
-                served.stalled = undefined;
-                served.stalledAt = undefined;
+                // The time it stood stalled is the AI's no more than while it was there.
+                stallEnds(served);
                 chatLeft(served, seated);
                 seated = undefined;
             }
@@ -108,8 +114,8 @@ export function chatSeat(served: Served, page: string): ChatSeat
             served.bell.chatPrompted();
         },
         atWork: () => chatCalls(served),
-        stall: (why) => {
-            served.stalledAt ??= served.context.now().toISOString();
+        stall: (why, since) => {
+            served.stalledAt ??= (since ?? served.context.now()).toISOString();
             served.stalled = why;
             tellWatchers(served.watchers);
         },

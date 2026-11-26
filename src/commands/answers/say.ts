@@ -1,6 +1,6 @@
 // The talk on the board page (D-51): a line of the player's or the AI's, saved with the game, and the player's words the AI has not been given yet.
 import { endWithMood, type Mood } from "../../core/index.ts";
-import { archiveMood, endOf, gameInAnalysis, loadGame, loadTableTalk, saveGame, saveTableTalk, type Sayer, type Shown, type TableTalk, type Talk, talkLimits, talkLine, unheardWords, type Words } from "../../games/index.ts";
+import { archiveMood, endOf, gameInAnalysis, loadGame, loadTableTalk, saveGame, saveTableTalk, type Sayer, type Shown, type TableTalk, type Talk, talkLimits, talkLine, unheardWords, withAiLine, type Words } from "../../games/index.ts";
 import { gameFolder, helpsIn } from "../../profiles/index.ts";
 import type { Context, SeenPosition } from "../registry/index.ts";
 import { gameAt } from "./clock.ts";
@@ -44,9 +44,10 @@ export function say(folder: string, who: Sayer, text: string, at: Date, mood?: M
 
 /**
  * The AI's words written in its chat outside any tool, which the player of a chat the table drives sees nowhere else: said on the board page as the AI's
- * line, with none of ai_say's limits on when it speaks, cut at the end of a sentence within the longest line the talk takes. What it said, none when empty.
+ * line, with none of ai_say's limits on when it speaks, cut at the end of a sentence within the longest line the talk takes, before the player's lines the
+ * chat was not given (`given`), which it has still to answer. What it said, none when empty.
  */
-export function sayProse(folder: string, text: string, at: Date): string | undefined
+export function sayProse(folder: string, text: string, at: Date, given: ReadonlySet<string>): string | undefined
 {
     const words = proseLine(text);
 
@@ -59,9 +60,9 @@ export function sayProse(folder: string, text: string, at: Date): string | undef
 
     if (current === undefined) {
         const before = loadTableTalk(folder);
-        saveTableTalk(folder, { started: before.started === "" ? at.toISOString() : before.started, talk: [...before.talk, { ...line, ply: 0 }] });
+        saveTableTalk(folder, { started: before.started === "" ? at.toISOString() : before.started, talk: withAiLine(before, { ...line, ply: 0 }, given) });
     } else {
-        saveGame(folder, { ...current, talk: [...current.talk, { ...line, ply: current.game.record.moves.length }] });
+        saveGame(folder, { ...current, talk: withAiLine(current, { ...line, ply: current.game.record.moves.length }, given) });
     }
 
     return words;

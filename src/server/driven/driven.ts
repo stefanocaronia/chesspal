@@ -108,7 +108,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
     const begin = (state: Driven): void => {
         state.inTurn = true;
         state.moved = false;
-        state.ending = false;
+        state.tools.clear();
         state.prose = [];
         state.from = { at: context.now(), position: positionNow(context) };
         seat?.changed();
@@ -160,7 +160,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             seat?.prompted();
         } else if (event.type === "tool") {
             endAtMove(state, event);
-        } else if (event.type === "text" && !state.ending) {
+        } else if (event.type === "text") {
             state.prose[event.block] = `${state.prose[event.block] ?? ""}${event.text}`;
         } else if (event.type === "turnEnd") {
             endTurn(state, event.reason, event.reason === "failed" ? event.why ?? "The chat's turn failed." : undefined);
@@ -177,13 +177,13 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         state.inTurn = false;
         state.stopping = false;
         state.moved = false;
-        state.ending = false;
+        state.tools.clear();
 
         if (why !== undefined) {
             failed(why);
         }
 
-        showProse(context, state);
+        showProse(context, state, reason === "done" && !stopped);
         state.game = gameStarted(context);
         seat?.changed();
 
@@ -202,7 +202,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         }
 
         keep(state, false);
-        state.gone = seat?.wait(listener(state));
+        // After the player's Stop a ring missed in the turn wakes nobody: the player's next act does.
+        state.gone = seat?.wait(listener(state), stopped);
 
         // A ring the chat missed in its turn woke it again already.
         if (state.inTurn || seat === undefined) {
@@ -210,7 +211,8 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
         }
 
         if (stopped) {
-            seat.stall("stopped");
+            // The turn the player stopped costs the AI no time: its clock is held from the turn's start.
+            seat.stall("stopped", state.from?.at);
         } else if (!seat.aiToMove()) {
             state.nudged = false;
         } else if (reason === "done" && !state.nudged) {
@@ -242,7 +244,7 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             startAgain: false,
             stopping: false,
             moved: false,
-            ending: false,
+            tools: new Set(),
             nudging: false,
             nudged: false,
             prose: [],
@@ -269,7 +271,9 @@ export function drivenChats(context: Context, options: DrivenOptions): TableChat
             };
 
             const answered = (tool: string, result: unknown): void => {
-                state.moved = state.inTurn && moveEndsTurn(tool, result);
+                if (tool === "ai_move") {
+                    state.moved = state.inTurn && moveEndsTurn(tool, result);
+                }
             };
 
             const hooks = { ...seat.hooks, caller, startAgain, answered, drivenByTable: true as const, givenSinceWords: new Set<string>() };
@@ -421,9 +425,9 @@ interface Driven
     startAgain: boolean;
     /** The player stopped the turn in course. */
     stopping: boolean;
-    /** The AI's move in this turn asked nothing more of it; the table, which interrupts the turn once the chat has the move's answer, ends it. */
+    /** The AI's move in this turn asked nothing more of it; the table ends the turn once the chat has the answers of all the tools it started. */
     moved: boolean;
-    ending: boolean;
+    readonly tools: Set<string>;
     /** The table rings the chat for the AI's move it did not make; it did once since the player last woke it. */
     nudging: boolean;
     nudged: boolean;
@@ -432,15 +436,24 @@ interface Driven
     from?: { readonly at: Date; readonly position: SeenPosition | undefined; };
 }
 
-/** Once the chat has the answer of a move that asked nothing more of it, the table ends its turn: not the player's Stop, and what it writes after is not shown. */
+/**
+ * Once the chat has the answer of a move that asked nothing more of it, and of every other tool it started, the table ends its turn: not the player's
+ * Stop. What it wrote is not shown, as the AI moved.
+ */
 function endAtMove(state: Driven, event: Extract<HostEvent, { type: "tool"; }>): void
 {
-    if (event.name !== "ai_move" || event.state !== "done" || !state.moved || state.stopping) {
+    if (event.state === "started") {
+        state.tools.add(event.id);
+        return;
+    }
+
+    state.tools.delete(event.id);
+
+    if (!state.moved || state.stopping || state.tools.size > 0) {
         return;
     }
 
     state.moved = false;
-    state.ending = true;
     state.chat?.interrupt();
 }
 
@@ -457,23 +470,26 @@ function heldOf(state: Driven): HeldChat
 }
 
 /**
- * What the chat wrote in its turn outside its tools, shown on the board page as the AI's words when no tool of the turn carried any: the player of a chat
- * the table drives has no other window to read it in.
+ * What the chat wrote in its turn outside its tools, which the player of a chat the table drives has no other window to read: shown on the board page as
+ * the AI's words only when the turn ended by itself (`whole`: done, neither stopped nor failed), the AI neither spoke through a tool nor moved in it, and it
+ * is not the AI's move. Its words while its move waits are its plans, never the player's to read. Written before the player's lines it was not given.
  */
-function showProse(context: Context, state: Driven): void
+function showProse(context: Context, state: Driven, whole: boolean): void
 {
     const text = state.prose.filter((block) => block.trim() !== "").join("\n\n");
     const from = state.from;
     state.prose = [];
 
-    if (text === "" || from === undefined) {
+    if (text === "" || from === undefined || !whole) {
         return;
     }
 
     try {
         const games = gameFolder(context.home());
+        const current = loadGame(games);
+        const aiToMove = current !== undefined && endOf(current.game) === undefined && current.game.position.turn === current.ai;
 
-        if (!aiActedSince(games, from.at, from.position) && sayProse(games, text, context.now()) !== undefined) {
+        if (!aiToMove && !aiActedSince(games, from.at, from.position) && sayProse(games, text, context.now(), state.place?.context.given ?? new Set()) !== undefined) {
             state.place?.context.heard?.();
         }
     } catch {
@@ -484,7 +500,8 @@ function showProse(context: Context, state: Driven): void
 /** The line that asks the chat once more for the AI's move it did not make, with the game as status shows it. */
 function yourMoveLine(language: string | undefined, game: string): string
 {
-    const line = "It is your move, and the player waits for it: here is the game now, as status shows it. Don't call status for it: decide, then call ai_move.";
+    const line = "It is your move, and the player waits for it: here is the game now, as status shows it. Don't call status for it: decide, then call ai_move. "
+        + "What you wrote outside your tools was not shown to the player: speak to them in ai_move's comment.";
     return `${line}${language === undefined ? "" : ` Write to the player in ${language}.`}\n${game}`;
 }
 

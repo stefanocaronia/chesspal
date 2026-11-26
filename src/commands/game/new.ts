@@ -202,8 +202,9 @@ function askedLine({ window, page }: Asked, doorbell: Doorbell): string
 {
     if (doorbell === "table") {
         return window === "opened"
-            ? "The New game window is open on the board page: the player chooses the game there. Don't ask; end your turn, the table wakes you when the game starts."
-            : "Nobody has the board page open: tell the player to open it and start the game there with its New game button. End your turn.";
+            ? "The New game window is open on the page the player has in front of them: they choose the game there. Don't ask, nor tell them where it is; end your "
+                + "turn, the table wakes you when the game starts."
+            : "The player chooses the game with the New game button of the page in front of them: tell them so in a few words. End your turn.";
     }
 
     // A host with no doorbell hears of the game from the player, in its window.

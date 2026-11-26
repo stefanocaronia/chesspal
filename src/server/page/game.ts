@@ -69,7 +69,14 @@ export function answerGame(request: IncomingMessage, response: ServerResponse, u
         return false;
     }
 
-    runRoute(response, () => route(request, response, served));
+    runRoute(response, () => {
+        // What the page asks reads the AI's clock where it stood while the chat the table drives stalled, whatever comes of it.
+        if (request.method === "POST") {
+            stalledTimeBack(served);
+        }
+
+        return route(request, response, served);
+    });
     return true;
 }
 
@@ -103,18 +110,30 @@ export function stallEnds(served: Served): void
         return;
     }
 
-    const folder = gameFolder(served.context.home());
-    const current = loadGame(folder);
-    const held = current !== undefined && aiHeld(served, current);
-    const since = served.stalledAt;
+    stalledTimeBack(served);
     served.stalled = undefined;
     served.stalledAt = undefined;
+    tellWatchers(served.watchers);
+}
 
-    if (held) {
-        rerunIfChanged(() => giveHeldTime(served, folder, since));
+/**
+ * The time the chat the table drives has stood stalled is given back to the AI's clock, the stall going on from now: whatever reads or changes the game
+ * next finds the clock where it stood, and never the AI's flag fallen while it was held.
+ */
+export function stalledTimeBack(served: Served): void
+{
+    if (served.stalled === undefined || served.stalledAt === undefined) {
+        return;
     }
 
-    tellWatchers(served.watchers);
+    const folder = gameFolder(served.context.home());
+    const current = loadGame(folder);
+    const since = served.stalledAt;
+    served.stalledAt = served.context.now().toISOString();
+
+    if (current !== undefined && aiHeld(served, current)) {
+        rerunIfChanged(() => giveHeldTime(served, folder, since));
+    }
 }
 
 /**
@@ -246,8 +265,6 @@ async function messageFromPage(request: IncomingMessage, response: ServerRespons
         return;
     }
 
-    // The words wake the chat the table drives: its clock, held while it stalled, runs again from now, before the words would find its flag fallen.
-    stallEnds(served);
     let current;
 
     try {

@@ -45,7 +45,8 @@ export const aiMove = defineCommand({
         const words = [commentWithPlan(comment, plan), drawingsText(drawings), mood === undefined ? "" : moodTag(mood)].filter((part) => part !== "").join(" ");
         const played = playMove(folder, context.now(), "ai", move, (message, legal) => `${message} Legal: ${legal.join(" ")}. Nothing changed.`, { comment: words, offerDraw, doorbell: doorbellOf(context) });
         const agents = agentsAfter(context, folder, played);
-        const board = context.pageOpen?.() === true ? {} : { board: true as const };
+        // A chat the table drives sits at the page: the player has the board in front of them.
+        const board = context.pageOpen?.() === true || context.drivenByTable === true ? {} : { board: true as const };
         return { ...played, game: withAnalyst(played.game, context), words: give(context, waiting), ...(agents.length === 0 ? {} : { agents }), ...board };
     },
     format: (result, context) => {

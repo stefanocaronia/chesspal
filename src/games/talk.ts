@@ -184,6 +184,17 @@ function sinceAiMoved(current: CurrentGame): number
     return lastIsAi ? moves : moves >= 2 ? moves - 1 : 0;
 }
 
+/**
+ * The talk with a line of the AI's written where it answers: before the player's lines it was not given (`given`), which it did not read and are still to
+ * answer, else at the end.
+ */
+export function withAiLine(current: Talk, line: TalkLine, given: ReadonlySet<string>): TalkLine[]
+{
+    const first = unanswered(current).find(({ key }) => !given.has(key));
+    const at = first === undefined ? current.talk.length : current.talk.indexOf(first.line);
+    return [...current.talk.slice(0, at), line, ...current.talk.slice(at)];
+}
+
 /** The player's lines after the AI's last words and its last move, each with a key of its own across games. */
 function unanswered(current: Talk): { key: string; line: TalkLine; }[]
 {
