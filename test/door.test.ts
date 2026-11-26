@@ -18,7 +18,7 @@ afterEach(async () => {
 
 function socketFolder(): string
 {
-    const folder = mkdtempSync(join(tmpdir(), "chesspal-door-"));
+    const folder = mkdtempSync(join(tmpdir(), "chesspal-"));
     folders.push(folder);
     return folder;
 }
@@ -67,7 +67,7 @@ describe("the hello", () => {
 
     it("names the door's socket: a named pipe on Windows, a socket file elsewhere", () => {
         expect(doorPath("ab12", "win32", "/tmp")).toBe("\\\\.\\pipe\\chesspal-table-ab12");
-        expect(doorPath("ab12", "linux", "/tmp")).toBe(join("/tmp", "chesspal-table-ab12.sock"));
+        expect(doorPath("ab12", "linux", "/tmp")).toBe(join("/tmp", "ab12.sock"));
     });
 });
 
@@ -79,7 +79,7 @@ describe("the table's door", () => {
 
         expect(key).toBe("ab".repeat(32));
         expect(environment).toEqual({ [doorVariable]: opened.path, [keyVariable]: key });
-        expect(opened.path).toContain("chesspal-table-0101010101010101");
+        expect(opened.path).toContain("0101010101010101");
 
         const chat = await knockAt(opened.path);
         chat.socket.write(`${helloLine({ key, version })}{"jsonrpc":"2.0","id":1}\n`);

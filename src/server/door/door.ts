@@ -115,8 +115,14 @@ export async function openDoor(options: DoorOptions): Promise<Door>
 
     try {
         // Off Windows the socket file sits in a folder of its own, for the player alone (mkdtemp makes it 0700).
-        folder = platform === "win32" ? undefined : mkdtempSync(join(options.folder ?? tmpdir(), "chesspal-door-"));
+        folder = platform === "win32" ? undefined : mkdtempSync(join(options.folder ?? tmpdir(), "chesspal-"));
         path = doorPath(name, platform, folder ?? "");
+
+        // A socket file's path longer than the system takes is cut without a word, and nobody finds the door at the path given.
+        if (platform !== "win32" && Buffer.byteLength(path) > longestSocketPath) {
+            throw new Error(`a socket file's path may be ${longestSocketPath} bytes long, and this one is ${Buffer.byteLength(path)}`);
+        }
+
         await listen(server, path);
     } catch (error) {
         removeFolder(folder);
@@ -185,3 +191,6 @@ function listen(server: Server, path: string): Promise<void>
         });
     });
 }
+
+// The shortest limit of a socket file's path among the systems: macOS takes 104 bytes with the end of the string.
+const longestSocketPath = 103;

@@ -11,7 +11,7 @@ export const keyVariable = "CHESSPAL_TABLE_KEY";
 /** The door's socket: a named pipe on Windows, else a socket file in `folder`, by a random name. */
 export function doorPath(name: string, platform: string, folder: string): string
 {
-    return platform === "win32" ? `\\\\.\\pipe\\chesspal-table-${name}` : join(folder, `chesspal-table-${name}.sock`);
+    return platform === "win32" ? `\\\\.\\pipe\\chesspal-table-${name}` : join(folder, `${name}.sock`);
 }
 
 /** Knocks at the door: the connection, "nobody" where nothing listens there, "slow" where it did not answer within `wait` ms. */
